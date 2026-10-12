@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "intervalMinutes": 1440,
+  "retryMinutes": 30,
+  "timeoutMinutes": 30
+}

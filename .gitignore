@@ -1,0 +1,17 @@
+node_modules/
+.next/
+.env
+.env.*
+!.env.example
+outputs/
+backups/
+runtime/
+work/
+.codex-worktrees/
+.worktrees/
+*.log
+*.tsbuildinfo
+.DS_Store
+*.pem
+*.key
+project.private.config.json

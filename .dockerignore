@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+.next
+node_modules
+outputs
+backups
+work
+.git
+.codex-worktrees
+.worktrees
+*.log
+*.tsbuildinfo

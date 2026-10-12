@@ -1,0 +1,43 @@
+{
+  "name": "moyao-reset-radar",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1 --port 5190",
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1 --port 5190",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:seed": "tsx scripts/seed.ts",
+    "worker": "tsx scripts/worker.ts",
+    "worker:once": "tsx scripts/worker.ts --once",
+    "bootstrap": "tsx scripts/bootstrap.ts",
+    "test:integration": "tsx scripts/test-integration.ts"
+  },
+  "dependencies": {
+    "better-auth": "1.7.7",
+    "cheerio": "^1.1.2",
+    "dotenv": "^17.2.3",
+    "drizzle-orm": "0.45.4",
+    "next": "16.4.0",
+    "pg": "^8.16.3",
+    "qrcode": "1.5.4",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@types/pg": "^8.15.5",
+    "@types/qrcode": "1.5.6",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "drizzle-kit": "^0.31.6",
+    "jsqr": "1.4.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
