@@ -10,8 +10,10 @@ COPY . .
 RUN node --input-type=module -e 'import { randomBytes } from "node:crypto"; import { spawnSync } from "node:child_process"; const result = spawnSync("pnpm", ["build"], { stdio: "inherit", env: { ...process.env, BETTER_AUTH_SECRET: randomBytes(40).toString("base64url") } }); process.exit(result.status ?? 1);'
 
 FROM node:24-alpine AS runtime
+# CloudRun HTTPS cloud calls require the platform CA installation tools.
+RUN apk add --no-cache ca-certificates
 WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=8080
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=8080 NODE_USE_SYSTEM_CA=1
 # Worker uses the existing TypeScript runner; no additional runtime service is needed.
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/.next/standalone ./.next/standalone
