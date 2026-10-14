@@ -1,5 +1,5 @@
 {
-  "description": "模钥重置雷达原生小程序，已绑定用户新账号，公共接口待配置",
+  "description": "模钥重置雷达黑金内测版，连接现有微信云托管服务",
   "projectname": "模钥重置雷达",
   "appid": "wx11eb1eaa9b83fa2b",
   "compileType": "miniprogram",

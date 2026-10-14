@@ -36,6 +36,48 @@ const commands = {
   worker: ['--import', 'tsx', 'scripts/worker.ts'],
   'health-worker': ['--import', 'tsx', 'scripts/runtime-health.ts', '--worker', '--quiet'],
 };
+if (mode === 'app-worker') {
+  // Keep the existing single container. A failed task process must also stop the
+  // website, so the platform restarts the whole service instead of hiding it.
+  const children = new Set();
+  let stopping = false;
+  let exitCode = 1;
+  let shutdownTimer;
+  const finish = () => {
+    if (stopping && children.size === 0) {
+      clearTimeout(shutdownTimer);
+      process.exit(exitCode);
+    }
+  };
+  const stop = (code, signal = 'SIGTERM') => {
+    if (stopping) return;
+    stopping = true;
+    exitCode = code;
+    for (const child of children) child.kill(signal);
+    shutdownTimer = setTimeout(() => {
+      for (const child of children) child.kill('SIGKILL');
+    }, 8000);
+    shutdownTimer.unref();
+    finish();
+  };
+  for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => stop(0, signal));
+  for (const command of [commands.app, commands.worker]) {
+    const child = spawn(process.execPath, command, { env: environment, stdio: 'inherit' });
+    children.add(child);
+    child.on('error', () => {
+      console.error('网站或后台任务未能启动。');
+      stop(1);
+    });
+    child.on('close', code => {
+      children.delete(child);
+      if (!stopping) {
+        console.error('网站或后台任务已停止，将由运行平台恢复。');
+        stop(code || 1);
+      }
+      finish();
+    });
+  }
+} else {
 if (!Object.hasOwn(commands, mode)) {
   console.error('未知运行模式。');
   process.exit(1);
@@ -51,3 +93,4 @@ child.on('error', () => {
   process.exit(1);
 });
 child.on('exit', (code, signal) => { process.exit(code ?? (stopping && signal ? 0 : 1)); });
+}

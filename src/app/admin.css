@@ -24,3 +24,8 @@
 
 .adm-ai-setup{border-top:0;margin-top:0;padding-top:0}
 .adm-ai-setup .adm-form-actions{justify-content:flex-start;margin-top:12px}
+
+/* Long settings forms keep save results visible beside the current viewport. */
+.adm-root .adm-global-feedback{position:fixed;right:24px;bottom:24px;z-index:70;width:max-content;max-width:min(560px,calc(100vw - 48px));margin:0;box-shadow:0 8px 28px #0006;font-size:16px}
+.adm-global-feedback>span{min-width:0}.adm-global-feedback>.adm-icon-button{flex-shrink:0}
+@media(max-width:680px){.adm-root .adm-global-feedback{left:16px;right:16px;bottom:16px;width:auto;max-width:none}}
