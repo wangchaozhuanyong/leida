@@ -1,3 +1,5 @@
+<page-loader wx:if="{{navigationLoading}}" />
+<view wx:else>
 <view class="page">
   <view wx:if="{{sceneLoading}}" class="card empty">正在读取小程序码对应的发布版本。</view>
   <view wx:if="{{sceneError}}" class="warning">{{sceneError}}<button wx:if="{{sceneCanRetry}}" class="secondary full" style="margin-top:12px" bindtap="retryScene">重新读取</button><button class="secondary full" style="margin-top:12px" data-path="/pages/announcements/index" bindtap="navigate">查看公开公告</button></view>
@@ -22,7 +24,7 @@
         <text class="source-text quote" style="display:block" user-select="{{true}}">{{item.text}}</text><view class="small muted">本站采集：{{item.collectedAt}}</view><button wx:if="{{item.url}}" class="secondary full" style="margin-top:14px" data-url="{{item.url}}" bindtap="copySource">复制原始来源链接</button>
       </view><view wx:if="{{!detail.evidence.length}}" class="card muted">暂未提供可展示的原文。</view>
       </block><view class="card"><button class="disclosure-heading" data-section="recordOpen" bindtap="toggleSection" aria-expanded="{{recordOpen}}"><text>记录信息</text><text class="disclosure-symbol">{{recordOpen ? '−' : '+'}}</text></button><view wx:if="{{recordOpen}}"><view class="fact record-row"><view class="muted">资料截止</view><view>{{detail.cutoff}}</view></view><view class="fact record-row"><view class="muted">本站发布</view><view>{{detail.publishedAt}}</view></view><view class="fact record-row"><view class="muted">版本说明</view><view>{{detail.reason}}</view></view></view></view>
-      <block wx:if="{{detail.canShare}}"><view class="chips poster-themes"><button class="{{posterTheme === 'precision' ? 'active' : ''}}" data-theme="precision" bindtap="selectPosterTheme">黑金仪表</button><button class="{{posterTheme === 'editorial' ? 'active' : ''}}" data-theme="editorial" bindtap="selectPosterTheme">水墨刊物</button></view><button class="primary full" open-type="share">分享此发布版本</button><button class="secondary full" style="margin-top:12px" loading="{{posterBusy}}" disabled="{{posterBusy}}" bindtap="generatePoster">生成带小程序码的海报</button></block>
+      <block wx:if="{{detail.canShare}}"><view class="chips poster-themes"><button class="{{posterTheme === 'precision' ? 'active' : ''}}" data-theme="precision" bindtap="selectPosterTheme">深色长图</button><button class="{{posterTheme === 'editorial' ? 'active' : ''}}" data-theme="editorial" bindtap="selectPosterTheme">浅色长图</button></view><button class="primary full" open-type="share">分享此发布版本</button><button class="secondary full" style="margin-top:12px" loading="{{posterBusy}}" disabled="{{posterBusy}}" bindtap="generatePoster">生成公告长图</button></block>
       <view wx:if="{{posterError}}" class="warning lead">{{posterError}}</view>
       <view wx:if="{{posterPreview}}" class="card lead"><image src="{{posterPreview}}" mode="widthFix" style="width:100%;display:block" bindtap="previewPoster" aria-label="指定发布版本海报，点击查看大图"/><button class="primary full" style="margin-top:16px" loading="{{posterSaving}}" disabled="{{posterSaving}}" bindtap="savePoster">保存海报到相册</button></view>
       <view wx:if="{{posterPrivacyNeeded}}" class="card stack"><button class="secondary full" bindtap="openPrivacyContract">阅读微信隐私指引</button><button class="primary full" open-type="agreePrivacyAuthorization" bindagreeprivacyauthorization="agreePosterPrivacy">同意并继续保存</button></view>
@@ -30,4 +32,6 @@
       <view class="foot">时间均为北京时间</view>
     </block>
   </block>
+</view>
+
 </view>

@@ -2,6 +2,7 @@ import { lockTransaction, repeatableRead } from '../db';
 import { z } from 'zod';
 import { list, one, insert, put, transaction, type Client } from '../db';
 import type { AdminData, PublicData, Candidate, Evidence, RadarEvent, Article, Publication, Source, Job, Audit, Notice, Activity, DraftContent, SiteSettings } from '../lib/types';
+import { createAdminNotice } from '../lib/admin-notice';
 import { DomainError, id, hash, now, assertVersion, draftSchema, validateDraft, mergeActions, noticeKey, safeTemplate, requireReason } from './domain';
 import { defaultAI, publicAI, encryptKey, validateEndpoint, testAI, AIServiceError, type AIRecord } from './ai';
 import { hasExplicitCorrectionText, normalizedEligibility } from './automatic-content';
@@ -341,6 +342,28 @@ export async function executeCommand(action:string,input:Record<string,unknown>,
   }
   return transaction(async c=>{
     await lockTransaction(c,'radar_publication');
+    if(action==='notice.publish') {
+      const requestId=input.requestId===undefined?undefined:z.string().uuid().parse(input.requestId);
+      const noticeId=requestId?`notice_${hash(`${actor}:${requestId}`).slice(0,32)}`:id('notice');
+      const notice=createAdminNotice(input,noticeId,now());
+      const existing=requestId?await one<Notice>('notices',noticeId,c):undefined;
+      if(existing){
+        if(existing.origin!=='admin'||existing.title!==notice.title||existing.body!==notice.body)throw new DomainError('这次发布内容已变化，请重新打开编辑后发布',409);
+        return existing;
+      }
+      await insert('notices',notice,c);
+      await audit(actor,action,notice.id,'发布站内信',undefined,notice,c);
+      return notice;
+    }
+    if(action==='notice.withdraw') {
+      const notice=await one<Notice>('notices',str(input.id),c);
+      if(!notice||notice.origin!=='admin')throw new DomainError('未找到管理员发布的站内信',404);
+      if(notice.status==='withdrawn')return notice;
+      const next={...notice,status:'withdrawn'} as Notice;
+      await put('notices',next,c);
+      await audit(actor,action,notice.id,'撤回站内信',notice,next,c);
+      return next;
+    }
     if(action==='candidate.save'||action==='candidate.ignore'||action==='candidate.generate') {
       const old=await locked<Candidate>('candidates',input.id,input.version,c);if(old.status==='published'||old.status==='ignored')throw new DomainError('候选已处理，不能修改');
       if(action==='candidate.generate') return queueJob('generate',{candidateId:old.id,force:true,expectedVersion:old.version},c,{actor,action,objectId:old.id});

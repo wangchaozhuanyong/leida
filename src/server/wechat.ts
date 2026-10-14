@@ -220,7 +220,7 @@ export function createWechatService(dependencies:WechatDependencies={}) {
         if(scheduled>=WECHAT_DISPATCH_BATCH_SIZE)break;
         await lock(client,previous.id);const grant=await store.one<WechatGrant>('wechat_grants',previous.id,client);if(!grant||grant.status!=='available'||grant.appId!==active.appId||grant.templateId!==active.templateId||!grant.acceptedAt)continue;
         if(!readers.some(value=>value.id===grant.readerId&&value.status==='active'))continue;
-        const eligible=notices.filter(notice=>notice.status==='active'&&notice.categories.length>0&&Date.parse(notice.createdAt)>Date.parse(grant.acceptedAt!)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+        const eligible=notices.filter(notice=>notice.origin!=='admin'&&notice.status==='active'&&notice.categories.length>0&&Date.parse(notice.createdAt)>Date.parse(grant.acceptedAt!)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
         for(const notice of eligible) {
           let pub:Publication;try{pub=await publication(notice.publicationId,client);}catch(error){if(error instanceof DomainError)continue;throw error;}
           if(!isQuotaPublication(pub))continue;

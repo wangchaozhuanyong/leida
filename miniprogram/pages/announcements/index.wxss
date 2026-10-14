@@ -1,1 +1,3 @@
 /* 页面使用统一卡片。 */
+
+.date-schedule-link{margin-left:auto;justify-content:flex-end;min-height:44px}

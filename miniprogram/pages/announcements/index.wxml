@@ -1,3 +1,5 @@
+<page-loader wx:if="{{navigationLoading}}" />
+<view wx:else>
 <view class="page">
 
   <status-panel wx:if="{{!connected}}" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />
@@ -5,6 +7,8 @@
     <view class="chips"><button wx:for="{{filters}}" wx:key="value" class="{{filter === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectFilter">{{item.label}}</button></view>
     <publication-card wx:for="{{items}}" wx:key="id" item="{{item}}" />
     <view wx:if="{{!items.length}}" class="card empty"><view class="heading">暂无相关公告</view><view>此分类尚无已发布事件。</view></view>
-    <button wx:if="{{hasMore}}" class="secondary full" bindtap="more">加载更多</button><button class="text-button" data-path="/pages/schedule/index" bindtap="navigate">按日期查看日程 →</button><view class="foot">资料截至 {{cutoff}} · 北京时间</view>
+    <button wx:if="{{hasMore}}" class="secondary full" bindtap="more">加载更多</button><button class="text-button date-schedule-link" data-path="/pages/schedule/index" bindtap="navigate">按日期查看日程 →</button><view class="foot">资料截至 {{cutoff}} · 北京时间</view>
   </block>
+</view>
+
 </view>

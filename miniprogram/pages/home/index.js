@@ -17,7 +17,7 @@ Page(createPage((data, query, page, app) => {
   const shareable = publication => publication && m.resolveDetail(data, { publicationId: publication.id }).canShare;
   const posterPublication = shareable(latestPublication) ? latestPublication : articles.map(article => data.publications.find(item => item.id === article.publicationId)).find(shareable);
   const posterPath = posterPublication ? pathFor({ publicationId: posterPublication.id }) : '';
-  const posterDescription = !posterPublication ? '暂无可分享的公开动态，收录后即可生成海报' : posterPublication === latestPublication ? '把最近的重置记录分享给朋友' : '把最新公开动态分享给朋友，不代表已经重置';
+  const posterDescription = '选择黑金或水墨，分享当前公开状态';
   return {
     name: data.site.name || '模钥重置雷达',
     latest: latest ? { title: latest.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', elapsed: m.elapsed(latest.statementAt, data.serverTime), time: m.completionTime(latest.statementAt), eligibility: latestAction.eligibility, path: pathFor(latest) } : null,
@@ -36,7 +36,7 @@ Page(createPage((data, query, page, app) => {
   };
 }, { view:()=>({view:'home'}), data: { name: '模钥重置雷达', freshnessOpen: false }, afterRender() { this.syncCountdown(); }, hide() { this.stopCountdown(); }, unload() { this.stopCountdown(); }, methods: {
   toggleFreshness() { this.setData({ freshnessOpen: !this.data.freshnessOpen }); },
-  openPoster() { if (this.data.posterPath) wx.navigateTo({ url: `${this.data.posterPath}&poster=1` }); },
+  openPoster() { if (this.data.connected) wx.navigateTo({ url:'/pages/poster/index' }); },
   syncCountdown() {
     if (!(this.data.pending && this.data.pending.counting) && !(this.data.timeline && this.data.timeline.completed)) { this.stopCountdown(); return; }
     if (!this._countdownTimer) this._countdownTimer = setInterval(() => this.redraw(), 1000);

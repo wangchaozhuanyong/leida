@@ -198,7 +198,7 @@ function calendarModel(data, selected) {
 }
 /** @param {PublicData} data @param {typeof preferenceDefaults} preferences @param {string[]} read */
 function noticeModel(data, preferences, read) {
-  return data.notices.filter(notice => notice.status === 'active' && notice.categories.some(category => preferences[category])).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).map(notice => ({ ...notice, time: displayTime(notice.createdAt), read: read.includes(notice.id), path: data.publications.some(item => item.id === notice.publicationId) ? `/pages/detail/index?publicationId=${encodeURIComponent(notice.publicationId)}` : '', missing: !data.publications.some(item => item.id === notice.publicationId) }));
+  return data.notices.filter(notice => notice.status === 'active' && (notice.origin === 'admin' || notice.categories.some(category => ['announcement','result','correction'].includes(category)))).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).map(notice => ({ ...notice, time: displayTime(notice.createdAt), read: read.includes(notice.id), path: data.publications.some(item => item.id === notice.publicationId) ? `/pages/detail/index?publicationId=${encodeURIComponent(notice.publicationId)}` : '', missing: notice.origin !== 'admin' && !data.publications.some(item => item.id === notice.publicationId) }));
 }
 /** @param {PublicData} data @param {{publicationId?:string}} query */
 function resolveDetail(data, query) {

@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { BenefitAction, Evidence, Publication } from '@/lib/types';
+import type { BenefitAction, Evidence, Publication, PublicData } from '@/lib/types';
+import { publicResetOutlook } from '@/lib/reset-outlook';
+import { latestCompletedBenefits } from '@/components/public/model';
 import type { StatusPosterStyle } from '@/lib/status-poster-style';
 import { designedStatusPoster } from './status-poster-designs';
 import { isNewsOnly } from '@/lib/public-facts';
@@ -30,6 +32,21 @@ function brandMarkup(x = 66, y = 62, width = 78, height = 70) {
   brandImage ??= readFileSync(join(process.cwd(), 'public/brand/MOYAO_AI_Icon_Transparent.svg'), 'utf8').match(/href="(data:image\/png;base64,[A-Za-z0-9+/=]+)"/)?.[1];
   if (!brandImage) throw new Error('海报品牌图标不可用');
   return `<svg x="${x}" y="${y}" width="${width}" height="${height}" viewBox="110 520 1850 1010"><image width="2048" height="2048" href="${brandImage}"/></svg>`;
+}
+
+/** A waiting/announced poster has no manufactured completion or elapsed time. */
+export function currentStatusPosterSvg(data:PublicData, generatedAt:string, roundId:string, style:StatusPosterStyle='precision', code?:StatusPosterCode):string {
+  const outlook=data.forecasts?.outlook??publicResetOutlook({...data,serverTime:generatedAt});
+  const active=outlook.active;
+  if(latestCompletedBenefits(data).length || (active?.publicationId??'waiting')!==roundId)throw Object.assign(new Error('公开状态已变化，请关闭后重新生成海报'),{status:409});
+  const countdown=active?announcementCountdown(active,generatedAt):undefined;
+  const upcoming=countdown?.status==='upcoming';
+  const minutes=upcoming?Math.ceil((Date.parse(active!.expectedAt!)-Date.parse(generatedAt))/60000):0;
+  const interval=upcoming?`${String(Math.floor(minutes/60)).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`:countdown?.status==='expired'?'等待确认':active?.stage==='in_progress'?'进行中':active?'时间待明确':'等待预告';
+  const title=upcoming?active!.kind==='banked_reset'?'重置卡发放预告':'用量重置预告':countdown?.status==='expired'?'等待公开确认':active?.stage==='in_progress'?active.kind==='banked_reset'?'发卡进行中':'重置进行中':active?'已有公开安排':'等待预告';
+  if(code&&(code.publicationId!==active?.publicationId||validateWechatImage(code.image)!==code.contentType))throw new Error('小程序码与海报版本不匹配');
+  const nextNote=upcoming?`预计 ${beijingTime(active!.expectedAt!)} · 北京时间`:countdown?.status==='expired'?'已过预计时间，等待公开确认':active?'具体时间待公开确认':'下一次时间待公开确认';
+  return designedStatusPoster({style,name:data.site.name,title,interval,intervalLabel:upcoming?'预计剩余 · 小时 : 分钟':'当前公开状态',statementAt:active?.statementAt??'',generatedAt,nextNote,nextIsForecast:!!upcoming,sourceLabel:'依据：当前公开状态',brand:brandMarkup(0,0,100,75),code});
 }
 
 /** The homepage poster summarizes one public completion; its scan target remains that publication. */

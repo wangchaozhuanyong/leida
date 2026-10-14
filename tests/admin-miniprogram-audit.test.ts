@@ -102,9 +102,9 @@ test('后台任务有错误时优先显示异常，即使上次心跳新鲜也�
   assert.match(html, /自动任务暂时异常/); assert.match(html, /隔离测试：预测任务未完成/); assert.doesNotMatch(html, /自动任务运行正常/);
 });
 
-test('小程序客户设置只展示整体资料连接及截止，运营来源名称不进入页面模型', () => {
+test('小程序客户设置优先显示站内信，运营来源名称和技术操作不进入页面', () => {
   const data = fixture(); data.sources = [{ id: 'internal-test', name: '人工补充原文（隔离输入）', status: 'healthy', lastSuccessAt: now }];
   const page = home(data, 'settings'); assert.equal(page.data.sources, undefined); assert.equal(page.data.connected, true); page.onUnload();
   const template = readFileSync(resolve(root, 'miniprogram/pages/settings/index.wxml'), 'utf8');
-  assert.doesNotMatch(template, /wx:for="{{sources}}"|item\.name|item\.status|最近采集/); assert.match(template, /资料截至 {{cutoff}}/); assert.match(template, /重新读取资料/);
+  assert.doesNotMatch(template, /wx:for="{{sources}}"|item\.name|item\.status|最近采集/); assert.match(template, /站内信/); assert.match(template, /查看全部提醒/); assert.doesNotMatch(template,/重新读取资料|资料截至|刷新授权状态|活动进展/);
 });
