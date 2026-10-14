@@ -1,7 +1,7 @@
 import {getPublicData} from '@/server/service';
 import {json,apiError} from '@/server/http';
 import {posterSvg} from '@/server/poster';
-import {statusPosterSvg,type StatusPosterCode} from '@/server/status-poster';
+import {statusPosterSvg,currentStatusPosterSvg,type StatusPosterCode} from '@/server/status-poster';
 import {parseStatusPosterOptions,type StatusPosterCodeState} from '@/lib/status-poster-style';
 import {WechatServiceError} from '@/server/wechat-errors';
 import {activityPosterSvg,resolveActivityPoster} from '@/server/activity-poster';
@@ -30,6 +30,17 @@ export async function GET(request:Request,{params}:{params:Promise<{path:string[
  if(kind==='health')return json({database:'ready',serverTime:data.serverTime,sources:data.sources});
  if(kind==='forecast-posters'&&id&&path.length===2){const snapshot=await getForecastSnapshot(id);if(!snapshot)throw Object.assign(new Error('未找到固定预测快照'),{status:404});const shareUrl=`${requestShareOrigin(request)}/methodology?snapshot=${encodeURIComponent(snapshot.id)}`;return new Response(forecastPosterSvg(snapshot,data.site.name,shareUrl),{headers:{'Content-Type':'image/svg+xml; charset=utf-8','Content-Disposition':'attachment; filename="moyao-radar-forecast.svg"','Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; sandbox"}});}
  if(kind==='activity-posters'&&id){const selected=resolveActivityPoster(data,parseActivityShare(id,new URL(request.url).searchParams));const shareUrl=activityPublicationUrl(requestShareOrigin(request),selected.manifest);return new Response(activityPosterSvg(selected,data.site.name,shareUrl),{headers:{'Content-Type':'image/svg+xml; charset=utf-8','Content-Disposition':'attachment; filename="moyao-radar-activity-day.svg"','Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; sandbox"}})}
+ if(kind==='posters'&&id==='current'){
+  const url=new URL(request.url),options=parseStatusPosterOptions(url.searchParams);
+  const at=url.searchParams.get('at')??data.serverTime;
+  if(!Number.isFinite(Date.parse(at))||Math.abs(Date.parse(at)-Date.now())>86400000)throw Object.assign(new Error('海报时间已失效，请重新生成'),{status:400});
+  const round=url.searchParams.get('round')??'waiting';
+  // Validate the round before any provider call. A later state never retargets an open poster.
+  currentStatusPosterSvg(data,at,round,options.style);
+  let code:StatusPosterCode|undefined;
+  if(options.includeCode&&round!=='waiting'){try{code=await generateWechatCode(round);}catch(error){if(!(error instanceof WechatServiceError))throw error;}}
+  return new Response(currentStatusPosterSvg(data,at,round,options.style,code),{headers:{'Content-Type':'image/svg+xml; charset=utf-8','Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox",'X-Poster-Code':code?'included':options.includeCode?'unavailable':'omitted'}});
+ }
  if(kind==='posters'&&id){
   const p=data.publications.find(p=>p.id===id);if(!p)throw Object.assign(new Error('未找到已发布版本'),{status:404});
   if(publicationWithdrawn(data,p))throw Object.assign(new Error('该内容已撤回，暂不生成海报'),{status:410});
@@ -43,9 +54,11 @@ export async function GET(request:Request,{params}:{params:Promise<{path:string[
    try{options=parseStatusPosterOptions(url.searchParams);}catch{throw Object.assign(new Error('海报样式或圆码选项无效'),{status:400});}
    if(options.includeCode){try{code=await generateWechatCode(p.id);}catch(error){if(!(error instanceof WechatServiceError))throw error;}}
    if(options.style)posterCodeState=code?'included':options.includeCode?'unavailable':'omitted';
+   const generatedAt=url.searchParams.get('at')??new Date().toISOString();
+   if(!Number.isFinite(Date.parse(generatedAt))||Math.abs(Date.parse(generatedAt)-Date.now())>86400000)throw Object.assign(new Error('海报时间已失效，请重新生成'),{status:400});
    const active=publicResetOutlook(data).active;
    const nextAction=active?publicActions(data).find(item=>item.publication.id===active.publicationId&&item.action.id===active.actionId)?.action:undefined;
-   svg=statusPosterSvg({publication:p,actionId,name:data.site.name,generatedAt:new Date().toISOString(),shareUrl,nextAction,code,style:options.style,evidence:data.evidence});
+   svg=statusPosterSvg({publication:p,actionId,name:data.site.name,generatedAt,shareUrl,nextAction,code,style:options.style,evidence:data.evidence});
   }else svg=posterSvg(p,data.site.name,shareUrl);
   return new Response(svg,{headers:{'Content-Type':'image/svg+xml; charset=utf-8','Content-Disposition':'attachment; filename="moyao-radar-poster.svg"','Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox",...(posterCodeState?{'X-Poster-Code':posterCodeState}:{})}})
  }

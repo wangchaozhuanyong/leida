@@ -11,7 +11,7 @@ export function parsePublicRoute(pathname: string, query: URLSearchParams) {
   const newsCategory: NewsCategory = category === 'reset' || category === 'activity' || category === 'product' ? category : 'all';
   const target = query.get('target');
   const historyFilter: HistoryFilter = target === 'automatic' ? 'automatic_reset' : target === 'banked' ? 'banked_reset' : 'all';
-  const view = ['history', 'news', 'methodology', 'notices'].includes(route) ? route
+  const view = route==='settings' ? 'notices' : ['history', 'news', 'methodology', 'notices'].includes(route) ? route
     : route === 'activities' ? 'activity'
     : ['events', 'articles', 'sources'].includes(route) ? 'detail'
     : route === 'home' ? 'home' : null;

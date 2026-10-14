@@ -1,14 +1,17 @@
-<view class="page">
+<page-loader wx:if="{{navigationLoading}}" />
+<view wx:else class="page">
   <view wx:if="{{storageError}}" class="warning">{{storageError}}</view>
-  <view class="card"><view class="heading">微信订阅提醒</view><view class="lead">{{wechat.label}}</view><view class="muted lead">仅用于后续公开关键变化，一次订阅选择最多用于一次提醒；是否发出以微信实际结果为准。</view><view class="small muted lead">真实账号或服务暂未接入时不可使用，可继续查看站内提醒。</view>
-    <view wx:if="{{wechat.error}}" class="warning lead">{{wechat.error}}</view>
-    <view wx:if="{{wechat.privacyNeeded}}" class="stack lead"><button class="secondary full" bindtap="openPrivacyContract">阅读微信隐私指引</button><button class="primary full" open-type="agreePrivacyAuthorization" bindagreeprivacyauthorization="agreeWechatPrivacy">同意并继续连接</button></view>
-    <button wx:elif="{{wechat.ready}}" class="primary full" style="margin-top:16px" disabled="{{wechat.busy}}" bindtap="authorizeWechat">选择接收下一次提醒</button>
-    <button wx:elif="{{wechat.canPrepare}}" class="primary full" style="margin-top:16px" loading="{{wechat.busy}}" disabled="{{wechat.busy}}" bindtap="prepareWechat">开启微信提醒</button>
-    <button class="secondary full" style="margin-top:12px" loading="{{wechat.busy}}" disabled="{{wechat.busy}}" bindtap="refreshWechat">刷新授权状态</button><button wx:if="{{wechat.canRevoke}}" class="secondary full" style="margin-top:12px" disabled="{{wechat.busy}}" bindtap="revokeWechat">关闭本站微信提醒</button><view class="small muted lead">关闭后取消尚未发送的记录；已提交微信的提醒可能仍会收到。</view>
+  <view class="card inbox-card"><view class="row"><view class="heading">站内信 <text wx:if="{{unread}}" class="inbox-unread">{{unread}} 未读</text></view><button class="text-button" data-path="/pages/notices/index" bindtap="navigate">查看全部提醒 →</button></view>
+    <status-panel wx:if="{{!connected}}" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />
+    <view wx:elif="{{error}}" class="warning lead">{{error}}<button class="text-button" bindtap="retry">重新加载</button></view>
+    <button wx:for="{{notices}}" wx:key="id" class="inbox-preview" data-id="{{item.id}}" bindtap="openNotice"><view class="grow"><view class="row top"><text>{{item.title}}</text><view wx:if="{{!item.read}}" class="dot"></view></view><view class="inbox-summary">{{item.summary}}</view><view class="small muted">{{item.time}}</view></view></button>
+    <view wx:if="{{connected && !notices.length}}" class="inbox-empty">暂无提醒，有新消息会显示在这里。</view>
   </view>
-  <view class="card"><view class="heading">动态记录筛选</view><view wx:for="{{choices}}" wx:key="key" class="setting-row"><view class="grow"><view>{{item.title}}</view><view class="small muted">{{item.description}}</view></view><switch checked="{{item.checked}}" color="#f4c15c" data-key="{{item.key}}" bindchange="changePreference" aria-label="{{item.title}}" /></view></view>
-
-  <view class="card"><view class="heading">资料状态</view><view wx:if="{{clientVersion}}" class="small muted lead">小程序版本 {{clientVersion}}</view><view class="muted lead">{{error && connected ? '连接暂时中断，保留最近读取的资料。' : connected ? '已连接公开资料' : unconfigured ? '尚未连接公开资料' : loading ? '正在读取资料' : '尚无成功读取记录'}}</view><view wx:if="{{connected}}" class="small muted lead">资料截至 {{cutoff}} · 北京时间</view><view wx:if="{{error}}" class="warning" style="margin-top:12px">{{error}}</view><button class="secondary full" style="margin-top:16px" loading="{{loading}}" disabled="{{loading}}" bindtap="retry">重新读取资料</button></view>
-  <view class="card"><view class="heading">更多</view><button class="row-button" data-path="/pages/news/index" bindtap="navigate"><text>查看动态</text><text>→</text></button><button class="row-button" data-path="/pages/notices/index" bindtap="navigate"><text>查看站内提醒</text><text>→</text></button><button class="row-button" data-path="/pages/methodology/index" bindtap="navigate"><text>如何判断预告与完成</text><text>→</text></button><button class="row-button" data-path="/pages/privacy/index" bindtap="navigate"><text>隐私与本机记录</text><text>→</text></button></view>
+  <view class="card"><view class="row"><view class="heading">微信提醒</view><text class="badge muted">待开通</text></view><view class="muted lead">持续微信提醒暂未开通，重置预告、完成和重要更正可在站内信查看。</view>
+    <view wx:if="{{closeMessage}}" class="lead">{{closeMessage}}</view><view wx:if="{{wechat.error}}" class="warning lead">{{wechat.error}}</view>
+    <view wx:if="{{wechat.privacyNeeded}}" class="stack lead"><button class="secondary full" bindtap="openPrivacyContract">查看隐私指引</button><button class="primary full" open-type="agreePrivacyAuthorization" bindagreeprivacyauthorization="agreeWechatPrivacy">同意并关闭提醒</button></view>
+    <button wx:else class="secondary full" style="margin-top:16px" loading="{{wechat.busy}}" disabled="{{wechat.busy}}" bindtap="revokeWechat">关闭微信提醒</button><view class="small muted lead">可关闭此前开启的提醒。已发送的消息无法撤回。</view>
+  </view>
+  <button class="row-button" data-path="/pages/privacy/index" bindtap="navigate"><text>隐私说明</text><text>→</text></button>
+  <view class="foot">版本 {{clientVersion}}</view>
 </view>

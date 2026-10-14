@@ -1,5 +1,5 @@
 <view class="card empty">
-  <view class="heading">{{loading ? '正在读取公开资料' : unconfigured ? '尚未连接' : '资料暂时无法加载'}}</view>
+  <view class="heading">{{loading ? '加载中' : unconfigured ? '尚未连接' : '资料暂时无法加载'}}</view>
   <view class="lead">{{loading ? '请稍候。' : error || '连接恢复后会继续更新。'}}</view>
   <button class="primary full" style="margin-top:20px" loading="{{loading}}" disabled="{{loading}}" bindtap="retry">{{loading ? '正在读取' : '重新加载'}}</button>
 </view>

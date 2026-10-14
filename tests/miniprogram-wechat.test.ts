@@ -125,7 +125,7 @@ test('页面声明真实canvas、主动授权和隐私入口，场景解析不�
   const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
   const detail=readFileSync(resolve(root,'miniprogram/pages/detail/index.wxml'),'utf8');
   assert.match(detail,/<canvas type="2d"/);assert.match(detail,/保存海报到相册/);assert.match(detail,/agreePrivacyAuthorization/);
-  const settings=readFileSync(resolve(root,'miniprogram/pages/settings/index.wxml'),'utf8');assert.match(settings,/bindtap="authorizeWechat"/);assert.match(settings,/关闭本站微信提醒/);
+  const settings=readFileSync(resolve(root,'miniprogram/pages/settings/index.wxml'),'utf8');assert.doesNotMatch(settings,/bindtap="authorizeWechat"|bindtap="prepareWechat"|bindtap="refreshWechat"/);assert.match(settings,/关闭微信提醒/);assert.match(settings,/待开通/);
   const code=readFileSync(resolve(root,'miniprogram/pages/detail/index.js'),'utf8');assert.match(code,/publicationId:result.data.publicationId/);assert.doesNotMatch(code,/wx\.login/);
   const app=readFileSync(resolve(root,'miniprogram/app.js'),'utf8');assert.doesNotMatch(app,/wx\.login|setStorageSync\([^)]*session/);
   assert.doesNotThrow(()=>new Script(code));
@@ -137,7 +137,7 @@ function pageHarness() {
   const latest=structuredClone(publication);latest.id='fixture-new';latest.article.publicationId=latest.id;latest.article.title='测试最新版本标题';latest.article.version=2;latest.event.publicationId=latest.id;
   const data:PublicData={publications:[publication,latest],events:[latest.event],articles:[latest.article],activities:[],evidence:[],notices:[],sources:[],site:{name:'模钥重置雷达',description:'',version:1,autoPublish:true},serverTime:'2026-10-10T04:00:00Z'};
   const listeners=new Set<(value:unknown)=>void>(),requests:{path:string;abortCount:number;resolve:(value:unknown)=>void;reject:(error:Error)=>void}[]=[],calls:string[]=[],navigation:{method:string;url:string}[]=[];
-  const app={client:{getState(){return{data,receivedAt:Date.now(),loading:false,unconfigured:false,error:''};},subscribe(fn:(value:unknown)=>void){listeners.add(fn);fn(this.getState());return()=>listeners.delete(fn);},async refresh(){calls.push('refresh');}},preferences:{snapshot(){return{preferences:{},error:''};}},publicApi(path:string){let resolve!:(value:unknown)=>void,reject!:(error:Error)=>void;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});const item={path,abortCount:0,resolve,reject};requests.push(item);return{promise,abort(){item.abortCount++;}};},wechat:{subscribe(fn:(value:unknown)=>void){calls.push('reader-subscribe');fn({label:'点击后连接',busy:false});return()=>calls.push('reader-unsubscribe');},async prepare(options:Options){assert.equal(options.userInitiated,true);calls.push('reader-prepare');},async authorize(options:Options){assert.equal(options.userInitiated,true);calls.push('reader-authorize');},async refresh(options:Options){assert.equal(options.userInitiated,true);calls.push('reader-refresh');},async revoke(options:Options){assert.equal(options.userInitiated,true);calls.push('reader-revoke');}}};
+  const app={client:{getState(){return{data,receivedAt:Date.now(),loading:false,unconfigured:false,error:''};},subscribe(fn:(value:unknown)=>void){listeners.add(fn);fn(this.getState());return()=>listeners.delete(fn);},async refresh(){calls.push('refresh');}},preferences:{snapshot(){return{preferences:{},read:[],error:''};}},publicApi(path:string){let resolve!:(value:unknown)=>void,reject!:(error:Error)=>void;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});const item={path,abortCount:0,resolve,reject};requests.push(item);return{promise,abort(){item.abortCount++;}};},wechat:{getState(){return{safe:{state:'revoked'}};},subscribe(fn:(value:unknown)=>void){calls.push('reader-subscribe');fn({label:'点击后连接',busy:false});return()=>calls.push('reader-unsubscribe');},async prepare(options:Options){assert.equal(options.userInitiated,true);calls.push('reader-prepare');},async authorize(options:Options){assert.equal(options.userInitiated,true);calls.push('reader-authorize');},async refresh(options:Options){assert.equal(options.userInitiated,true);calls.push('reader-refresh');},async revoke(options:Options){assert.equal(options.userInitiated,true);calls.push('reader-revoke');}}};
   function page(name:string,query:Record<string,string>={}){
     let definition:Options|undefined;const cache=new Map<string,{exports:Options}>();
     function load(filename:string):Options{const existing=cache.get(filename);if(existing)return existing.exports;const module={exports:{}};cache.set(filename,module);new Script(readFileSync(filename,'utf8'),{filename}).runInNewContext({module,exports:module.exports,wx:{showShareMenu(){},hideShareMenu(){},showToast(){},switchTab(options:Options){navigation.push({method:'switchTab',url:options.url});},navigateTo(options:Options){navigation.push({method:'navigateTo',url:options.url});}},getApp(){return app;},setTimeout,clearTimeout,Date,Page(value:Options){definition=value;},require(path:string){const target=resolve(dirname(filename),path.endsWith('.js')?path:`${path}.js`);assert.ok(target.startsWith(resolve(root,'miniprogram')+'/'));return load(target);}});return module.exports;}
@@ -151,10 +151,10 @@ test('首页没有完成记录时，海报分享最新公开动态的固定版�
   const h=pageHarness(),page=h.page('home');
   assert.equal(page.data.latest,null);
   assert.equal(page.data.posterPath,'/pages/detail/index?publicationId=fixture-new');
-  assert.match(page.data.posterDescription,/最新公开动态.*不代表已经重置/);
+  assert.match(page.data.posterDescription,/黑金或水墨/);
   assert.equal(h.requests.length,0);assert.deepEqual(h.calls,[]);
   page.openPoster();
-  assert.deepEqual(h.navigation,[{method:'navigateTo',url:'/pages/detail/index?publicationId=fixture-new&poster=1'}]);
+  assert.deepEqual(h.navigation,[{method:'navigateTo',url:'/pages/poster/index'}]);
   assert.equal(h.data.publications[1].mode,'news_only');assert.equal(h.data.events[0].actions.length,0);
   page.onUnload();
 });
@@ -168,7 +168,7 @@ test('首页海报保留完成记录优先，不被发布时间更晚的新闻�
   h.data.publications.push(completed);h.data.articles.push(completed.article);h.data.events.push(completed.event);
   const page=h.page('home');
   assert.equal(page.data.posterPath,'/pages/detail/index?publicationId=fixture-completed');
-  assert.equal(page.data.posterDescription,'把最近的重置记录分享给朋友');
+  assert.match(page.data.posterDescription,/黑金或水墨/);
   page.onUnload();
 });
 
@@ -182,8 +182,8 @@ test('首页海报跳过撤回、合并和关联缺失的动态；无有效记�
     const page=h.page('home');assert.equal(page.data.posterPath,'/pages/detail/index?publicationId=fixture-new');page.onUnload();
   }
   const empty=pageHarness();empty.data.publications=[];empty.data.events=[];empty.data.articles=[];
-  const page=empty.page('home');assert.equal(page.data.posterPath,'');assert.match(page.data.posterDescription,/暂无可分享的公开动态/);
-  page.openPoster();assert.equal(empty.navigation.length,0);assert.equal(empty.requests.length,0);page.onUnload();
+  const page=empty.page('home');assert.equal(page.data.posterPath,'');assert.match(page.data.posterDescription,/分享当前公开状态/);
+  page.openPoster();assert.deepEqual(empty.navigation,[{method:'navigateTo',url:'/pages/poster/index'}]);assert.equal(empty.requests.length,0);page.onUnload();
 });
 
 test('首页微信提醒切换到设置标签页，不打开动态记录或自动发起微信登录授权',()=>{

@@ -393,3 +393,11 @@ test('公开入口检查只返回开放状态，不调用微信、不预留额�
   assert.deepEqual(await f.service.publicWechatAvailability(),{available:false,codeAvailable:false});
   assert.equal(f.calls.length,0);
 });
+
+
+test('管理员站内信不会预留微信授权或排入微信发送任务',async()=>{
+  const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);f.advance(1000);
+  await f.store.put('notices',{id:'manual-inbox',eventId:'',publicationId:'',semanticKey:'manual-inbox',origin:'admin',title:'隔离站内信',summary:'隔离正文',body:'隔离正文',categories:['system'],status:'active',createdAt:new Date(f.now()).toISOString()} satisfies Notice);
+  await f.service.scheduleWechatDeliveries();assert.equal((await f.queued()).length,0);assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).state,'available');
+  assert.equal(f.calls.filter(call=>call.url.includes('subscribe/send')).length,0);
+});

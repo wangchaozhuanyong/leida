@@ -1,11 +1,11 @@
 const { createPage } = require('../../utils/page');
+const { noticeModel } = require('../../utils/model');
 // Bundled client version; keep this aligned with the development-tool upload.
-const buildVersion = '1.0.4';
-const labels = [{ key: 'announcement', title: '发放预告', description: '明确的重置或发卡安排' }, { key: 'result', title: '完成声明', description: '公告称重置或发卡已完成' }, { key: 'activity', title: '活动进展', description: '关联活动与产品更新' }, { key: 'correction', title: '重要更正', description: '资格、状态变更或内容撤回' }];
+const buildVersion = '1.0.5';
 Page(createPage((data, query, page, app) => {
-  const stored = app.preferences.snapshot();
-  return { choices: labels.map(item => ({ ...item, checked: stored.preferences[item.key] })), storageError: stored.error };
-}, { data: { choices: [], storageError: '', clientVersion:buildVersion, wechat:{label:'点击后连接微信提醒',busy:false,ready:false,canPrepare:true,canRevoke:false,error:'',privacyNeeded:false} },
+  const stored=app.preferences.snapshot(),notices=data?noticeModel(data,stored.preferences,stored.read):[];
+  return { notices:notices.slice(0,3),unread:notices.filter(n=>!n.read).length,storageError:stored.error };
+}, { view:()=>({view:'notices'}),data: { notices:[],unread:0,closeMessage:'',storageError: '', clientVersion:buildVersion, wechat:{label:'点击后连接微信提醒',busy:false,ready:false,canPrepare:true,canRevoke:false,error:'',privacyNeeded:false} },
   load(){
     try {
       const info=typeof wx.getAccountInfoSync==='function' ? wx.getAccountInfoSync().miniProgram : null;
@@ -17,11 +17,11 @@ Page(createPage((data, query, page, app) => {
   hide(){if(this._wechatUnsubscribe)this._wechatUnsubscribe();this._wechatUnsubscribe=null;},
   unload(){if(this._wechatUnsubscribe)this._wechatUnsubscribe();this._wechatUnsubscribe=null;},
   methods: {
-  changePreference(event) { getApp().preferences.set(event.currentTarget.dataset.key, event.detail.value); this.redraw(); },
+  openNotice(event){const notice=this.data.notices.find(n=>n.id===event.currentTarget.dataset.id);if(!notice)return;getApp().preferences.markRead([notice.id]);this.redraw();const url=notice.origin==='admin'?`/pages/notices/index?id=${encodeURIComponent(notice.id)}`:notice.path;if(url)wx.navigateTo({url});},
   prepareWechat(){if(getApp().wechat)void getApp().wechat.prepare({userInitiated:true});},
   authorizeWechat(){if(getApp().wechat)void getApp().wechat.authorize({userInitiated:true});},
   refreshWechat(){if(getApp().wechat)void getApp().wechat.refresh({userInitiated:true});},
-  revokeWechat(){if(getApp().wechat)void getApp().wechat.revoke({userInitiated:true});},
-  agreeWechatPrivacy(){this.prepareWechat();},
+  async revokeWechat(){const reader=getApp().wechat;if(!reader)return;await reader.revoke({userInitiated:true});if(reader.getState().safe?.state==='revoked')this.setData({closeMessage:'微信提醒已关闭'});},
+  agreeWechatPrivacy(){void this.revokeWechat();},
   openPrivacyContract(){if(typeof wx.openPrivacyContract==='function')wx.openPrivacyContract({fail(){wx.showToast({title:'隐私指引暂不可用',icon:'none'});}});}
 } }));

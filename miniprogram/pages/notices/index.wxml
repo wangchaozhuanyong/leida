@@ -1,7 +1,11 @@
+<page-loader wx:if="{{navigationLoading}}" />
+<view wx:else>
 <view class="page">
   <view wx:if="{{storageError}}" class="warning">{{storageError}}</view><status-panel wx:if="{{!connected}}" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />
-  <block wx:else><view wx:if="{{error}}" class="warning">{{error}}<button class="secondary" bindtap="retry">重新加载</button></view><view class="row" style="margin-bottom:16px"><text class="muted">{{unread}}条未读</text><button class="secondary" disabled="{{!unread}}" bindtap="markAll">全部标为已读</button></view>
-    <view wx:for="{{notices}}" wx:key="id" class="card {{item.read ? 'notice-read' : 'notice-unread'}}"><view class="row wrap"><text class="badge {{item.read ? 'muted' : ''}}">{{item.read ? '已读' : '未读'}}</text><text class="time">{{item.time}}</text></view><view class="announcement-title">{{item.title}}</view><view class="prose">{{item.summary}}</view><button wx:if="{{!item.missing}}" class="secondary full" style="margin-top:16px" data-id="{{item.id}}" bindtap="openNotice">查看此版本详情</button><view wx:else class="warning" style="margin-top:16px;margin-bottom:0">关联发布记录暂时缺失，稍后重新加载。</view></view>
-    <view wx:if="{{!notices.length}}" class="card empty">当前偏好下暂无站内提醒。</view><view class="foot">关闭小程序后不承诺微信消息推送。</view>
-  </block>
+  <block wx:else><block wx:if="{{detailMode}}"><view wx:if="{{selected}}" class="card"><view class="title">{{selected.title}}</view><view class="small muted lead">{{selected.time}}</view><text class="prose" style="display:block" user-select="{{true}}">{{selected.body || selected.summary}}</text></view><view wx:else class="card empty">这条消息已撤回或暂不可用。</view></block><block wx:else><view wx:if="{{error}}" class="warning">{{error}}<button class="secondary" bindtap="retry">重新加载</button></view><view class="row" style="margin-bottom:16px"><text class="muted">{{unread}}条未读</text><button class="secondary" disabled="{{!unread}}" bindtap="markAll">全部标为已读</button></view>
+    <view wx:for="{{notices}}" wx:key="id" class="card {{item.read ? 'notice-read' : 'notice-unread'}}"><view class="row wrap"><text class="badge {{item.read ? 'muted' : ''}}">{{item.read ? '已读' : '未读'}}</text><text class="time">{{item.time}}</text></view><view class="announcement-title">{{item.title}}</view><view class="prose">{{item.summary}}</view><button wx:if="{{!item.missing}}" class="secondary full" style="margin-top:16px" data-id="{{item.id}}" bindtap="openNotice">查看详情</button><view wx:else class="warning" style="margin-top:16px;margin-bottom:0">关联发布记录暂时缺失，稍后重新加载。</view></view>
+    <view wx:if="{{!notices.length}}" class="card empty">暂无提醒，有新消息会显示在这里。</view>
+  </block></block>
+</view>
+
 </view>

@@ -21,7 +21,7 @@ function validateBootstrap(value) {
   if (!value.articles.every(validArticle) || !value.events.every(validEvent)) return false;
   if (!value.publications.every(x => x && text(x.id) && text(x.eventId) && text(x.articleId) && validArticle(x.article) && validEvent(x.event) && x.event.id === x.eventId && x.article.id === x.articleId && x.article.eventId === x.eventId && Number.isFinite(Date.parse(x.publishedAt)) && Number.isFinite(Date.parse(x.cutoffAt)))) return false;
   if (!value.evidence.every(x => x && text(x.id) && text(x.text) && text(x.url) && ['official','archive','manual'].includes(x.provenance))) return false;
-  if (!value.notices.every(x => x && text(x.id) && text(x.publicationId) && text(x.title) && text(x.summary) && ['active','withdrawn'].includes(x.status) && Array.isArray(x.categories))) return false;
+  if (!value.notices.every(x => x && text(x.id) && text(x.publicationId) && text(x.title) && text(x.summary) && ['active','withdrawn'].includes(x.status) && Array.isArray(x.categories) && (x.origin === undefined || x.origin === 'admin' && text(x.body)))) return false;
   if (!value.activities.every(x => x && text(x.id) && text(x.title) && text(x.rules) && text(x.timezone) && /^\d{4}-\d{2}-\d{2}$/.test(x.startsOn) && Number.isInteger(x.days) && x.days > 0 && x.days <= 366 && Array.isArray(x.items) && x.items.every(item => item && Number.isInteger(item.day) && item.day >= 1 && item.day <= x.days && text(item.articleId)))) return false;
   return value.sources.every(x => x && text(x.id) && text(x.name) && ['unconnected','healthy','delayed','failed','paused'].includes(x.status)) && (value.forecasts === undefined || validateForecastPublicData(value.forecasts));
 }

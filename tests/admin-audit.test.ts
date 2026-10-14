@@ -154,3 +154,21 @@ test('隔离数据库后台审计：新增、去重、生成、采集、补采�
   }finally{if(originalAI)await put('settings',originalAI as {id:string});pool.query=originalQuery;pool.connect=originalConnect;}
 });
 after(async()=>{pool.query=originalQuery;pool.connect=originalConnect;await pool.end();});
+
+
+test('站内信独立发布、校验和撤回均有审计，不制造公告、事件或微信任务',async()=>{
+  reset();
+  for(const input of [{title:'',body:'测试正文'},{title:'标题',body:''},{title:'长'.repeat(81),body:'测试正文'}])await assert.rejects(executeCommand('notice.publish',input,actor));
+  assert.equal(table('notices').length,0);
+  const input={title:' 测试站内信 ',body:'第一行正文\n第二行正文',requestId:'00000000-0000-4000-8000-000000000001'};
+  const notice=await executeCommand('notice.publish',input,actor) as {id:string;origin:string;publicationId:string;body:string;status:string};
+  assert.equal((await executeCommand('notice.publish',input,actor) as {id:string}).id,notice.id);
+  await assert.rejects(executeCommand('notice.publish',{...input,body:'另一个正文'},actor),/已变化/);
+  assert.equal(table('notices').length,1);
+  assert.equal(notice.origin,'admin');assert.equal(notice.publicationId,'');assert.equal(notice.body,'第一行正文\n第二行正文');
+  for(const tableName of ['events','articles','publications','jobs','wechat_deliveries'])assert.equal(table(tableName).length,0);
+  assert.equal((await audits()).filter(a=>a.action==='notice.publish').length,1);
+  await executeCommand('notice.withdraw',{id:notice.id},actor);await executeCommand('notice.withdraw',{id:notice.id},actor);
+  assert.equal(table('notices')[0].status,'withdrawn');assert.equal((await audits()).filter(a=>a.action==='notice.withdraw').length,1);
+  await assert.rejects(executeCommand('notice.withdraw',{id:'missing'},actor),/未找到/);
+});

@@ -226,7 +226,7 @@ test('多分类提醒只显示一次；已撤回提醒不显示，缺失版本�
   const notices = mini.noticeModel(data, { announcement: true, result: true, activity: true, correction: true }, ['notice-combined']);
   assert.equal(notices.length, 2); assert.equal(notices[0].read, true);
   assert.equal(notices[1].missing, true); assert.equal(notices[1].path, '');
-  assert.equal(mini.noticeModel(data, { announcement: false, result: false, activity: false, correction: false }, []).length, 0);
+  assert.equal(mini.noticeModel(data, { announcement: false, result: false, activity: false, correction: false }, []).length, 2);
 });
 
 test('正式配置连接现有云托管，空白示例仍拒绝联网、本机地址和空云环境', () => {
@@ -514,8 +514,8 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);news.onUnload();
-  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.4 · 体验版');settings.onUnload();
-  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.4');fallback.onUnload();
+  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.5 · 体验版');settings.onUnload();
+  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.5');fallback.onUnload();
 });
 
 test('四个原生导航页先设置 iOS 窗口底色再订阅数据，返回页面恢复底色而资料刷新不重复设置',()=>{
@@ -615,7 +615,7 @@ test('原始来源链接仅允许明确HTTP地址，不执行脚本或复制隐�
 test('原生项目配置与十个页面完整，支持游客或真实AppID，正文与触控规格有实物对应', () => {
   const app = JSON.parse(readFileSync(resolve(root, 'miniprogram/app.json'), 'utf8'));
   const project = JSON.parse(readFileSync(resolve(root, 'miniprogram/project.config.json'), 'utf8'));
-  assert.equal(app.pages.length, 10);
+  assert.equal(app.pages.length, 11);
   assert.equal(app.window.backgroundColorTop,app.window.backgroundColor);
   assert.equal(app.window.backgroundColorBottom,app.window.backgroundColor);
   assert.equal(app.tabBar.backgroundColor,app.window.backgroundColor);
@@ -627,7 +627,7 @@ test('原生项目配置与十个页面完整，支持游客或真实AppID，正
   const css = readFileSync(resolve(root, 'miniprogram/app.wxss'), 'utf8');
   assert.match(css, /font-size:\s*16px/); assert.match(css, /min-height:\s*44px/);
   assert.equal(app.tabBar.list[0].text, '首页');
-  assert.equal(readFileSync(resolve(root, 'miniprogram/pages/settings/index.wxml'), 'utf8').includes('暂未接入'), true);
+  assert.equal(readFileSync(resolve(root, 'miniprogram/pages/settings/index.wxml'), 'utf8').includes('待开通'), true);
 });
 
 test('所有原生JS可解析，JSON配置有效；模板无浏览器标签与内嵌脚本', () => {
@@ -641,4 +641,25 @@ test('所有原生JS可解析，JSON配置有效；模板无浏览器标签与�
     }
   }
   check(resolve(root, 'miniprogram'));
+});
+
+
+test('独立站内信不依赖公告链接；顶部预览、未读及已读由真实页面状态驱动',()=>{
+  const input=fixture();input.notices.push({id:'manual',eventId:'',publicationId:'',semanticKey:'manual',origin:'admin',title:'测试站内信',summary:'测试摘要',body:'完整正文',categories:['system'],status:'active',createdAt:now});
+  input.notices.push({...input.notices[0],id:'activity-only',categories:['activity']});
+  const h=nativeHarness(input),settings=h.page('settings');assert.equal(settings.data.notices.length,3);assert.equal(settings.data.unread,3);
+  const n=settings.data.notices.find((n:any)=>n.id==='manual');assert.equal(n.missing,false);
+  settings.openNotice({currentTarget:{dataset:{id:'manual'}}});assert.equal(settings.data.unread,2);assert.equal(h.ui.navigations.at(-1),'/pages/notices/index?id=manual');
+  const detail=h.page('notices',{id:'manual'});assert.equal(detail.data.selected.body,'完整正文');assert.equal(detail.data.selected.read,true);
+  input.notices.find(n=>n.id==='manual')!.status='withdrawn';h.replace(input);assert.equal(detail.data.selected,null);
+  settings.onUnload();detail.onUnload();
+});
+
+test('前景加载先遮住缓存；筛选、重试等待新响应；隐藏后的迟到响应不撤销新遮罩',async()=>{
+  const h=nativeHarness(),page=h.page('news');let finish!:()=>void;
+  h.app.client.refresh=()=>new Promise<void>(resolve=>{assert.equal(page.data.navigationLoading,true);finish=resolve;});
+  const retry=page.retry();assert.equal(page.data.navigationLoading,true);page.onHide();finish();await retry;assert.equal(page.data.navigationLoading,true);
+  page.onShow();assert.equal(page.data.navigationLoading,false);
+  const refresh=page.onPullDownRefresh();assert.equal(page.data.navigationLoading,true);finish();await refresh;assert.equal(page.data.navigationLoading,false);assert.equal(h.pullStops,1);
+  h.replace(fixture());assert.equal(page.data.navigationLoading,false,'后台资料更新不制造前景加载');page.onUnload();
 });

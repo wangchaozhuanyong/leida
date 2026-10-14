@@ -1,1 +1,1 @@
-Page({});
+Page({openPrivacyContract(){if(typeof wx.openPrivacyContract==='function')wx.openPrivacyContract({fail(){wx.showToast({title:'隐私指引暂不可用',icon:'none'});}});else wx.showToast({title:'请更新微信后查看',icon:'none'});}});

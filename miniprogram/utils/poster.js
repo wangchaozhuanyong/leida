@@ -126,12 +126,20 @@ async function renderPoster({wxApi,canvas,data,publicationId,code={status:'not_c
     else if(command.type==='circle'){ctx.beginPath();ctx.arc(command.x,command.y,command.r,0,Math.PI*2);ctx.fillStyle=command.color;ctx.fill();ctx.strokeStyle=command.stroke;ctx.lineWidth=2;ctx.stroke();}
     else ctx.drawImage(image,command.x,command.y,command.width,command.height);
   }
+  return exportCanvas(wxApi,canvas,page,{publicationId,width:layout.width,height:layout.height,codeStatus:code.status});
+}
+async function exportCanvas(wxApi,canvas,page,metadata,isCurrent=()=>true) {
   await nextPaint(canvas);
+  if(!isCurrent())throw new PosterError('cancelled','已取消旧海报生成。');
+  const layout=metadata;
   return new Promise((resolve,reject)=>{
-    wxApi.canvasToTempFilePath({canvas,x:0,y:0,width:layout.width,height:layout.height,destWidth:layout.width,destHeight:layout.height,fileType:'png',
-      success(result){if(!result || typeof result.tempFilePath!=='string' || !result.tempFilePath){reject(new PosterError('export','海报导出失败，请重试。'));return;}
-        const artifact={tempFilePath:result.tempFilePath,publicationId,width:layout.width,height:layout.height,codeStatus:code.status};exported.add(artifact);resolve(artifact);},
-      fail(){reject(new PosterError('export','海报导出失败，请重试。'));}},page);
+    let settled=false;
+    const finish=(error,artifact)=>{if(settled)return;settled=true;clearTimeout(timeout);error?reject(error):resolve(artifact);};
+    const timeout=setTimeout(()=>finish(new PosterError('export','海报导出超时，请重新生成。')),15000);
+    try{wxApi.canvasToTempFilePath({canvas,x:0,y:0,width:layout.width,height:layout.height,destWidth:layout.width,destHeight:layout.height,fileType:'png',
+      success(result){if(settled)return;if(!isCurrent()){finish(new PosterError('cancelled','已取消旧海报生成。'));return;}if(!result || typeof result.tempFilePath!=='string' || !result.tempFilePath){finish(new PosterError('export','海报导出失败，请重试。'));return;}
+        const artifact={...metadata,tempFilePath:result.tempFilePath};exported.add(artifact);finish(null,artifact);},
+      fail(){finish(new PosterError('export','海报导出失败，请重试。'));}},page);}catch(_){finish(new PosterError('export','海报导出失败，请重试。'));}
   });
 }
 /** Only an explicit save-button handler may pass userInitiated:true. No automatic permission prompts. */
@@ -158,4 +166,4 @@ function writeCodeAsset(wxApi,value,publicationId){
 let assetCounter=0;
 // Official APIs: canvasToTempFilePath, Canvas.createImage, Canvas.requestAnimationFrame,
 // saveImageToPhotosAlbum. Real native compile/image export/permissions remain unverified.
-module.exports={PosterError,wrapText,posterInput,createPosterLayout,loadCanvasImage,renderPoster,savePoster,writeCodeAsset};
+module.exports={PosterError,wrapText,posterInput,createPosterLayout,loadCanvasImage,renderPoster,exportCanvas,savePoster,writeCodeAsset};
