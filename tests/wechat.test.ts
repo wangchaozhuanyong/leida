@@ -121,8 +121,23 @@ test('32位scene支持旧发布ID，解析精确版本且拒绝非法/未知',as
 test('真实码接口使用固定页/scene和环境；重复获取复用缓存；JSON错误不能充作图',async()=>{
   const f=await fixture();const first=await f.service.generateWechatCode(f.publication.id),second=await f.service.generateWechatCode(f.publication.id);
   assert.equal(first.contentType,'image/png');assert.equal(first.publicationId,f.publication.id);assert.ok(first.image.equals(second.image));
-  const code=f.calls.filter(call=>call.url.includes('getwxacodeunlimit'));assert.equal(code.length,1);assert.equal(code[0].body?.scene,publicationScene(f.publication.id));assert.equal(code[0].body?.page,'pages/detail/index');assert.equal(code[0].body?.env_version,'trial');assert.equal(code[0].body?.check_path,true);
+  const code=f.calls.filter(call=>call.url.includes('getwxacodeunlimit'));assert.equal(code.length,1);assert.equal(code[0].body?.scene,publicationScene(f.publication.id));assert.equal(code[0].body?.page,'pages/detail/index');assert.equal(code[0].body?.env_version,'trial');assert.equal(code[0].body?.check_path,false);
   const bad=await fixture({qr:'error'});await assert.rejects(bad.service.generateWechatCode(bad.publication.id),/41030/);assert.equal((await bad.service.adminWechat()).codesToday,1);
+});
+
+test('体验和开发码允许尚未正式发布的固定详情页，正式码仍检查页面且不自动降级',async()=>{
+  const calls:Record<string,unknown>[]=[];
+  const provider=createWechatProvider(async(_input,init)=>{
+    const body=JSON.parse(String(init?.body));calls.push(body);
+    assert.equal(body.page,'pages/detail/index');
+    return body.check_path?Response.json({errcode:41030}):new Response(new Uint8Array(actualPng));
+  });
+  for(const env of ['trial','develop']){
+    const result=await provider.code('fixture-token','0'.repeat(32),env);
+    assert.equal(result.contentType,'image/png');assert.ok(result.image.equals(actualPng));assert.equal(calls.at(-1)?.env_version,env);
+  }
+  await assert.rejects(provider.code('fixture-token','0'.repeat(32),'release'),/41030/);
+  assert.equal(calls.at(-1)?.check_path,true);assert.equal(calls.length,3);
 });
 
 test('当前内容撤回、合并及历史快照撤回都禁止解析和生成',async()=>{

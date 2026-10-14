@@ -67,7 +67,10 @@ export function createWechatProvider(fetcher:typeof fetch=fetch) {
       return {token:data.access_token,expiresIn:data.expires_in};
     },
     async code(token:string,scene:string,envVersion:string) {
-      const response=await request(`/wxa/getwxacodeunlimit?access_token=${encodeURIComponent(token)}`,{scene,page:'pages/detail/index',check_path:true,env_version:envVersion,width:430});
+      // Trial/development pages may exist before the first formal release.
+      // Keep the destination fixed; formal release codes still require a published page.
+      const checkPath=envVersion!=='trial'&&envVersion!=='develop';
+      const response=await request(`/wxa/getwxacodeunlimit?access_token=${encodeURIComponent(token)}`,{scene,page:'pages/detail/index',check_path:checkPath,env_version:envVersion,width:430});
       const image=await bytes(response,2_000_000);
       if(image[0]===123||image[0]===91) {
         let errcode:number|undefined;try {const data=JSON.parse(image.toString('utf8'));if(typeof data.errcode==='number')errcode=data.errcode;}catch{}
