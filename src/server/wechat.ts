@@ -36,11 +36,24 @@ export function assertWechatPublication(publication:Publication,event?:RadarEven
   if(!event||!article||publication.event.status!=='published'||publication.article.status!=='published'||event.status!=='published'||article.status!=='published')throw new DomainError('该内容已撤回、合并或不可分享',410);
 }
 const fieldSchema=z.object({title:z.string().regex(/^thing\d{1,3}$/),status:z.string().regex(/^(?:thing|phrase)\d{1,3}$/),time:z.string().regex(/^(?:time|date)\d{1,3}$/)}).refine(fields=>new Set(Object.values(fields)).size===3,'模板字段不能重复');
-export function wechatTemplateData(settings:WechatSettings,notice:Notice):Record<string,{value:string}> {
+const publicQuotaActions=(publication:Publication)=>publication.event.actions.filter(action=>action.scope==='public'&&['automatic_reset','banked_reset'].includes(action.kind));
+const isQuotaPublication=(publication:Publication)=>publicQuotaActions(publication).length>0||publication.article.category==='reset'&&publication.event.actions.length===0;
+export function wechatTemplateData(settings:WechatSettings,notice:Notice,publication?:Publication):Record<string,{value:string}> {
   let fields:WechatSettings['templateFields'];try {fields=fieldSchema.parse(settings.templateFields);}catch {throw new WechatServiceError('模板字段未配置或类型不兼容','configuration');}
-  const status=notice.categories.includes('correction')?'重要更正':notice.categories.includes('result')?'公告称完成':notice.categories.includes('activity')?'活动更新':'发放预告';
+  let status=notice.categories.includes('correction')?'重要更正':notice.categories.includes('result')?'公告称完成':notice.categories.includes('activity')?'活动更新':'发放预告';
   // Keep the factual qualifier at the beginning even when a long title is truncated.
-  const title=notice.categories.includes('result')?`公告称完成：${notice.title.replace(/^公告称(?:已)?(?:完成|发放)[：:]?/,'')}`:notice.title;
+  let title=notice.categories.includes('result')?`公告称完成：${notice.title.replace(/^公告称(?:已)?(?:完成|发放)[：:]?/,'')}`:notice.title;
+  if(publication){
+    if(publication.id!==notice.publicationId||!isQuotaPublication(publication))throw new WechatServiceError('此内容不属于额度重置提醒','configuration');
+    const actions=publicQuotaActions(publication),kinds=new Set(actions.map(action=>action.kind)),stages=new Set(actions.map(action=>action.stage));
+    // The actual template labels this field as quota type, not an article title.
+    title=kinds.size>1?'用量重置与重置卡':kinds.has('banked_reset')?'重置卡':'编程套餐额度';
+    if(notice.categories.includes('correction'))status='公告更正';
+    else if(stages.size>1)status='公开进展更新';
+    else if(stages.size===1)status={promised:'已公布计划',in_progress:'公告称进行中',claimed_complete:'公告称完成',cancelled:'公告已取消'}[actions[0].stage];
+    // Mixed stages must never imply every benefit is complete; phrase fields allow five characters.
+    if(fields.status.startsWith('phrase')&&Array.from(status).length>5)status='进展已更新';
+  }
   const at=Date.parse(notice.createdAt);if(!Number.isFinite(at))throw new WechatServiceError('消息时间无效','configuration');
   const time=new Date(at+8*3600_000).toISOString().slice(0,16).replace('T',' ');
   return {[fields.title]:{value:Array.from(title.replace(/[\r\n\x00-\x1f]/g,' ')).slice(0,20).join('')},[fields.status]:{value:status},[fields.time]:{value:fields.time.startsWith('date')?time.slice(0,10):time}};
@@ -210,6 +223,7 @@ export function createWechatService(dependencies:WechatDependencies={}) {
         const eligible=notices.filter(notice=>notice.status==='active'&&notice.categories.length>0&&Date.parse(notice.createdAt)>Date.parse(grant.acceptedAt!)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
         for(const notice of eligible) {
           let pub:Publication;try{pub=await publication(notice.publicationId,client);}catch(error){if(error instanceof DomainError)continue;throw error;}
+          if(!isQuotaPublication(pub))continue;
           if(!notice.categories.includes('correction')&&isHistoricalArticle(pub.article,evidence))continue;
           const deliveryId=`wxdelivery_${digest(`${notice.id}:${grant.readerId}:${grant.templateId}`)}`;
           const delivery:WechatDelivery={id:deliveryId,readerId:grant.readerId,grantId:grant.id,appId:settings.appId,templateId:settings.templateId,noticeId:notice.id,publicationId:pub.id,semanticKey:notice.semanticKey,status:'queued',createdAt:timestamp(),attempts:0};
@@ -248,12 +262,13 @@ export function createWechatService(dependencies:WechatDependencies={}) {
     if(!ready(settings,'subscription'))return {state:'deferred',resumeAt:new Date(clock()+15*60_000).toISOString(),reason:'微信提醒未配置或已关闭'};
     const [value,grant,notice]=await Promise.all([store.one<WechatReader>('wechat_readers',delivery.readerId),store.one<WechatGrant>('wechat_grants',delivery.grantId),store.one<Notice>('notices',delivery.noticeId)]);
     let safe=value?.status==='active'&&value.appId===settings.appId&&delivery.appId===settings.appId&&delivery.templateId===settings.templateId&&grant?.status==='reserved'&&grant.deliveryId===delivery.id&&notice?.status==='active';
-    if(safe)try{await publication(delivery.publicationId);}catch(error){if(error instanceof DomainError)safe=false;else throw error;}
+    let verifiedPublication:Publication|undefined;
+    if(safe)try{verifiedPublication=await publication(delivery.publicationId);if(!isQuotaPublication(verifiedPublication))safe=false;}catch(error){if(error instanceof DomainError)safe=false;else throw error;}
     if(!safe) {await store.transaction(client=>finish(delivery!,'cancelled','身份、授权、模板或对应内容已失效',undefined,client));return {state:'cancelled'};}
     try {await preparePublicPage(delivery.publicationId);}
     catch {return {state:'deferred',resumeAt:new Date(clock()+5000).toISOString(),reason:'公开页面尚未准备好，稍后再发送'};}
     let token:string,body:Record<string,unknown>;
-    try {body={touser:open(value!.encryptedOpenid),template_id:delivery.templateId,page:`pages/detail/index?publicationId=${encodeURIComponent(delivery.publicationId)}`,miniprogram_state:{release:'formal',trial:'trial',develop:'developer'}[settings.envVersion],lang:'zh_CN',data:wechatTemplateData(settings,notice!)};token=await accessToken(settings);}
+    try {body={touser:open(value!.encryptedOpenid),template_id:delivery.templateId,page:`pages/detail/index?publicationId=${encodeURIComponent(delivery.publicationId)}`,miniprogram_state:{release:'formal',trial:'trial',develop:'developer'}[settings.envVersion],lang:'zh_CN',data:wechatTemplateData(settings,notice!,verifiedPublication)};token=await accessToken(settings);}
     catch(error) {const budget=error instanceof WechatServiceError&&error.failureKind==='budget';return {state:'deferred',resumeAt:budget?tomorrow():new Date(clock()+15*60_000).toISOString(),reason:error instanceof WechatServiceError?error.message:'微信发送准备失败'};}
     let claimed=false,rateResumeAt:string|undefined;
     try {claimed=await store.transaction(async client=>{
