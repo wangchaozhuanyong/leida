@@ -1,22 +1,16 @@
 'use client';
-import React, {useEffect, useState} from 'react';
+import React from 'react';
 import type {ResetOutlook} from '@/lib/reset-outlook';
 import type {BenefitAction} from '@/lib/types';
-import {announcementClock, announcementCountdown, completionElapsed} from './model';
+import {announcementCountdown, completionElapsed} from './model';
+import {usePublicClock} from './PublicSession';
 
 const point = (angle: number, radius: number) => ({x: 300 + Math.sin(angle * Math.PI / 180) * radius, y: 300 - Math.cos(angle * Math.PI / 180) * radius});
 const timeLabel = (at: string) => new Intl.DateTimeFormat('zh-CN', {timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'}).format(new Date(at));
 
 /** A Beijing clock face showing an active announcement or a recent public completion. */
 export function InstrumentDial({outlook, serverTime, completion = outlook.latestCompletion}: {outlook: ResetOutlook; serverTime: string; completion?: Pick<BenefitAction, 'kind' | 'stage' | 'statementAt'> | null}) {
-  const [clock, setClock] = useState({serverTime, elapsed: 0});
-  useEffect(() => {
-    const start = performance.now(), tick = () => setClock({serverTime, elapsed: performance.now() - start});
-    tick(); const timer = window.setInterval(tick, 1000);
-    document.addEventListener('visibilitychange', tick);
-    return () => {clearInterval(timer); document.removeEventListener('visibilitychange', tick);};
-  }, [serverTime]);
-  const now = announcementClock(serverTime, clock.serverTime === serverTime ? clock.elapsed : 0);
+  const now = usePublicClock(serverTime);
   const active = outlook.active, countdown = active ? announcementCountdown(active, now) : undefined;
   const completed = active ? undefined : completionElapsed(completion, now);
   const bankedCompletion = !!completed && completion?.kind === 'banked_reset';
