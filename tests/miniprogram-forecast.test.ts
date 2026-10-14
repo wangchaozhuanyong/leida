@@ -149,7 +149,7 @@ const flush=()=>new Promise<void>(resolve=>setImmediate(resolve));
 test('实际首页只显示当前公开预告，历史实验不变成下次倒计时或分享目标',()=>{
   const h=nativeHarness(),page=h.page('home');assert.equal(page.data.forecast,null);assert.equal(page.data.sharePath,'');assert.match(page.data.waitingText,/等待下一次预告.*暂无新的时间依据/);
   const next=fixture();addAnnouncement(next);h.replace(next);assert.equal(page.data.forecast,null);assert.ok(page.data.pending);assert.equal(page.data.pending.countdown,'时间待明确');assert.equal(page.data.sharePath,'/pages/detail/index?publicationId=publication-test');assert.match(page.data.shareLabel,/公告/);page.onUnload();assert.equal(h.subscriptions,0);
-  const template=readFileSync(resolve(root,'miniprogram/pages/home/index.wxml'),'utf8');assert.doesNotMatch(template,/forecast\.probability|forecast &&|实验预测/);assert.match(template,/pending\.countdown/);assert.match(template,/北京时间/);
+  const template=readFileSync(resolve(root,'miniprogram/pages/home/index.wxml'),'utf8');assert.doesNotMatch(template,/forecast\.probability|forecast &&|实验预测/);assert.match(template,/timeline\.title/);assert.match(template,/北京时间/);
 });
 
 const outlookDeadline='2026-10-10T13:00:00Z';
@@ -176,7 +176,7 @@ test('服务端完成转为24小时结果计时，取消结束计时，不回退
       next.events=[structuredClone(p.event)];next.articles=[structuredClone(p.article)];
     }
     h.replace(next);assert.equal(page.data.pending,null);assert.equal(page.data.forecast,null);assert.equal(page.data.outlookStatus,status);assert.match(page.data.waitingText,/等待下一次预告/);
-    if(status==='completed'){assert.ok(page._countdownTimer);assert.equal(page.data.dial.completed,true);assert.equal(page.data.latest.elapsed,'刚刚');assert.equal(page.data.latest.title,'公告称已重置用量');assert.equal(page.data.sharePath,'/pages/detail/index?publicationId=live-publication');}
+    if(status==='completed'){assert.ok(page._countdownTimer);assert.equal(page.data.timeline.completed,true);assert.equal(page.data.latest.elapsed,'刚刚');assert.equal(page.data.latest.title,'公告称已重置用量');assert.equal(page.data.sharePath,'/pages/detail/index?publicationId=live-publication');}
     else assert.equal(page._countdownTimer,null);
     page.onUnload();
   }
