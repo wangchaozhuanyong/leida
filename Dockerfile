@@ -11,7 +11,9 @@ RUN node --input-type=module -e 'import { randomBytes } from "node:crypto"; impo
 
 FROM node:24-alpine AS runtime
 # CloudRun HTTPS cloud calls require the platform CA installation tools.
-RUN apk add --no-cache ca-certificates
+# Use the official CloudRun regional mirror; keep HTTPS and APK signature checks.
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tencent.com/g' /etc/apk/repositories \
+    && apk add --no-cache ca-certificates
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=8080 NODE_USE_SYSTEM_CA=1
 # Worker uses the existing TypeScript runner; no additional runtime service is needed.

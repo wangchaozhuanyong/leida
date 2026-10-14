@@ -378,3 +378,11 @@
   .pub-poster-code-option { font-size: 11px; flex-wrap: wrap; }
   .pub-poster-code-option small { font-size: 10px; }
 }
+
+/* Content loading never removes the navigation or changes the document canvas. */
+.pub-content-placeholder{min-height:340px;display:grid;align-content:start;gap:22px;padding:24px 0;color:var(--pub-muted)}
+.pub-content-placeholder>div{height:102px;border-top:1px solid var(--pub-line);background:linear-gradient(90deg,#17202355,#17202322);border-radius:4px}
+.pub-main{position:relative;overflow-anchor:none}
+.pub-background-status{position:fixed;right:18px;bottom:calc(88px + env(safe-area-inset-bottom));z-index:15;padding:4px 9px;background:#101719;color:var(--pub-muted);border:1px solid var(--pub-line);border-radius:8px;font-size:11px;pointer-events:none}
+.pub-pagination-error{padding:16px 0;color:var(--pub-amber)}
+.pub-pagination-error button{margin-left:12px}

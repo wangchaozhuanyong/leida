@@ -1,2 +1,7 @@
 import '@/app/public.css';
-export default function PublicLayout({ children }: { children: React.ReactNode }) { return <div className="public-surface">{children}</div>; }
+import PublicApp from '@/components/public/PublicApp';
+import { PublicSessionProvider } from '@/components/public/PublicSession';
+import { FixedSnapshotProvider } from '@/components/public/useFixedSnapshot';
+export default function PublicLayout({ children }: { children: React.ReactNode }) {
+  return <div className="public-surface"><PublicSessionProvider><FixedSnapshotProvider><PublicApp />{children}</FixedSnapshotProvider></PublicSessionProvider></div>;
+}
