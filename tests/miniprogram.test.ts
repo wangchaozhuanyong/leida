@@ -229,8 +229,15 @@ test('多分类提醒只显示一次；已撤回提醒不显示，缺失版本�
   assert.equal(mini.noticeModel(data, { announcement: false, result: false, activity: false, correction: false }, []).length, 0);
 });
 
-test('接口配置默认为未连接，不接受本机地址和空云环境，不在页面生成假凭证', () => {
-  const config = require('../miniprogram/config.js');
+test('正式配置连接现有云托管，空白示例仍拒绝联网、本机地址和空云环境', () => {
+  const deployed = require('../miniprogram/config.js');
+  assert.equal(configurationError(deployed), '');
+  assert.equal(deployed.mode, 'cloud');
+  assert.equal(deployed.baseUrl, '');
+  assert.equal(deployed.cloudEnv, 'prod-d5gatkqvs39259932');
+  assert.equal(deployed.serviceName, 'express-l98p');
+  assert.deepEqual(Object.keys(deployed).sort(), ['baseUrl','cloudEnv','mode','pollMs','serviceName','timeoutMs'].sort());
+  const config = require('../miniprogram/config.example.js');
   assert.deepEqual([config.mode, config.baseUrl, config.cloudEnv, config.serviceName], ['', '', '', '']);
   assert.match(configurationError(config), /尚未连接/);
   for (const baseUrl of ['http://example.org', 'https://127.0.0.1', 'https://localhost', 'https://example.org/api/v1']) assert.ok(configurationError({ ...httpsConfig, baseUrl }));
@@ -326,7 +333,7 @@ test('一个前台轮询；相同版本不重取资料，版本改变只重取�
 
 test('首次配置为空不轮询、不调用任何网络，重试不制造模拟数据', async () => {
   const mock = network(), timers = timerHarness();
-  const client = createClient({ wxApi: mock.wx, config: require('../miniprogram/config.js'), timers: timers.timers });
+  const client = createClient({ wxApi: mock.wx, config: require('../miniprogram/config.example.js'), timers: timers.timers });
   await client.start(); await client.refresh(false);
   assert.equal(mock.calls.length, 0); assert.equal(timers.callbacks.size, 0);
   assert.equal(client.getState().data, null); assert.equal(client.getState().unconfigured, true);

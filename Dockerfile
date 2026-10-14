@@ -24,4 +24,4 @@ RUN mkdir -p /app/outputs/implementation-qa && chown -R node:node /app/outputs
 USER node
 EXPOSE 8080
 ENTRYPOINT ["node", "scripts/runtime-entrypoint.mjs"]
-CMD ["app"]
+CMD ["app-worker"]
