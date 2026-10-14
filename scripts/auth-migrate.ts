@@ -1,4 +1,5 @@
 import 'dotenv/config';
+if((process.env.RADAR_STORAGE_BACKEND??'native')!=='native'){console.error('此命令仅用于原生数据库；云端请使用 bootstrap，不导入历史。');process.exit(1);}
 import {getMigrations} from 'better-auth/db/migration';
 import {betterAuth} from 'better-auth';
 import pg from 'pg';

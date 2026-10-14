@@ -14,8 +14,11 @@ import {publicActions,publicationWithdrawn} from '@/lib/public-facts';
 import {publicResetOutlook} from '@/lib/reset-outlook';
 import {getForecastSnapshot,getResetCadenceSnapshot} from '@/server/forecast';
 import {forecastPosterSvg} from '@/server/forecast-poster';
+import {getLightPublicVersion,getPublicRead,parsePublicRead} from '@/server/public-read';
 export const dynamic='force-dynamic';
 export async function GET(request:Request,{params}:{params:Promise<{path:string[]}>}){try{const {path}=await params;const [kind,id]=path;
+ if(kind==='version'&&new URL(request.url).searchParams.get('light')==='1'){const state=await getLightPublicVersion(),etag=`"${state.version}"`;if(request.headers.get('if-none-match')===etag)return new Response(null,{status:304,headers:{ETag:etag,'Cache-Control':'no-store'}});return Response.json({data:state},{headers:{ETag:etag,'Cache-Control':'no-store'}});}
+ if((kind==='bootstrap'||kind==='status')&&new URL(request.url).searchParams.has('view'))return Response.json(await getPublicRead(parsePublicRead(new URL(request.url).searchParams)),{headers:{'Cache-Control':'no-store'}});
  if(kind==='version'){const version=await getPublicVersion();const etag=`"${version}"`;if(request.headers.get('if-none-match')===etag)return new Response(null,{status:304,headers:{ETag:etag,'Cache-Control':'no-store'}});return Response.json({data:{version}},{headers:{ETag:etag,'Cache-Control':'no-store'}});}
  if(kind==='wechat'&&id==='availability'&&path.length===2)return json(await publicWechatAvailability());
  if(kind==='wechat'&&id==='code'&&path.length===3){const code=await generateWechatCode(path[2]);return json({...code,image:undefined,imageBase64:code.image.toString('base64')});}

@@ -1,4 +1,5 @@
 import { pool } from '../src/db';
+if((process.env.RADAR_STORAGE_BACKEND??'native')!=='native'){console.error('此命令仅用于原生数据库；云端请使用 bootstrap，不导入历史。');process.exit(1);}
 const tables = ['evidence','candidates','events','articles','publications','sources','jobs','notices','audits','activities','settings'];
 const c = await pool.connect();
 try {

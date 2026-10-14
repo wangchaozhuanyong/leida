@@ -4,7 +4,9 @@ const args = process.argv.slice(2);
 const containerRuntime = args.includes('--container');
 const mode = args.find(arg => arg !== '--container') || 'app';
 const environment = { ...process.env };
-if (containerRuntime) {
+const storageMode=environment.RADAR_STORAGE_BACKEND||'native';
+if(!['native','cloudbase'].includes(storageMode)){console.error('数据库模式无效。');process.exit(1);}
+if (containerRuntime && storageMode === 'native') {
   try {
     // Preserve URL-encoded credentials. This conversion is only enabled by the Docker entrypoint.
     const database = new URL(environment.DATABASE_URL || '');
@@ -20,8 +22,12 @@ if (containerRuntime) {
 
 if (mode === 'health-app') {
   try {
-    const response = await fetch('http://127.0.0.1:5190/api/v1/version', { signal: AbortSignal.timeout(8000) });
-    process.exit(response.ok ? 0 : 1);
+    const port = environment.PORT || '5190';
+    if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) process.exit(1);
+    const response = await fetch(`http://127.0.0.1:${port}/api/v1/version?light=1`, { redirect: 'error', signal: AbortSignal.timeout(8000) });
+    if (!response.ok) process.exit(1);
+    const payload = await response.json();
+    process.exit(typeof payload?.data?.version === 'string' && payload.data.version.trim() ? 0 : 1);
   } catch { process.exit(1); }
 }
 

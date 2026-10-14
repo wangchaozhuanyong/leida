@@ -1,3 +1,4 @@
+import { lockTransaction, repeatableRead } from '../db';
 import { z } from 'zod';
 import { list, one, insert, put, transaction, type Client } from '../db';
 import type { AdminData, PublicData, Candidate, Evidence, RadarEvent, Article, Publication, Source, Job, Audit, Notice, Activity, DraftContent, SiteSettings } from '../lib/types';
@@ -11,6 +12,7 @@ import { isHistoricalContent, projectPublicHistory } from '../lib/history';
 import {getPublicForecast} from './forecast';
 import {gatherEvidenceContext,hasCompleteContext} from './source-context';
 import {TIBO_PUBLIC_SOURCE} from './tibo-public';
+import {configuredPublicRpc} from './cloudbase/public-config';
 export const defaultSite:SiteSettings = { name:'模钥重置雷达',description:'跟踪公开重置公告与重置卡动态',autoPublish:true,version:1 };
 const str=(x:unknown)=>z.string().min(1).max(200).parse(x);
 export async function audit(actor:string,action:string,objectId:string,reason:string,before:unknown,after:unknown,c:Client) { await insert('audits',{id:id('audit'),actor,action,objectId,reason,createdAt:now(),before,after} satisfies Audit,c); }
@@ -34,7 +36,7 @@ export async function getAdminData():Promise<AdminData> { const [sources,candida
  const workerError=forecastRuntime?.status==='error'?'预测观察暂时异常，新闻任务继续运行':heartbeat?.error;
  const runtime:NonNullable<AdminData['runtime']>={worker:{status:workerRuntimeStatus({...heartbeat,error:workerError}),heartbeatAt:heartbeat?.heartbeatAt,lastJobAt:heartbeat?.lastJobAt,error:workerError},backlog:{queued:queued.length,running:jobs.filter(job=>job.status==='running').length,waitingEvidence:tally('waiting_evidence'),deferred:tally('deferred'),cooldown:tally('cooldown'),configuration:tally('configuration'),conflict:tally('conflict')},oldestQueuedAt:queued.map(job=>job.createdAt).sort()[0]};
  return {...data,runtime}; }
-export async function getPublicData():Promise<PublicData> { return transaction(async c=> { await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY'); const [events,articles,publications,evidence,notices,activities,site,sources]=await Promise.all([list<RadarEvent>('events',c),list<Article>('articles',c),list<Publication>('publications',c),list<Evidence>('evidence',c),list<Notice>('notices',c),list<Activity>('activities',c),one<SiteSettings>('settings','site',c),list<Source>('sources',c)]); const publicEvidence=new Set(publications.flatMap(p=>p.article.evidenceIds)); const data=projectPublicHistory({events,articles,publications,evidence:evidence.filter(e=>publicEvidence.has(e.id)),notices,activities,site:site??defaultSite,sources:sources.map(currentSource).map(({id,name,status,lastSuccessAt})=>({id,name,status,lastSuccessAt})),serverTime:now()}); return {...data,forecasts:await getPublicForecast(c,data.serverTime,data)}; }); }
+export async function getPublicData():Promise<PublicData> { const rpc=configuredPublicRpc();if(rpc)return (await import('./cloudbase/public-read')).createCloudbasePublicReader(rpc).legacy();return transaction(async c=> { await repeatableRead(c); const [events,articles,publications,evidence,notices,activities,site,sources]=await Promise.all([list<RadarEvent>('events',c),list<Article>('articles',c),list<Publication>('publications',c),list<Evidence>('evidence',c),list<Notice>('notices',c),list<Activity>('activities',c),one<SiteSettings>('settings','site',c),list<Source>('sources',c)]); const publicEvidence=new Set(publications.flatMap(p=>p.article.evidenceIds)); const data=projectPublicHistory({events,articles,publications,evidence:evidence.filter(e=>publicEvidence.has(e.id)),notices,activities,site:site??defaultSite,sources:sources.map(currentSource).map(({id,name,status,lastSuccessAt})=>({id,name,status,lastSuccessAt})),serverTime:now()}); return {...data,forecasts:await getPublicForecast(c,data.serverTime,data)}; }); }
 function actionContent(actions:RadarEvent['actions']):{title:string;summary:string;translation:string} { const stage={promised:'已有发放安排',in_progress:'正在进行',claimed_complete:'公告称已完成',cancelled:'已取消'};const names={automatic_reset:'用量重置',banked_reset:'重置卡'};const title=actions.length===1?`${names[actions[0].kind]}：${stage[actions[0].stage]}`:'用量重置与重置卡进展';return {title,summary:actions.map(a=>`${names[a.kind]}${stage[a.stage]}，适用对象：${a.eligibility}。`).join(''),translation:''}; }
 interface PublishOptions { actor:string; reason:string; existingArticle?:Article; correction?:boolean; suppressNotice?:boolean; withdrawn?:boolean; automatic?:boolean; eventTitle?:string; }
 
@@ -174,7 +176,7 @@ async function withdrawalNotice(publication:Publication, kind:'event'|'article',
 }
 export async function createEvidence(input: Omit<Evidence,'id'|'hash'>,actor?:string):Promise<{evidence:Evidence;created:boolean;candidate?:Candidate}> {
   return transaction(async c=> {
-    await c.query("SELECT pg_advisory_xact_lock(hashtext($1))",["evidence:"+input.sourceId+":"+input.messageId]);
+    await lockTransaction(c,'evidence:'+input.sourceId+':'+input.messageId);
     let parentConflict:string|undefined;
     if(input.textOrigin!=='original'){
       const original=(await list<Evidence>('evidence',c)).find(item=>item.sourceId===input.sourceId&&item.messageId===input.messageId&&item.textOrigin==='original');
@@ -206,14 +208,14 @@ export async function createEvidence(input: Omit<Evidence,'id'|'hash'>,actor?:st
     await insert('candidates',candidate,c); return finish({evidence:ev,created:true,candidate}); });
 }
 export async function queueJob(kind:Job['kind'],payload:{sourceId?:string;candidateId?:string;[key:string]:unknown},c:Client,operation?:{actor:string;action:TrackedAdminAction;objectId:string}):Promise<Job> {
-  await c.query('SELECT pg_advisory_xact_lock(hashtext($1))',[`radar_queue:${kind}:${payload.sourceId??''}:${payload.candidateId??''}`]);
+  await lockTransaction(c,`radar_queue:${kind}:${payload.sourceId??''}:${payload.candidateId??''}`);
   const finish=async(job:Job,reused:boolean)=>{if(operation)await audit(operation.actor,operation.action,operation.objectId,`${trackedLabels[operation.action]}：${reused?'复用已有待执行任务':'已加入任务队列'}`,undefined,{outcome:reused?'already_pending':'queued',jobId:job.id,jobStatus:job.status},c);return job;};
   const pending=(await list<Job>('jobs',c)).find(j=>j.kind===kind&&j.sourceId===payload.sourceId&&j.candidateId===payload.candidateId&&['queued','running'].includes(j.status)); if(pending)return finish(pending,true);
   const job:Job={id:id('job'),kind,sourceId:payload.sourceId,candidateId:payload.candidateId,status:'queued',attempts:0,availableAt:now(),createdAt:now(),payload}; await insert('jobs',job,c); return finish(job,false);
 }
 export interface CandidatePreview { canPublish:boolean; reasons:string[]; changes:string[]; pages:string[]; willNotify:boolean; noticeReason:string; expectedEventVersion?:number; }
 export async function previewCandidate(candidateId:string,version:number):Promise<CandidatePreview> {return transaction(async c=>{
-  await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
+  await repeatableRead(c);
   const candidate=await one<Candidate>('candidates',candidateId,c);assertVersion(candidate,version);
   const evidence=await list<Evidence>('evidence',c),events=await list<RadarEvent>('events',c),articles=await list<Article>('articles',c);const parsed=draftSchema.safeParse(candidate!.content);
   if(!parsed.success)return {canPublish:false,reasons:['候选内容结构不完整，请先保存必要字段'],changes:[],pages:[],willNotify:false,noticeReason:'内容未通过校验，不会发布提醒'};
@@ -244,7 +246,7 @@ export async function previewCandidate(candidateId:string,version:number):Promis
 });}
 export async function publishCandidate(candidateId:string,version:number,actor:string,reason:string,automatic=false,expectedEventVersion?:number,requireEventVersion=false):Promise<Publication> {
   return transaction(async c=>{
-    await c.query("SELECT pg_advisory_xact_lock(hashtext('radar_publication'))");
+    await lockTransaction(c,'radar_publication');
     const candidate=await locked<Candidate>('candidates',candidateId,version,c);
     const enrichment=automatic&&candidate.status==='published'&&candidate.automation?.templatePublished;
     if((candidate.status==='published'&&!enrichment)||candidate.status==='ignored')throw new DomainError('候选已处理');
@@ -338,7 +340,7 @@ export async function executeCommand(action:string,input:Record<string,unknown>,
     } catch(error) {await failedOperationAudit(actor,action,result?.candidate?.id??result?.evidence.id??'manual',error,result?{evidenceId:result.evidence.id,candidateId:result.candidate?.id}:undefined);throw error;}
   }
   return transaction(async c=>{
-    await c.query("SELECT pg_advisory_xact_lock(hashtext('radar_publication'))");
+    await lockTransaction(c,'radar_publication');
     if(action==='candidate.save'||action==='candidate.ignore'||action==='candidate.generate') {
       const old=await locked<Candidate>('candidates',input.id,input.version,c);if(old.status==='published'||old.status==='ignored')throw new DomainError('候选已处理，不能修改');
       if(action==='candidate.generate') return queueJob('generate',{candidateId:old.id,force:true,expectedVersion:old.version},c,{actor,action,objectId:old.id});

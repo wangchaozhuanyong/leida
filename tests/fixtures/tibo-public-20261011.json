@@ -1,0 +1,699 @@
+{
+  "code": 200,
+  "results": [
+    {
+      "type": "status",
+      "id": "2109152716954222849",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2109152716954222849",
+      "text": "Pro users, would you rather have",
+      "created_at": "Sun Oct 11 05:22:48 +0000 2026",
+      "created_timestamp": 1791696168,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Pro users, would you rather have"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2109132167112782291",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2109132167112782291",
+      "text": "Put the reset in the bag. All propagated.",
+      "created_at": "Sun Oct 11 04:01:09 +0000 2026",
+      "created_timestamp": 1791691269,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Put the reset in the bag. All propagated."
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2109045392684032299",
+        "provider": "twitter",
+        "url": "https://x.com/thsottiaux/status/2109045392684032299",
+        "text": "Global reset by EOD. May the tokens do good things for you.",
+        "created_at": "Sat Oct 10 22:16:20 +0000 2026",
+        "created_timestamp": 1791670580,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "Global reset by EOD. May the tokens do good things for you."
+        },
+        "author": {
+          "id": "1953337039510003712",
+          "screen_name": "thsottiaux",
+          "protected": false
+        },
+        "quote": null
+      }
+    },
+    {
+      "type": "status",
+      "id": "2109090080497508356",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2109090080497508356",
+      "text": "The day we reach perfection it will be resets from there onwards",
+      "created_at": "Sun Oct 11 01:13:54 +0000 2026",
+      "created_timestamp": 1791681234,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "The day we reach perfection it will be resets from there onwards"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2109045220411351517",
+        "provider": "twitter",
+        "url": "https://x.com/thsottiaux/status/2109045220411351517",
+        "text": "Day 6/ Reset",
+        "created_at": "Sat Oct 10 22:15:39 +0000 2026",
+        "created_timestamp": 1791670539,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "Day 6/ Reset"
+        },
+        "author": {
+          "id": "1953337039510003712",
+          "screen_name": "thsottiaux",
+          "protected": false
+        },
+        "quote": null
+      }
+    },
+    {
+      "type": "status",
+      "id": "2109045220411351517",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2109045220411351517",
+      "text": "Day 6/ Reset",
+      "created_at": "Sat Oct 10 22:15:39 +0000 2026",
+      "created_timestamp": 1791670539,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Day 6/ Reset"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2109045392684032299",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2109045392684032299",
+      "text": "Global reset by EOD. May the tokens do good things for you.",
+      "created_at": "Sat Oct 10 22:16:20 +0000 2026",
+      "created_timestamp": 1791670580,
+      "replying_to": {
+        "screen_name": "thsottiaux",
+        "status": "2109045220411351517",
+        "url": "https://x.com/thsottiaux/status/2109045220411351517",
+        "profile_url": "https://x.com/thsottiaux"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Global reset by EOD. May the tokens do good things for you."
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2108840070648397933",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2108840070648397933",
+      "text": "Blinked and it’s already Saturday",
+      "created_at": "Sat Oct 10 08:40:27 +0000 2026",
+      "created_timestamp": 1791621627,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Blinked and it’s already Saturday"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2108777962053292398",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2108777962053292398",
+      "text": "Your ChatGPT subscription is now also a Devin subscription",
+      "created_at": "Sat Oct 10 04:33:40 +0000 2026",
+      "created_timestamp": 1791606820,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Your ChatGPT subscription is now also a Devin subscription"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2108692010056188048",
+        "provider": "twitter",
+        "url": "https://x.com/cognition/status/2108692010056188048",
+        "text": "You can use any personal ChatGPT plan with Devin\n\nJust connect your Go, Plus, or Pro plan to Devin and all GPT model usage will draw down from you plan's quota",
+        "created_at": "Fri Oct 09 22:52:07 +0000 2026",
+        "created_timestamp": 1791586327,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "You can use any personal ChatGPT plan with Devin\n\nJust connect your Go, Plus, or Pro plan to Devin and all GPT model usage will draw down from you plan's quota https://t.co/7vVFQq3IAB"
+        },
+        "author": {
+          "id": "1751810001751183361",
+          "screen_name": "cognition",
+          "protected": false
+        },
+        "quote": null
+      }
+    },
+    {
+      "type": "status",
+      "id": "2108773703064657936",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2108773703064657936",
+      "text": "Dots got a pretty big upgrade",
+      "created_at": "Sat Oct 10 04:16:44 +0000 2026",
+      "created_timestamp": 1791605804,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Dots got a pretty big upgrade"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2108636748217770180",
+        "provider": "twitter",
+        "url": "https://x.com/ChatGPT/status/2108636748217770180",
+        "text": "Delegate work in Codex to your dot.\n\nYour dot can now start work in Codex and follow up on existing threads, drawing on your ChatGPT conversations, Codex threads, and automations. It’s also better at deciding when to keep a thread going or start fresh.\n\nYour dot can also review and edit Scheduled Tasks in ChatGPT Work, too. Ask what’s scheduled or update a recurring task as plans change.",
+        "created_at": "Fri Oct 09 19:12:32 +0000 2026",
+        "created_timestamp": 1791573152,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "Delegate work in Codex to your dot.\n\nYour dot can now start work in Codex and follow up on existing threads, drawing on your ChatGPT conversations, Codex threads, and automations. It’s also better at deciding when to keep a thread going or start fresh.\n\nYour dot can also review and edit Scheduled Tasks in ChatGPT Work, too. Ask what’s scheduled or update a recurring task as plans change."
+        },
+        "author": {
+          "id": "1714438092655149056",
+          "screen_name": "ChatGPT",
+          "protected": false
+        },
+        "quote": null
+      }
+    },
+    {
+      "type": "status",
+      "id": "2108645667451318747",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2108645667451318747",
+      "text": "Day 5/\n\nComposer predictions in the desktop app. Often leads to a double take with how on point they are. Included in the Pro plans without consuming usage.",
+      "created_at": "Fri Oct 09 19:47:58 +0000 2026",
+      "created_timestamp": 1791575278,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Day 5/\n\nComposer predictions in the desktop app. Often leads to a double take with how on point they are. Included in the Pro plans without consuming usage."
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2108624138369929725",
+        "provider": "twitter",
+        "url": "https://x.com/OpenAIDevs/status/2108624138369929725",
+        "text": "Now in beta: composer predictions in Codex for Pro users.\n\nCodex can now suggest your next message based on your conversation and how you talk to it.\n\nOne of the most loved new features we've ever tested internally.",
+        "created_at": "Fri Oct 09 18:22:25 +0000 2026",
+        "created_timestamp": 1791570145,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "Now in beta: composer predictions in Codex for Pro users.\n\nCodex can now suggest your next message based on your conversation and how you talk to it.\n\nOne of the most loved new features we've ever tested internally. https://t.co/0u8d2a3feS"
+        },
+        "author": {
+          "id": "1633874951508721686",
+          "screen_name": "OpenAIDevs",
+          "protected": false
+        },
+        "quote": null
+      }
+    },
+    {
+      "type": "status",
+      "id": "2108650026671231468",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2108650026671231468",
+      "text": "Send feedback to @keyanzhang and @sharifshameem !",
+      "created_at": "Fri Oct 09 20:05:17 +0000 2026",
+      "created_timestamp": 1791576317,
+      "replying_to": {
+        "screen_name": "thsottiaux",
+        "status": "2108645667451318747",
+        "url": "https://x.com/thsottiaux/status/2108645667451318747",
+        "profile_url": "https://x.com/thsottiaux"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Send feedback to @keyanzhang and @sharifshameem !"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2108646052178092403",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2108646052178092403",
+      "text": "Day 5 (dots edition)/\n\nYou can now create and text your dot entirely from the ChatGPT mobile app. Impressed so many created them via the desktop/web app previously. Time to scale!",
+      "created_at": "Fri Oct 09 19:49:30 +0000 2026",
+      "created_timestamp": 1791575370,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Day 5 (dots edition)/\n\nYou can now create and text your dot entirely from the ChatGPT mobile app. Impressed so many created them via the desktop/web app previously. Time to scale!"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2108636745915052037",
+        "provider": "twitter",
+        "url": "https://x.com/ChatGPT/status/2108636745915052037",
+        "text": "Fresh updates for dots.\n\nFirst up: you can now create your dot straight from your phone in the ChatGPT app on iOS and Android.",
+        "created_at": "Fri Oct 09 19:12:31 +0000 2026",
+        "created_timestamp": 1791573151,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "Fresh updates for dots.\n\nFirst up: you can now create your dot straight from your phone in the ChatGPT app on iOS and Android. https://t.co/ZHOqBx6tLI"
+        },
+        "author": {
+          "id": "1714438092655149056",
+          "screen_name": "ChatGPT",
+          "protected": false
+        },
+        "quote": null
+      }
+    },
+    {
+      "type": "status",
+      "id": "2108349826727588000",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2108349826727588000",
+      "text": "Today, we are announcing ChatGPT.\n\nIt is here: https://chatgpt.com/",
+      "created_at": "Fri Oct 09 00:12:24 +0000 2026",
+      "created_timestamp": 1791504744,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Today, we are announcing ChatGPT.\n\nIt is here: https://t.co/Pgk3THSyOJ"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2108275041276420573",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2108275041276420573",
+      "text": "Day 4/\n\nWe have improved steering to be instant, leading to the model now reacting much faster to adjustments you make, allowing you to course-correct direction in realtime and not have the model waste effort.\n\nAlso releasing GPT-6.1 Sol ultrafast. The two work very well together.",
+      "created_at": "Thu Oct 08 19:15:14 +0000 2026",
+      "created_timestamp": 1791486914,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Day 4/\n\nWe have improved steering to be instant, leading to the model now reacting much faster to adjustments you make, allowing you to course-correct direction in realtime and not have the model waste effort.\n\nAlso releasing GPT-6.1 Sol ultrafast. The two work very well together."
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2108262812489531498",
+        "provider": "twitter",
+        "url": "https://x.com/OpenAIDevs/status/2108262812489531498",
+        "text": "Ultrafast is rolling out today for GPT-6.1 Sol in the API, Codex, and ChatGPT Work.\n\nNear-Astra intelligence at up to 8x faster speeds than Sol Standard, so you can build as fast as the ideas come.",
+        "created_at": "Thu Oct 08 18:26:38 +0000 2026",
+        "created_timestamp": 1791483998,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "Ultrafast is rolling out today for GPT-6.1 Sol in the API, Codex, and ChatGPT Work.\n\nNear-Astra intelligence at up to 8x faster speeds than Sol Standard, so you can build as fast as the ideas come. https://t.co/Cyy9k2hifV"
+        },
+        "author": {
+          "id": "1633874951508721686",
+          "screen_name": "OpenAIDevs",
+          "protected": false
+        },
+        "quote": null
+      }
+    },
+    {
+      "type": "status",
+      "id": "2108084615349170480",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2108084615349170480",
+      "text": "Day 3 (encore)/\n\nWe silently re-shipped codex cloud. It’s pretty good now",
+      "created_at": "Thu Oct 08 06:38:33 +0000 2026",
+      "created_timestamp": 1791441513,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Day 3 (encore)/\n\nWe silently re-shipped codex cloud. It’s pretty good now"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2107836671605551217",
+        "provider": "twitter",
+        "url": "https://x.com/Tailscale/status/2107836671605551217",
+        "text": "Codex 🤝 Tailscale\n\nCodex Cloud can now securely connect to resources on your tailnet with Tailscale.\n\nUseful tools should be easy to build with, combine, and turn into something even more useful.\n\nSee how it works → \nhttps://buff.ly/yFcldrC",
+        "created_at": "Wed Oct 07 14:13:18 +0000 2026",
+        "created_timestamp": 1791382398,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "Codex 🤝 Tailscale\n\nCodex Cloud can now securely connect to resources on your tailnet with Tailscale.\n\nUseful tools should be easy to build with, combine, and turn into something even more useful.\n\nSee how it works → \nhttps://t.co/0eFd37GmmO"
+        },
+        "author": {
+          "id": "1106616565573844992",
+          "screen_name": "Tailscale",
+          "protected": false
+        },
+        "quote": null
+      }
+    },
+    {
+      "type": "status",
+      "id": "2108040921044639779",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2108040921044639779",
+      "text": "Confirmed landed across all accounts. How are we doing so far?",
+      "created_at": "Thu Oct 08 03:44:55 +0000 2026",
+      "created_timestamp": 1791431095,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Confirmed landed across all accounts. How are we doing so far?"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2107913674593644711",
+        "provider": "twitter",
+        "url": "https://x.com/thsottiaux/status/2107913674593644711",
+        "text": "Day 3/\n\nThe big one is GPT-6 in Chat, but today is also a little celebration day with a new high of 40M active users across Codex and ChatGPT Work.\n\nLoading a banked reset in everyone's paid accounts. See you again tomorrow!",
+        "created_at": "Wed Oct 07 19:19:17 +0000 2026",
+        "created_timestamp": 1791400757,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "Day 3/\n\nThe big one is GPT-6 in Chat, but today is also a little celebration day with a new high of 40M active users across Codex and ChatGPT Work.\n\nLoading a banked reset in everyone's paid accounts. See you again tomorrow!"
+        },
+        "author": {
+          "id": "1953337039510003712",
+          "screen_name": "thsottiaux",
+          "protected": false
+        },
+        "quote": {
+          "type": "tombstone",
+          "id": "2107575657014468879",
+          "provider": "twitter",
+          "url": "https://x.com/i/status/2107575657014468879",
+          "text": null,
+          "created_at": null,
+          "created_timestamp": null,
+          "replying_to": null,
+          "reposted_by": null,
+          "raw_text": null,
+          "author": {
+            "id": null,
+            "screen_name": null,
+            "protected": null
+          },
+          "quote": null
+        }
+      }
+    },
+    {
+      "type": "status",
+      "id": "2107913674593644711",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2107913674593644711",
+      "text": "Day 3/\n\nThe big one is GPT-6 in Chat, but today is also a little celebration day with a new high of 40M active users across Codex and ChatGPT Work.\n\nLoading a banked reset in everyone's paid accounts. See you again tomorrow!",
+      "created_at": "Wed Oct 07 19:19:17 +0000 2026",
+      "created_timestamp": 1791400757,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Day 3/\n\nThe big one is GPT-6 in Chat, but today is also a little celebration day with a new high of 40M active users across Codex and ChatGPT Work.\n\nLoading a banked reset in everyone's paid accounts. See you again tomorrow!"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2107575657014468879",
+        "provider": "twitter",
+        "url": "https://x.com/thsottiaux/status/2107575657014468879",
+        "text": "Roundup of Day 2/\n\n2.1/ Approve for me (auto-review) is now included and does not use usage. Can be between 2-10% of plan when used. Also better for you.\n2.2/ Simplified API for builders.\n2.3/ Meeting notes integrated.\n2.4/ Decisions API live for builders. Will use in the app to improve the experience.",
+        "created_at": "Tue Oct 06 20:56:08 +0000 2026",
+        "created_timestamp": 1791320168,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "Roundup of Day 2/\n\n2.1/ Approve for me (auto-review) is now included and does not use usage. Can be between 2-10% of plan when used. Also better for you.\n2.2/ Simplified API for builders.\n2.3/ Meeting notes integrated.\n2.4/ Decisions API live for builders. Will use in the app to improve the experience."
+        },
+        "author": {
+          "id": "1953337039510003712",
+          "screen_name": "thsottiaux",
+          "protected": false
+        },
+        "quote": null
+      }
+    },
+    {
+      "type": "status",
+      "id": "2107913738791596286",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2107913738791596286",
+      "text": "Will be there by EOD PST.",
+      "created_at": "Wed Oct 07 19:19:33 +0000 2026",
+      "created_timestamp": 1791400773,
+      "replying_to": {
+        "screen_name": "thsottiaux",
+        "status": "2107913674593644711",
+        "url": "https://x.com/thsottiaux/status/2107913674593644711",
+        "profile_url": "https://x.com/thsottiaux"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Will be there by EOD PST."
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2107912709715132482",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2107912709715132482",
+      "text": "We're going beyond text and are releasing a new version of GPT-6 to all users in ChatGPT. Lots of model and infra improvements coming together here to scale it to 1.2B users!",
+      "created_at": "Wed Oct 07 19:15:27 +0000 2026",
+      "created_timestamp": 1791400527,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "We're going beyond text and are releasing a new version of GPT-6 to all users in ChatGPT. Lots of model and infra improvements coming together here to scale it to 1.2B users!"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2107894997538525580",
+        "provider": "twitter",
+        "url": "https://x.com/OpenAI/status/2107894997538525580",
+        "text": "GPT-6 and Intelligent UI, now rolling out in ChatGPT for everyone.\n\nIntelligent UI in ChatGPT delivers fast, interactive answers that make everyday questions more visual, complex topics easier to grasp, and interactive tools for your task available on the spot.",
+        "created_at": "Wed Oct 07 18:05:04 +0000 2026",
+        "created_timestamp": 1791396304,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "GPT-6 and Intelligent UI, now rolling out in ChatGPT for everyone.\n\nIntelligent UI in ChatGPT delivers fast, interactive answers that make everyday questions more visual, complex topics easier to grasp, and interactive tools for your task available on the spot. https://t.co/XL2gDCPBwG"
+        },
+        "author": {
+          "id": "4398626122",
+          "screen_name": "OpenAI",
+          "protected": false
+        },
+        "quote": null
+      }
+    },
+    {
+      "type": "status",
+      "id": "2107676072871600470",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2107676072871600470",
+      "text": "We shipped four things that were deemed good to great and some math proofs, but the vote is clear and the community demands a reset. I did calibrate it and it *seems* that the game is rigged in reset's favor, but such are the rules at the moment.\n\nTherefore ... the reset has been processed. Enjoy!",
+      "created_at": "Wed Oct 07 03:35:09 +0000 2026",
+      "created_timestamp": 1791344109,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "We shipped four things that were deemed good to great and some math proofs, but the vote is clear and the community demands a reset. I did calibrate it and it *seems* that the game is rigged in reset's favor, but such are the rules at the moment.\n\nTherefore ... the reset has been processed. Enjoy!"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2107575657014468879",
+        "provider": "twitter",
+        "url": "https://x.com/thsottiaux/status/2107575657014468879",
+        "text": "Roundup of Day 2/\n\n2.1/ Approve for me (auto-review) is now included and does not use usage. Can be between 2-10% of plan when used. Also better for you.\n2.2/ Simplified API for builders.\n2.3/ Meeting notes integrated.\n2.4/ Decisions API live for builders. Will use in the app to improve the experience.",
+        "created_at": "Tue Oct 06 20:56:08 +0000 2026",
+        "created_timestamp": 1791320168,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "Roundup of Day 2/\n\n2.1/ Approve for me (auto-review) is now included and does not use usage. Can be between 2-10% of plan when used. Also better for you.\n2.2/ Simplified API for builders.\n2.3/ Meeting notes integrated.\n2.4/ Decisions API live for builders. Will use in the app to improve the experience."
+        },
+        "author": {
+          "id": "1953337039510003712",
+          "screen_name": "thsottiaux",
+          "protected": false
+        },
+        "quote": null
+      }
+    },
+    {
+      "type": "status",
+      "id": "2107676653895967106",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2107676653895967106",
+      "text": "Also! Good evening!!",
+      "created_at": "Wed Oct 07 03:37:27 +0000 2026",
+      "created_timestamp": 1791344247,
+      "replying_to": {
+        "screen_name": "thsottiaux",
+        "status": "2107676072871600470",
+        "url": "https://x.com/thsottiaux/status/2107676072871600470",
+        "profile_url": "https://x.com/thsottiaux"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Also! Good evening!!"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2107676261099426030",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2107676261099426030",
+      "text": "And we won't unship the improvements. You get to have your cake and eat it too. See you tomorrow for Day 3!",
+      "created_at": "Wed Oct 07 03:35:54 +0000 2026",
+      "created_timestamp": 1791344154,
+      "replying_to": {
+        "screen_name": "thsottiaux",
+        "status": "2107676072871600470",
+        "url": "https://x.com/thsottiaux/status/2107676072871600470",
+        "profile_url": "https://x.com/thsottiaux"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "And we won't unship the improvements. You get to have your cake and eat it too. See you tomorrow for Day 3!"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    }
+  ],
+  "cursor": {
+    "top": "DAAHCgABHUVvqWtAJxELAAIAAAATMjEwOTE1MjcxNjk1NDIyMjg0OQgAAwAAAAEAAA",
+    "bottom": "DAAHCgABHUVvqWs__-8LAAIAAAATMjEwNzY3NjI2MTA5OTQyNjAzMAgAAwAAAAIAAA"
+  }
+}

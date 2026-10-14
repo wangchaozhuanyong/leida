@@ -1,0 +1,2 @@
+/* 活动按真实规则展示，不生成未发布的进展。 */
+.activity-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.activity-heading .title{flex:1;min-width:0;word-break:break-word}.activity-phase{flex:none;max-width:45%;text-align:right}

@@ -1,0 +1,10 @@
+<view class="page">
+  <status-panel wx:if="{{!connected}}" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />
+  <block wx:else><view wx:if="{{error}}" class="warning">{{error}}<button class="secondary" bindtap="retry">重新加载</button></view>
+    <view wx:if="{{activity.missing}}" class="card empty"><view class="heading">暂无这项活动</view><view>活动规则与进展发布后收录。</view></view>
+    <block wx:else><view class="activity-heading"><view class="title">{{activity.title}}</view><view class="activity-phase purple small">{{activity.phase}}</view></view><view class="prose muted" style="margin-bottom:20px">{{activity.rules}}</view>
+      <view class="card"><view class="row wrap"><view class="heading">每日进展</view><text class="badge purple">已收录{{activity.recordedDays}}天</text></view><view class="activity-days" style="margin-top:16px"><button wx:for="{{activity.days}}" wx:key="value" class="activity-day {{item.selected ? 'selected' : ''}}" data-day="{{item.value}}" bindtap="selectDay" aria-label="第{{item.value}}天，{{item.recorded ? '有已收录进展' : '暂无记录'}}">{{item.value}}<view wx:if="{{item.recorded}}" class="dot"></view></button></view><view class="small muted lead">日期按{{activity.timezone}}划分，记录时间显示为北京时间。</view></view>
+      <view class="row section"><view class="heading">第{{activity.selected}}天</view><text class="muted">{{activity.entries.length}}条进展</text></view><publication-card wx:for="{{activity.entries}}" wx:key="id" item="{{item}}" /><view wx:if="{{!activity.entries.length}}" class="card empty">{{activity.emptyText}}</view>
+    </block><view class="foot">资料截至 {{cutoff}} · 北京时间</view>
+  </block>
+</view>

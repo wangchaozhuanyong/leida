@@ -1,0 +1,873 @@
+{
+  "code": 200,
+  "results": [
+    {
+      "type": "status",
+      "id": "2109152716954222849",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2109152716954222849",
+      "text": "Pro users, would you rather have",
+      "created_at": "Sun Oct 11 05:22:48 +0000 2026",
+      "created_timestamp": 1791696168,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Pro users, would you rather have"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2109140410723639741",
+      "provider": "twitter",
+      "url": "https://x.com/SiftByte/status/2109140410723639741",
+      "text": "OpenAI and Anthropic keep handing out free usage resets. I got curious about how much this actually costs them.\n\nLet's do some math.\n\nAt GPT-6 Sol / Claude Sonnet 5.5 API rates:\n→ 2M input tokens = $4\n→ 500K output tokens = $5\n→ That's $9 of API-equivalent usage per user.\n\nNow imagine 1M eligible accounts. 30% redeem their reset, and half that usage is genuinely additional.\n\nThat's $1.35M in API-equivalent usage, but NOT $1.35M in actual GPU costs.\n\nThose numbers aren't public.\n\nAnd there's another catch: OpenAI's banked reset moves your next weekly reset date. It's partly borrowing usage from the future.\n\nWhy give them away?\nBecause keeping developers building, reducing churn, and getting people hooked on new workflows can be worth more than the extra compute.\n\nIf the reset costs less than the subscriptions it saves, it's a pretty good trade.\n\nI'm curious: would you rather get a smarter model or more usage of the one you already have?",
+      "created_at": "Sun Oct 11 04:33:54 +0000 2026",
+      "created_timestamp": 1791693234,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "OpenAI and Anthropic keep handing out free usage resets. I got curious about how much this actually costs them.\n\nLet's do some math.\n\nAt GPT-6 Sol / Claude Sonnet 5.5 API rates:\n→ 2M input tokens = $4\n→ 500K output tokens = $5\n→ That's $9 of API-equivalent usage per user.\n\nNow imagine 1M eligible accounts. 30% redeem their reset, and half that usage is genuinely additional.\n\nThat's $1.35M in API-equivalent usage, but NOT $1.35M in actual GPU costs.\n\nThose numbers aren't public.\n\nAnd there's another catch: OpenAI's banked reset moves your next weekly reset date. It's partly borrowing usage from the future.\n\nWhy give them away?\nBecause keeping developers building, reducing churn, and getting people hooked on new workflows can be worth more than the extra compute.\n\nIf the reset costs less than the subscriptions it saves, it's a pretty good trade.\n\nI'm curious: would you rather get a smarter model or more usage of the one you already have?"
+      },
+      "author": {
+        "id": "2096487230542098432",
+        "screen_name": "SiftByte",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2109045392684032299",
+        "provider": "twitter",
+        "url": "https://x.com/thsottiaux/status/2109045392684032299",
+        "text": "Global reset by EOD. May the tokens do good things for you.",
+        "created_at": "Sat Oct 10 22:16:20 +0000 2026",
+        "created_timestamp": 1791670580,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "Global reset by EOD. May the tokens do good things for you."
+        },
+        "author": {
+          "id": "1953337039510003712",
+          "screen_name": "thsottiaux",
+          "protected": false
+        },
+        "quote": null
+      }
+    },
+    {
+      "type": "status",
+      "id": "2109142061014466866",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2109142061014466866",
+      "text": "@SiftByte You are doing more math than I am",
+      "created_at": "Sun Oct 11 04:40:27 +0000 2026",
+      "created_timestamp": 1791693627,
+      "replying_to": {
+        "screen_name": "SiftByte",
+        "status": "2109140410723639741",
+        "url": "https://x.com/SiftByte/status/2109140410723639741",
+        "profile_url": "https://x.com/SiftByte"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "@SiftByte You are doing more math than I am"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2109017261378035873",
+      "provider": "twitter",
+      "url": "https://x.com/theo/status/2109017261378035873",
+      "text": "400,000 of you guys now. Absolutely wild. Thank you all. 🫡",
+      "created_at": "Sat Oct 10 20:24:33 +0000 2026",
+      "created_timestamp": 1791663873,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "400,000 of you guys now. Absolutely wild. Thank you all. 🫡 https://t.co/YR8N7alORO"
+      },
+      "author": {
+        "id": "786375418685165568",
+        "screen_name": "theo",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2109135750054957556",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2109135750054957556",
+      "text": "@theo Dare you to invite everyone to a party",
+      "created_at": "Sun Oct 11 04:15:23 +0000 2026",
+      "created_timestamp": 1791692123,
+      "replying_to": {
+        "screen_name": "theo",
+        "status": "2109017261378035873",
+        "url": "https://x.com/theo/status/2109017261378035873",
+        "profile_url": "https://x.com/theo"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "@theo Dare you to invite everyone to a party"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2109132167112782291",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2109132167112782291",
+      "text": "Put the reset in the bag. All propagated.",
+      "created_at": "Sun Oct 11 04:01:09 +0000 2026",
+      "created_timestamp": 1791691269,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Put the reset in the bag. All propagated."
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2109045392684032299",
+        "provider": "twitter",
+        "url": "https://x.com/thsottiaux/status/2109045392684032299",
+        "text": "Global reset by EOD. May the tokens do good things for you.",
+        "created_at": "Sat Oct 10 22:16:20 +0000 2026",
+        "created_timestamp": 1791670580,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "Global reset by EOD. May the tokens do good things for you."
+        },
+        "author": {
+          "id": "1953337039510003712",
+          "screen_name": "thsottiaux",
+          "protected": false
+        },
+        "quote": null
+      }
+    },
+    {
+      "type": "status",
+      "id": "2108649508955648408",
+      "provider": "twitter",
+      "url": "https://x.com/ConnorTalksAI/status/2108649508955648408",
+      "text": "You are sitting next to Tibo and get 3 words…\n\nWhat do you say?",
+      "created_at": "Fri Oct 09 20:03:14 +0000 2026",
+      "created_timestamp": 1791576194,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "You are sitting next to Tibo and get 3 words…\n\nWhat do you say? https://t.co/h4HhPJ3ptP"
+      },
+      "author": {
+        "id": "2048564521631916032",
+        "screen_name": "ConnorTalksAI",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2108780620583403652",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2108780620583403652",
+      "text": "@ConnorTalksAI What the heck",
+      "created_at": "Sat Oct 10 04:44:13 +0000 2026",
+      "created_timestamp": 1791607453,
+      "replying_to": {
+        "screen_name": "ConnorTalksAI",
+        "status": "2108649508955648408",
+        "url": "https://x.com/ConnorTalksAI/status/2108649508955648408",
+        "profile_url": "https://x.com/ConnorTalksAI"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "@ConnorTalksAI What the heck"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2109092087501332816",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2109092087501332816",
+      "text": "@ConnorTalksAI Actually had a nightmare about this",
+      "created_at": "Sun Oct 11 01:21:53 +0000 2026",
+      "created_timestamp": 1791681713,
+      "replying_to": {
+        "screen_name": "thsottiaux",
+        "status": "2108780620583403652",
+        "url": "https://x.com/thsottiaux/status/2108780620583403652",
+        "profile_url": "https://x.com/thsottiaux"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "@ConnorTalksAI Actually had a nightmare about this"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2108924445318414581",
+      "provider": "twitter",
+      "url": "https://x.com/ziwenxu_/status/2108924445318414581",
+      "text": "General question: does anyone actually use OpenAI Dot, or pay for Codex just for Dot?",
+      "created_at": "Sat Oct 10 14:15:44 +0000 2026",
+      "created_timestamp": 1791641744,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "General question: does anyone actually use OpenAI Dot, or pay for Codex just for Dot?"
+      },
+      "author": {
+        "id": "1781009683743997952",
+        "screen_name": "ziwenxu_",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2108646052178092403",
+        "provider": "twitter",
+        "url": "https://x.com/thsottiaux/status/2108646052178092403",
+        "text": "Day 5 (dots edition)/\n\nYou can now create and text your dot entirely from the ChatGPT mobile app. Impressed so many created them via the desktop/web app previously. Time to scale!",
+        "created_at": "Fri Oct 09 19:49:30 +0000 2026",
+        "created_timestamp": 1791575370,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "Day 5 (dots edition)/\n\nYou can now create and text your dot entirely from the ChatGPT mobile app. Impressed so many created them via the desktop/web app previously. Time to scale!"
+        },
+        "author": {
+          "id": "1953337039510003712",
+          "screen_name": "thsottiaux",
+          "protected": false
+        },
+        "quote": {
+          "type": "tombstone",
+          "id": "2108636745915052037",
+          "provider": "twitter",
+          "url": "https://x.com/i/status/2108636745915052037",
+          "text": null,
+          "created_at": null,
+          "created_timestamp": null,
+          "replying_to": null,
+          "reposted_by": null,
+          "raw_text": null,
+          "author": {
+            "id": null,
+            "screen_name": null,
+            "protected": null
+          },
+          "quote": null
+        }
+      }
+    },
+    {
+      "type": "status",
+      "id": "2109091159784198475",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2109091159784198475",
+      "text": "@ziwenxu_ 1M dots running and doing things for their users",
+      "created_at": "Sun Oct 11 01:18:12 +0000 2026",
+      "created_timestamp": 1791681492,
+      "replying_to": {
+        "screen_name": "ziwenxu_",
+        "status": "2108924445318414581",
+        "url": "https://x.com/ziwenxu_/status/2108924445318414581",
+        "profile_url": "https://x.com/ziwenxu_"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "@ziwenxu_ 1M dots running and doing things for their users"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2109090080497508356",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2109090080497508356",
+      "text": "The day we reach perfection it will be resets from there onwards",
+      "created_at": "Sun Oct 11 01:13:54 +0000 2026",
+      "created_timestamp": 1791681234,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "The day we reach perfection it will be resets from there onwards"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2109045220411351517",
+        "provider": "twitter",
+        "url": "https://x.com/thsottiaux/status/2109045220411351517",
+        "text": "Day 6/ Reset",
+        "created_at": "Sat Oct 10 22:15:39 +0000 2026",
+        "created_timestamp": 1791670539,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "Day 6/ Reset"
+        },
+        "author": {
+          "id": "1953337039510003712",
+          "screen_name": "thsottiaux",
+          "protected": false
+        },
+        "quote": null
+      }
+    },
+    {
+      "type": "status",
+      "id": "2109072811113488768",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2109072811113488768",
+      "text": "@elonmusk @bot Might as well just post it here",
+      "created_at": "Sun Oct 11 00:05:17 +0000 2026",
+      "created_timestamp": 1791677117,
+      "replying_to": {
+        "screen_name": "elonmusk",
+        "status": "2109027407185277123",
+        "url": "https://x.com/elonmusk/status/2109027407185277123",
+        "profile_url": "https://x.com/elonmusk"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "@elonmusk @bot Might as well just post it here https://t.co/ZGHpL9JLbX"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2109075516741263693",
+      "provider": "twitter",
+      "url": "https://x.com/TrustAgentic/status/2109075516741263693",
+      "text": "@thsottiaux @elonmusk @bot I thought it was a joke, but it works!! Thanks Tibo!!",
+      "created_at": "Sun Oct 11 00:16:02 +0000 2026",
+      "created_timestamp": 1791677762,
+      "replying_to": {
+        "screen_name": "thsottiaux",
+        "status": "2109072811113488768",
+        "url": "https://x.com/thsottiaux/status/2109072811113488768",
+        "profile_url": "https://x.com/thsottiaux"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "@thsottiaux @elonmusk @bot I thought it was a joke, but it works!! Thanks Tibo!!"
+      },
+      "author": {
+        "id": "2060397283103887361",
+        "screen_name": "TrustAgentic",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2109089556675137886",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2109089556675137886",
+      "text": "@TrustAgentic @elonmusk @bot Buy something nice",
+      "created_at": "Sun Oct 11 01:11:49 +0000 2026",
+      "created_timestamp": 1791681109,
+      "replying_to": {
+        "screen_name": "TrustAgentic",
+        "status": "2109075516741263693",
+        "url": "https://x.com/TrustAgentic/status/2109075516741263693",
+        "profile_url": "https://x.com/TrustAgentic"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "@TrustAgentic @elonmusk @bot Buy something nice"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2109046141375680877",
+      "provider": "twitter",
+      "url": "https://x.com/maria_rcks/status/2109046141375680877",
+      "text": "so they ran out of things to release / improve?",
+      "created_at": "Sat Oct 10 22:19:18 +0000 2026",
+      "created_timestamp": 1791670758,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "so they ran out of things to release / improve?"
+      },
+      "author": {
+        "id": "2011873878440886275",
+        "screen_name": "maria_rcks",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2109045220411351517",
+        "provider": "twitter",
+        "url": "https://x.com/thsottiaux/status/2109045220411351517",
+        "text": "Day 6/ Reset",
+        "created_at": "Sat Oct 10 22:15:39 +0000 2026",
+        "created_timestamp": 1791670539,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "Day 6/ Reset"
+        },
+        "author": {
+          "id": "1953337039510003712",
+          "screen_name": "thsottiaux",
+          "protected": false
+        },
+        "quote": null
+      }
+    },
+    {
+      "type": "status",
+      "id": "2109084804625158541",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2109084804625158541",
+      "text": "@maria_rcks That’s right, no more ships",
+      "created_at": "Sun Oct 11 00:52:56 +0000 2026",
+      "created_timestamp": 1791679976,
+      "replying_to": {
+        "screen_name": "maria_rcks",
+        "status": "2109046141375680877",
+        "url": "https://x.com/maria_rcks/status/2109046141375680877",
+        "profile_url": "https://x.com/maria_rcks"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "@maria_rcks That’s right, no more ships"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2109045220411351517",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2109045220411351517",
+      "text": "Day 6/ Reset",
+      "created_at": "Sat Oct 10 22:15:39 +0000 2026",
+      "created_timestamp": 1791670539,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Day 6/ Reset"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2109045392684032299",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2109045392684032299",
+      "text": "Global reset by EOD. May the tokens do good things for you.",
+      "created_at": "Sat Oct 10 22:16:20 +0000 2026",
+      "created_timestamp": 1791670580,
+      "replying_to": {
+        "screen_name": "thsottiaux",
+        "status": "2109045220411351517",
+        "url": "https://x.com/thsottiaux/status/2109045220411351517",
+        "profile_url": "https://x.com/thsottiaux"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Global reset by EOD. May the tokens do good things for you."
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2108928475251781852",
+      "provider": "twitter",
+      "url": "https://x.com/ryanvogel/status/2108928475251781852",
+      "text": "tibo is just a director level devrel",
+      "created_at": "Sat Oct 10 14:31:45 +0000 2026",
+      "created_timestamp": 1791642705,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "tibo is just a director level devrel"
+      },
+      "author": {
+        "id": "1590716769433427968",
+        "screen_name": "ryanvogel",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2109021594576470290",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2109021594576470290",
+      "text": "@ryanvogel 👀",
+      "created_at": "Sat Oct 10 20:41:46 +0000 2026",
+      "created_timestamp": 1791664906,
+      "replying_to": {
+        "screen_name": "ryanvogel",
+        "status": "2108928475251781852",
+        "url": "https://x.com/ryanvogel/status/2108928475251781852",
+        "profile_url": "https://x.com/ryanvogel"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "@ryanvogel 👀"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2108752800167731611",
+      "provider": "twitter",
+      "url": "https://x.com/LukeParkerDev/status/2108752800167731611",
+      "text": "> works at frontier lab\n> must achieve RSI and SI\n> runs out of eval ideas\n> idea.jpeg",
+      "created_at": "Sat Oct 10 02:53:40 +0000 2026",
+      "created_timestamp": 1791600820,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "&gt; works at frontier lab\n&gt; must achieve RSI and SI\n&gt; runs out of eval ideas\n&gt; idea.jpeg"
+      },
+      "author": {
+        "id": "3634867160",
+        "screen_name": "LukeParkerDev",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2108743632035700982",
+        "provider": "twitter",
+        "url": "https://x.com/theo/status/2108743632035700982",
+        "text": "What are some coding tasks that AI is still really bad at?",
+        "created_at": "Sat Oct 10 02:17:15 +0000 2026",
+        "created_timestamp": 1791598635,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "What are some coding tasks that AI is still really bad at?"
+        },
+        "author": {
+          "id": "786375418685165568",
+          "screen_name": "theo",
+          "protected": false
+        },
+        "quote": null
+      }
+    },
+    {
+      "type": "status",
+      "id": "2108756052921766389",
+      "provider": "twitter",
+      "url": "https://x.com/theo/status/2108756052921766389",
+      "text": "@LukeParkerDev Man I keep forgetting I work for OpenAI",
+      "created_at": "Sat Oct 10 03:06:36 +0000 2026",
+      "created_timestamp": 1791601596,
+      "replying_to": {
+        "screen_name": "LukeParkerDev",
+        "status": "2108752800167731611",
+        "url": "https://x.com/LukeParkerDev/status/2108752800167731611",
+        "profile_url": "https://x.com/LukeParkerDev"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "@LukeParkerDev Man I keep forgetting I work for OpenAI"
+      },
+      "author": {
+        "id": "786375418685165568",
+        "screen_name": "theo",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2108852361536098422",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2108852361536098422",
+      "text": "@theo @LukeParkerDev Me too",
+      "created_at": "Sat Oct 10 09:29:18 +0000 2026",
+      "created_timestamp": 1791624558,
+      "replying_to": {
+        "screen_name": "theo",
+        "status": "2108756052921766389",
+        "url": "https://x.com/theo/status/2108756052921766389",
+        "profile_url": "https://x.com/theo"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "@theo @LukeParkerDev Me too"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2108840070648397933",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2108840070648397933",
+      "text": "Blinked and it’s already Saturday",
+      "created_at": "Sat Oct 10 08:40:27 +0000 2026",
+      "created_timestamp": 1791621627,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Blinked and it’s already Saturday"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2108277836285161798",
+      "provider": "twitter",
+      "url": "https://x.com/rohit3a/status/2108277836285161798",
+      "text": "Did some digging and apparently setting /autocompact to 400k would have saved me 29% of my weekly usage without lobotomizing Claude.",
+      "created_at": "Thu Oct 08 19:26:20 +0000 2026",
+      "created_timestamp": 1791487580,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Did some digging and apparently setting /autocompact to 400k would have saved me 29% of my weekly usage without lobotomizing Claude. https://t.co/cytegXaU6g"
+      },
+      "author": {
+        "id": "2914778029",
+        "screen_name": "rohit3a",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2108778939057664357",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2108778939057664357",
+      "text": "@rohit3a Folks. Why do you think we picked 300k for context length for Codex. \n\nWe ran the numbers and it’s better. We can run it at 1M too but it would just cost more of the usage. Good defaults are important.",
+      "created_at": "Sat Oct 10 04:37:32 +0000 2026",
+      "created_timestamp": 1791607052,
+      "replying_to": {
+        "screen_name": "rohit3a",
+        "status": "2108277836285161798",
+        "url": "https://x.com/rohit3a/status/2108277836285161798",
+        "profile_url": "https://x.com/rohit3a"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "@rohit3a Folks. Why do you think we picked 300k for context length for Codex. \n\nWe ran the numbers and it’s better. We can run it at 1M too but it would just cost more of the usage. Good defaults are important."
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2108777962053292398",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2108777962053292398",
+      "text": "Your ChatGPT subscription is now also a Devin subscription",
+      "created_at": "Sat Oct 10 04:33:40 +0000 2026",
+      "created_timestamp": 1791606820,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Your ChatGPT subscription is now also a Devin subscription"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2108692010056188048",
+        "provider": "twitter",
+        "url": "https://x.com/cognition/status/2108692010056188048",
+        "text": "You can use any personal ChatGPT plan with Devin\n\nJust connect your Go, Plus, or Pro plan to Devin and all GPT model usage will draw down from you plan's quota",
+        "created_at": "Fri Oct 09 22:52:07 +0000 2026",
+        "created_timestamp": 1791586327,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "You can use any personal ChatGPT plan with Devin\n\nJust connect your Go, Plus, or Pro plan to Devin and all GPT model usage will draw down from you plan's quota https://t.co/7vVFQq3IAB"
+        },
+        "author": {
+          "id": "1751810001751183361",
+          "screen_name": "cognition",
+          "protected": false
+        },
+        "quote": null
+      }
+    },
+    {
+      "type": "status",
+      "id": "2108431557824500204",
+      "provider": "twitter",
+      "url": "https://x.com/kunchenguid/status/2108431557824500204",
+      "text": "my dot has been running astra non-stop for almost 72 hrs now\n\nit seems there’s no quota limit right now so it’s free astra + 8 cpu + 10G RAM\n\ni don’t think this will last long so if you haven’t made use of it yet i highly recommend taking advantage before it ends",
+      "created_at": "Fri Oct 09 05:37:10 +0000 2026",
+      "created_timestamp": 1791524230,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "my dot has been running astra non-stop for almost 72 hrs now\n\nit seems there’s no quota limit right now so it’s free astra + 8 cpu + 10G RAM\n\ni don’t think this will last long so if you haven’t made use of it yet i highly recommend taking advantage before it ends"
+      },
+      "author": {
+        "id": "1433268230819176451",
+        "screen_name": "kunchenguid",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2108773866281795814",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2108773866281795814",
+      "text": "@kunchenguid Dot goes brrrrrrr",
+      "created_at": "Sat Oct 10 04:17:23 +0000 2026",
+      "created_timestamp": 1791605843,
+      "replying_to": {
+        "screen_name": "kunchenguid",
+        "status": "2108431557824500204",
+        "url": "https://x.com/kunchenguid/status/2108431557824500204",
+        "profile_url": "https://x.com/kunchenguid"
+      },
+      "reposted_by": null,
+      "raw_text": {
+        "text": "@kunchenguid Dot goes brrrrrrr"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": null
+    },
+    {
+      "type": "status",
+      "id": "2108773703064657936",
+      "provider": "twitter",
+      "url": "https://x.com/thsottiaux/status/2108773703064657936",
+      "text": "Dots got a pretty big upgrade",
+      "created_at": "Sat Oct 10 04:16:44 +0000 2026",
+      "created_timestamp": 1791605804,
+      "replying_to": null,
+      "reposted_by": null,
+      "raw_text": {
+        "text": "Dots got a pretty big upgrade"
+      },
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux",
+        "protected": false
+      },
+      "quote": {
+        "type": "status",
+        "id": "2108636748217770180",
+        "provider": "twitter",
+        "url": "https://x.com/ChatGPT/status/2108636748217770180",
+        "text": "Delegate work in Codex to your dot.\n\nYour dot can now start work in Codex and follow up on existing threads, drawing on your ChatGPT conversations, Codex threads, and automations. It’s also better at deciding when to keep a thread going or start fresh.\n\nYour dot can also review and edit Scheduled Tasks in ChatGPT Work, too. Ask what’s scheduled or update a recurring task as plans change.",
+        "created_at": "Fri Oct 09 19:12:32 +0000 2026",
+        "created_timestamp": 1791573152,
+        "replying_to": null,
+        "reposted_by": null,
+        "raw_text": {
+          "text": "Delegate work in Codex to your dot.\n\nYour dot can now start work in Codex and follow up on existing threads, drawing on your ChatGPT conversations, Codex threads, and automations. It’s also better at deciding when to keep a thread going or start fresh.\n\nYour dot can also review and edit Scheduled Tasks in ChatGPT Work, too. Ask what’s scheduled or update a recurring task as plans change."
+        },
+        "author": {
+          "id": "1714438092655149056",
+          "screen_name": "ChatGPT",
+          "protected": false
+        },
+        "quote": null
+      }
+    }
+  ],
+  "cursor": {
+    "top": "DAAHCgABHUVyUhNAJxELAAIAAAATMjEwOTE1MjcxNjk1NDIyMjg0OQgAAwAAAAEAAA",
+    "bottom": "DAAHCgABHUVyUhM__-8LAAIAAAATMjEwODc3MzcwMzA2NDY1NzkzNggAAwAAAAIAAA"
+  }
+}

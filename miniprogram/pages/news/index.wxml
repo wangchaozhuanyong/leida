@@ -1,0 +1,8 @@
+<view class="page">
+  <status-panel wx:if="{{!connected}}" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />
+  <block wx:else><view wx:if="{{error}}" class="warning">{{error}}<button class="secondary" bindtap="retry">重新加载</button></view>
+    <view class="chips"><button wx:for="{{categories}}" wx:key="value" class="{{category === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectCategory">{{item.label}}</button></view>
+    <publication-card wx:for="{{items}}" wx:key="id" item="{{item}}" /><view wx:if="{{!items.length}}" class="card empty">暂无相关内容。</view>
+    <button wx:if="{{hasMore}}" class="secondary full" bindtap="more">加载更多</button><view class="foot">资料截至 {{cutoff}} · 北京时间</view>
+  </block>
+</view>

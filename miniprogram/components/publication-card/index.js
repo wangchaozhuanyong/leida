@@ -1,0 +1,1 @@
+Component({ options: { styleIsolation: 'apply-shared' }, properties: { item: Object }, methods: { open() { if (this.data.item && this.data.item.path) wx.navigateTo({ url: this.data.item.path }); } } });

@@ -1,4 +1,5 @@
 import { pool, one, insert, transaction } from '../src/db';
+if((process.env.RADAR_STORAGE_BACKEND??'native')!=='native'){console.error('此命令仅用于原生数据库；云端请使用 bootstrap，不导入历史。');process.exit(1);}
 import { sourceDefinitions } from '../src/server/ingestion';
 import { defaultAI } from '../src/server/ai';
 import { defaultSite } from '../src/server/service';

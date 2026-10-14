@@ -1,0 +1,45 @@
+const { createPage } = require('../../utils/page');
+const m = require('../../utils/model');
+const { dialModel } = require('../../utils/dial');
+Page(createPage((data, query, page, app) => {
+  if (!data) return { name: '模钥重置雷达', latest: null, completions: [], pending: null, forecast: null, recent: [], activity: null, sharePath: '', dial: null, posterPath: '' };
+  const outlook = m.resetOutlookModel(data), completed = m.latestCompletedBenefits(data), latestItem = completed[0], pending = outlook.active;
+  const latestPublication = latestItem && latestItem.publication;
+  const latestAction = latestItem && latestItem.action;
+  const latest = latestItem ? { ...latestAction, publicationId: latestPublication.id } : null;
+  const pendingPublication = pending && data.publications.find(item => item.id === pending.publicationId);
+  const countdown = pending && m.announcementCountdown(pending, data.serverTime);
+  const pathFor = item => item ? `/pages/detail/index?publicationId=${encodeURIComponent(item.publicationId)}` : '';
+  const shareTarget = pending || latest;
+  const activity = data.activities.find(item => m.activityHomeVisible(item, data.serverTime));
+  const recentSuccess = data.sources.map(item => item.lastSuccessAt).filter(at => Number.isFinite(Date.parse(at))).sort().pop();
+  const latestArticle = m.sortedArticles(data.articles)[0];
+  const posterPath = latestPublication && !m.publicationWithdrawn(data, latestPublication) ? pathFor(latest) : '';
+  return {
+    name: data.site.name || '模钥重置雷达',
+    latest: latest ? { title: latest.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', elapsed: m.elapsed(latest.statementAt, data.serverTime), time: m.completionTime(latest.statementAt), eligibility: latestAction.eligibility, path: pathFor(latest) } : null,
+    completions: completed.map(item => ({ kind: item.action.kind, title: item.action.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', time: m.completionTime(item.action.statementAt), path: pathFor({ publicationId: item.publication.id }) })),
+    pending: pending ? { label: m.actionLabels[pending.kind], stage: m.stageText(pending, data.serverTime), countdown: countdown.label, timed: countdown.status !== 'unknown', counting: countdown.status === 'upcoming', time: pending.expectedAt ? m.displayTime(pending.expectedAt) : '', timeNote: pending.timeNote || '', path: pathFor(pending) } : null,
+    forecast: null, outlookStatus: outlook.status,
+    dial: dialModel(outlook, data.serverTime, latestAction || null), posterPath,
+    sourceDelayed: data.sources.some(item => ['failed', 'delayed'].includes(item.status)),
+    collectedAt: m.displayTime(recentSuccess), latestSourceTime: latestArticle ? m.displayTime(m.articleSourceTime(latestArticle)) : '暂无记录',
+    waitingText: outlook.status === 'completed' ? '本次已有公开完成声明，等待下一次预告。' : outlook.status === 'cancelled' ? '本次安排已取消，等待下一次预告。' : '等待下一次预告，暂无新的时间依据。',
+    activity: activity ? { title: activity.title, rules: activity.rules, phase: m.activityModel(data, activity.id).phase, entries: activity.items.length, path: `/pages/activity/index?id=${encodeURIComponent(activity.id)}` } : null,
+    recent: m.sortedArticles(data.articles).map(article => data.publications.find(item => item.id === article.publicationId)).filter(Boolean).slice(0, 3).map(item => m.publicationCard(data, item)),
+    recentDays: m.calendarModel(data).recentDays, sharePath: pathFor(shareTarget), shareTitle: pendingPublication ? pendingPublication.article.title : latestPublication ? latestPublication.article.title : data.site.name,
+    shareLabel: '分享这条公告给朋友',
+    historical: data.articles.length > 0 && data.articles.every(article => m.isHistoricalArticle(article, data.evidence))
+  };
+}, { view:()=>({view:'home'}), data: { name: '模钥重置雷达', freshnessOpen: false }, afterRender() { this.syncCountdown(); }, hide() { this.stopCountdown(); }, unload() { this.stopCountdown(); }, methods: {
+  toggleFreshness() { this.setData({ freshnessOpen: !this.data.freshnessOpen }); },
+  openPoster() { if (this.data.posterPath) wx.navigateTo({ url: `${this.data.posterPath}&poster=1` }); },
+  syncCountdown() {
+    if (!(this.data.pending && this.data.pending.counting) && !(this.data.dial && this.data.dial.completed)) { this.stopCountdown(); return; }
+    if (!this._countdownTimer) this._countdownTimer = setInterval(() => this.redraw(), 1000);
+  },
+  stopCountdown() { if (this._countdownTimer) clearInterval(this._countdownTimer); this._countdownTimer = null; },
+  openWechatSettings() { wx.switchTab({ url: '/pages/settings/index' }); },
+  openDay(event) { wx.navigateTo({ url: `/pages/schedule/index?date=${event.currentTarget.dataset.date}` }); },
+  onShareAppMessage() { return { title: this.data.shareTitle || '模钥重置雷达', path: this.data.sharePath || '/pages/home/index' }; }
+} }));

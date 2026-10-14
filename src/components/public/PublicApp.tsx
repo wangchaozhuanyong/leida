@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Activity, BenefitAction, Evidence, Notice, PublicData, Publication } from '@/lib/types';
+import {mergePublicPage,type PublicPage} from '@/lib/public-read';
 import type {ForecastSnapshot} from '@/lib/forecast';
 import {ForecastPanel} from './ForecastPanel';
 import {InstrumentDial} from './InstrumentDial';
@@ -16,7 +17,7 @@ import { createPosterFromEndpoint, savePosterImage, type PosterImage } from './p
 import { statusPosterStyles, statusPosterVariant, type StatusPosterStyle } from '@/lib/status-poster-style';
 import { activityPublicationUrl, activityShareQuery, buildActivityShare, parseActivityShare, resolveActivityShare, type ActivityDayShare } from '@/lib/activity-share';
 import { briefTime, articleSourceTime, publicationSourceTime, publicationWithdrawn, sortedArticles, sortedStatePublications, currentPublication, dateKey, displayTime, elapsed, preferenceDefaults, publicActions, safeUrl, statePublication, isNewsOnly, stageText, type Preferences } from './model';
-import { groupedNoticeUpdates, latestSourceSuccess, publicArticleSummary, publicNavSection } from './model';
+import { groupedNoticeUpdates, latestSourceSuccess, publicArticleSummary, publicNavSection, latestCompletedBenefits, completionTime } from './model';
 
 type IconName = 'radar' | 'home' | 'settings' | 'arrow' | 'back' | 'bell' | 'link' | 'share' | 'card' | 'clock' | 'check' | 'close' | 'external' | 'info' | 'refresh' | 'calendar' | 'news' | 'more';
 function Icon({ name, className = '' }: { name: IconName; className?: string }) {
@@ -89,55 +90,66 @@ export default function PublicApp({ path }: { path: string[] }) {
         if (!controller.signal.aborted) { setWechatEntry(result.data.available ? 'ready' : 'unavailable'); setPosterCodeAvailable(result.data.codeAvailable === true); }
       }).catch(() => { if (!controller.signal.aborted) { setWechatEntry('error'); setPosterCodeAvailable(false); } });
     return () => controller.abort();
-  }, [data?.serverTime, entryAttempt]);
+  }, [!!data, entryAttempt]);
   useEffect(() => { if (route !== 'news') setNewsCategory('all'); }, [route]);
   const request = useRef<AbortController | null>(null);
-  const revision = useRef<string | null>(null);
-  const lastRefresh = useRef(0);
-  const refresh = useCallback(async (quiet = false) => {
+  const revision = useRef<string | null>(null), contentRevision = useRef<string | null>(null);
+  const [page, setPage] = useState<PublicPage | undefined>();
+  const queryString = query.toString();
+  const readPath = useMemo(() => {
+    const params = new URLSearchParams({ view: route === 'history' || route === 'news' || route === 'methodology' || route === 'notices' ? route : route === 'activities' ? 'activity' : ['events','articles','sources'].includes(route) ? 'detail' : 'home' });
+    if (path[1]) params.set('id', path[1]);
+    if (['events','articles','sources'].includes(route)) params.set('entity', route);
+    if (route === 'history') params.set('filter', historyFilter);
+    if (route === 'news') params.set('filter', newsCategory);
+    const selected = new URLSearchParams(queryString);
+    for (const key of ['version','day','publication']) for (const value of selected.getAll(key)) params.append(key, value);
+    return `/api/v1/bootstrap?${params}`;
+  }, [route, path[1], queryString, historyFilter, newsCategory]);
+  const refresh = useCallback(async (quiet = false, cursor?: string, stateOnly = false) => {
     if (quiet && request.current) return;
     request.current?.abort();
     const controller = new AbortController(); request.current = controller;
     if (!quiet) setLoading(true);
-    let timedOut = false;
-    const timeout = window.setTimeout(() => { timedOut = true; controller.abort(); }, 15000);
     try {
-      const response = await fetch('/api/v1/status', { cache: 'no-store', signal: controller.signal });
-      if (!response.ok) throw new Error('暂时无法获取资料');
+      const endpoint = stateOnly ? '/api/v1/bootstrap?view=state' : readPath + (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '');
+      const response = await fetch(endpoint, { cache: 'no-store', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) });
       const result = await response.json();
-      if (!result.data || !Array.isArray(result.data.events)) throw new Error('资料暂时不可用');
+      if (!response.ok || !result.data || !Array.isArray(result.data.events)) throw new Error('暂时无法获取资料');
       if (controller.signal.aborted) return;
       const next = result.data as PublicData;
-      setData(next); setError('');
-      revision.current = typeof result.version === 'string' ? result.version : null;
-      lastRefresh.current = Date.now();
-    } catch (cause) { if (timedOut || !controller.signal.aborted) setError(timedOut ? '请求超时，请重试' : cause instanceof Error ? cause.message : '连接暂时中断'); }
-    finally { clearTimeout(timeout); if (request.current === controller) { request.current = null; setLoading(false); } }
-  }, []);
+      if (stateOnly && result.contentVersion !== contentRevision.current) { request.current = null; await refresh(true); return; }
+      setData(old => stateOnly && old ? { ...old, sources: next.sources, serverTime: next.serverTime } : cursor && old ? mergePublicPage(old, next) : next);
+      if (!stateOnly) setPage(old => cursor && old ? { ...result.page, ids: [...new Set([...old.ids, ...result.page.ids])] } : result.page);
+      setError(''); revision.current = result.version; contentRevision.current = result.contentVersion;
+    } catch (cause) { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '连接暂时中断'); }
+    finally { if (request.current === controller) { request.current = null; setLoading(false); } }
+  }, [readPath]);
   useEffect(() => {
+    setData(null); setPage(undefined); revision.current = null; contentRevision.current = null;
     void refresh();
-    let checking = false;
+    let checking = false, failures = 0, timer: number;
     const controller = new AbortController();
+    const schedule = () => { timer = window.setTimeout(() => void check(), Math.min(60000, 5000 * 2 ** failures) + Math.random() * 1000); };
     const check = async () => {
-      if (checking || request.current || document.visibilityState !== 'visible') return;
+      if (checking || request.current || document.visibilityState !== 'visible') { schedule(); return; }
       checking = true;
       try {
-        const response = await fetch('/api/v1/version', { cache: 'no-store', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]),
-          headers: revision.current ? { 'If-None-Match': `"${revision.current}"` } : {} });
-        if (response.status !== 304 && !response.ok) throw new Error('连接暂时中断');
-        const changed = response.status === 304 ? false : (await response.json()).data?.version !== revision.current;
-        if (changed || Date.now() - lastRefresh.current >= 60000) await refresh(true);
-        else setError('');
-      } catch { if (!controller.signal.aborted) setError('连接暂时中断'); }
-      finally { checking = false; }
+        const response = await fetch('/api/v1/version?light=1', { cache: 'no-store', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]), headers: revision.current ? { 'If-None-Match': `"${revision.current}"` } : {} });
+        if (response.status !== 304 && !response.ok) throw new Error();
+        if (response.status !== 304) {
+          const next = (await response.json()).data;
+          if (next.version !== revision.current) await refresh(true, undefined, next.contentVersion === contentRevision.current);
+        }
+        failures = 0; setError('');
+      } catch { if (!controller.signal.aborted) { failures = Math.min(4, failures + 1); setError('连接暂时中断'); } }
+      finally { checking = false; if (!controller.signal.aborted) schedule(); }
     };
-    const timer = window.setInterval(() => { void check(); }, 5000);
-    const onVisible = () => { if (document.visibilityState === 'visible') void refresh(true); };
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('online', onVisible);
-    const onOffline = () => setError('网络已断开');
-    window.addEventListener('offline', onOffline);
-    return () => { clearInterval(timer); controller.abort(); request.current?.abort(); document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('online', onVisible); window.removeEventListener('offline', onOffline); };
+    schedule();
+    const onVisible = () => { if (document.visibilityState === 'visible') { clearTimeout(timer); failures = 0; void check(); } };
+    document.addEventListener('visibilitychange', onVisible); window.addEventListener('online', onVisible);
+    const onOffline = () => setError('网络已断开'); window.addEventListener('offline', onOffline);
+    return () => { clearTimeout(timer); controller.abort(); request.current?.abort(); document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('online', onVisible); window.removeEventListener('offline', onOffline); };
   }, [refresh]);
   useEffect(() => {
     try {
@@ -189,8 +201,8 @@ export default function PublicApp({ path }: { path: string[] }) {
   let content: React.ReactNode;
   if (!data) content = error ? <div className="pub-empty" role="alert"><Icon name="info" /><h2>资料暂时无法加载</h2><p>请稍后重试，页面不会显示未经确认的状态。</p><button className="pub-button primary" onClick={() => void refresh()} disabled={loading}>{loading ? '正在重试…' : '重新加载'}</button></div> : <div className="pub-loading" role="status"><Icon name="radar" /><p>正在读取公开资料…</p></div>;
   else if (route === 'home') content = <Home data={data} onWechatReminders={() => setWechatReminders(true)} onPoster={(publication, actionId) => setStatusPoster({ publication, actionId })} onShare={share} historical={historical} wechatEntry={wechatEntry} />;
-  else if (route === 'history') content = <History publications={historyPublications} filter={historyFilter} onFilter={setHistoryFilter} data={data} />;
-  else if (route === 'news') content = <News articles={newsArticles} category={newsCategory} onCategoryChange={setNewsCategory} />;
+  else if (route === 'history') content = <History publications={historyPublications} filter={historyFilter} onFilter={setHistoryFilter} data={data} hasMore={!!page?.nextCursor} onMore={() => void refresh(false,page?.nextCursor || undefined)} loading={loading} />;
+  else if (route === 'news') content = <News articles={newsArticles} category={newsCategory} onCategoryChange={setNewsCategory} hasMore={!!page?.nextCursor} onMore={() => void refresh(false,page?.nextCursor || undefined)} loading={loading} />;
   else if (route === 'events' && path[1]) content = <EventPage data={data} id={path[1]} onPoster={setPoster} onShare={share} />;
   else if (route === 'articles' && path[1]) content = <ArticlePage data={data} id={path[1]} onPoster={setPoster} />;
   else if (route === 'sources' && path[1]) content = <EvidencePage data={data} id={path[1]} />;
@@ -203,7 +215,7 @@ export default function PublicApp({ path }: { path: string[] }) {
   return <div className={`pub-shell route-${route} ${subpage ? 'is-detail' : ''}`}>
     <a className="pub-skip" href="#public-main">跳到主要内容</a>
     <header className="pub-topbar">
-      <div className="pub-topbar-identity">{route === 'home' ? <Link href="/" className="pub-brand-home" aria-label="模钥重置雷达首页"><Brand name={data?.site.name} /></Link> : <div className="pub-topbar-heading">{subpage && <Link className="pub-header-back" href={backHref} aria-label="返回上级"><Icon name="back" /></Link>}{['news', 'history', 'settings', 'more', 'notices'].includes(route) ? <h1 className="pub-topbar-title">{pageTitle}</h1> : <span className="pub-topbar-title">{pageTitle}</span>}{data && ['news', 'history'].includes(route) && <span className="pub-context-count" role="status" aria-live="polite" aria-atomic="true">共{route === 'news' ? `${newsArticles.length}篇` : `${historyPublications.length}个事件`}</span>}</div>}</div>
+      <div className="pub-topbar-identity">{route === 'home' ? <Link href="/" className="pub-brand-home" aria-label="模钥重置雷达首页"><Brand name={data?.site.name} /></Link> : <div className="pub-topbar-heading">{subpage && <Link className="pub-header-back" href={backHref} aria-label="返回上级"><Icon name="back" /></Link>}{['news', 'history', 'settings', 'more', 'notices'].includes(route) ? <h1 className="pub-topbar-title">{pageTitle}</h1> : <span className="pub-topbar-title">{pageTitle}</span>}{data && ['news', 'history'].includes(route) && <span className="pub-context-count" role="status" aria-live="polite" aria-atomic="true">共{route === 'news' ? `${page?.total ?? newsArticles.length}篇` : `${page?.total ?? historyPublications.length}个事件`}</span>}</div>}</div>
       <nav className="pub-desktop-nav" aria-label="主导航">{navigation}</nav><div className="pub-sidebar-note"><span className="pub-status-dot" /> 公开消息追踪<small>所有时间 · 北京时间</small></div><Link className="pub-icon-button pub-more-button" href="/more" aria-label="更多"><Icon name="more" /></Link>
     </header>
     {subpage && <nav className="pub-page-back" aria-label="返回上级"><Link className="pub-back-link" href={backHref}><Icon name="back" />返回</Link></nav>}
@@ -226,26 +238,22 @@ export default function PublicApp({ path }: { path: string[] }) {
 }
 
 export function Home({ data, onWechatReminders, onPoster, onShare, historical, wechatEntry = 'checking' }: { data: PublicData; onWechatReminders: () => void; onPoster: (p: Publication, actionId: string) => void; onShare: (p?: Publication) => Promise<void>; historical: boolean; wechatEntry?: WechatEntryState }) {
-  const actions = publicActions(data);
   const outlook = data.forecasts?.outlook ?? publicResetOutlook(data);
-  const latest = actions.find(item => item.action.id === outlook.latestCompletion?.actionId && item.publication.id === outlook.latestCompletion.publicationId);
+  const completions = latestCompletedBenefits(data), latest = completions[0];
   const recent = sortedArticles(data.articles).map(article => data.publications.find(p => p.id === article.publicationId)).filter((p): p is Publication => !!p).slice(0, 3);
   const activity = data.activities.find(item => activityHomeVisible(item, data.serverTime));
   const activityDay = activity ? activityDayNumber(activity, data.serverTime) : undefined;
   const activityPhase = activityDay === undefined ? '活动进展' : activityDay < 1 ? '尚未开始' : activity && activityDay > activity.days ? '活动已结束' : `第${activityDay}天 / 共${activity?.days}天`;
-  const latestRecord = <section className={`pub-instrument-last${outlook.active ? '' : ' is-featured'}`} aria-label="最新完成公告">
-    {latest && outlook.active && <div className="pub-record-heading">
-      <div className="pub-record-tools"><Link className="pub-text-link" href={`/events/${encodeURIComponent(latest.event.id)}`}>上一轮依据<Icon name="arrow"/></Link></div>
-    </div>}
-    <div className="pub-record-detail">
-      <h2>{latest ? `公告称已${latest.action.kind === 'banked_reset' ? '发放重置卡' : '重置用量'}` : '暂无公开完成记录'}</h2>
-      {latest ? <p className="pub-record-time"><time dateTime={latest.action.statementAt}>{briefTime(latest.action.statementAt)}</time><span> · 北京时间</span></p> : <p className="pub-record-time">收录后将在这里更新</p>}
-    </div>
+  const latestRecord = <section className={`pub-instrument-last${outlook.active ? '' : ' is-featured'}`} aria-label="各类福利最近完成公告">
+    {completions.length ? completions.map(item => <div className="pub-record-detail" key={item.action.kind}>
+      <h2><Link href={`/events/${encodeURIComponent(item.event.id)}`} aria-label={`查看最近${item.action.kind === 'banked_reset' ? '重置卡发放' : '用量重置'}的公开依据`}>公告称已{item.action.kind === 'banked_reset' ? '发放重置卡' : '重置用量'}</Link></h2>
+      <p className="pub-record-time"><time dateTime={item.action.statementAt}>{completionTime(item.action.statementAt)}</time><span> · 北京时间</span></p>
+    </div>) : <div className="pub-record-detail"><h2>暂无公开完成记录</h2><p className="pub-record-time">收录后将在这里更新</p></div>}
   </section>;
   return <>
     {historical && <p className="pub-warning">当前展示历史收录资料。</p>}
     <div className={`pub-instrument-layout${outlook.active ? '' : ' is-idle'}`}>
-      <InstrumentDial outlook={outlook} serverTime={data.serverTime}/>
+      <InstrumentDial outlook={outlook} serverTime={data.serverTime} completion={latest?.action ?? null}/>
       <aside className="pub-instrument-summary" aria-label="重置状态与操作">
         {outlook.active ? <ResetOutlookPanel outlook={outlook} serverTime={data.serverTime} instrument /> : latestRecord}
         <div className="pub-instrument-actions">
@@ -275,20 +283,17 @@ function Announcement({ publication, withdrawn }: { publication: Publication; wi
   const kinds = [...new Set(actions.map(a => actionLabels[a.kind]))];
   return <article className="pub-card pub-announcement"><div className="pub-card-top"><Badge tone={actions.some(a => a.kind === 'banked_reset') ? 'purple' : 'cyan'}>{article.historical ? '历史收录 · ' : ''}{isNewsOnly(publication) ? '来源消息' : kinds.join('＋') || (article.category === 'activity' ? '活动进展' : '产品更新')}</Badge><time dateTime={publicationSourceTime(publication)} title={`${displayTime(publicationSourceTime(publication))} · 北京时间`}>{briefTime(publicationSourceTime(publication))}</time></div><h3><Link href={isNewsOnly(publication) ? `/articles/${encodeURIComponent(article.id)}` : `/events/${encodeURIComponent(event.id)}`}>{article.title}</Link></h3><p>{publicArticleSummary(article)}</p><div className="pub-card-top"><span className="pub-muted">{withdrawn ? '已撤回' : isNewsOnly(publication) ? '来源消息' : actions.some(a => a.stage === 'in_progress') ? '含进行中动作' : '公开公告'}</span><TextLink href={isNewsOnly(publication) ? `/articles/${encodeURIComponent(article.id)}` : `/events/${encodeURIComponent(event.id)}`}>查看详情</TextLink></div></article>;
 }
-function History({ publications, filter, onFilter, data }: { publications: Publication[]; filter: string; onFilter: (value: string) => void; data: PublicData }) {
-  const [limit, setLimit] = useState(10);
-  useEffect(() => setLimit(10), [filter]);
+function History({ publications, filter, onFilter, data, hasMore, onMore, loading }: { publications: Publication[]; filter: string; onFilter: (value: string) => void; data: PublicData; hasMore:boolean; onMore:()=>void; loading:boolean }) {
   const months = new Map<string, Publication[]>();
-  for (const publication of publications.slice(0, limit)) {
+  for (const publication of publications) {
     const month = dateKey(publicationSourceTime(publication)).slice(0, 7);
     months.set(month, [...(months.get(month) ?? []), publication]);
   }
-  return <><div className="pub-filter" role="group" aria-label="公告类型">{[['all', '全部'], ['automatic_reset', '用量重置'], ['banked_reset', '重置卡']].map(([value, label]) => <button key={value} aria-pressed={filter === value} className={filter === value ? 'active' : ''} onClick={() => onFilter(value)}>{label}</button>)}</div>{publications.length ? [...months].map(([month, rows]) => <section className="pub-history-month" key={month}><h2>{month.replace('-', '年')}月</h2><div className="pub-history-list">{rows.map(publication => <article className={`pub-history-item${publicationWithdrawn(data, publication) ? ' is-withdrawn' : ''}`} key={publication.id}><time dateTime={publicationSourceTime(publication)}>{briefTime(publicationSourceTime(publication))}</time><div><h3><Link href={`/events/${encodeURIComponent(publication.eventId)}`}>{publication.article.title}</Link></h3><div className="pub-history-status">{publication.event.actions.map(action => <Badge key={action.id} tone={action.stage === 'claimed_complete' ? 'cyan' : 'amber'}>{actionLabels[action.kind]} · {stageText(action, data.serverTime)}</Badge>)}{publicationWithdrawn(data, publication) && <Badge>已撤回</Badge>}{publication.article.historical && <span>历史收录</span>}</div><p>{publicArticleSummary(publication.article)}</p><TextLink href={`/events/${encodeURIComponent(publication.eventId)}`}>查看依据与进展</TextLink></div></article>)}</div></section>) : <Empty title="暂无相关公告" detail="这个分类还没有已发布的事件。" />}{publications.length > limit && <button className="pub-button full" onClick={() => setLimit(limit + 10)}>加载更多</button>}</>;
+  return <><div className="pub-filter" role="group" aria-label="公告类型">{[['all', '全部'], ['automatic_reset', '用量重置'], ['banked_reset', '重置卡']].map(([value, label]) => <button key={value} aria-pressed={filter === value} className={filter === value ? 'active' : ''} onClick={() => onFilter(value)}>{label}</button>)}</div>{publications.length ? [...months].map(([month, rows]) => <section className="pub-history-month" key={month}><h2>{month.replace('-', '年')}月</h2><div className="pub-history-list">{rows.map(publication => <article className={`pub-history-item${publicationWithdrawn(data, publication) ? ' is-withdrawn' : ''}`} key={publication.id}><time dateTime={publicationSourceTime(publication)}>{briefTime(publicationSourceTime(publication))}</time><div><h3><Link href={`/events/${encodeURIComponent(publication.eventId)}`}>{publication.article.title}</Link></h3><div className="pub-history-status">{publication.event.actions.map(action => <Badge key={action.id} tone={action.stage === 'claimed_complete' ? 'cyan' : 'amber'}>{actionLabels[action.kind]} · {stageText(action, data.serverTime)}</Badge>)}{publicationWithdrawn(data, publication) && <Badge>已撤回</Badge>}{publication.article.historical && <span>历史收录</span>}</div><p>{publicArticleSummary(publication.article)}</p><TextLink href={`/events/${encodeURIComponent(publication.eventId)}`}>查看依据与进展</TextLink></div></article>)}</div></section>) : <Empty title="暂无相关公告" detail="这个分类还没有已发布的事件。" />}{hasMore && <button className="pub-button full" disabled={loading} onClick={onMore}>{loading ? '正在加载…' : '加载更多'}</button>}</>;
 }
 
-function News({ articles, category, onCategoryChange }: { articles: PublicData['articles']; category: NewsCategory; onCategoryChange: (category: NewsCategory) => void }) {
-  const [limit, setLimit] = useState(10);
-  return <><div className="pub-filter" role="group" aria-label="新闻分类">{([['all', '全部'], ['reset', '重置'], ['activity', '活动'], ['product', '产品']] as const).map(([value, label]) => <button key={value} aria-pressed={category === value} className={category === value ? 'active' : ''} onClick={() => { onCategoryChange(value); setLimit(10); }}>{label}</button>)}</div>{articles.length ? articles.slice(0, limit).map(article => <article className="pub-card pub-announcement pub-news-item" key={article.id}><div className="pub-card-top"><Badge tone={article.status === 'withdrawn' ? '' : 'cyan'}>{article.historical && article.status !== 'withdrawn' ? '历史收录 · ' : ''}{article.status === 'withdrawn' ? '已撤回' : article.publicationMode === 'news_only' ? '来源消息' : { reset: '重置公告', activity: '活动进展', product: '产品更新' }[article.category]}</Badge><time dateTime={articleSourceTime(article)} title={`${displayTime(articleSourceTime(article))} · 北京时间`}>{briefTime(articleSourceTime(article))}</time></div><h3><Link href={`/articles/${encodeURIComponent(article.id)}`}>{article.title}</Link></h3><p>{publicArticleSummary(article)}</p><TextLink href={`/articles/${encodeURIComponent(article.id)}`}>查看全文与来源</TextLink></article>) : <Empty title="暂无相关内容" detail="核验后的中文新闻将在这里发布。" />}{articles.length > limit && <button className="pub-button full" onClick={() => setLimit(limit + 10)}>加载更多</button>}<TextLink href="/history">按事件查看重置公告</TextLink></>;
+function News({ articles, category, onCategoryChange, hasMore, onMore, loading }: { articles: PublicData['articles']; category: NewsCategory; onCategoryChange: (category: NewsCategory) => void; hasMore:boolean; onMore:()=>void; loading:boolean }) {
+  return <><div className="pub-filter" role="group" aria-label="新闻分类">{([['all', '全部'], ['reset', '重置'], ['activity', '活动'], ['product', '产品']] as const).map(([value, label]) => <button key={value} aria-pressed={category === value} className={category === value ? 'active' : ''} onClick={() => { onCategoryChange(value); }}>{label}</button>)}</div>{articles.length ? articles.map(article => <article className="pub-card pub-announcement pub-news-item" key={article.id}><div className="pub-card-top"><Badge tone={article.status === 'withdrawn' ? '' : 'cyan'}>{article.historical && article.status !== 'withdrawn' ? '历史收录 · ' : ''}{article.status === 'withdrawn' ? '已撤回' : article.publicationMode === 'news_only' ? '来源消息' : { reset: '重置公告', activity: '活动进展', product: '产品更新' }[article.category]}</Badge><time dateTime={articleSourceTime(article)} title={`${displayTime(articleSourceTime(article))} · 北京时间`}>{briefTime(articleSourceTime(article))}</time></div><h3><Link href={`/articles/${encodeURIComponent(article.id)}`}>{article.title}</Link></h3><p>{publicArticleSummary(article)}</p><TextLink href={`/articles/${encodeURIComponent(article.id)}`}>查看全文与来源</TextLink></article>) : <Empty title="暂无相关内容" detail="核验后的中文新闻将在这里发布。" />}{hasMore && <button className="pub-button full" disabled={loading} onClick={onMore}>{loading ? '正在加载…' : '加载更多'}</button>}<TextLink href="/history">按事件查看重置公告</TextLink></>;
 }
 function PublicationNote({ publication }: { publication: Publication }) {
   return isNewsOnly(publication) ? <p className="pub-muted">{publication.article.category === 'reset' ? '此条仅作消息记录，不代表已确认发放。' : '完整更新内容请以原文为准。'}</p> : null;
@@ -382,7 +387,9 @@ function ActivityPage({ data, id, onPoster, onDayPoster }: { data: PublicData; i
   const activity = data.activities.find(a => a.id === id);
   const query = useSearchParams();
   const requestedDay = query.get('day');
-  const [day, setDay] = useState<number | null>(() => requestedDay && /^[1-9]\d{0,2}$/.test(requestedDay) ? Number(requestedDay) : null);
+  const router = useRouter();
+  const day = requestedDay && /^[1-9]\d{0,2}$/.test(requestedDay) ? Number(requestedDay) : null;
+  const setDay = (value: number | null) => router.replace(`/activities/${encodeURIComponent(id)}${value ? `?day=${value}` : ''}`, {scroll:false});
   if (!activity) return <Empty title="暂无这项活动" detail="活动规则和进展发布后，会统一收录在这里。" />;
   if (query.getAll('publication').length) {
     let selection: ActivityDayShare;
@@ -404,7 +411,7 @@ function ActivityContent({ activity, data, day, onDay, onPoster, onDayPoster }: 
   const timezoneName = activity.timezone === 'Asia/Shanghai' ? '北京时间' : activity.timezone === 'America/Los_Angeles' ? '美国西部时间' : '活动指定时区';
   const selectedDate = new Date(Date.parse(`${activity.startsOn}T00:00:00Z`) + (selected - 1) * 86400000).toISOString().slice(0, 10);
   const latestDay = [...publishedDays].filter(n => n <= actualDay).sort((a, b) => b - a)[0];
-  return <>
+  return <div className="pub-activity-content">
     <div className="pub-page-heading"><div className="pub-activity-heading"><h1>{activity.title}</h1><span className="pub-activity-phase">{actualDay < 1 ? '尚未开始' : actualDay > activity.days ? '活动已结束' : `第${actualDay}天 / 共${activity.days}天`}</span></div><p>{activity.rules}</p></div>
     <section className="pub-card pub-activity-calendar"><div className="pub-card-top"><h2>每日进展</h2><Badge tone="purple">已收录{publishedDays.size}天</Badge></div>
       <div className="pub-activity-days" role="group" aria-label="选择活动日期">{Array.from({ length: activity.days }, (_, index) => index + 1).map(n => <button key={n} className={`${selected === n ? 'active' : ''} ${publishedDays.has(n) ? 'has-entry' : ''} ${n === actualDay ? 'is-today' : ''} ${n > actualDay ? 'is-future' : ''}`} aria-label={`第${n}天${publishedDays.has(n) ? '，有已收录进展' : n > actualDay ? '，尚未到来' : '，暂无记录'}`} title={n === actualDay ? '今天' : n > actualDay ? '未来日期' : publishedDays.has(n) ? '已有进展' : '待收录'} aria-pressed={selected === n} onClick={() => onDay(n)}>{n}{publishedDays.has(n) && <i />}</button>)}</div>
@@ -416,8 +423,7 @@ function ActivityContent({ activity, data, day, onDay, onPoster, onDayPoster }: 
     <button className="pub-button full pub-day-poster" disabled={!entries.length} onClick={() => { try { const selection = buildActivityShare(data, activity.id, selected); activityPublicationUrl(location.origin, selection); setShareError(''); onDayPoster(selection); } catch (cause) { setShareError(cause instanceof Error ? cause.message : '这一天暂时不能生成整合海报。'); } }}>生成整日海报<Icon name="share" /></button>
     {shareError && <p className="pub-warning" role="alert">{shareError}</p>}
     {entries.map(article => { const publication = data.publications.find(p => p.id === article.publicationId); return <article className="pub-card" key={article.id}><div className="pub-card-top"><Badge tone="purple">{article.historical ? '历史收录 · ' : ''}活动进展</Badge><time dateTime={articleSourceTime(article)} title={`${displayTime(articleSourceTime(article))} · 北京时间`}>{briefTime(articleSourceTime(article))}</time></div><h2>{article.title}</h2><p>{publicArticleSummary(article)}</p><details><summary>查看完整内容</summary><p className="pub-prose">{article.translation || article.summary}</p></details><div className="pub-card-top"><TextLink href={`/articles/${encodeURIComponent(article.id)}`}>查看详情与来源</TextLink>{publication && <button className="pub-text-button" disabled={article.status === 'withdrawn' || data.events.find(event => event.id === article.eventId)?.status === 'withdrawn'} onClick={() => onPoster(publication)}>分享海报<Icon name="share" /></button>}</div></article>; })}
-    <TextLink href="/settings">设置活动提醒</TextLink>
-  </>;
+  </div>;
 
 }
 function Settings({ wechatEntry, preferences, onChange, ready, storageError, onWechatReminders }: { wechatEntry: WechatEntryState; onWechatReminders: () => void; preferences: Preferences; onChange: (p: Preferences) => void; ready: boolean; storageError: string }) {

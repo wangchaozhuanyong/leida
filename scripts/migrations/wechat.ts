@@ -8,6 +8,7 @@ export const WECHAT_MIGRATION_SQL=[
   `CREATE INDEX IF NOT EXISTS radar_wechat_delivery_status ON radar_wechat_deliveries ((payload->>'status'))`
 ];
 if(process.argv.includes('--apply')) {
+  if((process.env.RADAR_STORAGE_BACKEND??'native')!=='native'){console.error('原生迁移不适用于当前数据库模式。');process.exit(1);}
   const client=await pool.connect();
   try {await client.query('BEGIN');for(const sql of WECHAT_MIGRATION_SQL)await client.query(sql);await client.query('COMMIT');console.log('微信订阅数据结构迁移完成');}
   catch(error){await client.query('ROLLBACK');throw error;}

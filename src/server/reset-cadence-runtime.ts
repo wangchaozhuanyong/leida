@@ -9,7 +9,7 @@ export interface StoredCadenceForecast extends ResetCadenceForecast {recordType:
 export type CadenceOutcome=ForecastCadenceOutcome;
 export interface CadenceRuntime {id:string;checkedAt:string;cadenceSnapshotId?:string;}
 const digest=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
-const isCadence=(value:unknown):value is StoredCadenceForecast=>!!value&&typeof value==='object'&&'recordType' in value&&value.recordType==='reset_cadence';
+export const isCadence=(value:unknown):value is StoredCadenceForecast=>!!value&&typeof value==='object'&&'recordType' in value&&value.recordType==='reset_cadence';
 const isOutcome=(value:unknown):value is CadenceOutcome=>!!value&&typeof value==='object'&&'recordType' in value&&value.recordType==='reset_cadence_outcome';
 
 /** Training can come from either verified public feed. An unused failed

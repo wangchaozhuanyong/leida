@@ -147,9 +147,27 @@
 .pub-instrument-last .pub-record-tools { display: flex; align-items: center; gap: 16px; }
 .pub-instrument-last .pub-record-share { display: inline-flex; flex-direction: row; gap: 6px; padding: 0; min-height: 44px; font-size: 12px; }
 .pub-instrument-last .pub-record-tools .pub-text-link { font-size: 12px; min-height: 44px; }
-.pub-instrument-last .pub-record-detail { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.pub-instrument-last .pub-record-detail h2 { margin: 0; font-size: clamp(16px, 5.4cqi, 23px); font-weight: 600; line-height: 1.5; white-space: nowrap; }
-.pub-instrument-last .pub-record-detail p.pub-record-time { margin: 0; font-size: 12px; line-height: 1.5; color: #aeb8ba; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+.pub-instrument-last .pub-record-detail { display: flex; flex-direction: column; align-items: stretch; gap: 5px; }
+.pub-instrument-last .pub-record-detail + .pub-record-detail { margin-top: 16px; padding-top: 16px; border-top: 1px solid #303b3e; }
+.pub-instrument-last .pub-record-detail h2 { margin: 0; font-size: clamp(16px, 5.4cqi, 23px); font-weight: 600; line-height: 1.5; }
+.pub-instrument-last .pub-record-detail h2 a:hover { color: var(--pub-cyan); }
+.pub-instrument-last .pub-record-detail + .pub-record-detail h2 { font-size: 16px; color: #bdc6c4; }
+.pub-instrument-last .pub-record-detail p.pub-record-time { margin: 0; font-size: 12px; line-height: 1.5; color: #aeb8ba; text-align: right; font-variant-numeric: tabular-nums; }
+.pub-record-time time { white-space: nowrap; }
+.pub-record-time > span { white-space: nowrap; }
+.pub-instrument-dial.is-completed { container-type: inline-size; }
+.pub-instrument-dial.is-completed .pub-dial-rim { stroke: #b39151; }
+.pub-instrument-dial.is-completed .pub-dial-readout { inset-inline: 10%; gap: 12px; }
+.pub-instrument-dial.is-completed .pub-dial-readout p { max-width: 90%; line-height: 1.5; font-size: clamp(12px, 4.4cqi, 19px); letter-spacing: 0; }
+.pub-dial-readout strong.pub-dial-elapsed { display: flex; justify-content: center; align-items: baseline; gap: 5px; font-size: clamp(32px, 18cqi, 72px); letter-spacing: -1px; white-space: nowrap; }
+.pub-dial-readout strong.pub-dial-elapsed.is-long { font-size: clamp(28px, 14cqi, 60px); }
+.pub-dial-elapsed .pub-dial-duration { display: inline-flex; align-items: baseline; gap: 3px; }
+.pub-dial-elapsed small { font-size: clamp(11px, 4.5cqi, 18px); font-weight: 500; letter-spacing: 0; color: #d7bc86; }
+.pub-instrument-dial.is-completed .pub-dial-readout > span { font-size: clamp(10px, 3cqi, 13px); letter-spacing: 0; }
+@container (max-width: 300px) {
+  .pub-dial-banked-lead span { display: block; }
+  .pub-instrument-dial.is-completed .pub-dial-readout { gap: 8px; }
+}
 @container (max-width: 300px) {
   .pub-instrument-last .pub-record-detail { gap: 8px; }
   .pub-instrument-last .pub-record-detail p.pub-record-time { font-size: 11px; }
@@ -262,6 +280,18 @@
 .pub-activity-days button.is-today { box-shadow: inset 0 0 0 1px #f4c15c; }
 .pub-activity-days button.is-future:not(.active) { color: #788681; background: #111719; border-style: dashed; }
 .pub-activity-calendar > .pub-muted { font-size: 12px; }
+.pub-shell:not(.route-home) .pub-main { min-height: 0; }
+.pub-main > :last-child { margin-bottom: 0; }
+.pub-activity-content { display: flex; flex-direction: column; gap: 24px; }
+.pub-activity-content > .pub-page-heading { margin: 0; padding: 4px 0 0; }
+.pub-activity-content > .pub-card,
+.pub-activity-content > .pub-section-heading,
+.pub-activity-content > .pub-empty,
+.pub-activity-content > .pub-day-poster,
+.pub-activity-content > .pub-warning { margin: 0; }
+.pub-activity-content > .pub-card { padding: 20px; }
+.pub-activity-calendar .pub-activity-days { margin: 16px 0 0; }
+.pub-activity-calendar .pub-activity-legend { margin: 16px 0 8px; }
 .pub-activity-day-heading { margin-top: 26px; }
 .pub-activity-day-heading p { margin: 4px 0 0; font-size: 12px; }
 .pub-activity-empty { padding: 26px 18px; margin-bottom: 16px; }
@@ -310,7 +340,8 @@
   .pub-notice { padding: 18px; }
   .pub-notice h2 { font-size: 18px; }
   .pub-activity-legend { gap: 10px 14px; font-size: 11px; }
-  .pub-activity-day-heading { margin-top: 22px; }
+  .pub-activity-content { gap: 20px; }
+  .pub-activity-content > .pub-card { padding: 18px; }
   .pub-dialog-heading { padding: 12px 15px; }
   .pub-dialog-body { padding: 15px; }
 }

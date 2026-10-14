@@ -1,12 +1,18 @@
+import { lockTransaction } from '../db';
 import {createCipheriv,createDecipheriv,createHash,randomBytes} from 'node:crypto';
 import {z} from 'zod';
-import {list,one,put,insert,transaction,type Client,type Table} from '../db';
+import {isCloudbaseClient,list,one,put,insert,transaction,type Client,type Table} from '../db';
 import type {Article,Evidence,Job,Notice,Publication,RadarEvent} from '../lib/types';
 import type {WechatSettings,WechatReader,WechatGrant,WechatDelivery,WechatSubscriptionState} from '../lib/wechat';
 import {isHistoricalArticle} from '../lib/history';
 import {DomainError,id} from './domain';
 import {createWechatProvider,WechatServiceError} from './wechat-provider';
 import {validateWechatImage} from './wechat-image';
+import {prepareNotificationPublicPage} from './notification-public-page';
+
+// Application ceilings, independent of the provider's quota and existing daily budget.
+export const WECHAT_DISPATCH_BATCH_SIZE=50;
+export const WECHAT_SEND_MAX_PER_SECOND=10;
 
 export type WechatRecord=WechatSettings&{id:'wechat';encryptedSecret?:string};
 export const defaultWechat:WechatRecord={id:'wechat',appId:'',qrEnabled:false,subscriptionsEnabled:false,envVersion:'release',templateId:'',templateFields:{title:'',status:'',time:''},dailyApiLimit:0,dailyQrLimit:0,dailySendLimit:0,version:1,hasSecret:false};
@@ -17,7 +23,7 @@ export interface WechatStore {
   insert<T extends {id:string}>(table:Table,value:T,client?:Client):Promise<boolean>;
   transaction<T>(fn:(client:Client)=>Promise<T>):Promise<T>;
 }
-export interface WechatDependencies {store?:WechatStore;fetcher?:typeof fetch;clock?:()=>number;encryptionKey?:()=>Buffer;}
+export interface WechatDependencies {store?:WechatStore;fetcher?:typeof fetch;clock?:()=>number;encryptionKey?:()=>Buffer;preparePublicPage?:(publicationId:string)=>Promise<void>;}
 const digest=(value:string)=>createHash('sha256').update(value).digest('hex');
 export const publicationScene=(publicationId:string)=>digest(publicationId).slice(0,32);
 export function publicationForScene(scene:string,publications:Publication[]):Publication {
@@ -45,12 +51,13 @@ export function createWechatService(dependencies:WechatDependencies={}) {
   const tokenFlights=new Map<string,Promise<string>>();
   const codeFlights=new Map<string,Promise<{image:Buffer;contentType:string;scene:string;publicationId:string}>>();
   const clock=dependencies.clock??Date.now;
+  const preparePublicPage=dependencies.preparePublicPage??prepareNotificationPublicPage;
   const timestamp=()=>new Date(clock()).toISOString();
   const key=()=>{const value=dependencies.encryptionKey?.()??Buffer.from(process.env.ENCRYPTION_KEY??'','base64');if(value.length!==32)throw new WechatServiceError('服务端加密密钥不可用','configuration');return value;};
   // Same AES-256-GCM storage format as the existing smart-service credential.
   function seal(value:string):string {const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',key(),iv),body=Buffer.concat([cipher.update(value,'utf8'),cipher.final()]);return Buffer.concat([iv,cipher.getAuthTag(),body]).toString('base64');}
   function open(value:string):string {try{const raw=Buffer.from(value,'base64');if(raw.length<29)throw new Error();const cipher=createDecipheriv('aes-256-gcm',key(),raw.subarray(0,12));cipher.setAuthTag(raw.subarray(12,28));return Buffer.concat([cipher.update(raw.subarray(28)),cipher.final()]).toString('utf8');}catch{throw new WechatServiceError('微信加密凭据无法读取，请检查服务端恢复配置','configuration');}}
-  const lock=(client:Client,name:string)=>client.query('SELECT pg_advisory_xact_lock(hashtext($1))',[name]);
+  const lock=(client:Client,name:string)=>lockTransaction(client,name);
   const config=(client?:Client)=>store.one<WechatRecord>('settings','wechat',client).then(value=>value??defaultWechat);
   const ready=(settings:WechatRecord,kind:'qr'|'subscription')=>Boolean(settings.appId&&settings.encryptedSecret&&settings.dailyApiLimit>0&&(kind==='qr'?settings.qrEnabled&&settings.dailyQrLimit>0:settings.subscriptionsEnabled&&settings.dailySendLimit>0&&settings.templateId&&fieldSchema.safeParse(settings.templateFields).success));
   // Public UI readiness only: no credentials, quota reservations or provider requests.
@@ -195,7 +202,9 @@ export function createWechatService(dependencies:WechatDependencies={}) {
     await store.transaction(async client=>{
       await lock(client,'wechat_config');await lock(client,'wechat_schedule');const active=await config(client);if(!ready(active,'subscription')||active.version!==settings.version)return;
       const [grants,readers,notices,evidence]=await Promise.all([store.list<WechatGrant>('wechat_grants',client),store.list<WechatReader>('wechat_readers',client),store.list<Notice>('notices',client),store.list<Evidence>('evidence',client)]);
+      let scheduled=0;
       for(const previous of grants.filter(item=>item.appId===settings.appId&&item.templateId===settings.templateId&&item.status==='available'&&item.acceptedAt)) {
+        if(scheduled>=WECHAT_DISPATCH_BATCH_SIZE)break;
         await lock(client,previous.id);const grant=await store.one<WechatGrant>('wechat_grants',previous.id,client);if(!grant||grant.status!=='available'||grant.appId!==active.appId||grant.templateId!==active.templateId||!grant.acceptedAt)continue;
         if(!readers.some(value=>value.id===grant.readerId&&value.status==='active'))continue;
         const eligible=notices.filter(notice=>notice.status==='active'&&notice.categories.length>0&&Date.parse(notice.createdAt)>Date.parse(grant.acceptedAt!)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
@@ -206,7 +215,7 @@ export function createWechatService(dependencies:WechatDependencies={}) {
           const delivery:WechatDelivery={id:deliveryId,readerId:grant.readerId,grantId:grant.id,appId:settings.appId,templateId:settings.templateId,noticeId:notice.id,publicationId:pub.id,semanticKey:notice.semanticKey,status:'queued',createdAt:timestamp(),attempts:0};
           if(!await store.insert('wechat_deliveries',delivery,client))continue;
           await store.put('wechat_grants',{...grant,status:'reserved',deliveryId,updatedAt:timestamp()},client);
-          await store.insert('jobs',{id:`job_${deliveryId}`,kind:'wechat_send',status:'queued',attempts:0,availableAt:timestamp(),createdAt:timestamp(),payload:{deliveryId}} satisfies Job,client);break;
+          await store.insert('jobs',{id:`job_${deliveryId}`,kind:'wechat_send',status:'queued',attempts:0,availableAt:timestamp(),createdAt:timestamp(),payload:{deliveryId}} satisfies Job,client);scheduled++;break;
         }
       }
       // Withdrawals cancel queued sends without manufacturing another consent.
@@ -241,18 +250,24 @@ export function createWechatService(dependencies:WechatDependencies={}) {
     let safe=value?.status==='active'&&value.appId===settings.appId&&delivery.appId===settings.appId&&delivery.templateId===settings.templateId&&grant?.status==='reserved'&&grant.deliveryId===delivery.id&&notice?.status==='active';
     if(safe)try{await publication(delivery.publicationId);}catch(error){if(error instanceof DomainError)safe=false;else throw error;}
     if(!safe) {await store.transaction(client=>finish(delivery!,'cancelled','身份、授权、模板或对应内容已失效',undefined,client));return {state:'cancelled'};}
+    try {await preparePublicPage(delivery.publicationId);}
+    catch {return {state:'deferred',resumeAt:new Date(clock()+5000).toISOString(),reason:'公开页面尚未准备好，稍后再发送'};}
     let token:string,body:Record<string,unknown>;
     try {body={touser:open(value!.encryptedOpenid),template_id:delivery.templateId,page:`pages/detail/index?publicationId=${encodeURIComponent(delivery.publicationId)}`,miniprogram_state:{release:'formal',trial:'trial',develop:'developer'}[settings.envVersion],lang:'zh_CN',data:wechatTemplateData(settings,notice!)};token=await accessToken(settings);}
     catch(error) {const budget=error instanceof WechatServiceError&&error.failureKind==='budget';return {state:'deferred',resumeAt:budget?tomorrow():new Date(clock()+15*60_000).toISOString(),reason:error instanceof WechatServiceError?error.message:'微信发送准备失败'};}
-    let claimed=false;
+    let claimed=false,rateResumeAt:string|undefined;
     try {claimed=await store.transaction(async client=>{
       await lock(client,'wechat_config');await lock(client,delivery!.grantId);await lock(client,deliveryId);const current=await store.one<WechatDelivery>('wechat_deliveries',deliveryId,client);const currentGrant=await store.one<WechatGrant>('wechat_grants',delivery!.grantId,client);const currentNotice=await store.one<Notice>('notices',delivery!.noticeId,client);const currentReader=await store.one<WechatReader>('wechat_readers',delivery!.readerId,client);
       if(current?.status!=='queued'||currentGrant?.status!=='reserved'||currentGrant.deliveryId!==deliveryId||currentNotice?.status!=='active'||currentReader?.status!=='active')return false;
       await publication(current.publicationId,client);
       const currentSettings=await config(client);if(currentSettings.version!==settings.version)throw new WechatServiceError('微信配置已变化，暂缓发送','configuration');
+      // The existing configuration lock serializes this check across workers/restarts.
+      // Count actual attempts, including unknown/rejected results; no new consent is made.
+      const recent=isCloudbaseClient(client)?{rows:[recentWechatAttempts(await store.list<WechatDelivery>('wechat_deliveries',client),clock())]}:await client.query("SELECT count(*)::int AS attempts, min(payload->>'attemptedAt') AS oldest FROM radar_wechat_deliveries WHERE payload->>'attemptedAt' > $1",[new Date(clock()-1000).toISOString()]);
+      if(recent.rows[0]?.attempts>=WECHAT_SEND_MAX_PER_SECOND){rateResumeAt=new Date(Math.max(clock()+100,Date.parse(recent.rows[0].oldest)+1000)).toISOString();return false;}
       await usage('send',client);
       delivery={...current,status:'sending',attempts:current.attempts+1,jobAttempt:job.attempts,attemptedAt:timestamp()};await store.put('wechat_deliveries',delivery,client);return true;
-    });}catch(error){if(error instanceof WechatServiceError)return {state:'deferred',resumeAt:error.failureKind==='budget'?tomorrow():new Date(clock()+15*60_000).toISOString(),reason:error.message};if(error instanceof DomainError){await store.transaction(client=>finish(delivery!,'cancelled','对应内容已撤回或不可分享',undefined,client));return {state:'cancelled'};}throw error;}if(!claimed)return {state:'cancelled'};
+    });}catch(error){if(error instanceof WechatServiceError)return {state:'deferred',resumeAt:error.failureKind==='budget'?tomorrow():new Date(clock()+15*60_000).toISOString(),reason:error.message};if(error instanceof DomainError){await store.transaction(client=>finish(delivery!,'cancelled','对应内容已撤回或不可分享',undefined,client));return {state:'cancelled'};}throw error;}if(!claimed)return rateResumeAt?{state:'deferred',resumeAt:rateResumeAt,reason:'通知发送达到每秒上限，继续排队'}:{state:'cancelled'};
     try {await provider.send(token!,body!);await store.transaction(client=>finish(delivery!,'sent',undefined,0,client));return {state:'sent'};}
     catch(error) {const rejected=error instanceof WechatServiceError&&error.failureKind==='rejected',state=rejected?'rejected':'unknown';await store.transaction(client=>finish(delivery!,state,rejected?'微信未接受此次发送':'发送结果未知，停止自动重发',error instanceof WechatServiceError?error.errorCode:undefined,client));return {state};}
   }
@@ -260,3 +275,5 @@ export function createWechatService(dependencies:WechatDependencies={}) {
 }
 const service=createWechatService();
 export const {adminWechat,publicWechatAvailability,saveWechatSettings,generateWechatCode,resolveWechatScene,wechatLogin,wechatSubscriptionState,wechatSubscriptionChallenge,confirmWechatSubscription,revokeWechatSubscription,scheduleWechatDeliveries,processWechatJob}=service;
+
+function recentWechatAttempts(deliveries:WechatDelivery[],clock:number){const attempts=deliveries.filter(d=>d.attemptedAt&&Date.parse(d.attemptedAt)>clock-1000);return {attempts:attempts.length,oldest:attempts.map(d=>d.attemptedAt!).sort()[0]};}

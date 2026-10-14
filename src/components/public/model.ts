@@ -1,5 +1,5 @@
 import type { Article, BenefitAction, Notice, PublicData, Publication, RadarEvent } from '@/lib/types';
-import { pendingPublicActions } from '@/lib/public-facts';
+import { pendingPublicActions, publicActions } from '@/lib/public-facts';
 export { currentPublication, isNewsOnly, statePublication, publicActions, publicationSourceTime, publicationWithdrawn, sortedPublications, sortedStatePublications } from '@/lib/public-facts';
 
 export const zone = 'Asia/Shanghai';
@@ -9,6 +9,33 @@ export const displayTime = (value?: string) => {
   return new Intl.DateTimeFormat('zh-CN', { timeZone: zone, year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value));
 };
 export const briefTime = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: zone, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value));
+export const completionTime = (value: string) => {
+  if (!Number.isFinite(Date.parse(value))) return '暂无记录';
+  const time = new Intl.DateTimeFormat('zh-CN', { timeZone: zone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(value));
+  return `${dateKey(value).replaceAll('-', '/')} ${time}`;
+};
+/** Keep one current public completion per benefit, ordered by its original statement time. */
+export function latestCompletedBenefits(data: PublicData) {
+  const now = Date.parse(data.serverTime), seen = new Set<BenefitAction['kind']>();
+  if (!Number.isFinite(now)) return [];
+  return publicActions(data).filter(({ action, publication }) => action.stage === 'claimed_complete'
+    && Number.isFinite(Date.parse(action.statementAt)) && Date.parse(action.statementAt) <= now
+    && Number.isFinite(Date.parse(publication.publishedAt)) && Date.parse(publication.publishedAt) <= now)
+    .sort((a, b) => Date.parse(b.action.statementAt) - Date.parse(a.action.statementAt) || a.action.id.localeCompare(b.action.id))
+    .filter(({ action }) => { if (seen.has(action.kind)) return false; seen.add(action.kind); return true; });
+}
+/** The 24-hour display expires from the public completion statement, never from page refresh. */
+export function completionElapsed(action: Pick<BenefitAction, 'kind' | 'stage' | 'statementAt'> | null | undefined, now: string) {
+  if (action?.stage !== 'claimed_complete') return undefined;
+  const age = Date.parse(now) - Date.parse(action.statementAt);
+  if (!Number.isFinite(age) || age < 0 || age >= 24 * 3600_000) return undefined;
+  const minutes = Math.floor(age / 60000), hours = Math.floor(minutes / 60), remainder = minutes % 60;
+  const parts: { value: number; unit: string }[] = [];
+  if (hours) parts.push({ value: hours, unit: '小时' });
+  if (remainder) parts.push({ value: remainder, unit: '分钟' });
+  return { parts, label: parts.length ? `${parts.map(part => `${part.value}${part.unit}`).join('')}前` : '刚刚',
+    lead: action.kind === 'banked_reset' ? '距最近一次确认发放重置卡' : '距最近一次确认重置' };
+}
 export const articleSourceTime = (article: Article) => article.sourcePublishedAt ?? article.publishedAt;
 export const sortedArticles = (articles: Article[]) => articles.slice().sort((a, b) => Date.parse(articleSourceTime(b)) - Date.parse(articleSourceTime(a)));
 /** Client navigation keeps a detail page in its parent section. */

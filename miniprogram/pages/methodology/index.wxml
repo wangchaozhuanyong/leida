@@ -1,0 +1,41 @@
+<view class="page">
+  <view wx:if="{{fixedLoading}}" class="card empty">正在读取指定预测记录。</view>
+  <view wx:elif="{{fixedError}}" class="warning"><view>{{fixedError}}</view><view class="small lead">保留此记录入口，不使用当前预测替代。</view><button class="secondary full" style="margin-top:12px" bindtap="retryFixed">重新读取</button></view>
+  <view wx:if="{{forecast}}" class="card hero">
+    <view class="row wrap"><view class="heading">{{forecast.title}}</view><text class="badge amber">{{fixed ? '固定预测记录' : '实验预测'}}</text></view>
+    <view class="prose">{{forecast.signalTitle}}</view>
+    <view class="forecast-grid">
+      <view class="forecast-metric"><view class="muted">首次信号后24小时</view><view class="forecast-value {{!forecast.probability24 ? 'forecast-empty' : ''}}">{{forecast.probability24 || forecast.emptyProbabilityText}}</view><view class="small muted">95%可信区间 {{forecast.interval24}}</view></view>
+      <view class="forecast-metric"><view class="muted">首次信号后48小时</view><view class="forecast-value {{!forecast.probability48 ? 'forecast-empty' : ''}}">{{forecast.probability48 || forecast.emptyProbabilityText}}</view><view class="small muted">95%可信区间 {{forecast.interval48}}</view></view>
+    </view>
+    <view class="small muted">{{forecast.sampleCount}}例实验样本，历史参考{{forecast.referenceCount}}例。另有{{forecast.observedSampleCount}}项可核对结局，尚未用于概率训练。</view>
+    <view class="prose muted">{{forecast.basisText}}。{{forecast.coverageText}}。概率不是发放承诺，也不是准确率。</view>
+    <view class="line"></view>
+    <view class="small muted">首次信号 {{forecast.signalAt}}</view><view class="small muted">预测生成 {{forecast.generatedAt}}</view><view class="small muted">资料截至 {{forecast.cutoff}}</view>
+    <view class="small muted lead">24小时截至 {{forecast.window24}}</view><view class="small muted">48小时截至 {{forecast.window48}}</view>
+    <view class="small muted lead">{{forecast.windowNote}} 时间均为北京时间。</view><view class="small muted lead">{{forecast.deliveryNote}}</view>
+    <view wx:if="{{forecast.late}}" class="warning lead">资料晚采，这条记录不能冒充提前预测。</view>
+    <button wx:if="{{!fixed}}" class="secondary full" style="margin-top:12px" bindtap="openForecast">查看固定预测记录</button>
+    <button wx:if="{{fixed}}" class="secondary full" style="margin-top:12px" open-type="share">分享这条实验预测给朋友</button>
+    <button class="secondary full" style="margin-top:12px" bindtap="copySignal">复制原始信号链接</button>
+  </view>
+  <view wx:elif="{{!fixed}}" class="card"><view class="heading">实验预测</view><view class="prose muted">{{currentUnavailable}}</view></view>
+  <view wx:if="{{forecast && outcomes}}" class="card">
+    <view class="heading">后续结局</view><view class="prose muted">{{outcomes.message}}</view>
+    <view wx:for="{{outcomes.entries}}" wx:key="id" class="outcome-entry">
+      <view class="row wrap"><view class="heading">{{item.stage}}</view><text class="badge muted">{{item.windowText}}</text></view>
+      <view class="small muted lead">公告时间 {{item.announcementAt}}</view><view class="small muted">观测时间 {{item.observedAt}}</view>
+      <view class="small muted lead">{{item.relationNote}}</view><view class="prose muted">{{item.reason}}</view>
+    </view>
+    <view class="small muted lead">{{outcomes.note}} 时间均为北京时间。</view>
+  </view>
+  <view wx:if="{{!fixed && reference}}" class="card">
+    <view class="row wrap"><view class="heading">历史实验参考</view><text class="badge muted">{{reference.sampleCount}}例样本</text></view>
+    <view class="prose">24小时 {{reference.probability24 || '样本不足'}}，48小时 {{reference.probability48 || '样本不足'}}。</view>
+    <view class="small muted lead">24小时95%可信区间 {{reference.interval24}}</view><view class="small muted">48小时95%可信区间 {{reference.interval48}}</view>
+    <view class="prose muted">{{reference.note}}</view>
+  </view>
+  <view class="card"><view class="heading">预测怎么算</view><view class="prose">分组贝叶斯试算：按首次公开信号固定观察24／48小时，当前使用选定历史样本作实验参考；实时结局单独记录，尚未用于概率训练。缺证、来源中断和未结束的事件保持未知，不当作未发放。</view><view class="prose muted">首页优先展示明确公告。历史参考单独标注，后续结果不会改写已分享的预测记录。</view></view>
+  <view class="card"><view class="heading">重置卡暂不预测</view><view class="prose muted">{{cardNote}}</view></view>
+  <view wx:for="{{rules}}" wx:key="title" class="card"><view class="heading">{{item.title}}</view><view class="prose">{{item.text}}</view></view>
+</view>

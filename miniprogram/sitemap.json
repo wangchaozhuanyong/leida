@@ -1,0 +1,1 @@
+{"desc":"公开阅读页面，正式索引待类目与发布确认","rules":[{"action":"disallow","page":"*"}]}

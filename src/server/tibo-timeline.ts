@@ -1,3 +1,4 @@
+import { lockTransaction } from '../db';
 import {z} from 'zod';
 import {one,put,insert,transaction,type Client} from '../db';
 import type {Source,TiboSettings,TiboTimelineScan,Evidence} from '../lib/types';
@@ -26,7 +27,7 @@ export async function adminTibo():Promise<TiboSettings>{
 export async function saveTiboSettings(input:Record<string,unknown>,actor:string):Promise<TiboSettings>{
  const parsed=z.object({version:z.number().int().positive(),dailyRequestLimit:z.number().int().min(0).max(5000),key:z.string().max(4096).optional()}).parse(input);
  return transaction(async c=>{
-  await c.query("SELECT pg_advisory_xact_lock(hashtext('radar_tibo_settings'))");
+  await lockTransaction(c,'radar_tibo_settings');
   const previous=await one<TiboRecord>('settings','tibo',c,true)??{...defaultTibo,id:'tibo' as const};assertVersion(previous,parsed.version);
   const token=parsed.key?.trim();if(token&&/\s/.test(token))throw new DomainError('请填写不含空格的 Bearer Token');
   const changed=!!token;
@@ -49,7 +50,7 @@ async function requestAccess():Promise<{bearerToken:string;version:number;before
  if(!settings?.encryptedKey||!settings.dailyRequestLimit)throw new TiboTimelineError('Tibo 直采未配置有效凭据和每日请求上限','configuration');
  let bearerToken:string;try{bearerToken=decryptKey(settings.encryptedKey);}catch{throw new TiboTimelineError('Tibo 凭据无法解密，请检查服务端配置','configuration');}
  return {bearerToken,version:settings.version,beforeRequest:()=>transaction(async c=>{
-  await c.query("SELECT pg_advisory_xact_lock(hashtext('radar_tibo_settings'))");
+  await lockTransaction(c,'radar_tibo_settings');
   const current=await one<TiboRecord>('settings','tibo',c,true);
   if(!current?.encryptedKey||current.version!==settings.version||!current.dailyRequestLimit)throw new TiboTimelineError('Tibo 配置已变化，请重新执行','configuration');
   const clock=Date.now(),key=usageId(clock),usage=await one<{id:string;requests:number}>('settings',key,c,true)??{id:key,requests:0};

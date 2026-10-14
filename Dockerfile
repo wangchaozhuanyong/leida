@@ -5,7 +5,9 @@ RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY . .
-RUN pnpm build
+# Next loads auth handlers while collecting routes. Use an ephemeral build-only
+# signing value; real credentials are supplied exclusively at container startup.
+RUN node --input-type=module -e 'import { randomBytes } from "node:crypto"; import { spawnSync } from "node:child_process"; const result = spawnSync("pnpm", ["build"], { stdio: "inherit", env: { ...process.env, BETTER_AUTH_SECRET: randomBytes(40).toString("base64url") } }); process.exit(result.status ?? 1);'
 
 FROM node:24-alpine AS runtime
 WORKDIR /app

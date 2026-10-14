@@ -1,4 +1,8 @@
-import { pool, list, one, insert, put, transaction } from '../db';
+import { lockTransaction } from '../db';
+import { configuredStorageRpc } from './cloudbase/storage-config';
+import { cloudbaseTasks } from './cloudbase/tasks';
+import { CloudbaseRpcError } from './cloudbase/rpc';
+import { pool, list, one, insert, put, transaction, withAutoPublicationGuard } from '../db';
 import type { Candidate, Evidence, Job, Source, SiteSettings, RadarEvent, DraftContent, CandidateAutomation, Article } from '../lib/types';
 import { AIServiceError, generateContent, type AIRecord } from './ai';
 import { collectSource, SourceStructureError, SourceRateLimitError, SourceConfigurationError, SourceTransientError } from './ingestion';
@@ -25,6 +29,7 @@ export function generationCooldown(cycle:number,timestamp=Date.now()):string {
   return new Date(timestamp+[15,30,60][Math.min(Math.max(cycle-1,0),2)]*60_000).toISOString();
 }
 export function isRecoverableStorageError(error:unknown):boolean {
+  if(error instanceof CloudbaseRpcError)return ['conflict','unknown','rejected'].includes(error.kind);
   const code=typeof error==='object'&&error!==null&&'code' in error?String(error.code):'';
   return /^(?:08[A-Z0-9]{3}|40001|40P01|53300|57P0[123]|ECONNRESET|ECONNREFUSED|ETIMEDOUT)$/.test(code);
 }
@@ -63,7 +68,7 @@ export function fingerprintChange(saved:string|undefined,current:string):'new'|'
 export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichment?:boolean}={}):Promise<void> {
   const allowTemplates=options.allowTemplates!==false;
   await transaction(async c=>{
-    await c.query("SELECT pg_advisory_xact_lock(hashtext('radar_scheduler'))");
+    await lockTransaction(c,'radar_scheduler');
     const sources=await list<Source>('sources',c);
     for(const source of sources) if(sourceCollectionDue(source)) {
       await queueJob('collect',{sourceId:source.id,structureProbe:source.pauseReason==='structure'},c);
@@ -148,6 +153,7 @@ export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichme
   });
 }
 export async function claimJob():Promise<Job|undefined> {
+  const rpc=configuredStorageRpc();if(rpc)return cloudbaseTasks(rpc).claim();
   return transaction(async c=>{
     const row=await c.query(`SELECT id,payload FROM radar_jobs
       WHERE (payload->>'status'='queued' AND (payload->>'availableAt')::timestamptz<=now())
@@ -282,9 +288,7 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
     return false;
   }
   // Hold only the short link/publish phase, never an external model request.
-  const guard=await pool.connect();
-  try {
-    await guard.query("SELECT pg_advisory_lock(hashtext('radar_auto_publication'))");
+  return withAutoPublicationGuard(async()=>{
     draft.evidenceIds=[...new Set([...draft.evidenceIds,...context.map(item=>item.id)])];
     if(candidate.content.activityId) {draft.activityId=candidate.content.activityId;draft.activityDay=candidate.content.activityDay;}
     const events=await list<RadarEvent>('events');
@@ -349,11 +353,10 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
       }
     }
     return true;
-  } finally {
-    try {await guard.query("SELECT pg_advisory_unlock(hashtext('radar_auto_publication'))");} finally {guard.release();}
-  }
+  },job);
 }
 export interface WorkerDependencies { generate?:Generator; collect?:typeof collectSource; enrich?:typeof enrichKnownEvidence; enrichQuoted?:typeof enrichQuotedResetContext; schedule?:boolean; allowTemplates?:boolean; wechat?:typeof processWechatJob; }
+let nextWechatScheduleAt=0;
 export async function writeWorkerHeartbeat(error?:string,processed=false):Promise<void> {
   const previous=await one<{id:string;heartbeatAt:string;lastJobAt?:string;error?:string}>('settings','worker_runtime');
   await put('settings',{id:'worker_runtime',heartbeatAt:now(),lastJobAt:processed?now():previous?.lastJobAt,error});
@@ -362,7 +365,10 @@ export async function runOne(dependencies:WorkerDependencies={}):Promise<boolean
   const allowTemplates=dependencies.allowTemplates??!dependencies.generate;
   if(dependencies.schedule!==false) {
     await scheduleDue({allowTemplates,allowEnrichment:!dependencies.generate||!!dependencies.enrich});
-    try {await scheduleWechatDeliveries();} catch {console.error('微信提醒调度暂不可用，其他任务继续运行');}
+    if(Date.now()>=nextWechatScheduleAt){
+      nextWechatScheduleAt=Date.now()+5000;
+      try {await scheduleWechatDeliveries();} catch {console.error('微信提醒调度暂不可用，其他任务继续运行');}
+    }
     try {await runForecastCycle();} catch {console.error('预测观察暂不可用，新闻任务继续运行');}
   }
   const job=await claimJob();

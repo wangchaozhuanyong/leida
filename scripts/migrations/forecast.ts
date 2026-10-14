@@ -13,6 +13,7 @@ export const FORECAST_MIGRATION_SQL=[
 export async function applyForecastMigration(client:Client):Promise<void> {for(const sql of FORECAST_MIGRATION_SQL)await client.query(sql);}
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  if(process.argv.includes('--apply')){
+  if((process.env.RADAR_STORAGE_BACKEND??'native')!=='native'){console.error('原生迁移不适用于当前数据库模式。');process.exit(1);}
   const client=await pool.connect();
   try {await client.query('BEGIN');await applyForecastMigration(client);await client.query('COMMIT');console.log('预测观察数据结构迁移完成');}
   catch(error){await client.query('ROLLBACK');throw error;}

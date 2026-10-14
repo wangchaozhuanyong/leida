@@ -1,0 +1,4 @@
+/* 判断说明保持离线可读，预测由同一公开快照读取。 */
+.forecast-grid{display:flex;gap:16px;margin:14px 0}.forecast-metric{flex:1;min-width:0}.forecast-value{font-size:28px;color:#f4c15c;font-weight:750;line-height:1.4;margin:4px 0}
+.outcome-entry{padding-top:16px;margin-top:16px;border-top:1px solid #303b3d}
+.forecast-empty{font-size:18px}

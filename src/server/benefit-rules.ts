@@ -1,7 +1,7 @@
 import type { ActionKind, ActionStage, BenefitAction } from '../lib/types';
 
 /** Change only when fact interpretation changes, so unchanged inputs are evaluated once. */
-export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261012-7';
+export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261013-8';
 export interface BenefitClaim {
   kind: ActionKind; stage: ActionStage; eligibility: string; scope: BenefitAction['scope'];
   quote: string; expectedAt?: string; timeNote?: string;
@@ -11,6 +11,8 @@ const normalize = (text: string) => text.replace(/[’‘]/g, "'").replace(/\s+/
 const banked = /banked\s*(?:resets?|重置)|重置卡|存卡|备用重置|累积(?:重置)?额度/i;
 const usage = /(?:usage(?:\s+limits?)?|rate\s+limits?|用量|使用(?:额度|限制|限额|量)).{0,40}(?:reset|重置)|(?:reset|重置).{0,40}(?:usage(?:\s+limits?)?|rate\s+limits?|用量|使用(?:额度|限制|限额|量))/i;
 const globalReset = /\bglobal\s+(?:(?:usage|rate\s+limits?)\s+)?reset\b|全局(?:用量)?重置/i;
+// A short completion can inherit a benefit only through extractReplyClaims' explicit parent.
+const deicticCompletion = /^(?:it|that|this)(?:'s|\s+is)\s+(?:(?:now|already)\s+)?done[.!]?$/i;
 const dayEndDeadline = /\b(?:by|before)\s+(?:the\s+)?(?:end\s+of\s+(?:the\s+)?(?:day|today|tomorrow)|EOD)\b|(?:今日|今天|当日|当天|明天)结束(?:之)?前|日终(?:之)?前/i;
 const excluded = /\b(?:purchase[ds]?|buy|bought|referral|invitation|invite[ds]?|redeem(?:ed|ing)?|carry(?:ing)? over|carried over|my resets?|my account|just you|your account only|inventory|store|stock|option)\b|购买|邀请|推荐奖励|个人结转|私人|仅你|仅该账户|自行使用|主动用卡|商店|库存|已有的重置卡/i;
 const targeted = /\b(?:some|certain|selected|subset|specific|affected)\s+(?:\w+\s+){0,3}(?:users?|accounts?)|\b\d[\d,]*(?:\.\d+)?[km]?\s+(?:\w+\s+){0,2}(?:users?|accounts?)\b|部分|特定|选定|受(?:故障)?影响|定向补偿/i;
@@ -76,6 +78,7 @@ export function benefitStage(text: string): ActionStage | undefined {
   if (/\b(?:will|(?:we|i|they)'ll|going to|scheduled to|plan to|should|expect(?:ed)?)\b.{0,80}(?:reset|giv|add|load|credit|grant|land|propagat|complet|be there|be showing)|将(?:会|于)?|计划|预计|安排|承诺|(?:改为|调整为)(?:稍后|之后|以后).{0,12}(?:发放|重置)/i.test(s)) return 'promised';
   if (/\blanding\b.{0,60}(?:\btomorrow\b|\btoday\b|\bsoon\b|\bin\b|\bby\b|\d{1,2}(?::\d{2})?\s*[ap]m\b)/i.test(s)) return 'promised';
   if (/\b(?:are|is|we're)\s+(?:now\s+)?(?:giving|loading|crediting|granting|reset{1,2}ing)|\b(?:loading|rolling out|propagating|in progress)\b|正在|发放中|传播中|加载中/i.test(s)) return 'in_progress';
+  if (deicticCompletion.test(s)) return 'claimed_complete';
   if (/\b(?:have|has)\s+(?:now\s+|already\s+|just\s+|been\s+|fully\s+)*(?:reset|added|credited|granted|given|loaded|deposited|landed|propagated|completed)\b|^(?:added|credited|granted|loaded)\b|\b(?:confirmed|fully|all)\s+(?:landed|propagated|credited|loaded|completed)\b|\b(?:reset|resets)\s+(?:have\s+)?(?:all\s+)?(?:landed|propagated|completed)\b|已(?:经|全部)?(?:为.{0,80})?(?:确认|重置|发放|到账|落地|传播|加载|存入|添加)|全部.{0,20}(?:落地|传播)/i.test(s)) return 'claimed_complete';
   if (/^all\s+reset\s+for\s+everyone[.!]?$/i.test(s)) return 'claimed_complete';
   // The original's short announcement omits "will", but a global action with
@@ -300,12 +303,13 @@ export function extractReplyClaims(text: string, publishedAt: string, parents: B
   // audience. Accept direct reset assertions, not reports about another user.
   if (kinds.length && !/^(?:the\s+)?(?:banked\s+resets?|(?:usage|rate)\s+limits?(?:\s+reset)?|global\s+reset)\b|^(?:重置卡|用量重置)/i.test(normalize(text))) return [];
   const clauses = benefitClauses(text);
-  const statement = clauses.find(clause => benefitStage(clause) && /land(?:ed|ing)?|propagated|credited|loaded|completed|be there|^all\s+reset\s+for\s+everyone|\b(?:cancel(?:led|ed)?|withdraw(?:n)?|withdrew)\b|已确认|落地|到账|传播|取消|撤回/i.test(clause)) ?? text;
+  const isReplyStatement = (clause: string) => deicticCompletion.test(normalize(clause)) || /land(?:ed|ing)?|propagated|credited|loaded|completed|be there|^all\s+reset\s+for\s+everyone|\b(?:cancel(?:led|ed)?|withdraw(?:n)?|withdrew)\b|已确认|落地|到账|传播|取消|撤回/i.test(clause);
+  const statement = clauses.find(clause => benefitStage(clause) && isReplyStatement(clause)) ?? text;
   if (/\b(?:rumou?rs?|unconfirmed|alleged|reports?|someone|a user)\b|传闻|据说|有人称/i.test(text)) return [];
   const stage = benefitStage(statement);
-  if (!stage || !/land(?:ed|ing)?|propagated|credited|loaded|completed|be there|^all\s+reset\s+for\s+everyone|\b(?:cancel(?:led|ed)?|withdraw(?:n)?|withdrew)\b|已确认|落地|到账|传播|取消|撤回/i.test(statement)) return [];
+  if (!stage || !isReplyStatement(statement)) return [];
   if (/\bnot all\b|\b(?:except|excluding|only for|selected|specific|affected)\b|并非所有|不是所有|仅|部分|定向/i.test(text)) return [];
-  if (clauses.some(clause => /\b(?:not|never|no|won't|haven't|hasn't|didn't|unconfirmed|rumou?rs?)\b.{0,40}\b(?:reset|land|propagat|load|credit|complete|account)/i.test(clause))) return [];
+  if (clauses.some(clause => /\b(?:not|never|no|won't|haven't|hasn't|didn't|unconfirmed|rumou?rs?)\b.{0,40}\b(?:reset|land|propagat|load|credit|complete|done|account)/i.test(clause))) return [];
   if (clauses.filter(clause => clause !== statement).some(clause => {
     const other = benefitStage(clause);
     return !!other && other !== stage && /reset|land|propagat|load|credit|cancel|withdraw/i.test(clause);

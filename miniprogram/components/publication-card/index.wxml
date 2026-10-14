@@ -1,0 +1,5 @@
+<view class="card publication-card">
+  <view class="row wrap"><text class="badge {{item.tone}}">{{item.historical ? '历史收录 · ' : ''}}{{item.label}}</text><text class="time">{{item.time}}</text></view>
+  <view class="announcement-title">{{item.title}}</view><view class="prose publication-summary">{{item.summary}}</view>
+  <view class="row publication-footer"><view class="small muted grow">{{item.note}}</view><button class="text-button" bindtap="open">查看详情 →</button></view>
+</view>

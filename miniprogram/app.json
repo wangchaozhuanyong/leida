@@ -1,0 +1,60 @@
+{
+  "pages": [
+    "pages/home/index",
+    "pages/settings/index",
+    "pages/announcements/index",
+    "pages/news/index",
+    "pages/schedule/index",
+    "pages/detail/index",
+    "pages/activity/index",
+    "pages/notices/index",
+    "pages/methodology/index",
+    "pages/privacy/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "模钥重置雷达",
+    "navigationBarBackgroundColor": "#0b1113",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#0b1113",
+    "backgroundTextStyle": "light",
+    "enablePullDownRefresh": true
+  },
+  "tabBar": {
+    "color": "#9ba9a6",
+    "selectedColor": "#f4c15c",
+    "backgroundColor": "#0b1113",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "首页",
+        "iconPath": "assets/radar.png",
+        "selectedIconPath": "assets/radar-gold.png"
+      },
+      {
+        "pagePath": "pages/news/index",
+        "text": "动态",
+        "iconPath": "assets/news.png",
+        "selectedIconPath": "assets/news-gold.png"
+      },
+      {
+        "pagePath": "pages/announcements/index",
+        "text": "记录",
+        "iconPath": "assets/records.png",
+        "selectedIconPath": "assets/records-gold.png"
+      },
+      {
+        "pagePath": "pages/settings/index",
+        "text": "提醒",
+        "iconPath": "assets/reminder.png",
+        "selectedIconPath": "assets/reminder-gold.png"
+      }
+    ]
+  },
+  "usingComponents": {
+    "status-panel": "/components/status-panel/index",
+    "publication-card": "/components/publication-card/index",
+    "instrument-dial": "/components/instrument-dial/index"
+  },
+  "sitemapLocation": "sitemap.json"
+}

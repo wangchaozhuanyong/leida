@@ -49,6 +49,7 @@ export interface CadenceBacktest extends CadenceBacktestSummary {
 }
 
 export interface ResetCadenceForecast {
+ summaryOnly?:boolean;
  status:'ready'|'insufficient'|'out_of_range'|'paused';
  id:string;
  modelVersion:string;
