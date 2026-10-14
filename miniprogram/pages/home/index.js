@@ -1,8 +1,8 @@
 const { createPage } = require('../../utils/page');
 const m = require('../../utils/model');
-const { dialModel } = require('../../utils/dial');
+const { statusTimelineModel } = require('../../utils/status-timeline');
 Page(createPage((data, query, page, app) => {
-  if (!data) return { name: '模钥重置雷达', latest: null, completions: [], pending: null, forecast: null, recent: [], activity: null, sharePath: '', dial: null, posterPath: '', posterDescription: '' };
+  if (!data) return { name: '模钥重置雷达', latest: null, completions: [], pending: null, forecast: null, recent: [], activity: null, sharePath: '', timeline: null, posterPath: '', posterDescription: '' };
   const outlook = m.resetOutlookModel(data), completed = m.latestCompletedBenefits(data), latestItem = completed[0], pending = outlook.active;
   const latestPublication = latestItem && latestItem.publication;
   const latestAction = latestItem && latestItem.action;
@@ -24,7 +24,7 @@ Page(createPage((data, query, page, app) => {
     completions: completed.map(item => ({ kind: item.action.kind, title: item.action.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', time: m.completionTime(item.action.statementAt), path: pathFor({ publicationId: item.publication.id }) })),
     pending: pending ? { label: m.actionLabels[pending.kind], stage: m.stageText(pending, data.serverTime), countdown: countdown.label, timed: countdown.status !== 'unknown', counting: countdown.status === 'upcoming', time: pending.expectedAt ? m.displayTime(pending.expectedAt) : '', timeNote: pending.timeNote || '', path: pathFor(pending) } : null,
     forecast: null, outlookStatus: outlook.status,
-    dial: dialModel(outlook, data.serverTime, latestAction || null), posterPath, posterDescription,
+    timeline: statusTimelineModel(outlook, data.serverTime, latestAction || null), posterPath, posterDescription,
     sourceDelayed: data.sources.some(item => ['failed', 'delayed'].includes(item.status)),
     collectedAt: m.displayTime(recentSuccess), latestSourceTime: latestArticle ? m.displayTime(m.articleSourceTime(latestArticle)) : '暂无记录',
     waitingText: outlook.status === 'completed' ? '本次已有公开完成声明，等待下一次预告。' : outlook.status === 'cancelled' ? '本次安排已取消，等待下一次预告。' : '等待下一次预告，暂无新的时间依据。',
@@ -38,7 +38,7 @@ Page(createPage((data, query, page, app) => {
   toggleFreshness() { this.setData({ freshnessOpen: !this.data.freshnessOpen }); },
   openPoster() { if (this.data.posterPath) wx.navigateTo({ url: `${this.data.posterPath}&poster=1` }); },
   syncCountdown() {
-    if (!(this.data.pending && this.data.pending.counting) && !(this.data.dial && this.data.dial.completed)) { this.stopCountdown(); return; }
+    if (!(this.data.pending && this.data.pending.counting) && !(this.data.timeline && this.data.timeline.completed)) { this.stopCountdown(); return; }
     if (!this._countdownTimer) this._countdownTimer = setInterval(() => this.redraw(), 1000);
   },
   stopCountdown() { if (this._countdownTimer) clearInterval(this._countdownTimer); this._countdownTimer = null; },

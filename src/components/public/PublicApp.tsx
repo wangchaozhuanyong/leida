@@ -11,6 +11,7 @@ import { useFixedSnapshot } from './useFixedSnapshot';
 import type {ForecastSnapshot} from '@/lib/forecast';
 import {ForecastPanel} from './ForecastPanel';
 import {InstrumentDial} from './InstrumentDial';
+import {StatusTimeline} from './StatusTimeline';
 import {ResetOutlookPanel} from './ResetOutlookPanel';
 import {publicResetOutlook} from '@/lib/reset-outlook';
 import { actionLabels } from '@/lib/labels';
@@ -212,16 +213,18 @@ export function Home({ data, onWechatReminders, onPoster, onShare, historical, w
     {completions.length ? completions.map(item => <div className="pub-record-detail" key={item.action.kind}>
       <h2><Link scroll={false} href={`/events/${encodeURIComponent(item.event.id)}`} aria-label={`查看最近${item.action.kind === 'banked_reset' ? '重置卡发放' : '用量重置'}的公开依据`}>公告称已{item.action.kind === 'banked_reset' ? '发放重置卡' : '重置用量'}</Link></h2>
       <p className="pub-record-time"><time dateTime={item.action.statementAt}>{completionTime(item.action.statementAt)}</time><span> · 北京时间</span></p>
-    </div>) : <div className="pub-record-detail"><h2>暂无公开完成记录</h2><p className="pub-record-time">收录后将在这里更新</p></div>}
+    </div>) : <div className="pub-record-detail pub-record-empty"><h2>暂无公开完成记录</h2><p className="pub-record-time">收录后将在这里更新</p></div>}
   </section>;
   return <>
     {historical && <p className="pub-warning">当前展示历史收录资料。</p>}
     <div className={`pub-instrument-layout${outlook.active ? '' : ' is-idle'}`}>
-      <InstrumentDial outlook={outlook} serverTime={data.serverTime} completion={latest?.action ?? null}/>
+      <div className="pub-home-dial"><InstrumentDial outlook={outlook} serverTime={data.serverTime} completion={latest?.action ?? null}/></div>
+      <StatusTimeline outlook={outlook} serverTime={data.serverTime} completion={latest?.action ?? null}/>
       <aside className="pub-instrument-summary" aria-label="重置状态与操作">
+        {outlook.active?.timeNote && <details className="pub-home-time-note"><summary>预告时间说明</summary><p>{outlook.active.timeNote}</p></details>}
         {outlook.active ? <ResetOutlookPanel outlook={outlook} serverTime={data.serverTime} instrument /> : latestRecord}
         <div className="pub-instrument-actions">
-          <Link scroll={false} href={outlook.active ? `/events/${encodeURIComponent(outlook.active.eventId)}` : latest ? `/events/${encodeURIComponent(latest.event.id)}` : '/history'} className="pub-button full pub-evidence-action"><Icon name="news"/>{outlook.active ? '查看原文依据' : '查看最近发放依据'}<Icon name="arrow"/></Link>
+          <Link scroll={false} href={outlook.active ? `/events/${encodeURIComponent(outlook.active.eventId)}` : latest ? `/events/${encodeURIComponent(latest.event.id)}` : '/history'} className="pub-button full pub-evidence-action"><Icon name="news"/><span className="pub-evidence-desktop">{outlook.active ? '查看原文依据' : '查看最近发放依据'}</span><span className="pub-evidence-mobile">查看依据</span><Icon name="arrow"/></Link>
           <button onClick={onWechatReminders} className="pub-button full pub-subscribe"><Icon name="bell"/><span>微信提醒</span>{wechatEntry === 'unavailable' && <small>待开放</small>}<Icon name="arrow"/></button>
         </div>
         <section className="pub-share-panel" aria-labelledby="home-share-title">

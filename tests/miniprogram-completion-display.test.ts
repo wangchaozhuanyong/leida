@@ -58,19 +58,19 @@ test('未来、个人、仅新闻、撤回和未完成公告不作为小程序�
 test('真实原生首页打开期间跨24小时自动恢复等待，并停止计时器且保留两条记录',()=>{
  const data=fixture([publication('reset','automatic_reset','2026-10-12T08:00:01Z'),publication('card','banked_reset','2026-10-10T04:00:00Z')]);
  const h=nativeHome(data);
- assert.equal(h.page.data.dial.completed,true);assert.equal(h.timers.size,1);assert.equal(h.page.data.completions.length,2);
+ assert.equal(h.page.data.timeline.completed,true);assert.equal(h.timers.size,1);assert.equal(h.page.data.completions.length,2);
  h.advance(1000);
- assert.equal(h.page.data.dial.completed,false);assert.equal(h.page.data.dial.state,'等待预告');assert.equal(h.timers.size,0);assert.equal(h.page.data.completions.length,2);
+ assert.equal(h.page.data.timeline.completed,false);assert.equal(h.page.data.timeline.title,'等待预告');assert.equal(h.timers.size,0);assert.equal(h.page.data.completions.length,2);
  assert.equal(h.page.data.completions[0].time,'2026/10/12 16:00');
- h.refresh();assert.equal(h.page.data.dial.completed,false,'刷新不重开24小时');
+ h.refresh();assert.equal(h.page.data.timeline.completed,false,'刷新不重开24小时');
  h.page.onUnload();assert.equal(h.timers.size,0);
 });
 test('最近发卡与重置独立计时，分享原文绑定最近完成；隐藏页面停止并在显示时恢复',()=>{
  const h=nativeHome(fixture([publication('reset','automatic_reset','2026-10-13T05:45:00Z'),publication('card','banked_reset','2026-10-13T07:25:00Z')]));
- assert.equal(h.page.data.dial.elapsedLabel,'35分钟前');assert.equal(h.page.data.dial.bankedCompleted,true);
+ assert.match(h.page.data.timeline.note,/^35分钟前/);assert.equal(h.page.data.timeline.title,'已确认发放重置卡');
  assert.equal(h.page.data.completions[1].time,'2026/10/13 13:45');
  assert.equal(h.page.onShareAppMessage().path,'/pages/detail/index?publicationId=card');
  h.page.onHide();assert.equal(h.timers.size,0);
- h.advance(60000);h.page.onShow();assert.equal(h.page.data.dial.elapsedLabel,'36分钟前');assert.equal(h.timers.size,1);
+ h.advance(60000);h.page.onShow();assert.match(h.page.data.timeline.note,/^36分钟前/);assert.equal(h.timers.size,1);
  h.page.onUnload();assert.equal(h.timers.size,0);
 });
