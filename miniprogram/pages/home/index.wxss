@@ -5,7 +5,7 @@
 /* Direction 03. No canvas or inferred completion is needed for this status card. */
 .status-timeline{width:100%;min-height:140px;padding:13px 15px 11px;border:1px solid #39483e;border-radius:12px;background:linear-gradient(115deg,#1b2822,#111c1b)}
 .timeline-head{display:flex;justify-content:space-between;align-items:center;gap:9px;color:#acb8ac;font-size:10px;line-height:16px;letter-spacing:.7px}
-.timeline-head>text:last-child{font-size:9px;letter-spacing:0;white-space:nowrap}
+.timeline-timezone{font-size:9px;letter-spacing:0;white-space:nowrap}
 .timeline-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:7px}
 .timeline-title{font-size:25px;font-weight:600;line-height:1.3;color:#e6ebe6;word-break:break-word;font-variant-numeric:tabular-nums}
 .timeline-unit{font-size:10px;font-weight:400;margin-left:6px;white-space:nowrap;color:#c4c5af}
@@ -34,3 +34,8 @@
 .completion-records .completion-time{font-size:10px;margin-top:3px;text-align:left;line-height:1.6}
 .share-panel{margin-top:14px;padding:14px;margin-bottom:18px}
 @media(max-width:350px){.timeline-title{font-size:24px}.instrument-actions .instrument-action-button{font-size:12px}.instrument-actions .button-label{gap:4px}}
+.home-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:56px;margin-bottom:10px}
+.home-heading-copy{flex:none}.home-heading-title{font-size:20px;font-weight:650;line-height:28px;color:#e4e9e3}
+.home-heading-subtitle{font-size:10px;line-height:16px;margin-top:2px;color:#98a6a5}
+.home-heading .freshness-summary{min-height:44px;max-width:58%;justify-content:flex-end;font-size:10px;line-height:16px;color:#aab8b3}
+.freshness-detail{font-size:11px}

@@ -3,10 +3,15 @@ const merge = (a, b) => [...new Map([...a, ...b].map(item => [item.id, item])).v
 const query = options => Object.entries(options).filter(([,value]) => value !== undefined && value !== null && value !== '').map(([key,value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join('&');
 /** Foreground public reads; independent views and response epochs protect page changes. */
 function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, now = () => Date.now(), random = Math.random }) {
-  const request = createTransport(wxApi, config), listeners = new Set();
-  let state = { data: null, version: '', contentVersion:'', page:null, loading: false, error: configurationError(config), unconfigured: !!configurationError(config), receivedAt: 0 };
+  const request = createTransport(wxApi, config), listeners = new Set(), views = new Map();
+  const empty = () => ({ data: null, version: '', contentVersion:'', page:null, loading: false, error: configurationError(config), unconfigured: !!configurationError(config), receivedAt: 0 });
+  let state = empty();
   let active = false, timer, pending, epoch = 0, task, failures = 0, view = {view:'home'};
-  const emit = patch => { state = { ...state, ...patch }; listeners.forEach(fn => fn(state)); };
+  const emit = patch => {
+    state = { ...state, ...patch };
+    if (state.data) views.set(query(view), { ...state, loading:false });
+    listeners.forEach(fn => fn(state));
+  };
   function schedule() {
     if (!active || state.unconfigured) return;
     if(timer!==undefined)timers.clearTimeout(timer);
@@ -51,7 +56,12 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
     getState() { return state; }, refresh,
     setView(next) {
       if (JSON.stringify(next)===JSON.stringify(view)) return refresh(true);
-      cancel(); view={...next}; emit({data:null,page:null,version:'',contentVersion:'',loading:false}); return refresh(false);
+      cancel(); view={...next};
+      // Each page/filter restores only its own successful snapshot. Revalidate
+      // in the background; a cold page must never show another page's body.
+      const cached=views.get(query(view));
+      state={...empty(),...cached}; emit({});
+      return refresh(!!cached?.data);
     },
     more() { return state.page?.nextCursor ? refresh(false,state.page.nextCursor) : Promise.resolve(); },
     start() { if(active)return pending||Promise.resolve(); active=true;failures=0;const first=refresh(!!state.data);first.finally(schedule);return first; },

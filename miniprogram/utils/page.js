@@ -4,7 +4,8 @@ function createPage(build, extra = {}) {
     const data = state.data;
     const clockData = data ? { ...data, serverTime: new Date(Date.parse(data.serverTime) + Math.max(0, Date.now() - state.receivedAt)).toISOString() } : null;
     const cutoff = data && data.publications.reduce((latest, item) => item.cutoffAt > latest ? item.cutoffAt : latest, '');
-    page.setData({ loading: state.loading, connected: !!data, unconfigured: state.unconfigured, error: state.error, cutoff: displayTime(cutoff), pagination:state.page||null, ...(build(clockData, page._params || {}, page.data, getApp()) || {}) });
+    const pagination=state.page||null;
+    page.setData({ loading: state.loading, connected: !!data, unconfigured: state.unconfigured, error: state.error, cutoff: displayTime(cutoff), pagination, ...(build(clockData, page._params || {}, {...page.data,pagination}, getApp()) || {}) });
     if(extra.title&&typeof wx.setNavigationBarTitle==='function'){
       const title=extra.title(page.data);
       if(title&&title!==page._navigationTitle){page._navigationTitle=title;wx.setNavigationBarTitle({title});}
