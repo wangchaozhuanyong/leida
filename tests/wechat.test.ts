@@ -192,6 +192,63 @@ test('模板字段严格限制，完成限定词保留且按五字phrase/二十�
   assert.throws(()=>wechatTemplateData({...settings,templateFields:{title:'name1',status:'phrase2',time:'time3'}},notice),/不兼容/);assert.throws(()=>wechatTemplateData({...settings,templateFields:{title:'thing1',status:'thing1',time:'time3'}},notice),/不兼容/);
 });
 
+test('额度重置模板使用公开福利类型和阶段，混合阶段不冒称全部完成',async()=>{
+  const f=await fixture(),settings={...defaultWechat,templateFields:{title:'thing1',status:'thing3',time:'time5'}};
+  const notice=await f.notice({title:'不应复制到额度类型的整条公告标题'});
+  const action=(kind:'automatic_reset'|'banked_reset',stage:RadarEvent['actions'][number]['stage'],scope:RadarEvent['actions'][number]['scope']='public'):RadarEvent['actions'][number]=>({id:`${kind}-${scope}`,kind,stage,scope,eligibility:'以公开来源为准',evidenceIds:['ev'],statementAt:new Date(f.now()).toISOString()});
+  for(const row of [
+    {actions:[action('automatic_reset','promised')],type:'编程套餐额度',stage:'已公布计划'},
+    {actions:[action('banked_reset','claimed_complete')],type:'重置卡',stage:'公告称完成'},
+    {actions:[action('automatic_reset','in_progress')],type:'编程套餐额度',stage:'公告称进行中'},
+    {actions:[action('banked_reset','cancelled')],type:'重置卡',stage:'公告已取消'},
+    {actions:[action('automatic_reset','claimed_complete'),action('banked_reset','promised')],type:'用量重置与重置卡',stage:'公开进展更新'},
+    {actions:[action('automatic_reset','promised'),action('banked_reset','claimed_complete','private')],type:'编程套餐额度',stage:'已公布计划'},
+  ]){
+    const publication={...f.publication,event:{...f.publication.event,actions:row.actions}};
+    const data=wechatTemplateData(settings,notice,publication);
+    assert.deepEqual(data,{thing1:{value:row.type},thing3:{value:row.stage},time5:{value:'2026-10-10 10:00'}});
+    assert.doesNotMatch(JSON.stringify(data),/到账|所有账户|整条公告标题/);
+  }
+  const mixed={...f.publication,event:{...f.publication.event,actions:[action('automatic_reset','claimed_complete'),action('banked_reset','promised')]}};
+  const phrase=wechatTemplateData({...settings,templateFields:{...settings.templateFields,status:'phrase3'}},notice,mixed);
+  assert.equal(phrase.phrase3.value,'进展已更新');assert.ok(Array.from(phrase.phrase3.value).length<=5);
+  assert.equal(wechatTemplateData(settings,{...notice,categories:['correction']},mixed).thing3.value,'公告更正');
+  assert.throws(()=>wechatTemplateData(settings,{...notice,publicationId:'different-fixed-version'},mixed),/不属于额度重置/);
+});
+
+test('额度模板拒绝纯活动、产品和仅私有福利，不消耗可用订阅',async()=>{
+  for(const category of ['activity','product'] as const){
+    const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);
+    const pub={...f.publication,article:{...f.publication.article,category}};
+    await f.store.put('publications',pub);const notice=await f.notice({categories:['activity']});
+    assert.throws(()=>wechatTemplateData({...defaultWechat,templateFields:{title:'thing1',status:'thing3',time:'time5'}},notice,pub),/不属于额度重置/);
+    assert.equal((await f.queued()).length,0);assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).state,'available');
+    assert.equal(f.calls.filter(call=>call.url.includes('stable_token')||call.url.includes('subscribe/send')).length,0);
+  }
+  const f=await fixture(),notice=await f.notice();
+  const privateOnly={...f.publication,event:{...f.publication.event,actions:[{id:'private',kind:'banked_reset',stage:'claimed_complete',scope:'private',eligibility:'定向对象',evidenceIds:['ev'],statementAt:new Date(f.now()).toISOString()} satisfies RadarEvent['actions'][number]]}};
+  assert.throws(()=>wechatTemplateData({...defaultWechat,templateFields:{title:'thing1',status:'thing3',time:'time5'}},notice,privateOnly),/不属于额度重置/);
+});
+
+test('真实发送路径的替身使用thing1、thing3、time5及对应发布版本，不读取公告标题作额度类型',async()=>{
+  const f=await fixture();await f.configure({templateFields:{title:'thing1',status:'thing3',time:'time5'}});
+  f.publication.event.actions=[{id:'public-reset',kind:'automatic_reset',stage:'promised',scope:'public',eligibility:'以公开来源为准',evidenceIds:['ev'],statementAt:new Date(f.now()).toISOString()}];
+  await f.store.put('publications',f.publication);
+  const session=await f.login();await f.accept(session.sessionToken);await f.notice({categories:['announcement'],title:'不应发送到额度类型的长标题'});
+  const jobs=await f.queued();assert.equal(jobs.length,1);assert.equal((await f.service.processWechatJob(jobs[0])).state,'sent');
+  const body=f.calls.find(call=>call.url.includes('subscribe/send'))!.body!;
+  assert.deepEqual(body.data,{thing1:{value:'编程套餐额度'},thing3:{value:'已公布计划'},time5:{value:'2026-10-10 10:00'}});
+  assert.equal(body.page,`pages/detail/index?publicationId=${f.publication.id}`);
+});
+
+test('已排队额度提醒在发送前失去重置内容时取消，不调用微信发送',async()=>{
+  const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);await f.notice();
+  const [job]=await f.queued();assert.ok(job);
+  await f.store.put('publications',{...f.publication,article:{...f.publication.article,category:'product'}});
+  assert.equal((await f.service.processWechatJob(job)).state,'cancelled');
+  assert.equal(f.calls.filter(call=>call.url.includes('stable_token')||call.url.includes('subscribe/send')).length,0);
+});
+
 test('provider不会回传含密钥的网络错误/URL，未明确errcode零不判成功',async()=>{
   const failed=createWechatProvider(async()=>{throw new Error('SECRET_QUERY_URL_OPENID');});await assert.rejects(failed.send('token-secret',{touser:'private'}),(error:unknown)=>error instanceof WechatServiceError&&error.failureKind==='unknown'&&!error.message.includes('SECRET'));
   const invalid=createWechatProvider(async()=>Response.json({errmsg:'ok'}));await assert.rejects(invalid.send('token-secret',{}),(error:unknown)=>error instanceof WechatServiceError&&error.failureKind==='unknown');
