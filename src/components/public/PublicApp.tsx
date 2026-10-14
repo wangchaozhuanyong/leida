@@ -178,7 +178,10 @@ export default function PublicApp() {
       <nav className="pub-desktop-nav" aria-label="主导航">{navigation}</nav><div className="pub-sidebar-note"><span className="pub-status-dot" /> 公开消息追踪<small>所有时间 · 北京时间</small></div><Link scroll={false} className="pub-icon-button pub-more-button" href="/more" aria-label="更多"><Icon name="more" /></Link>
     </header>
     {subpage && <nav className="pub-page-back" aria-label="返回上级"><Link scroll={false} className="pub-back-link" href={backHref}><Icon name="back" />返回</Link></nav>}
-    {route === 'home' && data && <details className="pub-freshness"><summary><span className={`pub-status-dot${error || data.sources.some(source => ['failed', 'delayed'].includes(source.status)) ? ' is-delayed' : ''}`} />{error ? '连接中断，保留已有资料' : data.sources.some(source => ['failed', 'delayed'].includes(source.status)) ? '部分来源更新延迟' : '自动检查公开消息'}<Icon name="info" /></summary><div><p>最近采集成功：<time dateTime={collectedAt}>{collectedAt ? `${briefTime(collectedAt)} · 北京时间` : '暂无记录'}</time></p><p>最新消息发布于：<time dateTime={latestArticle ? articleSourceTime(latestArticle) : undefined}>{latestArticle ? `${briefTime(articleSourceTime(latestArticle))} · 北京时间` : '暂无记录'}</time></p><p>采集成功时间来自最近成功的来源，不代表所有来源同时更新。</p></div></details>}
+    {route === 'home' && <div className="pub-home-heading">
+      <div className="pub-home-heading-copy"><strong>Codex重置</strong><p>不要错过每一次重置。</p></div>
+      {data && <details className="pub-freshness"><summary><span className={`pub-status-dot${error || data.sources.some(source => ['failed', 'delayed'].includes(source.status)) ? ' is-delayed' : ''}`} />{error ? '连接中断，保留已有资料' : data.sources.some(source => ['failed', 'delayed'].includes(source.status)) ? '部分来源更新延迟' : '自动检查公开消息'}<Icon name="info" /></summary><div><p>最近采集成功：<time dateTime={collectedAt}>{collectedAt ? `${briefTime(collectedAt)} · 北京时间` : '暂无记录'}</time></p><p>最新消息发布于：<time dateTime={latestArticle ? articleSourceTime(latestArticle) : undefined}>{latestArticle ? `${briefTime(articleSourceTime(latestArticle))} · 北京时间` : '暂无记录'}</time></p><p>采集成功时间来自最近成功的来源，不代表所有来源同时更新。</p></div></details>}
+    </div>}
     <main className="pub-main" id="public-main" tabIndex={-1}>
       {data && error && <div className="pub-warning" role="alert">连接暂时中断，保留上次成功获取的资料。<button className="pub-text-button" onClick={() => void refresh()}>重试</button></div>}
       {data && !error && data.sources.some(s => ['failed', 'delayed'].includes(s.status)) && <div className="pub-warning" role="status">部分来源更新延迟，以下保留最近可信结果。</div>}
@@ -222,8 +225,7 @@ export function Home({ data, onWechatReminders, onPoster, onShare, historical, w
           <button onClick={onWechatReminders} className="pub-button full pub-subscribe"><Icon name="bell"/><span>微信提醒</span>{wechatEntry === 'unavailable' && <small>待开放</small>}<Icon name="arrow"/></button>
         </div>
         <section className="pub-share-panel" aria-labelledby="home-share-title">
-          <div className="pub-share-panel-heading"><Icon name="share"/><h2 id="home-share-title">分享重置动态</h2></div>
-          <p>{latest ? '把最近的重置记录分享给朋友' : '分享雷达，一起关注后续动态'}</p>
+          <div className="pub-share-panel-heading"><Icon name="share"/><h2 id="home-share-title">分享重置动态</h2><p>{latest ? '把最近的重置记录分享给朋友' : '分享雷达，一起关注后续动态'}</p></div>
           <div className="pub-share-panel-actions">
             <button className="pub-button primary" disabled={!latest} aria-describedby={!latest ? 'home-share-note' : undefined} onClick={() => latest && onPoster(latest.publication, latest.action.id)}><Icon name="card"/>生成分享海报</button>
             <button className="pub-button" onClick={() => void onShare(latest?.publication)}><Icon name="link"/>分享链接</button>

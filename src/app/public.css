@@ -129,16 +129,17 @@
 /* Keep sharing together immediately after the WeChat reminder action. */
 .pub-instrument-actions { margin-bottom: 14px; }
 .pub-share-panel { padding: 18px; margin-bottom: 24px; border: 1px solid #51452d; border-radius: 12px; background: linear-gradient(125deg, #f4c15c09, #11191b80); }
-.pub-share-panel-heading { display: flex; align-items: center; gap: 9px; }
+.pub-share-panel-heading { display: flex; align-items: center; gap: 8px; }
 .pub-share-panel-heading > .pub-icon { width: 18px; height: 18px; color: #f4c15c; }
-.pub-share-panel-heading h2 { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.5; }
+.pub-share-panel-heading h2 { flex-shrink: 0; margin: 0; font-size: 15px; font-weight: 600; line-height: 1.5; white-space: nowrap; }
+.pub-share-panel-heading > p { min-width: 0; margin: 0 0 0 auto; color: var(--pub-muted); font-size: 12px; line-height: 1.7; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pub-share-panel > p { margin: 6px 0 0; color: var(--pub-muted); font-size: 12px; line-height: 1.7; }
 .pub-share-panel-actions { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 10px; margin-top: 14px; }
 .pub-share-panel-actions .pub-button { min-width: 0; min-height: 46px; padding: 10px 8px; gap: 7px; border-radius: 8px; font-size: 13px; white-space: nowrap; }
 .pub-share-panel-actions .pub-icon { width: 17px; height: 17px; }
 .pub-share-panel > .pub-share-panel-note { margin-top: 10px; }
 @media (max-width:700px) { .pub-share-panel { padding: 16px; margin-bottom: 20px; } }
-@media (max-width:360px) { .pub-share-panel { padding: 14px; } .pub-share-panel-actions { gap: 8px; } .pub-share-panel-actions .pub-button { font-size: 12px; gap: 5px; padding-inline: 6px; } }
+@media (max-width:360px) { .pub-share-panel { padding: 14px; } .pub-share-panel-heading { gap: 6px; } .pub-share-panel-heading > .pub-icon { width: 14px; height: 14px; } .pub-share-panel-heading h2 { font-size: 12px; } .pub-share-panel-heading > p { font-size: 10px; } .pub-share-panel-actions { gap: 8px; } .pub-share-panel-actions .pub-button { font-size: 12px; gap: 5px; padding-inline: 6px; } }
 
 /* Completion record: optional evidence link, then outcome and Beijing time. */
 .pub-instrument-last, .pub-instrument-last.is-featured { display: block; container-type: inline-size; }
@@ -197,15 +198,19 @@
 .pub-page-heading { padding: 4px 0 20px; margin-bottom: 24px; }
 .pub-page-heading > .pub-eyebrow { margin: 0 0 8px; }
 .pub-page-intro { color: var(--pub-muted); margin: 0 0 20px; font-size: 14px; }
-.public-surface .pub-freshness { display: block; position: relative; margin: 0 0 8px; padding: 0; border: 0; font-size: 11px; color: var(--pub-muted); }
-.pub-freshness > summary { display: inline-flex; align-items: center; justify-content: flex-start; gap: 6px; min-height: 28px; cursor: pointer; list-style: none; border: 0; color: #929f9a; font-size: 11px; line-height: 1.5; font-weight: 400; }
+.pub-home-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 68px; margin-bottom: 16px; }
+.pub-home-heading-copy { min-width: 0; }
+.pub-home-heading-copy strong { display: block; color: var(--pub-text); font-size: 22px; font-weight: 650; line-height: 1.4; letter-spacing: -.3px; white-space: nowrap; }
+.pub-home-heading-copy p { margin-top: 4px; color: var(--pub-muted); font-size: 12px; line-height: 1.5; white-space: nowrap; }
+.public-surface .pub-freshness { display: block; position: relative; flex-shrink: 0; margin: 0 0 0 auto; padding: 0; border: 0; font-size: 11px; color: var(--pub-muted); }
+.pub-freshness > summary { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; min-height: 44px; cursor: pointer; list-style: none; border: 0; color: #929f9a; font-size: 11px; line-height: 1.5; font-weight: 400; white-space: nowrap; }
 .public-surface .pub-freshness > summary:after,
 .public-surface .pub-freshness[open] > summary:after { content: none; }
 .pub-freshness > summary::-webkit-details-marker { display: none; }
 .pub-freshness > summary .pub-icon { width: 13px; height: 13px; flex-shrink: 0; opacity: .65; }
 .pub-freshness .pub-status-dot { width: 6px; height: 6px; flex-shrink: 0; margin: 0; background: #a7bdac; }
 .pub-freshness .pub-status-dot.is-delayed { background: #efbd62; }
-.pub-freshness > div { padding: 12px 16px; margin-top: 4px; border: 1px solid var(--pub-line); border-radius: 10px; background: #11191b; max-width: 560px; }
+.pub-freshness > div { position: absolute; top: 100%; right: 0; z-index: 35; width: min(420px, calc(100vw - 44px)); padding: 12px 16px; margin-top: 4px; border: 1px solid var(--pub-line); border-radius: 10px; background: #11191b; box-shadow: 0 12px 32px #0005; }
 .pub-freshness > div p { margin: 4px 0; line-height: 1.8; }
 .pub-freshness time { margin: 0; }
 .is-idle .pub-instrument-dial { max-width: 440px; }
@@ -315,7 +320,9 @@
   .pub-header-back { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; min-height: 44px; margin-left: -10px; color: #b6c0bc; }
   .pub-page-back { display: none; }
   .pub-context-count { font-size: 11px; padding: 2px 6px; }
-  .pub-freshness > summary { min-height: 32px; }
+  .pub-home-heading { gap: 12px; min-height: 64px; margin-bottom: 14px; }
+  .pub-home-heading-copy strong { font-size: 19px; }
+  .pub-home-heading-copy p { font-size: 11px; }
   .pub-freshness > div p { white-space: normal; }
   .pub-instrument-layout.is-idle { min-height: 0; gap: 22px; }
   .is-idle .pub-instrument-dial { max-width: 222px; }
