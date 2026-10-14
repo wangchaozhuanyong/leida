@@ -2,7 +2,7 @@ const { createPage } = require('../../utils/page');
 const m = require('../../utils/model');
 const { dialModel } = require('../../utils/dial');
 Page(createPage((data, query, page, app) => {
-  if (!data) return { name: '模钥重置雷达', latest: null, completions: [], pending: null, forecast: null, recent: [], activity: null, sharePath: '', dial: null, posterPath: '' };
+  if (!data) return { name: '模钥重置雷达', latest: null, completions: [], pending: null, forecast: null, recent: [], activity: null, sharePath: '', dial: null, posterPath: '', posterDescription: '' };
   const outlook = m.resetOutlookModel(data), completed = m.latestCompletedBenefits(data), latestItem = completed[0], pending = outlook.active;
   const latestPublication = latestItem && latestItem.publication;
   const latestAction = latestItem && latestItem.action;
@@ -13,15 +13,18 @@ Page(createPage((data, query, page, app) => {
   const shareTarget = pending || latest;
   const activity = data.activities.find(item => m.activityHomeVisible(item, data.serverTime));
   const recentSuccess = data.sources.map(item => item.lastSuccessAt).filter(at => Number.isFinite(Date.parse(at))).sort().pop();
-  const latestArticle = m.sortedArticles(data.articles)[0];
-  const posterPath = latestPublication && !m.publicationWithdrawn(data, latestPublication) ? pathFor(latest) : '';
+  const articles = m.sortedArticles(data.articles), latestArticle = articles[0];
+  const shareable = publication => publication && m.resolveDetail(data, { publicationId: publication.id }).canShare;
+  const posterPublication = shareable(latestPublication) ? latestPublication : articles.map(article => data.publications.find(item => item.id === article.publicationId)).find(shareable);
+  const posterPath = posterPublication ? pathFor({ publicationId: posterPublication.id }) : '';
+  const posterDescription = !posterPublication ? '暂无可分享的公开动态，收录后即可生成海报' : posterPublication === latestPublication ? '把最近的重置记录分享给朋友' : '把最新公开动态分享给朋友，不代表已经重置';
   return {
     name: data.site.name || '模钥重置雷达',
     latest: latest ? { title: latest.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', elapsed: m.elapsed(latest.statementAt, data.serverTime), time: m.completionTime(latest.statementAt), eligibility: latestAction.eligibility, path: pathFor(latest) } : null,
     completions: completed.map(item => ({ kind: item.action.kind, title: item.action.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', time: m.completionTime(item.action.statementAt), path: pathFor({ publicationId: item.publication.id }) })),
     pending: pending ? { label: m.actionLabels[pending.kind], stage: m.stageText(pending, data.serverTime), countdown: countdown.label, timed: countdown.status !== 'unknown', counting: countdown.status === 'upcoming', time: pending.expectedAt ? m.displayTime(pending.expectedAt) : '', timeNote: pending.timeNote || '', path: pathFor(pending) } : null,
     forecast: null, outlookStatus: outlook.status,
-    dial: dialModel(outlook, data.serverTime, latestAction || null), posterPath,
+    dial: dialModel(outlook, data.serverTime, latestAction || null), posterPath, posterDescription,
     sourceDelayed: data.sources.some(item => ['failed', 'delayed'].includes(item.status)),
     collectedAt: m.displayTime(recentSuccess), latestSourceTime: latestArticle ? m.displayTime(m.articleSourceTime(latestArticle)) : '暂无记录',
     waitingText: outlook.status === 'completed' ? '本次已有公开完成声明，等待下一次预告。' : outlook.status === 'cancelled' ? '本次安排已取消，等待下一次预告。' : '等待下一次预告，暂无新的时间依据。',

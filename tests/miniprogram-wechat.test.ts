@@ -147,6 +147,45 @@ function pageHarness() {
 }
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 
+test('首页没有完成记录时，海报分享最新公开动态的固定版本，点击前不调用微信',()=>{
+  const h=pageHarness(),page=h.page('home');
+  assert.equal(page.data.latest,null);
+  assert.equal(page.data.posterPath,'/pages/detail/index?publicationId=fixture-new');
+  assert.match(page.data.posterDescription,/最新公开动态.*不代表已经重置/);
+  assert.equal(h.requests.length,0);assert.deepEqual(h.calls,[]);
+  page.openPoster();
+  assert.deepEqual(h.navigation,[{method:'navigateTo',url:'/pages/detail/index?publicationId=fixture-new&poster=1'}]);
+  assert.equal(h.data.publications[1].mode,'news_only');assert.equal(h.data.events[0].actions.length,0);
+  page.onUnload();
+});
+
+test('首页海报保留完成记录优先，不被发布时间更晚的新闻替换',()=>{
+  const h=pageHarness(),completed=structuredClone(h.data.publications[1]);
+  completed.id='fixture-completed';completed.articleId='completed-article';completed.eventId='completed-event';completed.mode='state_change';
+  Object.assign(completed.article,{id:completed.articleId,eventId:completed.eventId,publicationId:completed.id,category:'reset',publishedAt:'2026-10-09T01:00:00Z'});
+  Object.assign(completed.event,{id:completed.eventId,publicationId:completed.id,actions:[{id:'completed-action',kind:'automatic_reset',stage:'claimed_complete',scope:'public',eligibility:'公开账户',statementAt:'2026-10-09T01:00:00Z',evidenceIds:[]}]});
+  completed.publishedAt='2026-10-09T01:00:00Z';
+  h.data.publications.push(completed);h.data.articles.push(completed.article);h.data.events.push(completed.event);
+  const page=h.page('home');
+  assert.equal(page.data.posterPath,'/pages/detail/index?publicationId=fixture-completed');
+  assert.equal(page.data.posterDescription,'把最近的重置记录分享给朋友');
+  page.onUnload();
+});
+
+test('首页海报跳过撤回、合并和关联缺失的动态；无有效记录时明确说明',()=>{
+  for(const kind of ['withdrawn','merged','missing']){
+    const h=pageHarness(),invalid=structuredClone(h.data.publications[1]);
+    invalid.id='fixture-invalid';invalid.articleId='invalid-article';invalid.eventId='invalid-event';invalid.article.id=invalid.articleId;invalid.article.eventId=invalid.eventId;invalid.article.publicationId=invalid.id;invalid.article.publishedAt='2026-10-10T03:00:00Z';invalid.event.id=invalid.eventId;invalid.event.publicationId=invalid.id;
+    if(kind==='withdrawn')invalid.article.status='withdrawn';
+    if(kind==='merged')invalid.event.status='merged';
+    h.data.publications.push(invalid);h.data.articles.push(invalid.article);if(kind!=='missing')h.data.events.push(invalid.event);
+    const page=h.page('home');assert.equal(page.data.posterPath,'/pages/detail/index?publicationId=fixture-new');page.onUnload();
+  }
+  const empty=pageHarness();empty.data.publications=[];empty.data.events=[];empty.data.articles=[];
+  const page=empty.page('home');assert.equal(page.data.posterPath,'');assert.match(page.data.posterDescription,/暂无可分享的公开动态/);
+  page.openPoster();assert.equal(empty.navigation.length,0);assert.equal(empty.requests.length,0);page.onUnload();
+});
+
 test('首页微信提醒切换到设置标签页，不打开动态记录或自动发起微信登录授权',()=>{
   const h=pageHarness(),page=h.page('home');
   page.openWechatSettings();
