@@ -254,6 +254,34 @@ test('provider不会回传含密钥的网络错误/URL，未明确errcode零不�
   const invalid=createWechatProvider(async()=>Response.json({errmsg:'ok'}));await assert.rejects(invalid.send('token-secret',{}),(error:unknown)=>error instanceof WechatServiceError&&error.failureKind==='unknown');
 });
 
+test('连接失败区分证书、域名、超时和网络错误，登录不重试且不回传原始错误',async()=>{
+  const privateMarker='fixture-private-request-url';
+  const cause=(code:string)=>Object.assign(new Error(privateMarker),{code});
+  const cases:[unknown,string][]=[
+    [new TypeError(privateMarker,{cause:cause('UNABLE_TO_VERIFY_LEAF_SIGNATURE')}),'微信接口证书校验失败，请联系站长检查云端证书配置'],
+    [new TypeError(privateMarker,{cause:new AggregateError([cause('SELF_SIGNED_CERT_IN_CHAIN')],privateMarker)}),'微信接口证书校验失败，请联系站长检查云端证书配置'],
+    [new TypeError(privateMarker,{cause:cause('ENOTFOUND')}),'微信接口域名解析失败，请稍后重试'],
+    [new DOMException(privateMarker,'TimeoutError'),'微信接口连接超时，请稍后重试'],
+    [new TypeError(privateMarker,{cause:new AggregateError([cause('ETIMEDOUT')],privateMarker)}),'微信接口连接超时，请稍后重试'],
+    [new TypeError(privateMarker,{cause:cause('ECONNRESET')}),'微信接口网络连接失败，请稍后重试'],
+    [new Error(privateMarker),'微信接口暂时无法连接'],
+  ];
+  for(const [failure,message] of cases) {
+    let attempts=0;const provider=createWechatProvider(async()=>{attempts++;throw failure;});
+    await assert.rejects(provider.login('fixture-app','fixture-secret','fixture-code'),(error:unknown)=>{
+      assert.ok(error instanceof WechatServiceError);assert.equal(error.status,503);assert.equal(error.failureKind,'transient');assert.equal(error.message,message);
+      assert.equal(error.errorCode,undefined);assert.equal(error.cause,undefined);assert.ok(!JSON.stringify(error).includes(privateMarker));return true;
+    });assert.equal(attempts,1);
+  }
+});
+
+test('连接诊断不会把不明确的发送改成可重试失败，循环cause也不阻塞',async()=>{
+  const failure:Error&{code:string;cause?:unknown}=Object.assign(new Error('fixture-private-request-url'),{code:'SELF_SIGNED_CERT_IN_CHAIN'});failure.cause=failure;
+  let attempts=0;const provider=createWechatProvider(async()=>{attempts++;throw failure;});
+  await assert.rejects(provider.send('fixture-token',{}),(error:unknown)=>error instanceof WechatServiceError&&error.failureKind==='unknown'&&error.message==='微信发送结果未知，已停止自动重发');
+  assert.equal(attempts,1);
+});
+
 test('并发二维码请求合并真实调用，独立服务进程也不能穿透生成租约',async()=>{
   let release!:()=>void,entered!:()=>void;const hold=new Promise<void>(resolve=>{release=resolve;}),started=new Promise<void>(resolve=>{entered=resolve;});
   const f=await fixture({beforeCode:async()=>{entered();await hold;}});

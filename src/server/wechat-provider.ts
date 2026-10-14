@@ -4,6 +4,26 @@ export type { WechatFailure } from './wechat-errors';
 import { validateWechatImage } from './wechat-image';
 
 const origin='https://api.weixin.qq.com';
+function connectionFailure(error:unknown):WechatServiceError {
+  const pending:unknown[]=[error],seen=new Set<unknown>(),codes=new Set<string>();let timedOut=false;
+  // Native fetch nests failures in cause/AggregateError. Read only their codes,
+  // never provider URLs, messages, stacks or request options containing secrets.
+  for(let i=0;i<pending.length&&i<16;i++) {
+    const item=pending[i];if(!item||typeof item!=='object'||seen.has(item))continue;seen.add(item);
+    const value=item as {code?:unknown;name?:unknown;cause?:unknown;errors?:unknown};
+    if(typeof value.code==='string')codes.add(value.code);
+    if(value.name==='TimeoutError'||value.name==='AbortError')timedOut=true;
+    if(value.cause)pending.push(value.cause);
+    if(Array.isArray(value.errors))pending.push(...value.errors.slice(0,8));
+  }
+  const message=['CERT_HAS_EXPIRED','DEPTH_ZERO_SELF_SIGNED_CERT','SELF_SIGNED_CERT_IN_CHAIN','UNABLE_TO_VERIFY_LEAF_SIGNATURE','UNABLE_TO_GET_ISSUER_CERT_LOCALLY','ERR_TLS_CERT_ALTNAME_INVALID'].some(code=>codes.has(code))
+    ?'微信接口证书校验失败，请联系站长检查云端证书配置'
+    :['ENOTFOUND','EAI_AGAIN'].some(code=>codes.has(code))?'微信接口域名解析失败，请稍后重试'
+    :timedOut||['ETIMEDOUT','UND_ERR_CONNECT_TIMEOUT','UND_ERR_HEADERS_TIMEOUT'].some(code=>codes.has(code))?'微信接口连接超时，请稍后重试'
+    :['ECONNRESET','ECONNREFUSED','ENETUNREACH','EHOSTUNREACH','UND_ERR_SOCKET'].some(code=>codes.has(code))?'微信接口网络连接失败，请稍后重试'
+    :'微信接口暂时无法连接';
+  return new WechatServiceError(message,'transient');
+}
 /** No provider URL, body or error message is copied into application logs. */
 export function createWechatProvider(fetcher:typeof fetch=fetch) {
   async function bytes(response:Response,limit:number):Promise<Buffer> {
@@ -19,7 +39,7 @@ export function createWechatProvider(fetcher:typeof fetch=fetch) {
       const response=await fetcher(`${origin}${path}`,{method:body?'POST':'GET',headers:body?{'Content-Type':'application/json'}:undefined,body:body?JSON.stringify(body):undefined,redirect:'error',signal:AbortSignal.timeout(15_000)});
       if(!response.ok)throw new WechatServiceError('微信接口响应异常','transient');
       return response;
-    } catch(error) {if(error instanceof WechatServiceError)throw error;throw new WechatServiceError('微信接口暂时无法连接','transient');}
+    } catch(error) {if(error instanceof WechatServiceError)throw error;throw connectionFailure(error);}
   }
   async function json(path:string,body?:Record<string,unknown>):Promise<Record<string,unknown>> {
     const response=await request(path,body);
