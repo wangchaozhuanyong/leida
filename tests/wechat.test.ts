@@ -258,8 +258,8 @@ test('连接失败区分证书、域名、超时和网络错误，登录不重�
   const privateMarker='fixture-private-request-url';
   const cause=(code:string)=>Object.assign(new Error(privateMarker),{code});
   const cases:[unknown,string][]=[
-    [new TypeError(privateMarker,{cause:cause('UNABLE_TO_VERIFY_LEAF_SIGNATURE')}),'微信接口证书校验失败，请联系站长检查云端证书配置'],
-    [new TypeError(privateMarker,{cause:new AggregateError([cause('SELF_SIGNED_CERT_IN_CHAIN')],privateMarker)}),'微信接口证书校验失败，请联系站长检查云端证书配置'],
+    [new TypeError(privateMarker,{cause:cause('UNABLE_TO_VERIFY_LEAF_SIGNATURE')}),'微信接口证书校验失败（UNABLE_TO_VERIFY_LEAF_SIGNATURE），请联系站长检查云端证书配置'],
+    [new TypeError(privateMarker,{cause:new AggregateError([cause('SELF_SIGNED_CERT_IN_CHAIN')],privateMarker)}),'微信接口证书校验失败（SELF_SIGNED_CERT_IN_CHAIN），请联系站长检查云端证书配置'],
     [new TypeError(privateMarker,{cause:cause('ENOTFOUND')}),'微信接口域名解析失败，请稍后重试'],
     [new DOMException(privateMarker,'TimeoutError'),'微信接口连接超时，请稍后重试'],
     [new TypeError(privateMarker,{cause:new AggregateError([cause('ETIMEDOUT')],privateMarker)}),'微信接口连接超时，请稍后重试'],
@@ -273,6 +273,23 @@ test('连接失败区分证书、域名、超时和网络错误，登录不重�
       assert.equal(error.errorCode,undefined);assert.equal(error.cause,undefined);assert.ok(!JSON.stringify(error).includes(privateMarker));return true;
     });assert.equal(attempts,1);
   }
+});
+
+test('证书诊断仅显示固定白名单码，不接受含请求数据的伪造码，多项错误按固定顺序分类',async()=>{
+  const privateMarker='fixture-private-request-url';
+  const failure=(code:string)=>new TypeError(privateMarker,{cause:Object.assign(new Error(privateMarker),{code})});
+  for(const code of ['CERT_HAS_EXPIRED','CERT_NOT_YET_VALID','ERR_TLS_CERT_ALTNAME_INVALID','DEPTH_ZERO_SELF_SIGNED_CERT','SELF_SIGNED_CERT_IN_CHAIN','UNABLE_TO_VERIFY_LEAF_SIGNATURE','UNABLE_TO_GET_ISSUER_CERT_LOCALLY']){
+    const provider=createWechatProvider(async()=>{throw failure(code);});
+    await assert.rejects(provider.login('fixture-app','fixture-secret','fixture-code'),(error:unknown)=>{
+      assert.ok(error instanceof WechatServiceError);assert.equal(error.status,503);assert.equal(error.failureKind,'transient');
+      assert.equal(error.message,`微信接口证书校验失败（${code}），请联系站长检查云端证书配置`);
+      assert.equal(error.errorCode,undefined);assert.equal(error.cause,undefined);assert.ok(!JSON.stringify(error).includes(privateMarker));return true;
+    });
+  }
+  const malformed=createWechatProvider(async()=>{throw failure('CERT_HAS_EXPIRED?'+privateMarker);});
+  await assert.rejects(malformed.login('fixture-app','fixture-secret','fixture-code'),(error:unknown)=>error instanceof WechatServiceError&&error.message==='微信接口暂时无法连接'&&!JSON.stringify(error).includes(privateMarker));
+  const aggregate=createWechatProvider(async()=>{throw new AggregateError([failure('SELF_SIGNED_CERT_IN_CHAIN'),failure('CERT_HAS_EXPIRED')],privateMarker);});
+  await assert.rejects(aggregate.login('fixture-app','fixture-secret','fixture-code'),(error:unknown)=>error instanceof WechatServiceError&&error.message==='微信接口证书校验失败（CERT_HAS_EXPIRED），请联系站长检查云端证书配置');
 });
 
 test('连接诊断不会把不明确的发送改成可重试失败，循环cause也不阻塞',async()=>{

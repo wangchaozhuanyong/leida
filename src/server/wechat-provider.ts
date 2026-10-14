@@ -16,8 +16,11 @@ function connectionFailure(error:unknown):WechatServiceError {
     if(value.cause)pending.push(value.cause);
     if(Array.isArray(value.errors))pending.push(...value.errors.slice(0,8));
   }
-  const message=['CERT_HAS_EXPIRED','DEPTH_ZERO_SELF_SIGNED_CERT','SELF_SIGNED_CERT_IN_CHAIN','UNABLE_TO_VERIFY_LEAF_SIGNATURE','UNABLE_TO_GET_ISSUER_CERT_LOCALLY','ERR_TLS_CERT_ALTNAME_INVALID'].some(code=>codes.has(code))
-    ?'微信接口证书校验失败，请联系站长检查云端证书配置'
+  // Only these fixed diagnostic codes may leave the provider; arbitrary native
+  // codes can contain request data and must remain hidden with messages/stacks.
+  const tlsCode=['CERT_HAS_EXPIRED','CERT_NOT_YET_VALID','ERR_TLS_CERT_ALTNAME_INVALID','DEPTH_ZERO_SELF_SIGNED_CERT','SELF_SIGNED_CERT_IN_CHAIN','UNABLE_TO_VERIFY_LEAF_SIGNATURE','UNABLE_TO_GET_ISSUER_CERT_LOCALLY'].find(code=>codes.has(code));
+  const message=tlsCode
+    ?`微信接口证书校验失败（${tlsCode}），请联系站长检查云端证书配置`
     :['ENOTFOUND','EAI_AGAIN'].some(code=>codes.has(code))?'微信接口域名解析失败，请稍后重试'
     :timedOut||['ETIMEDOUT','UND_ERR_CONNECT_TIMEOUT','UND_ERR_HEADERS_TIMEOUT'].some(code=>codes.has(code))?'微信接口连接超时，请稍后重试'
     :['ECONNRESET','ECONNREFUSED','ENETUNREACH','EHOSTUNREACH','UND_ERR_SOCKET'].some(code=>codes.has(code))?'微信接口网络连接失败，请稍后重试'
