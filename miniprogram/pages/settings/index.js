@@ -1,6 +1,6 @@
 const { createPage } = require('../../utils/page');
 // Bundled client version; keep this aligned with the development-tool upload.
-const buildVersion = '1.0.3';
+const buildVersion = '1.0.4';
 const labels = [{ key: 'announcement', title: '发放预告', description: '明确的重置或发卡安排' }, { key: 'result', title: '完成声明', description: '公告称重置或发卡已完成' }, { key: 'activity', title: '活动进展', description: '关联活动与产品更新' }, { key: 'correction', title: '重要更正', description: '资格、状态变更或内容撤回' }];
 Page(createPage((data, query, page, app) => {
   const stored = app.preferences.snapshot();

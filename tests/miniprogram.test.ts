@@ -465,26 +465,28 @@ test('本机偏好只接受布尔值，已读去重，存储不可用时保留�
 });
 
 type NativePage = Record<string,any> & { data:Record<string,any>; setData:(patch:Record<string,unknown>)=>void };
-function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{envVersion:string;version?:string}};page?:Record<string,unknown>} = {}) {
+function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{envVersion:string;version?:string}};page?:Record<string,unknown>;wxApi?:Record<string,unknown>} = {}) {
   let data = input, refreshes = 0, pullStops = 0;
   const listeners = new Set<(state:Record<string,unknown>)=>void>();
-  const ui = { shares: [] as string[], navigations: [] as string[], copies: [] as string[] };
+  const ui = { shares: [] as string[], navigations: [] as string[], copies: [] as string[], backgrounds: [] as Record<string,unknown>[], lifecycle: [] as string[] };
   const storage = new Map<string,unknown>();
   const app = {
     client: {
       getState() { return { data, page:options.page, version: 'fixture-v1', receivedAt: Date.now(), loading: false, unconfigured: false, error: '' }; },
-      subscribe(fn:(state:Record<string,unknown>)=>void) { listeners.add(fn); fn(this.getState()); return () => listeners.delete(fn); },
+      subscribe(fn:(state:Record<string,unknown>)=>void) { ui.lifecycle.push('subscribe'); listeners.add(fn); fn(this.getState()); return () => listeners.delete(fn); },
       async refresh() { refreshes++; },
     },
     preferences: createPreferences({ getStorageSync(key:string) { return storage.get(key); }, setStorageSync(key:string,value:unknown) { storage.set(key,value); } }),
   };
   const wxApi = {
+    setBackgroundColor(value:Record<string,unknown>) { ui.lifecycle.push('background'); ui.backgrounds.push(value); },
     getAccountInfoSync() { return options.accountInfo || {}; },
     showShareMenu() { ui.shares.push('show'); }, hideShareMenu() { ui.shares.push('hide'); },
     navigateTo(options:{url:string}) { ui.navigations.push(options.url); },
     switchTab(options:{url:string}) { ui.navigations.push(`tab:${options.url}`); },
     setClipboardData(options:{data:string}) { ui.copies.push(options.data); },
     stopPullDownRefresh() { pullStops++; }, showToast() {},
+    ...(options.wxApi||{}),
   };
   function page(name:string, query:Record<string,string> = {}) {
     let definition: Record<string,any> | undefined;
@@ -512,8 +514,40 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);news.onUnload();
-  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.3 · 体验版');settings.onUnload();
-  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.3');fallback.onUnload();
+  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.4 · 体验版');settings.onUnload();
+  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.4');fallback.onUnload();
+});
+
+test('四个原生导航页先设置 iOS 窗口底色再订阅数据，返回页面恢复底色而资料刷新不重复设置',()=>{
+  for(const name of ['home','news','announcements','settings']) {
+    const h=nativeHarness(),page=h.page(name);
+    assert.deepEqual(h.ui.lifecycle,['background','background','subscribe'],name);
+    for(const value of h.ui.backgrounds) {
+      assert.equal(value.backgroundColor,'#0b1113');
+      assert.equal(value.backgroundColorTop,'#0b1113');
+      assert.equal(value.backgroundColorBottom,'#0b1113');
+    }
+    const previous=structuredClone(page.data);
+    h.replace(fixture());
+    assert.equal(h.ui.backgrounds.length,2,'资料更新不触碰原生窗口外观');
+    page.onHide();assert.equal(h.subscriptions,0);
+    page.onShow();assert.equal(h.subscriptions,1);
+    assert.deepEqual(h.ui.lifecycle.slice(-2),['background','subscribe']);
+    assert.equal(page.data.connected,true);
+    assert.deepEqual(JSON.parse(JSON.stringify(page.data)),previous,'恢复窗口底色不清空已有页面内容');
+    page.onUnload();
+  }
+});
+
+test('背景 API 缺失、抛错或异步失败时，页面加载和原生导航仍可使用',()=>{
+  for(const setBackgroundColor of [undefined,()=>{throw new Error('unsupported');},(value:{fail:()=>void})=>value.fail()]) {
+    const h=nativeHarness(fixture(),{wxApi:{setBackgroundColor}});
+    const page=h.page('news');
+    assert.equal(page.data.connected,true);
+    page.navigate({currentTarget:{dataset:{path:'/pages/home/index'}}});
+    assert.deepEqual(h.ui.navigations,['tab:/pages/home/index']);
+    page.onHide();page.onShow();assert.equal(h.subscriptions,1);page.onUnload();
+  }
 });
 
 test('实际详情页面分享固定版本，收到撤回后隐藏菜单并保留说明，来源复制需要点击', () => {
@@ -582,6 +616,9 @@ test('原生项目配置与十个页面完整，支持游客或真实AppID，正
   const app = JSON.parse(readFileSync(resolve(root, 'miniprogram/app.json'), 'utf8'));
   const project = JSON.parse(readFileSync(resolve(root, 'miniprogram/project.config.json'), 'utf8'));
   assert.equal(app.pages.length, 10);
+  assert.equal(app.window.backgroundColorTop,app.window.backgroundColor);
+  assert.equal(app.window.backgroundColorBottom,app.window.backgroundColor);
+  assert.equal(app.tabBar.backgroundColor,app.window.backgroundColor);
   assert.match(project.appid, /^(?:touristappid|wx[0-9a-z]{16})$/i);
   assert.equal(project.compileType, 'miniprogram');
   assert.equal(project.miniprogramRoot, './');

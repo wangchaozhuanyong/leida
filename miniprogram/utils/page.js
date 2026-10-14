@@ -1,4 +1,11 @@
 const { displayTime } = require('./model');
+function setWindowBackground() {
+  // iOS has separate native top/bottom backdrops outside the page's CSS surface.
+  if (typeof wx.setBackgroundColor !== 'function') return;
+  try {
+    wx.setBackgroundColor({ backgroundColor: '#0b1113', backgroundColorTop: '#0b1113', backgroundColorBottom: '#0b1113', fail() {} });
+  } catch (_) { /* An unavailable appearance API must never block page data. */ }
+}
 function createPage(build, extra = {}) {
   function render(page, state) {
     const data = state.data;
@@ -14,8 +21,8 @@ function createPage(build, extra = {}) {
   }
   return {
     data: { loading: false, connected: false, unconfigured: false, error: '', cutoff: '暂无记录', ...(extra.data || {}) },
-    onLoad(params) { this._params = params || {}; if (extra.load) extra.load.call(this, params || {}); },
-    onShow() { const app = getApp(); if(app.client.setView)void app.client.setView(this.readView()); this._unsubscribe = app.client.subscribe(state => render(this, state)); if (extra.show) extra.show.call(this); },
+    onLoad(params) { setWindowBackground(); this._params = params || {}; if (extra.load) extra.load.call(this, params || {}); },
+    onShow() { setWindowBackground(); const app = getApp(); if(app.client.setView)void app.client.setView(this.readView()); this._unsubscribe = app.client.subscribe(state => render(this, state)); if (extra.show) extra.show.call(this); },
     onHide() { if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.hide)extra.hide.call(this); },
     onUnload() { if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.unload)extra.unload.call(this); },
     async onPullDownRefresh() { try { await getApp().client.refresh(false); } finally { wx.stopPullDownRefresh(); } },
