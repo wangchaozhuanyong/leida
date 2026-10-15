@@ -5,7 +5,7 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import {SearchParamsContext} from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import type {Article, PublicData, Publication, Evidence, Notice} from '../src/lib/types';
 import {groupedNoticeUpdates, latestSourceSuccess, publicArticleSummary, publicContentRevision, publicNavSection} from '../src/components/public/model';
-import {Home, EventPage} from '../src/components/public/PublicApp';
+import {Home, EventPage, Settings, Methodology} from '../src/components/public/PublicApp';
 
 const time = '2026-10-12T04:00:00.000Z';
 const article: Article = {id:'article', eventId:'event', publicationId:'v1', title:'用量重置：公告称已完成', summary:'公开完成声明。', translation:'', category:'reset', version:1, status:'published', evidenceIds:['source-a'], publishedAt:time, updatedAt:time, publicationMode:'state_change', contentOrigin:'template'};
@@ -72,4 +72,17 @@ test('依据入口保留真实原文片段，待开放提醒不承诺可订阅',
   assert.match(html,/完成声明的实际原文。/);assert.doesNotMatch(html,/来源1 ·/);
   const home=renderToStaticMarkup(createElement(Home,{data,historical:false,wechatEntry:'unavailable',onWechatReminders(){},onPoster(){},onShare:async()=>{}}));
   assert.match(home,/待开放/);assert.match(home,/距最近一次确认重置/);assert.match(home,/1小时前/);assert.doesNotMatch(home,/去微信订阅/);
+});
+
+test('站内信加载失败只影响信箱内容，提醒与隐私入口仍可见且不冒充空信箱',()=>{
+  const html=renderToStaticMarkup(createElement(Settings,{notices:[],read:[],markRead(){},storageError:'',pending:createElement('p',{role:'alert'},'消息暂时无法加载')}));
+  assert.ok(html.indexOf('站内信')<html.indexOf('微信提醒'));
+  assert.match(html,/查看全部提醒/);assert.match(html,/消息暂时无法加载/);assert.match(html,/隐私说明/);
+  assert.doesNotMatch(html,/暂无提醒|刷新授权状态|选择接收下一次提醒|活动进展/);
+});
+
+test('观察记录保留固定记录功能，不再给读者展示内部判断流程',()=>{
+  const html=renderToStaticMarkup(createElement(Methodology,{data:fixture(),snapshotId:null,cadenceId:null,onPoster(){},onShare:async()=>{}}));
+  assert.match(html,/观察记录/);
+  assert.doesNotMatch(html,/如何判断重置|先看承诺，再看完成|原文、中文与更正/);
 });

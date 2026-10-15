@@ -1,38 +1,43 @@
 const m = require('../../utils/model');
-const rules = [{ title: '预告与完成分别判断', text: '明确承诺显示发放预告；对应完成声明显示“公告称已完成”。预计时间到期只显示等待确认。' }, { title: '用量重置与重置卡分开记录', text: '不同福利动作可以处于不同状态；定向补偿和私人结转不计入普发次数。' }, { title: '新闻不等于发放依据', text: '可准确复述的消息可以独立收录，但证据不足时不改变福利状态和次数。' }, { title: '同一件事不重复计数', text: '重复采集、多个回复与措辞更新不会生成一次新的发放；日程中同一福利动作只计一次。' }, { title: '历史与更正保留版本', text: '补录旧消息标为历史收录。撤回、合并和重要更正有说明，分享固定对应发布版本。' }, { title: '个人是否到账未观测', text: '公开声明不能证明你的账户已到账，个人到账状态保持未观测。' }];
 const validId = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,179}$/.test(value);
 Page({
-  data: { rules, fixed: false, forecast: null, reference: null, outcomes: null, fixedLoading: false, fixedError: '', currentUnavailable: '尚未读取预测资料。', cardNote: '重置卡缺少可比样本，暂不显示概率；个人到账未观测。' },
+  data: { navigationLoading: true, fixed: false, forecast: null, reference: null, outcomes: null, fixedLoading: false, fixedError: '', currentUnavailable: '暂无观察记录。' },
   onLoad(params) {
     this._snapshotId = params && params.snapshot || '';
     this._visible = true;
     this.setData({ fixed: !!this._snapshotId });
-    if (this._snapshotId && !validId(this._snapshotId)) this.setData({ fixedError: '预测记录链接无效，请返回查看判断规则。' });
+    if (this._snapshotId && !validId(this._snapshotId)) this.setData({ fixedError: '记录链接无效，请返回查看其他记录。' });
     else if (this._snapshotId) void this.loadFixed();
   },
   onShow() {
     this._visible = true;
+    const generation = this._navigationGeneration = (this._navigationGeneration || 0) + 1;
+    this.setData({ navigationLoading: true });
     const app = getApp();
-    if(app.client.setView)void app.client.setView({view:'methodology'});
+    const work = app.client.setView && app.client.setView({view:'methodology'});
     this._unsubscribe = app.client.subscribe(state => {
       this._latestState = state;
       if (this._snapshotId) { this.updateOutcomes(); return; }
       const data = state.data;
       const current = data ? { ...data, serverTime: new Date(Date.parse(data.serverTime) + Math.max(0, Date.now() - state.receivedAt)).toISOString() } : null;
       const forecast = !state.error && current ? m.currentForecast(current) : null;
-      this.setData({ forecast, reference: current ? m.forecastReferenceModel(current.forecasts) : null, currentUnavailable: state.error ? '当前预测资料暂时无法读取，请稍后重试。' : !current || !current.forecasts ? '尚未接入实验预测。' : current.forecasts.status === 'unavailable' ? '预测资料暂不可用。' : '暂无可展示的当前实验预测；明确公告优先。' });
+      this.setData({ forecast, reference: current ? m.forecastReferenceModel(current.forecasts) : null, currentUnavailable: state.error ? '观察记录暂时无法加载，请稍后重试。' : !current || !current.forecasts ? '暂时没有可展示的观察记录。' : current.forecasts.status === 'unavailable' ? '观察记录暂时无法加载，请稍后重试。' : '暂无可展示的当前实验预测；明确公告优先。' });
       this.updateOutcomes();
+    });
+    void Promise.resolve(work).catch(()=>{}).finally(()=>{
+      if(this._visible && this._navigationGeneration === generation)this.setData({ navigationLoading:false });
     });
     if (validId(this._snapshotId) && !this.data.forecast && !this.data.fixedLoading && !this.data.fixedError) void this.loadFixed();
   },
   suspend() {
     this._visible = false;
+    this._navigationGeneration = (this._navigationGeneration || 0) + 1;
     if (this._unsubscribe) this._unsubscribe();
     this._unsubscribe = null;
     this._fixedEpoch = (this._fixedEpoch || 0) + 1;
     if (this._fixedTask) this._fixedTask.abort();
     this._fixedTask = null;
-    this.setData({ fixedLoading: false });
+    this.setData({ navigationLoading: true, fixedLoading: false });
   },
   onHide() { this.suspend(); },
   onUnload() { this.suspend(); },
@@ -66,6 +71,6 @@ Page({
   openForecast() { const forecast = this.data.forecast; if (forecast) wx.navigateTo({ url: forecast.path }); },
   copySignal() { const url = this.data.forecast && this.data.forecast.url; if (url) wx.setClipboardData({ data: url }); },
   onShareAppMessage() {
-    return { title: this.data.forecast ? `模钥重置雷达：${this.data.forecast.title}` : '模钥重置雷达：判断规则', path: this._snapshotId ? `/pages/methodology/index?snapshot=${encodeURIComponent(this._snapshotId)}` : '/pages/methodology/index' };
+    return { title: this.data.forecast ? `模钥重置雷达：${this.data.forecast.title}` : '模钥重置雷达：观察记录', path: this._snapshotId ? `/pages/methodology/index?snapshot=${encodeURIComponent(this._snapshotId)}` : '/pages/methodology/index' };
   }
 });

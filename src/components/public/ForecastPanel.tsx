@@ -34,8 +34,8 @@ export function ForecastPanel({data,snapshotId,cadenceId,onPoster,onShare}:{data
  const fixed = useFixedSnapshot<ForecastSnapshot>(snapshotId && !cadenceId ? `/api/v1/forecasts/${encodeURIComponent(snapshotId)}` : null, cadenceId ? null : snapshotId);
  if(cadenceId)return <CadencePanel data={data} selectedId={cadenceId}/>;
  if(snapshotId){
-  if(!fixed.value && !fixed.error)return <section className="pub-card" role="status"><h2>正在读取固定预测快照</h2></section>;
-  if(!fixed.value)return <section className="pub-card" role="alert"><h2>预测快照暂时不可用</h2><p>{fixed.error}</p><button className="pub-button" disabled={fixed.loading} onClick={fixed.retry}>重新读取</button><Link scroll={false} className="pub-text-link" href="/methodology">查看实验说明</Link></section>;
+  if(!fixed.value && !fixed.error)return <div className="pub-page-loading" role="status"><span className="pub-loading-ring" aria-hidden="true"/><span>加载中</span></div>;
+  if(!fixed.value)return <section className="pub-card" role="alert"><h2>预测快照暂时不可用</h2><p>{fixed.error}</p><button className="pub-button" disabled={fixed.loading} onClick={fixed.retry}>重新加载</button><Link scroll={false} className="pub-text-link" href="/methodology">查看其他记录</Link></section>;
   return <><Snapshot snapshot={fixed.value} onPoster={onPoster} onShare={onShare} disabled={!!fixed.error || fixed.loading}/>{fixed.error && <p className="pub-warning" role="alert">{fixed.error}<button onClick={fixed.retry}>重新检查</button></p>}<OutcomeRecords item={data?.cases.find(c=>c.id===fixed.value?.caseId)} available={data?.status==='ready'&&data.cases.some(c=>c.id===fixed.value?.caseId)}/><Link scroll={false} className="pub-text-link" href="/methodology">查看全部实验观察</Link></>;
  }
  const reference=data?.reference;

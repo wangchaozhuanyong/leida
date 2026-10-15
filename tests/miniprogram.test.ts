@@ -514,8 +514,8 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);news.onUnload();
-  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.6 · 体验版');settings.onUnload();
-  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.6');fallback.onUnload();
+  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.7 · 体验版');settings.onUnload();
+  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.7');fallback.onUnload();
 });
 
 test('四个原生导航页先设置 iOS 窗口底色再订阅数据，返回页面恢复底色而资料刷新不重复设置',()=>{
@@ -662,4 +662,15 @@ test('前景加载先遮住缓存；筛选、重试等待新响应；隐藏后�
   page.onShow();assert.equal(page.data.navigationLoading,false);
   const refresh=page.onPullDownRefresh();assert.equal(page.data.navigationLoading,true);finish();await refresh;assert.equal(page.data.navigationLoading,false);assert.equal(h.pullStops,1);
   h.replace(fixture());assert.equal(page.data.navigationLoading,false,'后台资料更新不制造前景加载');page.onUnload();
+});
+
+test('观察记录页进入和返回时隐藏旧内容，离开后的旧请求不能提前撤掉加载遮罩',async()=>{
+  const h=nativeHarness();const finishes:Array<()=>void>=[];
+  Object.assign(h.app.client,{setView:()=>new Promise<void>(resolve=>finishes.push(resolve))});
+  const page=h.page('methodology');assert.equal(page.data.navigationLoading,true);
+  page.onHide();page.onShow();assert.equal(finishes.length,2);
+  finishes[0]();await new Promise(resolve=>setImmediate(resolve));assert.equal(page.data.navigationLoading,true);
+  finishes[1]();await new Promise(resolve=>setImmediate(resolve));assert.equal(page.data.navigationLoading,false);
+  h.replace(fixture());assert.equal(page.data.navigationLoading,false,'后台同步不重复遮住页面');
+  page.onUnload();assert.equal(h.subscriptions,0);assert.equal(page.data.navigationLoading,true);
 });

@@ -26,6 +26,6 @@ export function ResetOutlookPanel({outlook,serverTime,details=false,instrument=f
    {resolved.announcedDeadlineNote&&<p className="pub-muted">当时的预告说明（本轮现已结束）：{resolved.announcedDeadlineNote}</p>}
    <Link scroll={false} className="pub-text-link" href={`/events/${encodeURIComponent(resolved.eventId)}`}>查看同一轮的原文证据 →</Link>
   </details>}
-  {!details&&!instrument&&<Link scroll={false} className="pub-text-link" href="/methodology#reset-prediction">查看判断规则 →</Link>}
+  {!details&&!instrument&&<Link scroll={false} className="pub-text-link" href="/history">查看重置记录 →</Link>}
  </section>;
 }

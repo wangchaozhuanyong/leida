@@ -177,7 +177,7 @@ function publicationCard(data, publication) {
   return {
     id: publication.id, path: sharePath(publication), title: publication.article.title, summary: publication.article.summary,
     time: displayTime(publicationSourceTime(publication)), historical: isHistoricalArticle(publication.article, data.evidence),
-    label: withdrawn ? '已撤回' : isNewsOnly(publication) ? '来源消息' : kinds || (publication.article.category === 'activity' ? '活动进展' : '产品更新'),
+    label: withdrawn ? '已撤回' : isNewsOnly(publication) ? '来源消息' : kinds || (publication.article.category === 'activity' ? '活动动态' : '产品更新'),
     note: withdrawn ? '已撤回，不能作为当前发放依据' : isNewsOnly(publication) ? '仅新闻收录，不改变发放状态' : '公开公告',
     tone: withdrawn ? 'muted' : actions.some(action => action.kind === 'banked_reset') ? 'purple' : 'cyan', withdrawn
   };
