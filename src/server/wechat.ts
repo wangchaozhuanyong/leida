@@ -90,7 +90,7 @@ export function createWechatService(dependencies:WechatDependencies={}) {
   // Public UI readiness only: no credentials, quota reservations or provider requests.
   async function publicWechatAvailability():Promise<{available:boolean;codeAvailable:boolean}> {
     const settings=await config();
-    return {available:ready(settings,'qr')&&ready(settings,'subscription'),codeAvailable:ready(settings,'qr')};
+    return {available:ready(settings,'subscription'),codeAvailable:ready(settings,'qr')};
   }
   const day=()=>new Date(clock()+8*3600_000).toISOString().slice(0,10);
   const tomorrow=()=>new Date(Date.parse(`${day()}T00:00:00+08:00`)+24*3600_000).toISOString();

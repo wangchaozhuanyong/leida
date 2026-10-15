@@ -1,7 +1,7 @@
 const { createPage } = require('../../utils/page');
 const { noticeModel } = require('../../utils/model');
 // Bundled client version; keep this aligned with the development-tool upload.
-const buildVersion = '1.0.8';
+const buildVersion = '1.0.9';
 Page(createPage((data, query, page, app) => {
   const stored=app.preferences.snapshot(),notices=data?noticeModel(data,stored.preferences,stored.read):[];
   return { notices:notices.slice(0,3),unread:notices.filter(n=>!n.read).length,storageError:stored.error };
@@ -23,6 +23,7 @@ Page(createPage((data, query, page, app) => {
   refreshWechat(){if(getApp().wechat)void getApp().wechat.refresh({userInitiated:true});},
   addWechat(){this._wechatPrivacyAction='add';const reader=getApp().wechat;if(!reader)return;const state=reader.getState();if(state.confirmNeeded)void reader.retryConfirmation({userInitiated:true});else if(state.ready)void reader.authorize({userInitiated:true});else void reader.prepare({userInitiated:true});},
   async revokeWechat(){this._wechatPrivacyAction='close';const reader=getApp().wechat;if(reader)await reader.revoke({userInitiated:true});},
-  agreeWechatPrivacy(){if(this._wechatPrivacyAction==='close')void this.revokeWechat();else this.addWechat();},
+  viewWechat(){this._wechatPrivacyAction='view';const reader=getApp().wechat;if(reader)void reader.refresh({userInitiated:true});},
+  agreeWechatPrivacy(){if(this._wechatPrivacyAction==='close')void this.revokeWechat();else if(this._wechatPrivacyAction==='view')this.viewWechat();else this.addWechat();},
   openPrivacyContract(){if(typeof wx.openPrivacyContract==='function')wx.openPrivacyContract({fail(){wx.showToast({title:'隐私指引暂不可用',icon:'none'});}});}
 } }));

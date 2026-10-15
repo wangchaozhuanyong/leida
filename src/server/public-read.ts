@@ -34,8 +34,9 @@ export function parsePublicRead(params: URLSearchParams): PublicReadOptions {
 export function publicSources(rows: Source[], timestamp: string): PublicData['sources'] {
   return rows.map(source => {
     let status = source.status;
-    if (source.enabled && status === 'paused') status = source.lastSuccessAt ? 'healthy' : 'unconnected';
-    if (source.enabled && source.lastSuccessAt && Date.parse(timestamp) - Date.parse(source.lastSuccessAt) > source.intervalMinutes * 3 * 60000) status = 'delayed';
+    if (!source.enabled || source.kind === 'manual') status = 'paused';
+    else if (status === 'paused') status = source.lastSuccessAt ? 'healthy' : 'unconnected';
+    if (source.enabled && source.kind !== 'manual' && source.lastSuccessAt && Date.parse(timestamp) - Date.parse(source.lastSuccessAt) > source.intervalMinutes * 3 * 60000) status = 'delayed';
     return { id: source.id, name: source.name, status, lastSuccessAt: source.lastSuccessAt };
   });
 }

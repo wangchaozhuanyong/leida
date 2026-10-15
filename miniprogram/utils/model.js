@@ -7,6 +7,16 @@ const dayMs = 86400000;
 const actionLabels = { automatic_reset: '用量重置', banked_reset: '重置卡' };
 const preferenceDefaults = { announcement: true, result: true, activity: false, correction: true };
 const validTime = value => !!value && Number.isFinite(Date.parse(value));
+function sourceStatus(sources) {
+  const automated=sources.filter(s=>s.id!=='manual');
+  if(!automated.length)return {label:'自动更新暂未启用',warning:true};
+  if(automated.every(s=>s.status==='paused'))return {label:'自动更新已暂停',warning:true};
+  const active=automated.filter(s=>s.status!=='paused');
+  if(active.every(s=>s.status==='unconnected'))return {label:'等待首次更新',warning:true};
+  if(active.some(s=>['failed','delayed','unconnected'].includes(s.status)))return {label:'部分消息更新延迟',warning:true};
+  if(active.every(s=>s.status==='healthy'&&validTime(s.lastSuccessAt)))return {label:'自动检查公开消息',warning:false};
+  return {label:'等待首次更新',warning:true};
+}
 // 微信设备未必具备完整 Intl 时区实现。北京时间使用 UTC+8，不依赖设备时区。
 function dateKey(value) {
   const date = new Date(new Date(value).getTime() + 8 * 3600000);
@@ -346,4 +356,4 @@ function forecastOutcomeModel(snapshot, data) {
   });
   return { available: true, entries, message: entries.length ? '按后续观测时间排列，最新记录在前。' : '尚无已关联的后续记录；不代表没有公告或不会发放。', note };
 }
-module.exports = { actionLabels, preferenceDefaults, dateKey, displayTime, elapsed, completionTime, latestCompletedBenefits, completionElapsed, articleSourceTime, sortedArticles, isNewsOnly, currentPublication, statePublication, publicationSourceTime, sortedPublications, sortedStatePublications, publicActions, isHistoricalArticle, upcomingActions, announcementCountdown, resetOutlookModel, stageText, calendarDays, safeUrl, sharePath, publicationWithdrawn, publicationCard, calendarModel, noticeModel, resolveDetail, activityDayNumber, activityHomeVisible, activityModel, validateForecastSnapshot, validateForecastPublicData, probabilityText, forecastPath, forecastSnapshotModel, currentForecast, forecastReferenceModel, forecastOutcomeModel };
+module.exports = { sourceStatus, actionLabels, preferenceDefaults, dateKey, displayTime, elapsed, completionTime, latestCompletedBenefits, completionElapsed, articleSourceTime, sortedArticles, isNewsOnly, currentPublication, statePublication, publicationSourceTime, sortedPublications, sortedStatePublications, publicActions, isHistoricalArticle, upcomingActions, announcementCountdown, resetOutlookModel, stageText, calendarDays, safeUrl, sharePath, publicationWithdrawn, publicationCard, calendarModel, noticeModel, resolveDetail, activityDayNumber, activityHomeVisible, activityModel, validateForecastSnapshot, validateForecastPublicData, probabilityText, forecastPath, forecastSnapshotModel, currentForecast, forecastReferenceModel, forecastOutcomeModel };

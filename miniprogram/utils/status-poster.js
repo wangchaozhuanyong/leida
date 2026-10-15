@@ -43,7 +43,7 @@ function createStatusPosterLayout(input,measure,theme='precision',includeCode=fa
   if(dark){
     brand(64,72);text(input.name,183,118,44,ink,400,'left',510);line(710,111,766,111);text('Codex 用量动态',1016,121,33,ink,400,'right');
     text(input.title,540,311,111,ink,700,'center',948);text(input.label,540,610,52,ink,400,'center');
-    if(/^\d+$/.test(input.value)){text(input.value,input.unit.length>1?540:660,1035,505,'gold',700,input.unit.length>1?'center':'right',480);text(input.unit,input.unit.length>1?540:735,input.unit.length>1?1144:1060,input.unit.length>1?66:95,ink,400,input.unit.length>1?'center':'left');}
+    if(/^\d+$/.test(input.value)){text(input.value,540,1000,440,'gold',700,'center',640);text(input.unit,540,1195,60,ink,400,'center');}
     else{text(input.value,540,942,input.value.includes(':')?180:150,'gold',700,'center',730);if(input.unit)text(input.unit,540,1050,42,ink,400,'center');}
     code(890,1248,158);text('公告时间',72,1495,34,muted);text(input.date,72,1556,59,ink,600,'left',445);text(input.time?`${input.time} · 北京时间`:'时间待公开确认',72,1612,35,muted);
     line(543,1472,543,1650);nextLines.forEach((s,i)=>text(s,590,1526+i*47,nextSize,ink,500,'left',425));

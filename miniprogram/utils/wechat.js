@@ -10,7 +10,7 @@ function createWechatReader({wxApi,config,now=()=>Date.now()}){
   const request=createWechatTransport(wxApi,config),listeners=new Set();
   let session,challenge,confirmation,pending,state={safe:null,busy:false,ready:false,error:'',privacyNeeded:false};
   const emit=patch=>{state={...state,...patch};listeners.forEach(fn=>fn(view()));};
-  function view(){const remainingCount=state.safe?(state.safe.remainingCount??(['available','reserved'].includes(state.safe.state)?1:0)):null;return{...state,remainingCount,confirmNeeded:!!confirmation,label:state.safe?labels[state.safe.state]:'开启后接收重置消息',canPrepare:!state.busy&&!state.ready&&state.safe?.state!=='unknown',canRevoke:!state.busy&&!!state.safe&&(remainingCount>0||state.safe.state==='unknown')};}
+  function view(){const remainingCount=state.safe?(state.safe.remainingCount??(['available','reserved'].includes(state.safe.state)?1:0)):null;return{...state,remainingCount,confirmNeeded:!!confirmation,label:state.safe?labels[state.safe.state]:'连接后查看已有提醒和剩余次数',canPrepare:!state.busy&&!state.ready&&state.safe?.state!=='unknown',canRevoke:!state.busy&&!!state.safe&&(remainingCount>0||state.safe.state==='unknown')};}
   async function login(){
     if(session&&Date.parse(session.expiresAt)>now())return;
     session=undefined;challenge=undefined;

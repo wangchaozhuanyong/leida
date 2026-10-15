@@ -505,7 +505,7 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
     }
     load(resolve(root, `miniprogram/pages/${name}/index.js`));
     assert.ok(definition);
-    const instance = { ...definition, data: structuredClone(definition.data || {}), setData(patch:Record<string,unknown>) { Object.assign(this.data,patch); } } as NativePage;
+    const instance = { ...definition, data: structuredClone(definition.data || {}), setData(patch:Record<string,unknown>,done?:()=>void) { Object.assign(this.data,patch);done?.(); } } as NativePage;
     instance.onLoad?.(query); instance.onShow?.();
     return instance;
   }
@@ -515,8 +515,8 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);news.onUnload();
-  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.8 · 体验版');settings.onUnload();
-  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.8');fallback.onUnload();
+  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.9 · 体验版');settings.onUnload();
+  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.9');fallback.onUnload();
 });
 
 test('四个原生导航页先设置 iOS 窗口底色再订阅数据，返回页面恢复底色而资料刷新不重复设置',()=>{
@@ -663,6 +663,20 @@ test('前景加载先遮住缓存；筛选、重试等待新响应；隐藏后�
   page.onShow();assert.equal(page.data.navigationLoading,false);
   const refresh=page.onPullDownRefresh();assert.equal(page.data.navigationLoading,true);finish();await refresh;assert.equal(page.data.navigationLoading,false);assert.equal(h.pullStops,1);
   h.replace(fixture());assert.equal(page.data.navigationLoading,false,'后台资料更新不制造前景加载');page.onUnload();
+});
+test('动态更新后恢复仍存在的阅读条目；已撤回锚点选择下一条有效记录',()=>{
+  const scrolls:number[]=[];let measurements=0;
+  const h=nativeHarness(fixture(),{wxApi:{
+    pageScrollTo(options:{scrollTop:number}){scrolls.push(options.scrollTop);},
+    createSelectorQuery(){return{in(){return this;},selectAll(){return this;},boundingClientRect(){return this;},selectViewport(){return this;},scrollOffset(){return this;},exec(fn:(v:unknown)=>void){
+      measurements++;fn([[{dataset:{readingId:'pub-done'},top:measurements%2?-40:60,bottom:160},{dataset:{readingId:'pub-promise'},top:measurements%2?180:100,bottom:380}],{scrollTop:240}]);
+    }};}
+  }});
+  const page=h.page('news');
+  h.replace(structuredClone(fixture()));assert.deepEqual(scrolls,[340]);
+  const withdrawn=fixture();withdrawn.articles=withdrawn.articles.filter(a=>a.publicationId!=='pub-done');
+  h.replace(withdrawn);assert.deepEqual(scrolls,[340,160]);
+  page.onHide();h.replace(fixture());assert.equal(measurements,4,'隐藏页面不再测量或移动阅读位置');page.onUnload();
 });
 
 test('观察记录页进入和返回时隐藏旧内容，离开后的旧请求不能提前撤掉加载遮罩',async()=>{

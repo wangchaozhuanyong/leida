@@ -110,4 +110,15 @@ export function calendarDays(now: string) {
   return Array.from({ length: 182 }, (_, index) => dateKey(start + index * 86400000));
 }
 export const preferenceDefaults = { announcement: true, result: true, activity: false, correction: true };
+/** The built-in manual source is not an automatic collector. Freshness is projected server-side using each configured interval. */
+export function sourceStatus(sources: PublicData['sources']) {
+  const automated=sources.filter(s=>s.id!=='manual');
+  if(!automated.length)return {label:'自动更新暂未启用',warning:true};
+  if(automated.every(s=>s.status==='paused'))return {label:'自动更新已暂停',warning:true};
+  const active=automated.filter(s=>s.status!=='paused');
+  if(active.every(s=>s.status==='unconnected'))return {label:'等待首次更新',warning:true};
+  if(active.some(s=>['failed','delayed','unconnected'].includes(s.status)))return {label:'部分消息更新延迟',warning:true};
+  if(active.every(s=>s.status==='healthy'&&Number.isFinite(Date.parse(s.lastSuccessAt??''))))return {label:'自动检查公开消息',warning:false};
+  return {label:'等待首次更新',warning:true};
+}
 export type Preferences = typeof preferenceDefaults;

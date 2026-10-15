@@ -477,7 +477,11 @@ test('公开入口检查只返回开放状态，不调用微信、不预留额�
   await f.store.put('settings',{...config,subscriptionsEnabled:false});
   assert.deepEqual(await f.service.publicWechatAvailability(),{available:false,codeAvailable:true});
   await f.store.put('settings',{...config,qrEnabled:false});
+  assert.deepEqual(await f.service.publicWechatAvailability(),{available:true,codeAvailable:false});
+  await f.store.put('settings',{...config,qrEnabled:false,subscriptionsEnabled:false});
   assert.deepEqual(await f.service.publicWechatAvailability(),{available:false,codeAvailable:false});
+  await f.store.put('settings',{...config,templateId:''});
+  assert.deepEqual(await f.service.publicWechatAvailability(),{available:false,codeAvailable:true});
   assert.equal(f.calls.length,0);
 });
 
