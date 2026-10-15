@@ -33,6 +33,10 @@ export async function testCloudbaseWrite(pool: pg.Pool, rpc: CloudbaseRpc, anony
     await assert.rejects(testAI(),error=>error instanceof AIServiceError&&error.failureKind==='configuration'&&/未配置|未测试|未启用/.test(error.message));
     pass('cloud_paid_ai_stays_disabled','unconfigured cloud AI rejects before provider request or accounting; free template path remains available');
     const store = cloudbaseStore(rpc);
+    assert.ok((await list<{recordType?:string}>('forecast_snapshots')).every(row=>row.recordType!=='historical_replay_step'));
+    assert.equal((await one<{recordType:string}>('forecast_snapshots','replay_step_qa_000'))?.recordType,'historical_replay_step');
+    assert.equal((await pool.query("SELECT count(*)::int AS n FROM radar_forecast_snapshots WHERE payload->>'recordType'='historical_replay_step'")).rows[0].n,120);
+    pass('worker_snapshot_list_and_replay_lookup','worker snapshot lists omit replay bodies; exact-id replay reads remain available and all stored rows are retained');
     const probeId = 'write-cas-probe';
     await put('settings', { id: probeId, count: 0 });
     const before = (await list('audits')).length;
