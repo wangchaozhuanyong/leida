@@ -158,7 +158,7 @@ test('订阅nonce绑定读者及配置模板，幂等accept至多生成一份授
   await assert.rejects(f.service.confirmWechatSubscription(b.sessionToken,{nonce:challenge.nonce,templateId:challenge.templateId,result:'accept'}),/不存在/);
   await assert.rejects(f.service.confirmWechatSubscription(a.sessionToken,{nonce:challenge.nonce,templateId:'forged-template',result:'accept'}),/模板已变化/);
   const results=await Promise.all([1,2,3].map(()=>f.service.confirmWechatSubscription(a.sessionToken,{nonce:challenge.nonce,templateId:challenge.templateId,result:'accept'})));assert.ok(results.every(result=>result.state==='available'));
-  const already=await f.service.wechatSubscriptionChallenge(a.sessionToken);assert.equal(already.nonce,undefined);assert.equal((await f.store.list<WechatGrant>('wechat_grants')).filter(grant=>grant.status==='available').length,1);
+  const already=await f.service.wechatSubscriptionChallenge(a.sessionToken);assert.ok(already.nonce);assert.equal((await f.service.wechatSubscriptionState(a.sessionToken)).remainingCount,1);assert.equal((await f.store.list<WechatGrant>('wechat_grants')).filter(grant=>grant.status==='available').length,1);
   await f.notice();await Promise.all([f.service.scheduleWechatDeliveries(),f.service.scheduleWechatDeliveries()]);assert.equal((await f.store.list<WechatDelivery>('wechat_deliveries')).length,1);assert.equal((await f.queued()).length,1);
 });
 
@@ -169,6 +169,93 @@ test('一次发送成功后仅记录微信接受，重复执行/旧nonce不制�
   const replay=await f.service.confirmWechatSubscription(session.sessionToken,{nonce:accepted.challenge.nonce,templateId:accepted.challenge.templateId,result:'accept'});assert.equal(replay.state,'consumed');
   await f.notice();await f.service.scheduleWechatDeliveries();assert.equal((await f.store.list<WechatDelivery>('wechat_deliveries')).length,1);
   const sent=f.calls.find(call=>call.url.includes('subscribe/send'))!.body!;assert.equal(sent.miniprogram_state,'trial');assert.equal(sent.page,`pages/detail/index?publicationId=${f.publication.id}`);assert.match((sent.data as Record<string,{value:string}>).phrase2.value,/公告称/);
+});
+
+test('三次独立accept累积三次机会，按三个不同新提醒依次扣减，旧nonce不能加次数',async()=>{
+  const f=await fixture(),session=await f.login(),receipts=[];
+  for(let count=1;count<=3;count++){const accepted=await f.accept(session.sessionToken);receipts.push(accepted.challenge);assert.equal(accepted.state.remainingCount,count);}
+  const notices=[await f.notice({categories:['announcement']}),await f.notice({categories:['result']}),await f.notice({categories:['correction']})];
+  const handled=new Set<string>();
+  for(let remaining=2;remaining>=0;remaining--){
+    const job=(await f.queued()).find(job=>!handled.has(job.id));assert.ok(job);handled.add(job.id);
+    assert.equal((await f.service.processWechatJob(job)).state,'sent');
+    assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,remaining);
+  }
+  await f.notice();assert.equal((await f.queued()).length,3);
+  assert.deepEqual((await f.store.list<WechatDelivery>('wechat_deliveries')).map(delivery=>delivery.noticeId),notices.map(notice=>notice.id));
+  assert.equal(f.calls.filter(call=>call.url.includes('subscribe/send')).length,3);
+  for(const receipt of receipts){const replay=await f.service.confirmWechatSubscription(session.sessionToken,{nonce:receipt.nonce,templateId:receipt.templateId,result:'accept'});assert.equal(replay.remainingCount,0);}
+});
+
+test('追加拒绝不清除已有次数，重复回报或客户端传次数不能增发机会',async()=>{
+  const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);
+  const rejected=await f.service.wechatSubscriptionChallenge(session.sessionToken);
+  assert.equal((await f.service.confirmWechatSubscription(session.sessionToken,{nonce:rejected.nonce,templateId:rejected.templateId,result:'reject'})).remainingCount,1);
+  assert.equal((await f.service.confirmWechatSubscription(session.sessionToken,{nonce:rejected.nonce,templateId:rejected.templateId,result:'accept',remainingCount:999})).remainingCount,1);
+  const fresh=await f.service.wechatSubscriptionChallenge(session.sessionToken);
+  const responses=await Promise.all([1,2,3].map(()=>f.service.confirmWechatSubscription(session.sessionToken,{nonce:fresh.nonce,templateId:fresh.templateId,result:'accept',remainingCount:999})));
+  assert.ok(responses.every(response=>response.remainingCount===2));
+});
+
+test('已排队时追加授权保留原发送绑定，预留次数在发送成功后才扣减',async()=>{
+  const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);await f.accept(session.sessionToken);await f.notice();
+  const job=(await f.queued())[0],before=await f.service.wechatSubscriptionState(session.sessionToken);assert.equal(before.remainingCount,2);assert.equal(before.pendingCount,1);
+  assert.equal((await f.accept(session.sessionToken)).state.remainingCount,3);
+  assert.equal((await f.service.processWechatJob(job)).state,'sent');
+  assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,2);
+  await f.service.processWechatJob(job);assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,2);
+});
+
+test('发送前撤回内容会释放预留次数，关闭提醒清空剩余并拒绝未确认旧nonce',async()=>{
+  const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);const withdrawn=await f.notice();await f.queued();
+  await f.store.put('notices',{...withdrawn,status:'withdrawn'});await f.service.scheduleWechatDeliveries();
+  assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,1);
+  const pending=await f.service.wechatSubscriptionChallenge(session.sessionToken);
+  assert.equal((await f.service.revokeWechatSubscription(session.sessionToken)).remainingCount,0);
+  await assert.rejects(f.service.confirmWechatSubscription(session.sessionToken,{nonce:pending.nonce,templateId:pending.templateId,result:'accept'}),/失效/);
+  await f.accept(session.sessionToken);assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,1);
+  await f.notice();const firstDelivery=(await f.store.list<WechatDelivery>('wechat_deliveries'))[0];const job=(await f.queued()).find(job=>job.payload.deliveryId!==firstDelivery.id);
+  assert.ok(job);assert.equal((await f.service.processWechatJob(job)).state,'sent');
+});
+
+test('旧版单次授权只迁移一次，次数不能用于授权之前的消息或活动',async()=>{
+  const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);
+  const grant=(await f.store.list<WechatGrant>('wechat_grants'))[0];const {credits:_credits,challengeTimes:_times,...legacy}=grant;await f.store.put('wechat_grants',legacy);
+  assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,1);
+  const oldNotice=await f.notice();await f.accept(session.sessionToken);
+  assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,2);
+  await f.service.scheduleWechatDeliveries();const first=(await f.queued())[0];assert.ok(first);await f.service.processWechatJob(first);
+  assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,1);
+  await f.notice({categories:['activity']});await f.service.scheduleWechatDeliveries();assert.equal((await f.queued()).length,1);
+  assert.equal((await f.store.list<WechatDelivery>('wechat_deliveries'))[0].noticeId,oldNotice.id);
+});
+
+test('多次机会遇到明确拒绝或未知发送均暂停，不把剩余次数继续自动发送',async()=>{
+  for(const send of ['reject','timeout'] as const){
+    const f=await fixture({send}),session=await f.login();
+    for(let count=0;count<3;count++)await f.accept(session.sessionToken);
+    await f.notice();const job=(await f.queued())[0];await f.service.processWechatJob(job);
+    const state=await f.service.wechatSubscriptionState(session.sessionToken);
+    assert.equal(state.state,send==='reject'?'rejected':'unknown');
+    assert.equal(state.remainingCount,send==='reject'?0:2);assert.equal(state.pendingCount,0);
+    await f.notice();await f.service.scheduleWechatDeliveries();await f.service.processWechatJob(job);
+    assert.equal((await f.store.list<WechatDelivery>('wechat_deliveries')).length,1);
+    assert.equal(f.calls.filter(call=>call.url.includes('subscribe/send')).length,1);
+    if(send==='timeout'){const challenge=await f.service.wechatSubscriptionChallenge(session.sessionToken);assert.equal(challenge.nonce,undefined);}
+  }
+});
+
+test('追加准备有独立频率限制；过期和已清理旧回执不能制造次数',async()=>{
+  const f=await fixture(),session=await f.login(),first=await f.accept(session.sessionToken);
+  for(let index=0;index<9;index++)await f.service.wechatSubscriptionChallenge(session.sessionToken);
+  await assert.rejects(f.service.wechatSubscriptionChallenge(session.sessionToken),/操作太快/);
+  assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,1);
+  f.advance(61_000);const expired=await f.service.wechatSubscriptionChallenge(session.sessionToken);f.advance(5*60_000);
+  await assert.rejects(f.service.confirmWechatSubscription(session.sessionToken,{nonce:expired.nonce,templateId:expired.templateId,result:'accept'}),/失效/);
+  await f.notice();await f.service.processWechatJob((await f.queued())[0]);
+  f.advance(16*60_000);await f.accept(session.sessionToken);
+  await assert.rejects(f.service.confirmWechatSubscription(session.sessionToken,{nonce:first.challenge.nonce,templateId:first.challenge.templateId,result:'accept'}),/失效/);
+  assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,1);
 });
 
 test('微信43101拒绝不自动恢复授权或再次发送',async()=>{

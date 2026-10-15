@@ -7,10 +7,15 @@
     <button wx:for="{{notices}}" wx:key="id" class="inbox-preview" data-id="{{item.id}}" bindtap="openNotice"><view class="grow"><view class="row top"><text>{{item.title}}</text><view wx:if="{{!item.read}}" class="dot"></view></view><view class="inbox-summary">{{item.summary}}</view><view class="small muted">{{item.time}}</view></view></button>
     <view wx:if="{{connected && !notices.length}}" class="inbox-empty">暂无提醒，有新消息会显示在这里。</view>
   </view>
-  <view class="card"><view class="row"><view class="heading">微信提醒</view><text class="badge muted">待开通</text></view><view class="muted lead">持续微信提醒暂未开通，重置预告、完成和重要更正可在站内信查看。</view>
-    <view wx:if="{{closeMessage}}" class="lead">{{closeMessage}}</view><view wx:if="{{wechat.error}}" class="warning lead">{{wechat.error}}</view>
-    <view wx:if="{{wechat.privacyNeeded}}" class="stack lead"><button class="secondary full" bindtap="openPrivacyContract">查看隐私指引</button><button class="primary full" open-type="agreePrivacyAuthorization" bindagreeprivacyauthorization="agreeWechatPrivacy">同意并关闭提醒</button></view>
-    <button wx:else class="secondary full" style="margin-top:16px" loading="{{wechat.busy}}" disabled="{{wechat.busy}}" bindtap="revokeWechat">关闭微信提醒</button><view class="small muted lead">可关闭此前开启的提醒。已发送的消息无法撤回。</view>
+  <view class="card reminder-card"><view class="row"><view class="heading">微信提醒</view><text class="badge muted">{{wechat.safe.state === 'revoked' ? '已关闭' : wechat.safe.state === 'unknown' ? '已暂停' : wechat.remainingCount > 0 ? '已开启' : '按次提醒'}}</text></view>
+    <view class="reminder-count" wx:if="{{wechat.safe}}"><text class="muted">剩余提醒</text><text class="reminder-number">{{wechat.remainingCount}}</text><text class="muted">次</text></view>
+    <view class="muted lead">重置预告、完成声明和重要更正，每条新提醒使用一次。可以随时增加次数。</view>
+    <view wx:if="{{wechat.error}}" class="warning lead">{{wechat.error}}</view>
+    <view wx:if="{{wechat.privacyNeeded}}" class="stack lead"><button class="secondary full" bindtap="openPrivacyContract">查看隐私指引</button><button class="primary full" open-type="agreePrivacyAuthorization" bindagreeprivacyauthorization="agreeWechatPrivacy">同意隐私指引并继续</button></view>
+    <block wx:else><button class="primary full reminder-add" loading="{{wechat.busy}}" disabled="{{wechat.busy || wechat.safe.state === 'unknown'}}" bindtap="addWechat">{{wechat.confirmNeeded ? '重试确认次数' : wechat.ready ? (wechat.remainingCount > 0 ? '增加一次提醒' : '确认开启提醒') : wechat.remainingCount > 0 ? '增加一次提醒' : '开启微信提醒'}}</button>
+    <view wx:if="{{wechat.ready}}" class="small muted lead">每次在微信中同意接收，增加一次提醒机会。</view><view wx:elif="{{wechat.safe}}" class="small muted lead">{{wechat.label}}</view>
+    <button wx:if="{{wechat.canRevoke}}" class="secondary full reminder-close" disabled="{{wechat.busy}}" bindtap="revokeWechat">关闭微信提醒</button></block>
+    <view class="small muted lead">关闭后停止后续提醒，已提交微信的消息可能仍会收到。</view>
   </view>
   <button class="row-button" data-path="/pages/privacy/index" bindtap="navigate"><text>隐私说明</text><text>→</text></button>
   <view class="foot">版本 {{clientVersion}}</view>

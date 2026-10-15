@@ -386,7 +386,7 @@ function Settings({notices,read,markRead,storageError}:{notices:Notice[];read:st
       {!notices.length&&<p className="pub-inbox-empty">暂无提醒，有新消息会显示在这里。</p>}
     </section>
     {storageError&&<p className="pub-warning">{storageError}</p>}
-    <section className="pub-card pub-reminder-pending"><div className="pub-section-heading"><h2>微信提醒</h2><Badge tone="muted">待开通</Badge></div><p>持续微信提醒暂未开通，重置预告、完成和重要更正可在站内信查看。</p><p className="pub-muted">关闭此前开启的微信提醒，请前往小程序的提醒页。</p></section>
+    <section className="pub-card pub-reminder-pending"><div className="pub-section-heading"><h2>微信提醒</h2><Badge tone="muted">小程序内开启</Badge></div><p>请在小程序的提醒页开启微信提醒，每次成功授权增加一次提醒机会。</p><p className="pub-muted">重置预告、完成声明和重要更正各使用一次，次数用完后可继续增加，也可以随时关闭。</p></section>
     <section className="pub-card"><TextLink href="/more#privacy">隐私说明</TextLink></section>
   </>;
 }
@@ -402,7 +402,7 @@ function Methodology({data,snapshotId,cadenceId,onPoster,onShare}:{data:PublicDa
 function WechatReminderModal({onClose}:{data:PublicData|null;dataError:string;onRetryData:()=>void;entry:WechatEntryState;onRetryEntry:()=>void;onClose:()=>void}) {
   const dialog=useRef<HTMLDialogElement>(null);
   useEffect(()=>{dialog.current?.showModal();const previous=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.body.style.overflow=previous;};},[]);
-  return <dialog className="pub-dialog" ref={dialog} onClose={onClose} onCancel={onClose}><div className="pub-dialog-heading"><h2>微信提醒</h2><button className="pub-icon-button" aria-label="关闭窗口" onClick={onClose}><Icon name="close"/></button></div><div className="pub-dialog-body"><p>持续微信提醒暂未开通。</p><p>重置预告、完成和重要更正可在站内信查看。此前开启的微信提醒可在小程序提醒页关闭。</p><TextLink href="/notices">查看全部提醒</TextLink><button className="pub-button full" onClick={onClose}>知道了</button></div></dialog>;
+  return <dialog className="pub-dialog" ref={dialog} onClose={onClose} onCancel={onClose}><div className="pub-dialog-heading"><h2>微信提醒</h2><button className="pub-icon-button" aria-label="关闭窗口" onClick={onClose}><Icon name="close"/></button></div><div className="pub-dialog-body"><p>在小程序的提醒页开启，每次成功授权增加一次提醒机会。</p><p>重置预告、完成声明和重要更正各使用一次。可以继续增加次数，也可以关闭提醒。</p><TextLink href="/notices">查看全部站内提醒</TextLink><button className="pub-button full" onClick={onClose}>知道了</button></div></dialog>;
 }
 function ShareLinkModal({ url, onClose }: { url: string; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null), input = useRef<HTMLInputElement>(null);
