@@ -515,8 +515,8 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);news.onUnload();
-  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.11 · 体验版');settings.onUnload();
-  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.11');fallback.onUnload();
+  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.12 · 体验版');settings.onUnload();
+  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.12');fallback.onUnload();
 });
 
 test('四个原生导航页初始化 iOS 窗口底色，缓存返回和资料刷新不反复触碰窗口外观',()=>{
@@ -614,10 +614,11 @@ test('原始来源链接仅允许明确HTTP地址，不执行脚本或复制隐�
   assert.equal(mini.safeUrl('https://example.org/original?id=1'), 'https://example.org/original?id=1');
 });
 
-test('原生项目配置与十个页面完整，支持游客或真实AppID，正文与触控规格有实物对应', () => {
+test('原生项目配置与页面完整，支持游客或真实AppID，正文与触控规格有实物对应', () => {
   const app = JSON.parse(readFileSync(resolve(root, 'miniprogram/app.json'), 'utf8'));
   const project = JSON.parse(readFileSync(resolve(root, 'miniprogram/project.config.json'), 'utf8'));
-  assert.equal(app.pages.length, 11);
+  assert.equal(app.pages.length, 12);
+  assert.ok(app.pages.includes('pages/replay/index'));
   assert.equal(app.window.backgroundColorTop,app.window.backgroundColor);
   assert.equal(app.window.backgroundColorBottom,app.window.backgroundColor);
   assert.equal(app.tabBar.backgroundColor,app.window.backgroundColor);

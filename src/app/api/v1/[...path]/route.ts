@@ -15,8 +15,10 @@ import {publicResetOutlook} from '@/lib/reset-outlook';
 import {getForecastSnapshot,getResetCadenceSnapshot} from '@/server/forecast';
 import {forecastPosterSvg} from '@/server/forecast-poster';
 import {getLightPublicVersion,getPublicRead,parsePublicRead} from '@/server/public-read';
+import {publicReplayRuns,publicReplayStep} from '@/server/historical-replay';
 export const dynamic='force-dynamic';
 export async function GET(request:Request,{params}:{params:Promise<{path:string[]}>}){try{const {path}=await params;const [kind,id]=path;
+ if(kind==='replays'&&path.length<=2){const query=new URL(request.url).searchParams;if([...query.keys()].some(key=>key!=='step')||query.getAll('step').length>1||!id&&query.has('step'))throw Object.assign(new Error('回放查询无效'),{status:400});return json(id?await publicReplayStep(id,query.get('step')??undefined):await publicReplayRuns());}
  if(kind==='version'&&new URL(request.url).searchParams.get('light')==='1'){const state=await getLightPublicVersion(),etag=`"${state.version}"`;if(request.headers.get('if-none-match')===etag)return new Response(null,{status:304,headers:{ETag:etag,'Cache-Control':'no-store'}});return Response.json({data:state},{headers:{ETag:etag,'Cache-Control':'no-store'}});}
  if((kind==='bootstrap'||kind==='status')&&new URL(request.url).searchParams.has('view'))return Response.json(await getPublicRead(parsePublicRead(new URL(request.url).searchParams)),{headers:{'Cache-Control':'no-store'}});
  if(kind==='version'){const version=await getPublicVersion();const etag=`"${version}"`;if(request.headers.get('if-none-match')===etag)return new Response(null,{status:304,headers:{ETag:etag,'Cache-Control':'no-store'}});return Response.json({data:{version}},{headers:{ETag:etag,'Cache-Control':'no-store'}});}

@@ -6,6 +6,11 @@ test('真实数据库、登录隔离、版本发布、去重与公共接口', {s
  let cookie='';
  async function request(path:string,body?:unknown,authenticated=true){return fetch(base+path,{method:body===undefined?'GET':'POST',headers:{...(body===undefined?{}:{'Content-Type':'application/json',Origin:base}),...(authenticated&&cookie?{Cookie:cookie}:{})},body:body===undefined?undefined:JSON.stringify(body),redirect:'manual'})}
  async function command(action:string,input:Record<string,unknown>){const r=await request('/api/admin/command',{action,input});const j=await r.json();assert.equal(r.status,200,`${action}: ${j.error}`);return j.data}
+ async function changedPublicVersion(previous:string){
+  const deadline=Date.now()+12_000;let current=previous;
+  do{current=(await (await request('/api/v1/version',undefined,false)).json()).data.version;if(current!==previous)return current;await new Promise(resolve=>setTimeout(resolve,250));}while(Date.now()<deadline);
+  assert.notEqual(current,previous,'已发布内容须在现有10秒公共缓存到期后更新版本');return current;
+ }
  assert.equal((await request('/api/admin/data',undefined,false)).status,401);
  assert.equal((await request('/api/admin/command',{action:'settings.site',input:{}},false)).status,401);
  assert.equal((await request('/api/setup')).status,200);
@@ -28,7 +33,7 @@ test('真实数据库、登录隔离、版本发布、去重与公共接口', {s
  const content={title:'测试：公开宣布用量重置',summary:'测试证据称已完成用量重置。',translation:'我们已为所有账户重置全部用量限制。',category:'reset',evidenceIds:[evidence.id],actions:[{id:'qa-action-1',kind:'automatic_reset',stage:'claimed_complete',eligibility:'所有账户',scope:'public',statementAt:publishedAt,evidenceIds:[evidence.id],evidenceQuote:text}]};
  const saved=await command('candidate.save',{id:candidate.id,version:candidate.version,content});
  const impact=await command('candidate.preview',{id:saved.id,version:saved.version});assert.equal(impact.canPublish,true);assert.equal(impact.willNotify,true);assert.ok(impact.changes.length>0);
- const p=await command('candidate.publish',{id:saved.id,version:saved.version,reason:'核对测试原文'});assert.equal(p.event.actions[0].stage,'claimed_complete');const publishedVersion=(await (await request('/api/v1/version',undefined,false)).json()).data.version;assert.notEqual(publishedVersion,baselineVersion.data.version);assert.equal((await (await request('/api/v1/status',undefined,false)).json()).version,publishedVersion);
+ const p=await command('candidate.publish',{id:saved.id,version:saved.version,reason:'核对测试原文'});assert.equal(p.event.actions[0].stage,'claimed_complete');const publishedVersion=await changedPublicVersion(baselineVersion.data.version);assert.equal((await (await request('/api/v1/status',undefined,false)).json()).version,publishedVersion);
  const duplicate=await request('/api/admin/command',{action:'candidate.publish',input:{id:saved.id,version:saved.version}});assert.equal(duplicate.status,409);
  const repeated=await command('candidate.create',{url:'https://example.org/qa-reset',text,publishedAt,contextComplete:true});assert.equal(repeated.created,false);
  data=(await (await request('/api/admin/data')).json()).data;const count=data.notices.length;assert.ok(count>=1);
