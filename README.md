@@ -126,6 +126,8 @@ Tibo 免费公开动态已接入。2 分钟是默认检查周期，实际新帖�
 
 隔离验证使用 `pnpm exec tsx scripts/test-cloudbase-adapter.ts`，真实受控接口验证使用 `pnpm exec tsx scripts/test-cloudbase-live.ts`。后者只读取 Git 忽略的本机配置，不输出凭证或行数据；报告留在项目已有 `outputs/implementation-qa/cloud-continuation-20261013/`。
 
+CloudBase 失败响应保留原 HTTP 状态和用户提示，并附加固定白名单生成的 `diagnosticCode`，不显示在客户界面。例如 `CB_REJECTED_503_PGRST002` 表示网关构建数据库结构缓存时无法连接数据库，`CB_REJECTED_404_INVALID_ENV` 表示网关未识别环境，`CB_REJECTED_403_42501` 表示权限拒绝。诊断只保留已知错误码，不返回上游正文、环境地址、凭证或请求参数；未知错误标记为 `UNCLASSIFIED`。连接根因应以实际运行配置和诊断结果为准，不据此自动更换数据库、修改权限或重试写入。错误码参考 [PostgREST 官方说明](https://docs.postgrest.org/en/stable/references/errors.html)。
+
 ### CloudBase 业务写入候选（仍未部署）
 
 隔离副本新增 `RADAR_STORAGE_BACKEND=cloudbase` 后，业务 `list/one/insert/put/transaction` 使用固定 RPC。默认仍为 native；公共读取必须同时使用 cloudbase，避免写入与展示分属不同数据库。不要把隔离验证用的 `CLOUDBASE_TEST_*` 当成运行配置。
