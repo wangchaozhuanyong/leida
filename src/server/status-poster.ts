@@ -34,6 +34,10 @@ function brandMarkup(x = 66, y = 62, width = 78, height = 70) {
   return `<svg x="${x}" y="${y}" width="${width}" height="${height}" viewBox="110 520 1850 1010"><image width="2048" height="2048" href="${brandImage}"/></svg>`;
 }
 
+export function assertStatusPosterRound(data:PublicData, roundId:string):void {
+  if((publicResetOutlook(data).active?.publicationId??'waiting')!==roundId)throw Object.assign(new Error('公开状态已变化，请关闭后重新生成海报'),{status:409});
+}
+
 /** A waiting/announced poster has no manufactured completion or elapsed time. */
 export function currentStatusPosterSvg(data:PublicData, generatedAt:string, roundId:string, style:StatusPosterStyle='precision', code?:StatusPosterCode):string {
   const outlook=data.forecasts?.outlook??publicResetOutlook({...data,serverTime:generatedAt});
