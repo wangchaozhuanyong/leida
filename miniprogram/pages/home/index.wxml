@@ -1,7 +1,7 @@
 <page-loader wx:if="{{navigationLoading}}" />
 <view wx:else>
 <view class="page home-page">
-  <view class="home-heading"><view class="home-heading-copy"><view class="home-heading-title">Codex重置</view><view class="home-heading-subtitle">不要错过每一次重置。</view></view><view class="freshness-summary" bindtap="toggleFreshness" role="button" aria-label="公开资料状态" aria-expanded="{{freshnessOpen}}"><view class="health-dot {{sourceDelayed || error ? 'delayed' : ''}}"></view><text>{{error ? '连接中断，保留已有资料' : connected ? sourceDelayed ? '部分来源更新延迟' : '自动检查公开消息' : loading ? '加载中' : '等待连接公开资料'}}</text><text class="info-symbol">ⓘ</text></view></view>
+  <view class="home-heading"><view class="home-heading-copy"><view class="home-heading-title">Codex重置</view><view class="home-heading-subtitle">不要错过每一次重置。</view></view><view class="freshness-summary" bindtap="toggleFreshness" role="button" aria-label="公开资料状态" aria-expanded="{{freshnessOpen}}"><view class="health-dot {{sourceDelayed || error ? 'delayed' : ''}}"></view><text>{{error ? connected ? '更新暂时中断' : '暂时无法连接' : connected ? sourceDelayed ? '部分来源更新延迟' : '自动检查公开消息' : loading ? '加载中' : '等待连接公开资料'}}</text><text class="info-symbol">ⓘ</text></view></view>
   <view wx:if="{{freshnessOpen && connected}}" class="freshness-detail"><view>最近采集成功：{{collectedAt}} · 北京时间</view><view>最新消息发布于：{{latestSourceTime}} · 北京时间</view><view class="muted">成功时间来自最近成功的来源，不代表所有来源同时更新。</view></view>
   <status-panel wx:if="{{!connected}}" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />
   <block wx:else>
