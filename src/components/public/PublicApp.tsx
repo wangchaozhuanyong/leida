@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useSearchParams, usePathname } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {WechatEntryGuide} from './WechatEntryGuide';
+import {sourceStatus} from './model';
 import { customerNotice } from '@/lib/notice-display';
 import type { Activity, BenefitAction, Evidence, Notice, PublicData, Publication } from '@/lib/types';
 import { usePublicClock, usePublicQuery, useWechatAvailability } from './PublicSession';
@@ -151,7 +153,7 @@ export default function PublicApp() {
   const failure = <div className="pub-empty" role="alert"><Icon name="info" /><h2>资料暂时无法加载</h2><p>{error || '请稍后重试。'}</p><button className="pub-button primary" onClick={() => void refresh()} disabled={loading}>{loading ? '正在重试…' : '重新加载'}</button></div>;
   const pending = error ? failure : <ContentPlaceholder />;
   let content: React.ReactNode;
-  if (route === 'settings') content = <Settings notices={visibleNotices} read={read} markRead={markRead} storageError={storageError} pending={!data ? error ? <div className="pub-inbox-empty" role="alert"><p>消息暂时无法加载，请稍后重试。</p><button className="pub-text-button" onClick={() => void refresh()} disabled={loading}>重新加载</button></div> : pending : undefined}/>;
+  if (route === 'settings') content = <Settings notices={visibleNotices} read={read} markRead={markRead} storageError={storageError} data={data} codeAvailable={posterCodeAvailable} pending={!data ? error ? <div className="pub-inbox-empty" role="alert"><p>消息暂时无法加载，请稍后重试。</p><button className="pub-text-button" onClick={() => void refresh()} disabled={loading}>重新加载</button></div> : pending : undefined}/>;
   else if (route === 'more') content = <MorePage />;
   else if (route === 'news') content = <News articles={newsArticles} category={newsCategory} onCategoryChange={setNewsCategory} hasMore={!!page?.nextCursor} onMore={() => void more()} loading={loadingMore} pending={!data ? pending : undefined} />;
   else if (route === 'history') content = <History publications={historyPublications} filter={historyFilter} onFilter={setHistoryFilter} data={data} hasMore={!!page?.nextCursor} onMore={() => void more()} loading={loadingMore} pending={!data ? pending : undefined} />;
@@ -175,11 +177,11 @@ export default function PublicApp() {
     {subpage && <nav className="pub-page-back" aria-label="返回上级"><Link scroll={false} className="pub-back-link" href={backHref}><Icon name="back" />返回</Link></nav>}
     {route === 'home' && <div className="pub-home-heading">
       <div className="pub-home-heading-copy"><strong>Codex重置</strong><p>不要错过每一次重置。</p></div>
-      {!navigationLoading && data && <details className="pub-freshness"><summary><span className={`pub-status-dot${error || data.sources.some(source => ['failed', 'delayed'].includes(source.status)) ? ' is-delayed' : ''}`} />{error ? '连接中断，保留已有资料' : data.sources.some(source => ['failed', 'delayed'].includes(source.status)) ? '部分来源更新延迟' : '自动检查公开消息'}<Icon name="info" /></summary><div><p>最近采集成功：<time dateTime={collectedAt}>{collectedAt ? `${briefTime(collectedAt)} · 北京时间` : '暂无记录'}</time></p><p>最新消息发布于：<time dateTime={latestArticle ? articleSourceTime(latestArticle) : undefined}>{latestArticle ? `${briefTime(articleSourceTime(latestArticle))} · 北京时间` : '暂无记录'}</time></p><p>采集成功时间来自最近成功的来源，不代表所有来源同时更新。</p></div></details>}
+      {!navigationLoading && data && <details className="pub-freshness"><summary><span className={`pub-status-dot${error || sourceStatus(data.sources).warning ? ' is-delayed' : ''}`} />{error ? '连接中断，保留已有资料' : sourceStatus(data.sources).label}<Icon name="info" /></summary><div><p>最近采集成功：<time dateTime={collectedAt}>{collectedAt ? `${briefTime(collectedAt)} · 北京时间` : '暂无记录'}</time></p><p>最新消息发布于：<time dateTime={latestArticle ? articleSourceTime(latestArticle) : undefined}>{latestArticle ? `${briefTime(articleSourceTime(latestArticle))} · 北京时间` : '暂无记录'}</time></p><p>采集成功时间来自最近成功的来源，不代表所有来源同时更新。</p></div></details>}
     </div>}
     <main className="pub-main" id="public-main" tabIndex={-1}>
       {!navigationLoading && data && error && <div className="pub-warning" role="alert">连接暂时中断，保留上次成功获取的资料。<button className="pub-text-button" onClick={() => void refresh()}>重试</button></div>}
-      {!navigationLoading && data && !error && data.sources.some(s => ['failed', 'delayed'].includes(s.status)) && <div className="pub-warning" role="status">部分来源更新延迟，以下保留最近可信结果。</div>}
+      {!navigationLoading && data && !error && sourceStatus(data.sources).warning && <div className="pub-warning" role="status">{sourceStatus(data.sources).label}，以下保留最近收录的资料。</div>}
       <Suspense fallback={<ContentPlaceholder />}>{navigationLoading ? <ContentPlaceholder /> : content}</Suspense>
       {!navigationLoading && moreError && <div className="pub-pagination-error" role="alert">{moreError}<button className="pub-text-button" disabled={loadingMore} onClick={() => void more()}>重试加载更多</button></div>}
     </main>
@@ -190,7 +192,7 @@ export default function PublicApp() {
     {!poster && dayPoster && <PosterModal target={{ id: `${dayPoster.activityId}:${dayPoster.day}:${dayPoster.publicationIds.join(',')}`, cutoffAt: dayPosterCutoff, title: `活动第${dayPoster.day}天整合海报`, endpoint: `/api/v1/activity-posters/${encodeURIComponent(dayPoster.activityId)}?${activityShareQuery(dayPoster)}`, filename: `模钥重置雷达-活动第${dayPoster.day}天.png` }} name={data?.site.name || '模钥重置雷达'} blocked={dayPosterError} onClose={() => setDayPoster(null)} onShare={() => shareUrl(activityPublicationUrl(location.origin, dayPoster), `活动第${dayPoster.day}天进展`)} />}
     {!poster && !dayPoster && forecastPoster && <PosterModal target={{id:forecastPoster.id,cutoffAt:forecastPoster.evidenceCutoffAt,title:'重置实验预测快照',endpoint:`/api/v1/forecast-posters/${encodeURIComponent(forecastPoster.id)}`,filename:`模钥重置雷达-实验预测-${forecastPoster.id}.png`}} name={data?.site.name||'模钥重置雷达'} blocked={forecastPosterState.unavailable ? '此固定预测记录已不可用，已停止生成与分享海报。' : ''} onClose={()=>setForecastPoster(null)} onShare={()=>shareUrl(`${location.origin}/methodology?snapshot=${encodeURIComponent(forecastPoster.id)}`,'重置实验预测快照')} />}
     {shareLink && <ShareLinkModal url={shareLink} onClose={() => setShareLink(null)} />}
-    {wechatReminders && <WechatReminderModal data={data} dataError={error} onRetryData={() => void refresh()} entry={wechatEntry} onRetryEntry={retryWechat} onClose={() => setWechatReminders(false)} />}
+    {wechatReminders && <WechatReminderModal data={data} dataError={error} onRetryData={() => void refresh()} entry={wechatEntry} codeAvailable={posterCodeAvailable} onRetryEntry={retryWechat} onClose={() => setWechatReminders(false)} />}
     {toast && <div className="pub-toast" role="status">{toast}</div>}
   </div>;
 }
@@ -378,7 +380,7 @@ function ActivityContent({ activity, data, pending, day, onDay, onPoster, onDayP
   </div>;
 
 }
-export function Settings({notices,read,markRead,storageError,pending}:{notices:Notice[];read:string[];markRead:(ids:string[])=>void;storageError:string;pending?:React.ReactNode}) {
+export function Settings({notices,read,markRead,storageError,pending,data,codeAvailable=false}:{notices:Notice[];read:string[];markRead:(ids:string[])=>void;storageError:string;pending?:React.ReactNode;data?:PublicData|null;codeAvailable?:boolean}) {
   const unread=notices.filter(n=>!read.includes(n.id)).length;
   return <>
     <section className="pub-card pub-inbox-card"><div className="pub-section-heading"><h2>站内信 {unread>0&&<span className="pub-inbox-unread">{unread} 未读</span>}</h2><TextLink href="/notices">查看全部提醒</TextLink></div>
@@ -386,7 +388,7 @@ export function Settings({notices,read,markRead,storageError,pending}:{notices:N
       {!notices.length&&<p className="pub-inbox-empty">暂无提醒，有新消息会显示在这里。</p>}</>}
     </section>
     {storageError&&<p className="pub-warning">{storageError}</p>}
-    <section className="pub-card pub-reminder-pending"><div className="pub-section-heading"><h2>微信提醒</h2><Badge tone="muted">小程序内开启</Badge></div><p>请在小程序的提醒页开启微信提醒，每次成功授权增加一次提醒机会。</p><p className="pub-muted">重置预告、完成声明和重要更正各使用一次，次数用完后可继续增加，也可以随时关闭。</p></section>
+    <section className="pub-card pub-reminder-pending"><div className="pub-section-heading"><h2>微信提醒</h2><Badge tone="muted">小程序内开启</Badge></div><p>请在小程序的提醒页开启微信提醒，每次成功授权增加一次提醒机会。</p><p className="pub-muted">重置预告、完成声明和重要更正各使用一次，次数用完后可继续增加，也可以随时关闭。</p><WechatEntryGuide publicationId={data?.publications.find(p=>!publicationWithdrawn(data,p))?.id} codeAvailable={codeAvailable}/></section>
     <section className="pub-card"><TextLink href="/more#privacy">隐私说明</TextLink></section>
   </>;
 }
@@ -399,10 +401,10 @@ export function Methodology({data,snapshotId,cadenceId,onPoster,onShare}:{data:P
   if(snapshotId)return <><div className="pub-page-heading"><h1>固定预测记录</h1><p>初始预测与后续结局分别保留。</p></div><ForecastPanel data={data.forecasts} snapshotId={snapshotId} onPoster={onPoster} onShare={onShare}/></>;
   return <><div className="pub-page-heading"><h1>观察记录</h1></div><ForecastPanel data={data.forecasts} snapshotId={snapshotId} onPoster={onPoster} onShare={onShare}/></>;
 }
-function WechatReminderModal({onClose}:{data:PublicData|null;dataError:string;onRetryData:()=>void;entry:WechatEntryState;onRetryEntry:()=>void;onClose:()=>void}) {
+function WechatReminderModal({onClose,data,codeAvailable}:{data:PublicData|null;dataError:string;onRetryData:()=>void;entry:WechatEntryState;codeAvailable:boolean;onRetryEntry:()=>void;onClose:()=>void}) {
   const dialog=useRef<HTMLDialogElement>(null);
   useEffect(()=>{dialog.current?.showModal();const previous=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.body.style.overflow=previous;};},[]);
-  return <dialog className="pub-dialog" ref={dialog} onClose={onClose} onCancel={onClose}><div className="pub-dialog-heading"><h2>微信提醒</h2><button className="pub-icon-button" aria-label="关闭窗口" onClick={onClose}><Icon name="close"/></button></div><div className="pub-dialog-body"><p>在小程序的提醒页开启，每次成功授权增加一次提醒机会。</p><p>重置预告、完成声明和重要更正各使用一次。可以继续增加次数，也可以关闭提醒。</p><TextLink href="/notices">查看全部站内提醒</TextLink><button className="pub-button full" onClick={onClose}>知道了</button></div></dialog>;
+  return <dialog className="pub-dialog" ref={dialog} onClose={onClose} onCancel={onClose}><div className="pub-dialog-heading"><h2>微信提醒</h2><button className="pub-icon-button" aria-label="关闭窗口" onClick={onClose}><Icon name="close"/></button></div><div className="pub-dialog-body"><p>在小程序的提醒页开启，每次成功授权增加一次提醒机会。</p><p>重置预告、完成声明和重要更正各使用一次。可以继续增加次数，也可以关闭提醒。</p><WechatEntryGuide publicationId={data?.publications.find(p=>!publicationWithdrawn(data,p))?.id} codeAvailable={codeAvailable}/><TextLink href="/notices">查看全部站内提醒</TextLink><button className="pub-button full" onClick={onClose}>知道了</button></div></dialog>;
 }
 function ShareLinkModal({ url, onClose }: { url: string; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null), input = useRef<HTMLInputElement>(null);

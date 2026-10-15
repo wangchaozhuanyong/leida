@@ -43,7 +43,7 @@ export function designedStatusPoster(input: DesignedPoster): string {
   const nextSize = nextLines.length > 2 ? 30 : 38;
   const qualifier = '仅整理公开公告，个人状态以账户显示为准';
   const interval = dark
-    ? elapsed ? text(elapsed[1], elapsed[2].length > 1 ? 540 : 660, 1035, fit(elapsed[1], 505, 480), 'url(#elapsed-gold)', 700, elapsed[2].length > 1 ? 'middle' : 'end', 'font-family="Georgia,Times New Roman,serif"') + text(elapsed[2], elapsed[2].length > 1 ? 540 : 735, elapsed[2].length > 1 ? 1144 : 1060, elapsed[2].length > 1 ? 66 : 95, ink, 400, elapsed[2].length > 1 ? 'middle' : 'start') : text(input.interval, 540, 942, fit(input.interval,160,730), 'url(#elapsed-gold)', 700, 'middle')
+    ? elapsed ? text(elapsed[1], 540, 1000, fit(elapsed[1], 440, 640), 'url(#elapsed-gold)', 700, 'middle', 'font-family="Georgia,Times New Roman,serif"') + text(elapsed[2], 540, 1195, 60, ink, 400, 'middle') : text(input.interval, 540, 942, fit(input.interval,160,730), 'url(#elapsed-gold)', 700, 'middle')
     : elapsed ? text(elapsed[1], 380, 1320, fit(elapsed[1], 460, 316), '#b72f28', 700, 'end', 'font-family="Georgia,Times New Roman,serif"') + text(elapsed[2], 505, 1310, elapsed[2].length > 1 ? 58 : 89, ink, 700, 'end') : text(input.interval, 64, 1190, fit(input.interval,138,455), '#b72f28', 700);
   const content = dark ? `
     ${mark(64, 72)}${text(input.name, 183, 118, fit(input.name, 44, 510))}

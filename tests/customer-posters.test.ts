@@ -32,6 +32,15 @@ test('完成海报冻结声明和生成时间；布局切换不改事实，撤�
   for(const layout of [dark,light]){const circle=layout.commands.find((c:any)=>c.type==='circle'),code=layout.commands.find((c:any)=>c.asset==='code');for(const x of [code.x,code.x+code.width])for(const y of [code.y,code.y+code.height])assert.ok(Math.hypot(x-circle.x,y-circle.y)<circle.r);assert.ok(layout.commands.filter((c:any)=>c.type==='text').map((c:any)=>c.value).join('').includes(input.title));}
   data.articles[0].status='withdrawn';assert.equal(native.statusPosterAvailable(input,data),false);
 });
+test('黑金海报的数字与单位保留独立安全区，覆盖分钟、小时、天及三位数',()=>{
+  const input=native.statusPosterInput(fixture('claimed_complete'));
+  for(const value of ['1','3','28','365'])for(const unit of ['分钟','小时','天']){
+    const layout=native.createStatusPosterLayout({...input,value,unit},measure,'precision');
+    const number=layout.commands.find((c:any)=>c.value===value),label=layout.commands.find((c:any)=>c.value===unit);
+    assert.ok(number.y+number.size*.25<label.y-label.size,'含数字下沿和文字顶端仍有间隔');
+    assert.ok(measure(value,number.size)<=640);assert.equal(label.align,'center');
+  }
+});
 test('网站两款海报也支持等待状态；公开轮次变化时拒绝旧预览而非替换事实',()=>{
   const waiting=fixture();for(const theme of ['precision','editorial'] as const){const svg=currentStatusPosterSvg(waiting,now,'waiting',theme);assert.match(svg,/1080.*1920/);assert.match(svg,/等待预告/);assert.match(svg,/暂无公开公告/);assert.doesNotMatch(svg,/公告称已|data-poster-code/);}
   const announced=fixture('promised','2026-10-15T03:00:00Z');assert.match(currentStatusPosterSvg(announced,now,'fixed-publication'),/03:00/);

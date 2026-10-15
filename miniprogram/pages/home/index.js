@@ -25,7 +25,7 @@ Page(createPage((data, query, page, app) => {
     pending: pending ? { label: m.actionLabels[pending.kind], stage: m.stageText(pending, data.serverTime), countdown: countdown.label, timed: countdown.status !== 'unknown', counting: countdown.status === 'upcoming', time: pending.expectedAt ? m.displayTime(pending.expectedAt) : '', timeNote: pending.timeNote || '', path: pathFor(pending) } : null,
     forecast: null, outlookStatus: outlook.status,
     timeline: statusTimelineModel(outlook, data.serverTime, latestAction || null), posterPath, posterDescription,
-    sourceDelayed: data.sources.some(item => ['failed', 'delayed'].includes(item.status)),
+    sourceDelayed: m.sourceStatus(data.sources).warning, sourceStatusLabel:m.sourceStatus(data.sources).label,
     collectedAt: m.displayTime(recentSuccess), latestSourceTime: latestArticle ? m.displayTime(m.articleSourceTime(latestArticle)) : '暂无记录',
     waitingText: outlook.status === 'completed' ? '本次已有公开完成声明，等待下一次预告。' : outlook.status === 'cancelled' ? '本次安排已取消，等待下一次预告。' : '等待下一次预告，暂无新的时间依据。',
     activity: activity ? { title: activity.title, rules: activity.rules, phase: m.activityModel(data, activity.id).phase, entries: activity.items.length, path: `/pages/activity/index?id=${encodeURIComponent(activity.id)}` } : null,

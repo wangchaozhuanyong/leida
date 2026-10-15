@@ -1,13 +1,13 @@
 <page-loader wx:if="{{navigationLoading}}" />
-<view wx:else>
+<view aria-hidden="{{navigationLoading}}" style="visibility:{{navigationLoading ? 'hidden' : 'visible'}}">
 <view class="page">
 
   <status-panel wx:if="{{!connected}}" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />
   <block wx:else><view wx:if="{{error}}" class="warning">{{error}}<button class="secondary" bindtap="retry">重新加载</button></view>
     <view class="chips"><button wx:for="{{filters}}" wx:key="value" class="{{filter === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectFilter">{{item.label}}</button></view>
-    <publication-card wx:for="{{items}}" wx:key="id" item="{{item}}" />
+    <view wx:for="{{items}}" wx:key="id" class="reading-item" data-reading-id="{{item.id}}"><publication-card item="{{item}}" /></view>
     <view wx:if="{{!items.length}}" class="card empty"><view class="heading">暂无相关公告</view><view>此分类尚无已发布事件。</view></view>
-    <button wx:if="{{hasMore}}" class="secondary full" bindtap="more">加载更多</button><view class="schedule-actions"><button class="text-button date-schedule-link" data-path="/pages/schedule/index" bindtap="navigate">按日期查看日程 →</button></view><view class="foot">资料截至 {{cutoff}} · 北京时间</view>
+    <button wx:if="{{hasMore}}" class="secondary full" bindtap="more" loading="{{loading}}" disabled="{{loading || error}}">加载更多</button><view class="schedule-actions"><button class="text-button date-schedule-link" data-path="/pages/schedule/index" bindtap="navigate">按日期查看日程 →</button></view><view class="foot">资料截至 {{cutoff}} · 北京时间</view>
   </block>
 </view>
 
