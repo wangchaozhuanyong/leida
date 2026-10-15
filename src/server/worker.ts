@@ -15,6 +15,7 @@ import { audit, createEvidence, publishCandidate, queueJob, defaultSite, publish
 import { isHistoricalContent } from '../lib/history';
 import {processWechatJob,scheduleWechatDeliveries} from './wechat';
 import {runForecastCycle} from './forecast';
+import {createWorkerCadence} from './worker-timing';
 
 const MAX_ACTIVE_GENERATION = 10;
 const MAX_ACTIVE_HISTORICAL = 2;
@@ -355,21 +356,21 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
     return true;
   },job);
 }
-export interface WorkerDependencies { generate?:Generator; collect?:typeof collectSource; enrich?:typeof enrichKnownEvidence; enrichQuoted?:typeof enrichQuotedResetContext; schedule?:boolean; allowTemplates?:boolean; wechat?:typeof processWechatJob; }
-let nextWechatScheduleAt=0;
-export async function writeWorkerHeartbeat(error?:string,processed=false):Promise<void> {
+export interface WorkerDependencies { generate?:Generator; collect?:typeof collectSource; enrich?:typeof enrichKnownEvidence; enrichQuoted?:typeof enrichQuotedResetContext; schedule?:boolean; allowTemplates?:boolean; wechat?:typeof processWechatJob; cadence?:ReturnType<typeof createWorkerCadence>; }
+const workerCadence=createWorkerCadence();
+export async function writeWorkerHeartbeat(error?:string,processed:boolean|string=false):Promise<void> {
   const previous=await one<{id:string;heartbeatAt:string;lastJobAt?:string;error?:string}>('settings','worker_runtime');
-  await put('settings',{id:'worker_runtime',heartbeatAt:now(),lastJobAt:processed?now():previous?.lastJobAt,error});
+  await put('settings',{id:'worker_runtime',heartbeatAt:now(),lastJobAt:typeof processed==='string'?processed:processed?now():previous?.lastJobAt,error});
 }
 export async function runOne(dependencies:WorkerDependencies={}):Promise<boolean> {
   const allowTemplates=dependencies.allowTemplates??!dependencies.generate;
+  const cadence=dependencies.cadence??workerCadence;
   if(dependencies.schedule!==false) {
-    await scheduleDue({allowTemplates,allowEnrichment:!dependencies.generate||!!dependencies.enrich});
-    if(Date.now()>=nextWechatScheduleAt){
-      nextWechatScheduleAt=Date.now()+5000;
-      try {await scheduleWechatDeliveries();} catch {console.error('微信提醒调度暂不可用，其他任务继续运行');}
-    }
-    try {await runForecastCycle();} catch {console.error('预测观察暂不可用，新闻任务继续运行');}
+    await cadence.run('sources',()=>scheduleDue({allowTemplates,allowEnrichment:!dependencies.generate||!!dependencies.enrich}));
+    try {await cadence.run('wechat',scheduleWechatDeliveries);} catch {console.error('微信提醒调度暂不可用，其他任务继续运行');}
+    try {await cadence.run('forecast',async()=>{
+      if((await runForecastCycle()).status==='error')throw new Error('预测观察暂不可用');
+    });} catch {console.error('预测观察暂不可用，新闻任务继续运行');}
   }
   const job=await claimJob();
   if(!job)return false;
@@ -383,6 +384,7 @@ export async function runOne(dependencies:WorkerDependencies={}):Promise<boolean
         const resumeAt=result.resumeAt??new Date(Date.now()+120_000).toISOString();
         await put('jobs',{...current,status:waiting?'queued':'succeeded',leaseUntil:undefined,finishedAt:waiting?undefined:now(),availableAt:waiting?resumeAt:current.availableAt,error:result.reason,payload:{...current.payload,wechatState:result.state,...(waiting?{resumeAfter:resumeAt}:{})}},c);
       });
+      cadence.nudge('wechat');
       return true;
     }
     const enrich=dependencies.enrich??(dependencies.generate?async()=>undefined:enrichKnownEvidence);
@@ -435,5 +437,8 @@ export async function runOne(dependencies:WorkerDependencies={}):Promise<boolean
       await audit('worker',retry?'job.retry_scheduled':'job.failed',job.id,message,undefined,{kind:job.kind,attempts:job.attempts,failureKind},c);
     });
   }
+  // Fresh evidence feeds generation on the next turn; publication feeds reminders.
+  // Manual changes in the separate web process are picked up by the bounded cadence.
+  cadence.nudge('sources','wechat','forecast');
   return true;
 }

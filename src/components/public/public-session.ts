@@ -17,6 +17,7 @@ export interface WechatAvailability {
 type Listener = () => void;
 type Revision = Pick<PublicReadEnvelope, 'version' | 'contentVersion'>;
 type Timer = ReturnType<typeof setTimeout>;
+export const PUBLIC_POLL_MS = 300_000;
 interface SessionOptions {
   fetch?: typeof fetch;
   now?: () => number;
@@ -30,6 +31,7 @@ interface Entry {
   pages: number;
   active: number;
   listeners: Set<Listener>;
+  validatedAt: number;
   errorKind?: 'body' | 'connection' | 'state';
   pending?: { kind: 'refresh' | 'more'; promise: Promise<void> };
 }
@@ -69,6 +71,7 @@ export class PublicSession {
   private clockTimer?: Timer;
   private running = false;
   private failures = 0;
+  private lastForegroundCheckAt = -Infinity;
   private epoch = 0;
   private readonly controllers = new Set<AbortController>();
   private availability = initialWechatAvailability;
@@ -92,7 +95,7 @@ export class PublicSession {
   private entry(endpoint: string): Entry {
     let entry = this.entries.get(endpoint);
     if (!entry) {
-      entry = { snapshot: emptySnapshot(), pages: 0, active: 0, listeners: new Set() };
+      entry = { snapshot: emptySnapshot(), pages: 0, active: 0, listeners: new Set(), validatedAt: -Infinity };
       this.entries.set(endpoint, entry);
     }
     return entry;
@@ -181,6 +184,7 @@ export class PublicSession {
       await this.refreshSources();
       if (entry.revision?.contentVersion !== this.revision?.contentVersion) await this.refresh(endpoint);
     }
+    if (this.now()-entry.validatedAt>=PUBLIC_POLL_MS) await this.refresh(endpoint);
   }
 
   refresh(endpoint: string): Promise<void> {
@@ -206,6 +210,8 @@ export class PublicSession {
         if (this.revision !== previousRevision && this.revision?.contentVersion !== contentVersion) throw new Error('资料正在更新，已保留原内容，请重试');
         entry.revision = { version: result.version, contentVersion: result.contentVersion };
         entry.pages = pages;
+        entry.validatedAt = this.now();
+        this.lastForegroundCheckAt = this.now();
         if (this.revision === previousRevision) this.setRevision(entry.revision);
         this.receiveTime(result.data.serverTime);
         entry.errorKind = undefined;
@@ -259,6 +265,7 @@ export class PublicSession {
         for (const entry of this.entries.values()) {
           if (entry.snapshot.data && entry.revision?.contentVersion === state.contentVersion) {
             entry.revision = this.revision;
+            entry.validatedAt = this.now();
             const patch: Partial<PublicQuerySnapshot> = { data: { ...entry.snapshot.data, sources: state.data.sources, serverTime: state.data.serverTime } };
             if (entry.errorKind === 'state') { entry.errorKind = undefined; patch.error = ''; }
             this.update(entry, patch);
@@ -283,6 +290,7 @@ export class PublicSession {
     if (active.some(([, entry]) => entry.snapshot.data && entry.revision?.contentVersion === this.revision?.contentVersion && entry.revision?.version !== this.revision?.version)) await this.refreshSources();
     await Promise.all(active.filter(([, entry]) => !entry.snapshot.data || entry.revision?.contentVersion !== this.revision?.contentVersion).map(([endpoint]) => this.refresh(endpoint)));
     const success = active.every(([, entry]) => !!entry.snapshot.data && entry.revision?.version === this.revision?.version);
+    for (const entry of this.entries.values()) if (entry.revision?.version === this.revision?.version) entry.validatedAt = this.now();
     if (success) for (const [, entry] of active) if (entry.errorKind === 'connection') { entry.errorKind = undefined; this.update(entry, { error: '' }); }
     return success;
   }
@@ -290,6 +298,7 @@ export class PublicSession {
   checkVersion = (): Promise<boolean> => {
     if (this.versionRequest) return this.versionRequest;
     if (!this.visible() || ![...this.entries.values()].some(entry => entry.active)) return Promise.resolve(true);
+    this.lastForegroundCheckAt = this.now();
     const epoch = this.epoch;
     this.versionRequest = Promise.resolve().then(async () => {
       try {
@@ -314,7 +323,7 @@ export class PublicSession {
       const success = await this.checkVersion();
       this.failures = success ? 0 : Math.min(4, this.failures + 1);
       this.schedule();
-    }, Math.min(60000, 5000 * 2 ** this.failures));
+    }, Math.min(900000, PUBLIC_POLL_MS * 2 ** this.failures));
   }
   start(): () => void { this.running = true; this.schedule(); return () => this.stop(); }
   stop(): void {
@@ -327,6 +336,7 @@ export class PublicSession {
     this.tickClock();
     if (!this.running || !this.visible()) return;
     if (this.pollTimer) this.cancel(this.pollTimer);
+    if (this.now()-this.lastForegroundCheckAt<60000) { this.schedule(); return; }
     void this.checkVersion().then(success => { this.failures = success ? 0 : Math.min(4, this.failures + 1); this.schedule(); });
   };
 
