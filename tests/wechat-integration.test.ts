@@ -49,6 +49,7 @@ test('真实隔离库：微信身份、一次性授权、任务派发和安全�
   const at = () => new Date(clock).toISOString();
   const sendCount = () => calls.filter(call => call.path === '/cgi-bin/message/subscribe/send').length;
   const ownedReaders = new Set<string>(), ownedJobs = new Set<string>();
+  const ownedSessions = new Map<string,string>();
   const fetcher = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input));
     assert.equal(url.origin, 'https://api.weixin.qq.com', '所有请求只交给官方地址的测试替身');
@@ -69,7 +70,8 @@ test('真实隔离库：微信身份、一次性授权、任务派发和安全�
     }
     if (url.pathname === '/wxa/getwxacodeunlimit') {
       assert.equal(body?.page, 'pages/detail/index');
-      assert.equal(body?.check_path, true);
+      assert.equal(body?.env_version, 'trial');
+      assert.equal(body?.check_path, false, '体验版圆码沿用已核验的固定页面策略');
       assert.match(String(body?.scene), /^[a-f0-9]{32}$/);
       return new Response(new Uint8Array(png), { headers: { 'Content-Type': 'image/png' } });
     }
@@ -96,6 +98,7 @@ test('真实隔离库：微信身份、一次性授权、任务派发和安全�
     const record = (await list<WechatReader>('wechat_readers')).find(reader => reader.appId === `wx${tag}` && !ownedReaders.has(reader.id));
     assert.ok(record, '测试登录必须持久化独立身份');
     ownedReaders.add(record.id);
+    ownedSessions.set(record.id,session.sessionToken);
     return { session, reader: record };
   }
   async function accept(sessionToken: string) {
@@ -116,6 +119,9 @@ test('真实隔离库：微信身份、一次性授权、任务派发和安全�
     return { evidence, event, article, publication };
   }
   async function queueNotice(readerId: string) {
+    // Each scenario owns one active reader. Cancelled deliveries now preserve
+    // unused credits, so previous scenarios must explicitly revoke their reader.
+    for(const [previousId,sessionToken] of ownedSessions)if(previousId!==readerId)await service.revokeWechatSubscription(sessionToken);
     const fixture = await publishedFixture();
     clock = Math.max(Date.now(), clock + 1);
     const notice: Notice = { id: `synthetic-wechat-notice-${tag}-${++sequence}`, eventId: fixture.event.id, publicationId: fixture.publication.id, semanticKey: `synthetic-fact-${tag}-${sequence}`, title: '[隔离合成样例] 用量重置结果', summary: '合成公告，不代表真实发放。', categories: ['result'], status: 'active', createdAt: at() };

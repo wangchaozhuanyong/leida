@@ -1,0 +1,13 @@
+import {config} from 'dotenv';
+import {readFile,writeFile,open} from 'node:fs/promises';
+import {spawn} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+import assert from 'node:assert/strict';
+const root=fileURLToPath(new URL('../',import.meta.url)),output=root+'outputs/month-replay-20261016/';
+const runtime=JSON.parse(await readFile(output+'preview-runtime.json','utf8'));
+assert.match(runtime.database,/^radar_qa_replay_import_\d+$/);
+config({path:fileURLToPath(new URL('../../../.env',import.meta.url)),quiet:true});
+const url=new URL(process.env.DATABASE_URL);assert.equal(url.hostname,'127.0.0.1');assert.equal(url.port,'55489');url.pathname='/'+runtime.database;
+const log=await open(output+'preview-server.log','a');
+const server=spawn(process.execPath,['node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port','5196'],{cwd:root,env:{...process.env,DATABASE_URL:url.href,BETTER_AUTH_URL:'http://127.0.0.1:5196',NODE_ENV:'production'},detached:true,stdio:['ignore',log.fd,log.fd]});
+server.unref();await log.close();await writeFile(output+'preview-runtime.json',JSON.stringify({...runtime,pid:server.pid},null,2)+'\n');console.log('隔离历史回放预览已启动：http://127.0.0.1:5196/methodology');

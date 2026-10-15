@@ -72,7 +72,7 @@ function createPage(build, extra = {}) {
     redraw() { render(this, getApp().client.getState()); },
     navigate(event) {
       const path = event.currentTarget.dataset.path;
-      if (typeof path !== 'string' || !/^\/pages\/(home|settings|announcements|news|schedule|detail|activity|notices|methodology|privacy|poster)\/index(?:\?|$)/.test(path)) return;
+      if (typeof path !== 'string' || !/^\/pages\/(home|settings|announcements|news|schedule|detail|activity|notices|methodology|privacy|poster|replay)\/index(?:\?|$)/.test(path)) return;
       const route = path.split('?')[0];
       if (['/pages/home/index', '/pages/settings/index', '/pages/news/index', '/pages/announcements/index'].includes(route)) wx.switchTab({ url: route });
       else wx.navigateTo({ url: path });

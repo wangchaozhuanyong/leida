@@ -1,5 +1,5 @@
 /* 页面使用统一卡片。 */
 
-.schedule-actions{display:flex;justify-content:flex-end}.date-schedule-link{justify-content:flex-end;min-height:44px}
+.schedule-actions{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}.date-schedule-link{justify-content:flex-end;min-height:44px}
 
 .month-heading{padding:10px 0;color:#aeb9b3;font-size:14px;font-weight:600}

@@ -12,6 +12,7 @@ import { parsePublicRoute } from './public-navigation';
 import { usePublicNavigation } from './usePublicNavigation';
 import { useFixedSnapshot } from './useFixedSnapshot';
 import type {ForecastSnapshot} from '@/lib/forecast';
+import {HistoricalReplayPanel} from './HistoricalReplayPanel';
 import {ForecastPanel} from './ForecastPanel';
 import {InstrumentDial} from './InstrumentDial';
 import {StatusTimeline} from './StatusTimeline';
@@ -390,13 +391,13 @@ export function Settings({notices,read,markRead,storageError,pending,data,codeAv
   </>;
 }
 function MorePage() {
-  return <><section className="pub-card"><h2>内容与记录</h2><div className="pub-link-row"><TextLink href="/history">查看重置公告</TextLink></div><div className="pub-link-row"><TextLink href="/news">查看动态</TextLink></div><div className="pub-link-row"><TextLink href="/notices">查看全部提醒</TextLink></div></section>
+  return <><section className="pub-card"><h2>内容与记录</h2><div className="pub-link-row"><TextLink href="/history">查看重置公告</TextLink></div><div className="pub-link-row"><TextLink href="/news">查看动态</TextLink></div><div className="pub-link-row"><TextLink href="/notices">查看全部提醒</TextLink></div><div className="pub-link-row"><TextLink href="/methodology">历史预测回放与观察记录</TextLink></div></section>
     <section className="pub-card" id="privacy"><h2>隐私说明</h2><p>查看公开消息无需提供手机号、通讯录或位置。已读状态保存在当前设备，清除浏览器数据后可能重置。</p><p>微信提醒使用微信提供的用户标识管理接收状态，可以在小程序提醒页关闭。保存海报由你主动操作，我们不读取或上传你的相册。</p><p>小程序内可查看平台提供的完整隐私指引。</p></section></>;
 }
 export function Methodology({data,snapshotId,cadenceId,onPoster,onShare}:{data:PublicData;snapshotId:string|null;cadenceId:string|null;onPoster:(s:ForecastSnapshot)=>void;onShare:(s:ForecastSnapshot)=>Promise<void>}) {
   if(cadenceId)return <><div className="pub-page-heading"><h1>历史间隔实验记录</h1></div><ForecastPanel data={data.forecasts} snapshotId={null} cadenceId={cadenceId} onPoster={onPoster} onShare={onShare}/></>;
   if(snapshotId)return <><div className="pub-page-heading"><h1>固定预测记录</h1><p>初始预测与后续结局分别保留。</p></div><ForecastPanel data={data.forecasts} snapshotId={snapshotId} onPoster={onPoster} onShare={onShare}/></>;
-  return <><div className="pub-page-heading"><h1>观察记录</h1></div><ForecastPanel data={data.forecasts} snapshotId={snapshotId} onPoster={onPoster} onShare={onShare}/></>;
+  return <><div className="pub-page-heading"><h1>观察记录</h1></div><HistoricalReplayPanel/><ForecastPanel data={data.forecasts} snapshotId={snapshotId} onPoster={onPoster} onShare={onShare}/></>;
 }
 function WechatReminderModal({onClose,data,codeAvailable}:{data:PublicData|null;dataError:string;onRetryData:()=>void;entry:WechatEntryState;codeAvailable:boolean;onRetryEntry:()=>void;onClose:()=>void}) {
   const dialog=useRef<HTMLDialogElement>(null);

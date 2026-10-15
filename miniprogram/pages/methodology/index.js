@@ -69,6 +69,7 @@ Page({
     }
   },
   retryFixed() { void this.loadFixed(); },
+  openReplay() { wx.navigateTo({url:'/pages/replay/index'}); },
   openForecast() { const forecast = this.data.forecast; if (forecast) wx.navigateTo({ url: forecast.path }); },
   copySignal() { const url = this.data.forecast && this.data.forecast.url; if (url) wx.setClipboardData({ data: url }); },
   onShareAppMessage() {
