@@ -1,12 +1,10 @@
-<page-loader wx:if="{{navigationLoading}}" />
-<view aria-hidden="{{navigationLoading}}" style="visibility:{{navigationLoading ? 'hidden' : 'visible'}}">
 <view class="page">
+    <view class="chips"><button wx:for="{{categories}}" wx:key="value" class="{{category === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectCategory">{{item.label}}</button></view>
   <status-panel wx:if="{{!connected}}" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />
   <block wx:else><view wx:if="{{error}}" class="warning">{{error}}<button class="secondary" bindtap="retry">重新加载</button></view>
-    <view class="chips"><button wx:for="{{categories}}" wx:key="value" class="{{category === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectCategory">{{item.label}}</button></view>
+    <button wx:if="{{updateAvailable}}" class="update-prompt" bindtap="applyUpdates">有新内容 · 点击更新</button>
+    <view wx:if="{{moreError}}" class="warning">{{moreError}}<button class="text-button" bindtap="more">重试加载更多</button></view>
     <view wx:for="{{items}}" wx:key="id" class="reading-item" data-reading-id="{{item.id}}"><publication-card item="{{item}}" /></view><view wx:if="{{!items.length}}" class="card empty">暂无相关内容。</view>
-    <button wx:if="{{hasMore}}" class="secondary full" bindtap="more" loading="{{loading}}" disabled="{{loading || error}}">加载更多</button><view class="foot">资料截至 {{cutoff}} · 北京时间</view>
+    <button wx:if="{{hasMore}}" class="secondary full" bindtap="more" loading="{{loadingMore}}" disabled="{{loadingMore || refreshing}}">加载更多</button><view class="foot">资料截至 {{cutoff}} · 北京时间</view>
   </block>
-</view>
-
 </view>

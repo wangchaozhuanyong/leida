@@ -29,29 +29,11 @@ export function usePublicQuery(endpoint: string | null, navigationKey = endpoint
   const subscribe = useCallback((listener: () => void) => endpoint ? session.subscribe(endpoint, listener) : noopSubscribe(), [endpoint, session]);
   const snapshot = useCallback(() => endpoint ? session.snapshot(endpoint) : idlePublicQuery, [endpoint, session]);
   const value = useSyncExternalStore(subscribe, snapshot, snapshot);
-  const [checkedKey, setCheckedKey] = useState<string | null>(null);
-  const [manualKey, setManualKey] = useState<string | null>(null);
-  const generation = useRef(0);
-  useEffect(() => {
-    const current = ++generation.current;
-    setManualKey(null);
-    const cached = endpoint && !!session.snapshot(endpoint).data;
-    const deactivate = endpoint ? session.activate(endpoint) : undefined;
-    // A cached route is hidden until its version has been checked. Polling keeps
-    // its existing silent behavior; only explicit navigation owns this mask.
-    const work = endpoint ? cached ? session.checkVersion().then(() => session.ensure(endpoint)) : session.ensure(endpoint) : Promise.resolve();
-    void work.finally(() => { if (generation.current === current) setCheckedKey(navigationKey); });
-    return () => { generation.current++; deactivate?.(); };
-  }, [endpoint, navigationKey, session]);
-  const refresh = useCallback(async () => {
-    if (!endpoint) return;
-    const current = generation.current;
-    setManualKey(navigationKey);
-    try { await session.refresh(endpoint); }
-    finally { if (generation.current === current) setManualKey(null); }
-  }, [endpoint, navigationKey, session]);
+  useEffect(() => endpoint ? session.activate(endpoint) : undefined, [endpoint, navigationKey, session]);
+  const refresh = useCallback(() => endpoint ? session.refresh(endpoint) : Promise.resolve(), [endpoint, session]);
+  const applyUpdates = useCallback(() => { if (endpoint) session.applyUpdates(endpoint); }, [endpoint, session]);
   const more = useCallback(() => endpoint ? session.more(endpoint) : Promise.resolve(), [endpoint, session]);
-  return { ...value, navigationLoading: checkedKey !== navigationKey || manualKey === navigationKey, refresh, more, currentTime: () => session.clock.current(value.data?.serverTime ?? '') };
+  return { ...value, navigationLoading: !value.data && value.initialLoading, refresh, more, applyUpdates, currentTime: () => session.clock.current(value.data?.serverTime ?? '') };
 }
 
 export function useWechatAvailability(enabled: boolean) {

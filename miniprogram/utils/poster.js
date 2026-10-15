@@ -108,7 +108,7 @@ function nextPaint(canvas, timers = {setTimeout,clearTimeout}) {
   });
 }
 /** Caller supplies a real <canvas type="2d"> node, never a browser/legacy canvas. */
-async function renderPoster({wxApi,canvas,data,publicationId,code={status:'not_configured'},page,options}) {
+async function renderPoster({wxApi,canvas,data,publicationId,code={status:'not_configured'},page,options,isCurrent=()=>true}) {
   if (!canvas || typeof canvas.getContext !== 'function' || !wxApi || typeof wxApi.canvasToTempFilePath !== 'function') throw new PosterError('unsupported','当前微信不支持生成海报，请更新微信。');
   const input=posterInput(data,publicationId), ctx=canvas.getContext('2d');
   if (!ctx || typeof ctx.measureText !== 'function') throw new PosterError('unsupported','当前微信不支持海报画布，请更新微信。');
@@ -126,7 +126,7 @@ async function renderPoster({wxApi,canvas,data,publicationId,code={status:'not_c
     else if(command.type==='circle'){ctx.beginPath();ctx.arc(command.x,command.y,command.r,0,Math.PI*2);ctx.fillStyle=command.color;ctx.fill();ctx.strokeStyle=command.stroke;ctx.lineWidth=2;ctx.stroke();}
     else ctx.drawImage(image,command.x,command.y,command.width,command.height);
   }
-  return exportCanvas(wxApi,canvas,page,{publicationId,width:layout.width,height:layout.height,codeStatus:code.status});
+  return exportCanvas(wxApi,canvas,page,{publicationId,width:layout.width,height:layout.height,codeStatus:code.status},isCurrent);
 }
 async function exportCanvas(wxApi,canvas,page,metadata,isCurrent=()=>true) {
   await nextPaint(canvas);

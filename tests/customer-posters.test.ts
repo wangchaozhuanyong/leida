@@ -73,3 +73,17 @@ test('原生海报样式快速切换和离开页面时，旧生成结果不能�
   renders[1].resolve({tempFilePath:'new'});await new Promise(r=>setImmediate(r));assert.equal(page.data.preview,'new');assert.equal(page.data.posterBusy,false);
   page.selectTheme({currentTarget:{dataset:{theme:'precision'}}});await new Promise(r=>setImmediate(r));page.hide();renders[2].resolve({tempFilePath:'late'});await new Promise(r=>setImmediate(r));assert.notEqual(page.data.preview,'late');
 });
+
+
+test('固定海报十次切换和预览返回复用两张成品，撤回立即清除缓存',async()=>{
+  const filename=resolve('miniprogram/pages/poster/index.js');let definition:any,renders=0;
+  const data=fixture('claimed_complete');const input=native.statusPosterInput(data);input.publicationId='';
+  const wx={createSelectorQuery(){return{in(){return this;},select(){return this;},fields(_o:any,fn:(v:any)=>void){fn({node:{}});return this;},exec(){}};}};
+  const app={client:{getState:()=>({data})}};
+  new Script(readFileSync(filename,'utf8'),{filename}).runInNewContext({Page(d:any){definition=d;},wx,getApp:()=>app,setTimeout,clearTimeout,require(path:string){if(path.endsWith('/page'))return{createPage:(_build:any,extra:any)=>({...extra,...extra.methods})};if(path.endsWith('/status-poster'))return{...native,renderStatusPoster:async(options:any)=>{renders++;return{tempFilePath:options.theme};}};if(path.endsWith('/poster'))return generic;return{privacyRequired:async()=>false};}});
+  const page={...definition,data:{...definition.data},_snapshot:input,setData(p:any){Object.assign(this.data,p);}};
+  page.show();await new Promise(r=>setImmediate(r));
+  for(let i=0;i<10;i++){const theme=i%2?'precision':'editorial';page.selectTheme({currentTarget:{dataset:{theme}}});await new Promise(r=>setImmediate(r));assert.equal(page.data.preview,theme);}
+  page.hide();page.show();await new Promise(r=>setImmediate(r));assert.equal(renders,2);assert.equal(page.data.posterBusy,false);
+  page._snapshot.publicationId='fixed-publication';data.articles[0].status='withdrawn';page.afterRender();assert.equal(page.data.preview,'');assert.match(page.data.blocked,/不可分享/);assert.equal(Object.keys(page._artifacts).length,0);page.unload();
+});

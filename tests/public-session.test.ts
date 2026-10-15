@@ -218,9 +218,10 @@ test('共享服务器时钟跨组件卸载继续前进，旧缓存与晚到响�
 });
 
 test('只有一个轮询调度，隐藏页面不请求，失败退避及停止释放定时器', async () => {
-  let nextId = 0, visible = true, fail = true, polls = 0;
+  let nextId = 0, visible = true, fail = true, polls = 0, now = 0;
   const timers = new Map<number, { callback: () => unknown; delay: number }>();
   const session = new PublicSession({
+    now: () => now,
     isVisible: () => visible,
     setTimeout: ((callback: () => unknown, delay: number) => { timers.set(++nextId, { callback, delay }); return nextId; }) as unknown as typeof setTimeout,
     clearTimeout: ((id: number) => { timers.delete(id); }) as unknown as typeof clearTimeout,
@@ -231,13 +232,30 @@ test('只有一个轮询调度，隐藏页面不请求，失败退避及停止�
   session.start(); session.start();
   assert.equal(timers.size, 1);
   const run = async () => { const [id, timer] = [...timers][0]; timers.delete(id); await timer.callback(); };
-  visible = false; await run(); assert.equal(polls, 0);
-  visible = true; await run(); assert.equal(polls, 1);
+  visible = false; session.resume(); assert.equal(timers.size, 0); assert.equal(polls, 0);
+  visible = true; now = 60000; session.resume(); await settle(); assert.equal(polls, 1);
   assert.equal([...timers.values()][0].delay, 600000);
   fail = false; await run();
   assert.equal([...timers.values()][0].delay, 300000);
   assert.equal(session.snapshot(news).error, '');
   session.stop(); leave(); assert.equal(timers.size, 0);
+});
+
+test('隐藏页面停止时钟，回前台校准时间，停止会话释放时钟', () => {
+  let now=0, visible=true, id=0, ticks=0;
+  const timers=new Map<number,()=>unknown>();
+  const session=new PublicSession({now:()=>now,isVisible:()=>visible,
+    setTimeout:((callback:()=>unknown)=>{timers.set(++id,callback);return id;}) as unknown as typeof setTimeout,
+    clearTimeout:((key:number)=>{timers.delete(key);}) as unknown as typeof clearTimeout,
+  });
+  session.observeClock('2026-10-14T00:00:00.000Z');
+  const unsubscribe=session.subscribeClock(()=>ticks++);
+  assert.equal(timers.size,1);
+  visible=false;session.resume();assert.equal(timers.size,0);
+  now=60000;assert.equal(ticks,0);
+  visible=true;session.resume();assert.equal(timers.size,1);assert.equal(ticks,1);
+  assert.equal(session.getClockSnapshot(),'2026-10-14T00:01:00.000Z');
+  session.stop();assert.equal(timers.size,0);unsubscribe();
 });
 
 test('正文版本订阅只在 contentVersion 改变时触发', async () => {
@@ -395,9 +413,33 @@ test('正常前台一小时最多十二次轻量检查，快速回前台合并�
   leave();session.stop();assert.equal(timers.size,0);
 });
 
-test('网页缓存过期重新读取，未过期切页不额外查询',async()=>{
+test('网页缓存过期只检查版本，未过期切页不额外查询',async()=>{
   let now=0,calls=0;
-  const session=new PublicSession({now:()=>now,fetch:(async()=>{calls++;return json(envelope(['a']));}) as typeof fetch});
+  const session=new PublicSession({now:()=>now,fetch:(async url=>{calls++;return url===version?new Response(null,{status:304}):json(envelope(['a']));}) as typeof fetch});
   await session.ensure(news);await session.ensure(home);await session.ensure(news);assert.equal(calls,2);
   now=300000;await session.ensure(news);assert.equal(calls,3);
+});
+
+
+test('仅新增内容等待用户确认，撤回立即替换，提示版本也参与304验证',async()=>{
+  const make=(ids:string[],revision:string)=>{const value=envelope(ids,revision);value.data.publications=ids.map(id=>({id})) as PublicData['publications'];return value;};
+  let current=make(['a'],'c1'),bodies=0;
+  const session=new PublicSession({fetch:(async url=>{if(url===version)return json({data:{version:current.version,contentVersion:current.contentVersion}});bodies++;return json(current);}) as typeof fetch});
+  await session.ensure(news);const leave=session.activate(news);
+  current=make(['b','a'],'c2');await session.checkVersion();
+  assert.deepEqual(session.snapshot(news).page?.ids,['a']);assert.equal(session.snapshot(news).updateAvailable,true);
+  await session.checkVersion();assert.equal(bodies,2,'待确认新版本不反复下载');
+  session.applyUpdates(news);assert.deepEqual(session.snapshot(news).page?.ids,['b','a']);assert.equal(session.snapshot(news).updateAvailable,false);
+  current=make(['b'],'c3');await session.checkVersion();assert.deepEqual(session.snapshot(news).page?.ids,['b']);assert.equal(session.snapshot(news).updateAvailable,false);
+  leave();session.stop();
+});
+
+test('会话缓存限制20项，主导航与活跃页保留，详情按最近访问淘汰',async()=>{
+  let now=0;const calls:string[]=[];
+  const session=new PublicSession({now:()=>now++,fetch:(async url=>{calls.push(String(url));return json(envelope(['a']));}) as typeof fetch});
+  await session.ensure(home);
+  for(let i=0;i<26;i++){const endpoint=`/api/v1/bootstrap?view=detail&id=${i}`;const leave=session.activate(endpoint);await session.ensure(endpoint);leave();}
+  assert.equal((session as any).entries.size,20);
+  const count=calls.length;await session.ensure(home);assert.equal(calls.length,count,'主导航不被详情挤掉');
+  await session.ensure('/api/v1/bootstrap?view=detail&id=0');assert.equal(calls.length,count+1);
 });

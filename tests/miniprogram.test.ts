@@ -497,7 +497,7 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
       const module = { exports: {} }; cache.set(filename,module);
       const sandbox = {
         module, exports: module.exports, Page(value:Record<string,any>) { definition = value; },
-        wx: wxApi, getApp() { return app; }, setInterval, clearInterval, Date,
+        wx: wxApi, getApp() { return app; }, setInterval, clearInterval, setTimeout, clearTimeout, Date,
         require(path:string) { const target = resolve(dirname(filename), path.endsWith('.js') ? path : `${path}.js`); assert.ok(target.startsWith(resolve(root,'miniprogram') + '/')); return load(target); },
       };
       new Script(readFileSync(filename,'utf8'), { filename }).runInNewContext(sandbox);
@@ -515,8 +515,8 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);news.onUnload();
-  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.9 · 体验版');settings.onUnload();
-  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.9');fallback.onUnload();
+  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.10 · 体验版');settings.onUnload();
+  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.10');fallback.onUnload();
 });
 
 test('四个原生导航页先设置 iOS 窗口底色再订阅数据，返回页面恢复底色而资料刷新不重复设置',()=>{
@@ -656,12 +656,12 @@ test('独立站内信不依赖公告链接；顶部预览、未读及已读由�
   settings.onUnload();detail.onUnload();
 });
 
-test('前景加载先遮住缓存；筛选、重试等待新响应；隐藏后的迟到响应不撤销新遮罩',async()=>{
+test('缓存返回、重试和下拉刷新均保持正文；隐藏后迟到请求不操作页面',async()=>{
   const h=nativeHarness(),page=h.page('news');let finish!:()=>void;
-  h.app.client.refresh=()=>new Promise<void>(resolve=>{assert.equal(page.data.navigationLoading,true);finish=resolve;});
-  const retry=page.retry();assert.equal(page.data.navigationLoading,true);page.onHide();finish();await retry;assert.equal(page.data.navigationLoading,true);
+  h.app.client.refresh=()=>new Promise<void>(resolve=>{assert.equal(page.data.navigationLoading,false);finish=resolve;});
+  const retry=page.retry();assert.equal(page.data.navigationLoading,false);page.onHide();finish();await retry;assert.equal(page.data.navigationLoading,false);
   page.onShow();assert.equal(page.data.navigationLoading,false);
-  const refresh=page.onPullDownRefresh();assert.equal(page.data.navigationLoading,true);finish();await refresh;assert.equal(page.data.navigationLoading,false);assert.equal(h.pullStops,1);
+  const refresh=page.onPullDownRefresh();assert.equal(page.data.navigationLoading,false);finish();await refresh;assert.equal(page.data.navigationLoading,false);assert.equal(h.pullStops,1);
   h.replace(fixture());assert.equal(page.data.navigationLoading,false,'后台资料更新不制造前景加载');page.onUnload();
 });
 test('动态更新后恢复仍存在的阅读条目；已撤回锚点选择下一条有效记录',()=>{
@@ -679,13 +679,13 @@ test('动态更新后恢复仍存在的阅读条目；已撤回锚点选择下�
   page.onHide();h.replace(fixture());assert.equal(measurements,4,'隐藏页面不再测量或移动阅读位置');page.onUnload();
 });
 
-test('观察记录页进入和返回时隐藏旧内容，离开后的旧请求不能提前撤掉加载遮罩',async()=>{
+test('观察记录缓存返回不制造遮罩，迟到请求不改变当前页面',async()=>{
   const h=nativeHarness();const finishes:Array<()=>void>=[];
   Object.assign(h.app.client,{setView:()=>new Promise<void>(resolve=>finishes.push(resolve))});
-  const page=h.page('methodology');assert.equal(page.data.navigationLoading,true);
+  const page=h.page('methodology');assert.equal(page.data.navigationLoading,false);
   page.onHide();page.onShow();assert.equal(finishes.length,2);
-  finishes[0]();await new Promise(resolve=>setImmediate(resolve));assert.equal(page.data.navigationLoading,true);
+  finishes[0]();await new Promise(resolve=>setImmediate(resolve));assert.equal(page.data.navigationLoading,false);
   finishes[1]();await new Promise(resolve=>setImmediate(resolve));assert.equal(page.data.navigationLoading,false);
   h.replace(fixture());assert.equal(page.data.navigationLoading,false,'后台同步不重复遮住页面');
-  page.onUnload();assert.equal(h.subscriptions,0);assert.equal(page.data.navigationLoading,true);
+  page.onUnload();assert.equal(h.subscriptions,0);assert.equal(page.data.navigationLoading,false);
 });
