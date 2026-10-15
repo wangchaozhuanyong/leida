@@ -9,6 +9,7 @@ export interface PublicQuerySnapshot {
   loadingMore: boolean;
   error: string;
   moreError: string;
+  updateAvailable?: boolean;
 }
 export interface WechatAvailability {
   status: 'checking' | 'ready' | 'unavailable' | 'error';
@@ -32,6 +33,8 @@ interface Entry {
   active: number;
   listeners: Set<Listener>;
   validatedAt: number;
+  touched: number;
+  candidate?: {result: PublicReadEnvelope; pages: number};
   errorKind?: 'body' | 'connection' | 'state';
   pending?: { kind: 'refresh' | 'more'; promise: Promise<void> };
 }
@@ -95,9 +98,10 @@ export class PublicSession {
   private entry(endpoint: string): Entry {
     let entry = this.entries.get(endpoint);
     if (!entry) {
-      entry = { snapshot: emptySnapshot(), pages: 0, active: 0, listeners: new Set(), validatedAt: -Infinity };
+      entry = { snapshot: emptySnapshot(), pages: 0, active: 0, listeners: new Set(), validatedAt: -Infinity, touched: this.now() };
       this.entries.set(endpoint, entry);
     }
+    entry.touched = this.now();
     return entry;
   }
   snapshot = (endpoint: string): PublicQuerySnapshot => this.entry(endpoint).snapshot;
@@ -109,9 +113,29 @@ export class PublicSession {
   activate(endpoint: string): () => void {
     const entry = this.entry(endpoint);
     entry.active++;
+    this.prune();
     void this.ensure(endpoint);
-    return () => { entry.active = Math.max(0, entry.active - 1); };
+    return () => { entry.active = Math.max(0, entry.active - 1); this.prune(); };
   }
+  private prune(): void {
+    const pinned = (endpoint: string) => {
+      const query = new URL(endpoint, 'https://local.invalid').searchParams;
+      return ['home','notices'].includes(query.get('view') || '') || ['news','history'].includes(query.get('view') || '') && (!query.get('filter') || query.get('filter') === 'all');
+    };
+    for (const [key, entry] of [...this.entries].sort((a,b) => a[1].touched-b[1].touched)) {
+      if (this.entries.size <= 20) break;
+      if (!entry.active && !entry.pending && !entry.listeners.size && !pinned(key)) this.entries.delete(key);
+    }
+  }
+  applyUpdates(endpoint: string): void {
+    const entry = this.entry(endpoint), candidate = entry.candidate;
+    if (!candidate) return;
+    entry.candidate = undefined;
+    entry.revision = candidate.result;
+    entry.pages = candidate.pages;
+    this.update(entry, {data:candidate.result.data, page:candidate.result.page, updateAvailable:false});
+  }
+  private observed(entry: Entry): Revision | undefined { return entry.candidate?.result ?? entry.revision; }
   private update(entry: Entry, patch: Partial<PublicQuerySnapshot>): void {
     entry.snapshot = { ...entry.snapshot, ...patch };
     entry.listeners.forEach(listener => listener());
@@ -126,7 +150,7 @@ export class PublicSession {
     this.revision = revision;
     if (previous !== revision.contentVersion) this.revisionListeners.forEach(listener => listener());
   }
-  private async request<T>(endpoint: string, consume: (response: Response) => Promise<T>, timeout = 15000, headers?: HeadersInit): Promise<T> {
+  private async request<T>(endpoint: string, consume: (response: Response) => Promise<T>, timeout = 10000, headers?: HeadersInit): Promise<T> {
     const controller = new AbortController();
     const epoch = this.epoch;
     let timedOut = false;
@@ -164,12 +188,15 @@ export class PublicSession {
     const value = this.clock.current(this.clockValue);
     if (value !== this.clockValue) { this.clockValue = value; this.clockListeners.forEach(listener => listener()); }
   };
+  private scheduleClock(): void {
+    if(this.clockTimer || !this.clockListeners.size || !this.visible())return;
+    this.clockTimer=this.later(()=>{this.clockTimer=undefined;if(this.visible())this.tickClock();this.scheduleClock();},1000);
+  }
   getClockSnapshot = (): string => this.clockValue;
   observeClock(serverTime: string): void { this.receiveTime(serverTime); }
   subscribeClock = (listener: Listener): (() => void) => {
     this.clockListeners.add(listener);
-    const tick = () => { this.tickClock(); this.clockTimer = this.later(tick, 1000); };
-    if (!this.clockTimer) { this.tickClock(); this.clockTimer = this.later(tick, 1000); }
+    this.tickClock();this.scheduleClock();
     return () => {
       this.clockListeners.delete(listener);
       if (!this.clockListeners.size && this.clockTimer) { this.cancel(this.clockTimer); this.clockTimer = undefined; }
@@ -179,17 +206,21 @@ export class PublicSession {
   async ensure(endpoint: string): Promise<void> {
     const entry = this.entry(endpoint);
     if (!entry.snapshot.data) return this.refresh(endpoint);
-    if (this.revision && entry.revision?.contentVersion !== this.revision.contentVersion) return this.refresh(endpoint);
-    if (this.revision && entry.revision?.version !== this.revision.version) {
+    if (this.revision && this.observed(entry)?.contentVersion !== this.revision.contentVersion) return this.refresh(endpoint, true);
+    if (this.revision && this.observed(entry)?.version !== this.revision.version) {
       await this.refreshSources();
       if (entry.revision?.contentVersion !== this.revision?.contentVersion) await this.refresh(endpoint);
     }
-    if (this.now()-entry.validatedAt>=PUBLIC_POLL_MS) await this.refresh(endpoint);
+    if (this.now()-entry.validatedAt>=PUBLIC_POLL_MS) {
+      await this.checkVersion(true);
+      if(this.revision && this.observed(entry)?.contentVersion !== this.revision.contentVersion)await this.refresh(endpoint,true);
+    }
   }
 
-  refresh(endpoint: string): Promise<void> {
+  refresh(endpoint: string, background = false): Promise<void> {
     const entry = this.entry(endpoint);
     if (entry.pending) return entry.pending.kind === 'refresh' ? entry.pending.promise : entry.pending.promise.then(() => this.refresh(endpoint));
+    if (!background) this.applyUpdates(endpoint);
     const previousRevision = this.revision;
     const epoch = this.epoch;
     const pageCount = Math.max(1, entry.pages);
@@ -208,14 +239,18 @@ export class PublicSession {
           pages++;
         }
         if (this.revision !== previousRevision && this.revision?.contentVersion !== contentVersion) throw new Error('资料正在更新，已保留原内容，请重试');
-        entry.revision = { version: result.version, contentVersion: result.contentVersion };
-        entry.pages = pages;
+        const before = entry.snapshot.data;
+        const view = new URL(endpoint, 'https://local.invalid').searchParams.get('view');
+        const onlyAdditions = background && before && ['news','history'].includes(view || '') && result.data.publications.length > before.publications.length &&
+          (['publications','articles','events','evidence','notices'] as const).every(key => before[key].every(item => result.data[key].some(next => next.id === item.id && JSON.stringify(next) === JSON.stringify(item))));
+        if (onlyAdditions) entry.candidate = {result, pages};
+        else { entry.candidate = undefined; entry.revision = result; entry.pages = pages; }
         entry.validatedAt = this.now();
         this.lastForegroundCheckAt = this.now();
-        if (this.revision === previousRevision) this.setRevision(entry.revision);
+        if (this.revision === previousRevision) this.setRevision(result);
         this.receiveTime(result.data.serverTime);
         entry.errorKind = undefined;
-        this.update(entry, { data: result.data, page: result.page, error: '', moreError: '' });
+        this.update(entry, { ...(onlyAdditions ? {} : {data:result.data,page:result.page}), updateAvailable:!!onlyAdditions, error:'', moreError:'' });
       } catch (cause) {
         stopped = cause instanceof SessionStoppedError;
         if (!stopped) { entry.errorKind = 'body'; this.update(entry, { error: cause instanceof Error ? cause.message : '连接暂时中断，请重试' }); }
@@ -230,6 +265,7 @@ export class PublicSession {
   }
 
   more(endpoint: string): Promise<void> {
+    this.applyUpdates(endpoint);
     const entry = this.entry(endpoint), cursor = entry.snapshot.page?.nextCursor;
     if (entry.pending) return entry.pending.promise;
     if (!cursor || !entry.snapshot.data) return Promise.resolve();
@@ -263,6 +299,7 @@ export class PublicSession {
         this.receiveTime(state.data.serverTime);
         this.setRevision({ version: state.version, contentVersion: state.contentVersion });
         for (const entry of this.entries.values()) {
+          if(entry.candidate?.result.contentVersion===state.contentVersion){entry.candidate.result={...entry.candidate.result,version:state.version,data:{...entry.candidate.result.data,sources:state.data.sources,serverTime:state.data.serverTime}};entry.validatedAt=this.now();}
           if (entry.snapshot.data && entry.revision?.contentVersion === state.contentVersion) {
             entry.revision = this.revision;
             entry.validatedAt = this.now();
@@ -287,17 +324,17 @@ export class PublicSession {
 
   private async synchronizeActive(): Promise<boolean> {
     const active = [...this.entries].filter(([, entry]) => entry.active);
-    if (active.some(([, entry]) => entry.snapshot.data && entry.revision?.contentVersion === this.revision?.contentVersion && entry.revision?.version !== this.revision?.version)) await this.refreshSources();
-    await Promise.all(active.filter(([, entry]) => !entry.snapshot.data || entry.revision?.contentVersion !== this.revision?.contentVersion).map(([endpoint]) => this.refresh(endpoint)));
-    const success = active.every(([, entry]) => !!entry.snapshot.data && entry.revision?.version === this.revision?.version);
-    for (const entry of this.entries.values()) if (entry.revision?.version === this.revision?.version) entry.validatedAt = this.now();
+    if (active.some(([, entry]) => entry.snapshot.data && this.observed(entry)?.contentVersion === this.revision?.contentVersion && this.observed(entry)?.version !== this.revision?.version)) await this.refreshSources();
+    await Promise.all(active.filter(([, entry]) => !entry.snapshot.data || this.observed(entry)?.contentVersion !== this.revision?.contentVersion).map(([endpoint]) => this.refresh(endpoint, true)));
+    const success = active.every(([, entry]) => !!entry.snapshot.data && this.observed(entry)?.version === this.revision?.version);
+    for (const entry of this.entries.values()) if (this.observed(entry)?.version === this.revision?.version) entry.validatedAt = this.now();
     if (success) for (const [, entry] of active) if (entry.errorKind === 'connection') { entry.errorKind = undefined; this.update(entry, { error: '' }); }
     return success;
   }
 
-  checkVersion = (): Promise<boolean> => {
+  checkVersion = (force = false): Promise<boolean> => {
     if (this.versionRequest) return this.versionRequest;
-    if (!this.visible() || ![...this.entries.values()].some(entry => entry.active)) return Promise.resolve(true);
+    if (!this.visible() || !force && ![...this.entries.values()].some(entry => entry.active)) return Promise.resolve(true);
     this.lastForegroundCheckAt = this.now();
     const epoch = this.epoch;
     this.versionRequest = Promise.resolve().then(async () => {
@@ -316,7 +353,7 @@ export class PublicSession {
     return this.versionRequest;
   };
   private schedule(): void {
-    if (!this.running) return;
+    if (!this.running || !this.visible()) return;
     if (this.pollTimer) this.cancel(this.pollTimer);
     this.pollTimer = this.later(async () => {
       this.pollTimer = undefined;
@@ -330,11 +367,17 @@ export class PublicSession {
     this.running = false;
     this.epoch++;
     if (this.pollTimer) { this.cancel(this.pollTimer); this.pollTimer = undefined; }
+    if(this.clockTimer){this.cancel(this.clockTimer);this.clockTimer=undefined;}
     for (const controller of this.controllers) controller.abort();
   }
   resume = (): void => {
-    this.tickClock();
-    if (!this.running || !this.visible()) return;
+    if(!this.visible()){
+      if(this.clockTimer){this.cancel(this.clockTimer);this.clockTimer=undefined;}
+      if(this.pollTimer){this.cancel(this.pollTimer);this.pollTimer=undefined;}
+      return;
+    }
+    this.tickClock();this.scheduleClock();
+    if (!this.running) return;
     if (this.pollTimer) this.cancel(this.pollTimer);
     if (this.now()-this.lastForegroundCheckAt<60000) { this.schedule(); return; }
     void this.checkVersion().then(success => { this.failures = success ? 0 : Math.min(4, this.failures + 1); this.schedule(); });

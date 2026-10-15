@@ -39,3 +39,5 @@
 .home-heading-subtitle{font-size:10px;line-height:16px;margin-top:2px;color:#98a6a5}
 .home-heading .freshness-summary{min-height:44px;max-width:58%;justify-content:flex-end;font-size:10px;line-height:16px;color:#aab8b3}
 .freshness-detail{font-size:11px}
+
+.share-compact{display:flex;align-items:center;gap:12px;padding:14px 0;border-top:1px solid #303b36;border-bottom:1px solid #303b36}.share-compact .heading{font-size:15px}.share-compact button{font-size:12px;padding:8px 12px;flex:none}

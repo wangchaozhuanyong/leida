@@ -39,7 +39,21 @@ Page(createPage((data, query, page, app) => {
   openPoster() { if (this.data.connected) wx.navigateTo({ url:'/pages/poster/index' }); },
   syncCountdown() {
     if (!(this.data.pending && this.data.pending.counting) && !(this.data.timeline && this.data.timeline.completed)) { this.stopCountdown(); return; }
-    if (!this._countdownTimer) this._countdownTimer = setInterval(() => this.redraw(), 1000);
+    if (!this._countdownTimer) this._countdownTimer = setInterval(() => this.tickCountdown(), 1000);
+  },
+  tickCountdown() {
+    if(!this._visible)return;
+    const state=getApp().client.getState();if(!state.data)return;
+    const now=new Date(Date.parse(state.data.serverTime)+Math.max(0,Date.now()-state.receivedAt)).toISOString();
+    const outlook=m.resetOutlookModel(state.data),completed=m.latestCompletedBenefits(state.data)[0];
+    const timeline=statusTimelineModel(outlook,now,completed?.action||null);
+    // Only the clock region crosses the native bridge; lists and page layout stay untouched.
+    if(JSON.stringify(timeline)!==JSON.stringify(this.data.timeline))this.setData({timeline});
+    if(outlook.active && this.data.pending){
+      const count=m.announcementCountdown(outlook.active,now);
+      if(count.label!==this.data.pending.countdown)this.setData({pending:{...this.data.pending,countdown:count.label,counting:count.status==='upcoming'}});
+    }
+    this.syncCountdown();
   },
   stopCountdown() { if (this._countdownTimer) clearInterval(this._countdownTimer); this._countdownTimer = null; },
   openWechatSettings() { wx.switchTab({ url: '/pages/settings/index' }); },

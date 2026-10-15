@@ -92,7 +92,7 @@ export default function PublicApp() {
   const [wechatReminders, setWechatReminders] = useState(false);
   const [toast, setToast] = useState('');
   const endpoint = queryReady ? readPath : null;
-  const { data, page, initialLoading, refreshing, navigationLoading, loadingMore, error, moreError, refresh, more, currentTime } = usePublicQuery(endpoint, `${pathname}?${queryString}:${queryReady}`);
+  const { data, page, initialLoading, refreshing, navigationLoading, loadingMore, error, moreError, refresh, more, applyUpdates, updateAvailable, currentTime } = usePublicQuery(endpoint, `${pathname}?${queryString}:${queryReady}`);
   const loading = initialLoading || refreshing;
   const { status: wechatEntry, codeAvailable: posterCodeAvailable, retry: retryWechat } = useWechatAvailability(route === 'home' || route === 'settings' || !!poster || !!statusPoster || !!dayPoster || wechatReminders);
   const { navHref, backHref, changeFilter, onNavigateCapture } = usePublicNavigation(pathname, queryString, data, queryReady && !navigationLoading);
@@ -182,7 +182,8 @@ export default function PublicApp() {
     <main className="pub-main" id="public-main" tabIndex={-1}>
       {!navigationLoading && data && error && <div className="pub-warning" role="alert">连接暂时中断，保留上次成功获取的资料。<button className="pub-text-button" onClick={() => void refresh()}>重试</button></div>}
       {!navigationLoading && data && !error && sourceStatus(data.sources).warning && <div className="pub-warning" role="status">{sourceStatus(data.sources).label}，以下保留最近收录的资料。</div>}
-      <Suspense fallback={<ContentPlaceholder />}>{navigationLoading ? <ContentPlaceholder /> : content}</Suspense>
+      {updateAvailable && <button className="pub-update-prompt" onClick={applyUpdates}>有新内容 · 点击更新</button>}
+      <Suspense fallback={<ContentPlaceholder />}>{content}</Suspense>
       {!navigationLoading && moreError && <div className="pub-pagination-error" role="alert">{moreError}<button className="pub-text-button" disabled={loadingMore} onClick={() => void more()}>重试加载更多</button></div>}
     </main>
     <footer className={`pub-footer ${subpage ? 'subpage' : ''}`}>{navigationLoading ? null : route==='methodology'&&query.get('snapshot') ? <p>预测资料截止时间见固定快照</p> : cutoff && !['home', 'events', 'articles', 'sources'].includes(route) ? <p>{historical ? '历史资料' : '资料截至'} · {displayTime(cutoff)}</p> : !data && !loading && !error && readPath ? <p>暂无已发布资料</p> : null}<p>所有时间均为北京时间</p><Link scroll={false} href="/more#privacy">隐私说明</Link></footer>
@@ -222,13 +223,9 @@ export function Home({ data, onWechatReminders, onPoster, onShare, historical, w
           <Link scroll={false} href={outlook.active ? `/events/${encodeURIComponent(outlook.active.eventId)}` : latest ? `/events/${encodeURIComponent(latest.event.id)}` : '/history'} className="pub-button full pub-evidence-action"><Icon name="news"/><span className="pub-evidence-desktop">{outlook.active ? '查看原文依据' : '查看最近发放依据'}</span><span className="pub-evidence-mobile">查看依据</span><Icon name="arrow"/></Link>
           <button onClick={onWechatReminders} className="pub-button full pub-subscribe"><Icon name="bell"/><span>微信提醒</span>{wechatEntry === 'unavailable' && <small>待开放</small>}<Icon name="arrow"/></button>
         </div>
-        <section className="pub-share-panel" aria-labelledby="home-share-title">
-          <div className="pub-share-panel-heading"><Icon name="share"/><h2 id="home-share-title">分享重置动态</h2><p>{latest ? '把最近的重置记录分享给朋友' : '分享雷达，一起关注后续动态'}</p></div>
-          <div className="pub-share-panel-actions">
-            <button className="pub-button primary" onClick={() => onPoster(latest?.publication, latest?.action.id)}><Icon name="card"/>生成分享海报</button>
-            <button className="pub-button" onClick={() => void onShare(latest?.publication)}><Icon name="link"/>分享链接</button>
-          </div>
-          <p className="pub-share-panel-note">选择黑金或水墨，分享当前公开状态</p>
+        <section className="pub-share-panel pub-share-compact" aria-labelledby="home-share-title">
+          <div><h2 id="home-share-title">分享重置动态</h2><p>黑金 / 水墨 · 两款固定海报</p></div>
+          <button className="pub-button" onClick={() => onPoster(latest?.publication, latest?.action.id)}>生成分享海报<Icon name="arrow"/></button>
         </section>
         {outlook.active && latestRecord}
         {activity && <Link scroll={false} className="pub-instrument-activity" href={`/activities/${encodeURIComponent(activity.id)}`}><Icon name="calendar"/><div><h2>{activity.title}</h2><p>{activityPhase} · 已收录{activity.items.length}项进展</p></div><span>查看进展 <Icon name="arrow"/></span></Link>}
@@ -416,6 +413,7 @@ function ShareLinkModal({ url, onClose }: { url: string; onClose: () => void }) 
 interface PosterTarget { id: string; cutoffAt: string; title: string; endpoint: string; filename: string; }
 function PosterModal({ target, name, blocked, note, statusDesign = false, codeAvailable = false, onClose, onShare }: { target: PosterTarget; name: string; blocked: string; note?: string; statusDesign?: boolean; codeAvailable?: boolean; onClose: () => void; onShare: () => Promise<void> }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const cache = useRef(new Map<string, PosterImage>());
   const [result, setResult] = useState<{ image: PosterImage; key: string } | null>(null);
   const [style, setStyle] = useState<StatusPosterStyle>('precision');
   const [includeCode, setIncludeCode] = useState(false);
@@ -425,18 +423,33 @@ function PosterModal({ target, name, blocked, note, statusDesign = false, codeAv
   const [error, setError] = useState('');
   const variant = statusDesign ? statusPosterVariant(target.endpoint, target.filename, style, includeCode && codeAvailable) : target;
   const requestKey = `${variant.endpoint}:${target.cutoffAt}:${variant.filename}`;
-  const image = result?.key === requestKey ? result.image : null;
+  const image = cache.current.get(requestKey) ?? (result?.key === requestKey ? result.image : null);
+  const preview = image ?? result?.image;
   const selectedStyle = statusPosterStyles.find(option => option.id === style)!;
   useEffect(() => { dialog.current?.showModal(); const previous = document.body.style.overflow; document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = previous; }; }, []);
+  useEffect(() => () => {
+    for (const image of cache.current.values()) URL.revokeObjectURL(image.url);
+    cache.current.clear();
+  }, [target.id, target.cutoffAt]);
   useEffect(() => {
     const controller = new AbortController();
-    let generated: PosterImage | null = null;
-    setResult(null); setError(''); setGenerating(!blocked);
-    const timer = !blocked ? window.setTimeout(() => { controller.abort(); setGenerating(false); setError('海报生成超时，请重新生成。'); }, 20_000) : undefined;
-    if (!blocked) void createPosterFromEndpoint(variant.endpoint, variant.filename, controller.signal)
-      .then(image => { window.clearTimeout(timer); generated = image; if (controller.signal.aborted) URL.revokeObjectURL(image.url); else { setResult({ image, key: requestKey }); setGenerating(false); } })
-      .catch(cause => { window.clearTimeout(timer); if (!controller.signal.aborted) { setError(cause instanceof Error ? cause.message : '海报生成失败，请重试。'); setGenerating(false); } });
-    return () => { window.clearTimeout(timer); controller.abort(); if (generated) URL.revokeObjectURL(generated.url); };
+    setError('');
+    if (blocked) {
+      for (const image of cache.current.values()) URL.revokeObjectURL(image.url);
+      cache.current.clear();setResult(null);setGenerating(false);return;
+    }
+    const cached = cache.current.get(requestKey);
+    if (cached) { setResult({image:cached,key:requestKey});setGenerating(false);return; }
+    setGenerating(true);
+    const timer = window.setTimeout(() => { controller.abort(); setGenerating(false); setError('海报生成超时，请重新生成。'); }, 20_000);
+    void createPosterFromEndpoint(variant.endpoint, variant.filename, controller.signal)
+      .then(image => {
+        window.clearTimeout(timer);
+        if (controller.signal.aborted) URL.revokeObjectURL(image.url);
+        else { cache.current.set(requestKey,image);setResult({image,key:requestKey});setGenerating(false); }
+      })
+      .catch(cause => { window.clearTimeout(timer);if (!controller.signal.aborted) { setError(cause instanceof Error ? cause.message : '海报生成失败，请重试。');setGenerating(false); } });
+    return () => { window.clearTimeout(timer);controller.abort(); };
   }, [target.id, target.cutoffAt, variant.endpoint, variant.filename, requestKey, blocked, attempt]);
   const file = image ? new File([image.blob], image.filename, { type: 'image/png' }) : null;
   const canShareImage = !!file && !!navigator.canShare?.({ files: [file] });
@@ -457,7 +470,10 @@ function PosterModal({ target, name, blocked, note, statusDesign = false, codeAv
         <label className="pub-poster-code-option"><input type="checkbox" checked={includeCode && codeAvailable} disabled={!codeAvailable || sharing || !!blocked} onChange={event => { setGenerating(true); setError(''); setIncludeCode(event.target.checked); }} /><span>带圆形小程序码</span>{!codeAvailable && <small>待接入 · 可保存无圆码版</small>}</label>
       </div>}
       <div className="pub-poster-preview" aria-busy={generating}>
-        {blocked ? <p className="pub-warning" role="alert">{blocked}</p> : generating ? <div className="pub-poster-loading" role="status"><Icon name="radar" /><p>正在生成{statusDesign ? selectedStyle.label : ''}海报…</p></div> : image ? <img className="pub-poster-image" src={image.url} alt={`${name}分享海报：${statusDesign ? `${selectedStyle.label}，` : ''}${target.title}${image.codeState === 'included' ? '，含此版本的小程序码' : ''}`} /> : null}
+        {blocked ? <p className="pub-warning" role="alert">{blocked}</p> : <>
+          {preview && <img className="pub-poster-image" src={preview.url} alt={`${name}分享海报：${target.title}`} />}
+          {generating && <div className="pub-poster-loading" role="status"><Icon name="radar" /><p>正在生成{statusDesign ? selectedStyle.label : ''}海报…</p></div>}
+        </>}
         {error && <div className="pub-warning" role="alert"><p>{error}</p>{!image && !blocked && <button className="pub-text-button" onClick={() => setAttempt(value => value + 1)}>重新生成</button>}</div>}
       </div>
       <div className="pub-share-row"><button className="pub-button" disabled={sharing || generating || !image || !!blocked} onClick={() => void (canShareImage ? shareImage() : onShare())}>{sharing ? '正在打开分享…' : canShareImage ? '转发海报' : '分享此版本链接'}<Icon name="share" /></button><button className="pub-button primary" disabled={generating || !image || !!blocked} onClick={() => image && savePosterImage(image)}>保存海报</button></div>

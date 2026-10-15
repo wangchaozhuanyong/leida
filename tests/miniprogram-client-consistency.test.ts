@@ -37,13 +37,32 @@ test('自动更新保留两页范围，只有状态变化不重读正文',async(
 test('重读再次变化只重试一次，失败后废弃旧游标，重试可恢复',async()=>{
   const h=harness([page(0,'v1'),page(20,'v2'),page(0,'v2'),page(20,'v3'),page(0,'v3'),page(20,'v4')]);
   await h.client.setView({view:'news',filter:'all'});await h.client.more();
-  assert.match(h.client.getState().error,/内容正在更新/);assert.equal(h.client.getState().page.nextCursor,null);
+  assert.match(h.client.getState().moreError,/内容正在更新/);assert.equal(h.client.getState().page.nextCursor,null);
   assert.equal(h.paths.length,6);assert.equal(h.client.getState().contentVersion,'v1');
-  await h.client.more();assert.equal(h.paths.length,6,'旧游标不能继续追加');
+  await h.client.more();assert.equal(h.paths.length,7,'失败重试从第一页开始，不能沿用旧游标');assert.doesNotMatch(h.paths.at(-1)!,/cursor=/);
 });
 test('刷新后实际结果不足两页，以新结果为准，不保留撤回条目',async()=>{
   const h=harness([page(0,'v1'),page(20,'v1'),page(0,'v2',1,15)]);
   await h.client.setView({view:'news',filter:'all'});await h.client.more();await h.client.refresh(false);
   assert.equal(h.client.getState().data.publications.length,15);assert.equal(h.client.getState().page.nextCursor,null);
   assert.equal(h.client.getState().pagesLoaded,1);
+});
+
+
+test('新增提示保持旧正文和游标同一版本，确认后应用，撤回无需等待确认',async()=>{
+  const first=page(0,'v1',1,5),added=page(0,'v2',0,6),withdrawn=page(0,'v3',2,4);
+  const h=harness([first,{data:{version:'v2',contentVersion:'v2'}},added,{data:{version:'v2',contentVersion:'v2'}},{data:{version:'v3',contentVersion:'v3'}},withdrawn]);
+  await h.client.setView({view:'news',filter:'all'});const ids=h.client.getState().page.ids;
+  await h.client.refresh(true);assert.equal(h.client.getState().updateAvailable,true);assert.deepEqual(h.client.getState().page.ids,ids);assert.equal(h.client.getState().contentVersion,'v1');
+  await h.client.refresh(true);assert.equal(h.paths.length,4);
+  h.client.applyUpdates();assert.equal(h.client.getState().contentVersion,'v2');assert.equal(h.client.getState().updateAvailable,false);
+  await h.client.refresh(true);assert.equal(h.client.getState().contentVersion,'v3');assert.equal(h.client.getState().updateAvailable,false);
+});
+
+test('二十项缓存上限淘汰旧详情而保留首页',async()=>{
+  const h=harness(Array.from({length:30},()=>page(0,'v1')));
+  await h.client.setView({view:'home'});
+  for(let i=0;i<25;i++)await h.client.setView({view:'detail',entity:'publications',id:`qa-publication-${i}`});
+  const count=h.paths.length;await h.client.setView({view:'home'});assert.equal(h.paths.length,count);
+  await h.client.setView({view:'detail',entity:'publications',id:'qa-publication-0'});assert.equal(h.paths.length,count+1);
 });

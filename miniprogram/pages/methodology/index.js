@@ -12,11 +12,12 @@ Page({
   onShow() {
     this._visible = true;
     const generation = this._navigationGeneration = (this._navigationGeneration || 0) + 1;
-    this.setData({ navigationLoading: true });
+
     const app = getApp();
     const work = app.client.setView && app.client.setView({view:'methodology'});
     this._unsubscribe = app.client.subscribe(state => {
       this._latestState = state;
+      this.setData({navigationLoading: !state.data && !!state.loading});
       if (this._snapshotId) { this.updateOutcomes(); return; }
       const data = state.data;
       const current = data ? { ...data, serverTime: new Date(Date.parse(data.serverTime) + Math.max(0, Date.now() - state.receivedAt)).toISOString() } : null;
@@ -37,7 +38,7 @@ Page({
     this._fixedEpoch = (this._fixedEpoch || 0) + 1;
     if (this._fixedTask) this._fixedTask.abort();
     this._fixedTask = null;
-    this.setData({ navigationLoading: true, fixedLoading: false });
+    this.setData({ fixedLoading: false });
   },
   onHide() { this.suspend(); },
   onUnload() { this.suspend(); },

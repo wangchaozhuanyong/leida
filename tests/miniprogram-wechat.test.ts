@@ -13,7 +13,7 @@ const config={mode:'https',baseUrl:'https://public.example.org',cloudEnv:'',serv
 const now=Date.parse('2026-10-10T04:00:00Z'),scene='a'.repeat(32);
 const safe=(state='none')=>({configured:true,enabled:true,state,templateId:'fixture-template'});
 type Options=Record<string,any>;
-function mock(options:{state?:string;challengeState?:string;result?:string;privacy?:boolean;failConfirm?:boolean;failState?:boolean;codeStatus?:number}={}){
+function mock(options:{state?:string;challengeState?:string;result?:string;privacy?:boolean;failConfirm?:boolean;failState?:boolean;codeStatus?:number;sessionMs?:number}={}){
   let state=options.state||'none',login=0,subscribe=0,clock=now,count=['available','reserved'].includes(state)?1:0,challenges=0;
   const confirmed=new Set<string>();const current=()=>({...safe(state),remainingCount:count,pendingCount:state==='reserved'?1:0});
   const requests:Options[]=[];
@@ -23,7 +23,7 @@ function mock(options:{state?:string;challengeState?:string;result?:string;priva
     requestSubscribeMessage(option:Options){subscribe++;queueMicrotask(()=>option.success({[option.tmplIds[0]]:options.result||'accept'}));},
     request(option:Options){requests.push(option);queueMicrotask(()=>{
       const path=option.url.replace(config.baseUrl,'');let response:unknown;
-      if(path==='/api/wechat/login')response={sessionToken:'fixture-reader-session',expiresAt:new Date(clock+60000).toISOString()};
+      if(path==='/api/wechat/login')response={sessionToken:'fixture-reader-session',expiresAt:new Date(clock+(options.sessionMs||60000)).toISOString()};
       else if(path==='/api/wechat/subscription'){
         if(options.failState){option.success({statusCode:401,data:{error:'当前读者会话已失效，请重新连接。'}});return;}
         if(option.method==='DELETE'){state='revoked';count=0;}response=current();
@@ -107,10 +107,10 @@ test('确认失败后主动重试同一个nonce，不能再次弹微信或重复
 });
 
 test('返回提醒页只同步已经连接的会话，未连接或过期不会自动登录或授权',async()=>{
-  const h=mock();await h.reader.refreshConnected();assert.equal(h.login,0);assert.equal(h.requests.length,0);
+  const h=mock({sessionMs:600000});await h.reader.refreshConnected();assert.equal(h.login,0);assert.equal(h.requests.length,0);
   await h.reader.prepare({userInitiated:true});await h.reader.authorize({userInitiated:true});
-  h.changeState('consumed');await h.reader.refreshConnected();assert.equal(h.reader.getState().remainingCount,0);assert.equal(h.subscribe,1);assert.equal(h.login,1);
-  const count=h.requests.length;h.advance(60001);await h.reader.refreshConnected();assert.equal(h.requests.length,count);assert.equal(h.login,1);
+  h.changeState('consumed');const before=h.requests.length;await h.reader.refreshConnected();assert.equal(h.requests.length,before);h.advance(300000);await h.reader.refreshConnected();assert.equal(h.reader.getState().remainingCount,0);assert.equal(h.subscribe,1);assert.equal(h.login,1);
+  const count=h.requests.length;h.advance(600001);await h.reader.refreshConnected();assert.equal(h.requests.length,count);assert.equal(h.login,1);
 });
 
 test('隐私未同意时停止登录与授权；模板准备过期不弹窗',async()=>{

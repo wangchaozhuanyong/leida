@@ -30,7 +30,7 @@ test('切换页面取消旧响应；分页位置与当前页面独立',async()=>
  requests[1].success({statusCode:200,data:{data:data(),version:'history',contentVersion:'changed',page:{ids:[],nextCursor:'next_page',total:40}}});await history;
  requests[0].success({statusCode:200,data:{data:data(),version:'old',contentVersion:'old'}});await home;
  assert.equal(client.getState().version,'history');assert.equal(client.getState().page.nextCursor,'next_page');
- const more=client.more();assert.match(requests[2].url,/view=history&filter=banked_reset&cursor=next_page/);
+ const more=client.more();assert.deepEqual(Object.fromEntries(new URL(requests[2].url).searchParams),{view:'history',filter:'banked_reset',cursor:'next_page'});
  requests[2].success({statusCode:200,data:{data:data(),version:'history',contentVersion:'changed',page:{ids:[],nextCursor:null,total:40}}});await more;assert.equal(client.getState().page.nextCursor,null);
  const news=client.setView({view:'news',filter:'product'});assert.equal(client.getState().data,null);assert.equal(client.getState().page,null);
  requests[3].success({statusCode:200,data:{data:data(),version:'news',contentVersion:'news',page:{ids:[],nextCursor:null,total:0}}});await news;assert.equal(client.getState().version,'news');client.stop();
