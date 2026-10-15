@@ -514,8 +514,8 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);news.onUnload();
-  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.5 · 体验版');settings.onUnload();
-  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.5');fallback.onUnload();
+  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.6 · 体验版');settings.onUnload();
+  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.6');fallback.onUnload();
 });
 
 test('四个原生导航页先设置 iOS 窗口底色再订阅数据，返回页面恢复底色而资料刷新不重复设置',()=>{
@@ -627,7 +627,7 @@ test('原生项目配置与十个页面完整，支持游客或真实AppID，正
   const css = readFileSync(resolve(root, 'miniprogram/app.wxss'), 'utf8');
   assert.match(css, /font-size:\s*16px/); assert.match(css, /min-height:\s*44px/);
   assert.equal(app.tabBar.list[0].text, '首页');
-  assert.equal(readFileSync(resolve(root, 'miniprogram/pages/settings/index.wxml'), 'utf8').includes('待开通'), true);
+  assert.equal(readFileSync(resolve(root, 'miniprogram/pages/settings/index.wxml'), 'utf8').includes('剩余提醒'), true);
 });
 
 test('所有原生JS可解析，JSON配置有效；模板无浏览器标签与内嵌脚本', () => {

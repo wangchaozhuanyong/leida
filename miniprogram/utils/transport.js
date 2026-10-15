@@ -32,6 +32,8 @@ function validForecastBody(path, value) {
 const subscriptionStates = ['unavailable','none','challenged','available','reserved','consumed','rejected','revoked','unknown'];
 function validateSubscription(value) {
   return !!value && typeof value.configured==='boolean' && typeof value.enabled==='boolean' && subscriptionStates.includes(value.state)
+    && (value.remainingCount===undefined || Number.isSafeInteger(value.remainingCount) && value.remainingCount>=0)
+    && (value.pendingCount===undefined || Number.isSafeInteger(value.pendingCount) && value.pendingCount>=0 && value.pendingCount<=value.remainingCount)
     && (value.templateId===undefined || typeof value.templateId==='string') && (value.lastResult===undefined || ['sent','rejected','unknown','cancelled'].includes(value.lastResult));
 }
 function validWechatBody(path,value) {

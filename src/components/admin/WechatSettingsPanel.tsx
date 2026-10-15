@@ -23,9 +23,9 @@ export function WechatSettingsPanel({ data, command, busy, preview }: SectionPro
           <Field label="小程序密钥" hint={saved.hasSecret ? '密钥已保存。留空沿用；更换编号时应重新填写对应密钥。' : '仅在服务端加密保存，不会进入小程序或公开接口。'}><input type="password" autoComplete="new-password" maxLength={256} value={secret} onChange={event => setSecret(event.target.value)} /></Field>
           <Field label="圆码使用版本"><select value={value.envVersion} onChange={event => patch({ envVersion: event.target.value as WechatSettings['envVersion'] })}><option value="release">正式版</option><option value="trial">体验版</option><option value="develop">开发版</option></select></Field>
           <label className="adm-check"><input type="checkbox" checked={value.qrEnabled} onChange={event => patch({ qrEnabled: event.target.checked })} />启用真正小程序码</label>
-          <label className="adm-check"><input type="checkbox" checked={value.subscriptionsEnabled} onChange={event => patch({ subscriptionsEnabled: event.target.checked })} />启用一次性微信订阅提醒</label>
+          <label className="adm-check"><input type="checkbox" checked={value.subscriptionsEnabled} onChange={event => patch({ subscriptionsEnabled: event.target.checked })} />启用微信订阅提醒（次数可累积）</label>
           <Field label="订阅模板编号" hint="从微信后台实际可用模板中填写，不预设虚构模板。"><input autoComplete="off" maxLength={128} value={value.templateId} onChange={event => patch({ templateId: event.target.value.trim() })} /></Field>
-          <div className="adm-inline-note">将实际模板中的标题、状态和时间字段对应填入下方。一次性订阅不等于长期无限通知。</div>
+          <div className="adm-inline-note">将实际模板中的标题、状态和时间字段对应填入下方。每次用户成功授权增加一次提醒机会，按不同的新预告、完成声明或重要更正使用，不自动增加次数。</div>
           {(['title', 'status', 'time'] as const).map(name => <Field key={name} label={{ title: '标题字段', status: '状态字段', time: '时间字段' }[name]}><input autoComplete="off" maxLength={30} value={value.templateFields[name]} onChange={event => patch({ templateFields: { ...value.templateFields, [name]: event.target.value.trim() } })} /></Field>)}
           {numberField('dailyApiLimit', '每日接口调用上限')}
           {numberField('dailyQrLimit', '每日圆码生成上限')}
