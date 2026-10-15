@@ -1,5 +1,5 @@
 /** Public GET results only. Rejected work is never retained; concurrent misses share one read. */
-export function createPublicCache(ttlMs = 2000, maxEntries = 128, now = Date.now) {
+export function createPublicCache(ttlMs = 10_000, maxEntries = 128, now = Date.now) {
   const entries = new Map<string, { until: number; pending: Promise<unknown> }>();
   return async function cached<T>(key: string, read: () => Promise<T>): Promise<T> {
     const old = entries.get(key);

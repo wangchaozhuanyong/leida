@@ -233,9 +233,9 @@ test('只有一个轮询调度，隐藏页面不请求，失败退避及停止�
   const run = async () => { const [id, timer] = [...timers][0]; timers.delete(id); await timer.callback(); };
   visible = false; await run(); assert.equal(polls, 0);
   visible = true; await run(); assert.equal(polls, 1);
-  assert.equal([...timers.values()][0].delay, 10000);
+  assert.equal([...timers.values()][0].delay, 600000);
   fail = false; await run();
-  assert.equal([...timers.values()][0].delay, 5000);
+  assert.equal([...timers.values()][0].delay, 300000);
   assert.equal(session.snapshot(news).error, '');
   session.stop(); leave(); assert.equal(timers.size, 0);
 });
@@ -372,4 +372,32 @@ test('网络错误和非 JSON 响应使用中文提示，业务错误文案保�
     await session.ensure(news);
     assert.equal(session.snapshot(news).error, expected);
   }
+});
+
+test('正常前台一小时最多十二次轻量检查，快速回前台合并而手动刷新立即执行',async()=>{
+  let now=0,id=0,versions=0,bodies=0;
+  const timers=new Map<number,{at:number;callback:()=>unknown}>();
+  const session=new PublicSession({now:()=>now,
+    setTimeout:((callback:()=>unknown,delay:number)=>{timers.set(++id,{at:now+delay,callback});return id;}) as unknown as typeof setTimeout,
+    clearTimeout:((key:number)=>{timers.delete(key);}) as unknown as typeof clearTimeout,
+    fetch:(async url=>{if(url===version){versions++;return new Response(null,{status:304});}bodies++;return json(envelope(['a']));}) as typeof fetch,
+  });
+  const leave=session.activate(news);await session.ensure(news);session.start();
+  for(let i=0;i<12;i++){
+    const [key,timer]=[...timers].sort((a,b)=>a[1].at-b[1].at)[0];
+    timers.delete(key);now=timer.at;await timer.callback();
+  }
+  assert.equal(now,3600_000);assert.equal(versions,12);assert.equal(bodies,1);
+  session.resume();session.resume();await settle();assert.equal(versions,12);
+  await session.refresh(news);assert.equal(bodies,2);
+  now+=60000;session.resume();await settle();assert.equal(versions,13);
+  session.resume();await settle();assert.equal(versions,13);assert.equal(timers.size,1);
+  leave();session.stop();assert.equal(timers.size,0);
+});
+
+test('网页缓存过期重新读取，未过期切页不额外查询',async()=>{
+  let now=0,calls=0;
+  const session=new PublicSession({now:()=>now,fetch:(async()=>{calls++;return json(envelope(['a']));}) as typeof fetch});
+  await session.ensure(news);await session.ensure(home);await session.ensure(news);assert.equal(calls,2);
+  now=300000;await session.ensure(news);assert.equal(calls,3);
 });

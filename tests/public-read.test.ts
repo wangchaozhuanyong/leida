@@ -18,6 +18,14 @@ test('公开缓存合并并发、到期重查，失败不伪装成成功',async(
  assert.equal(await cache('different-view',async()=>8),8);
 });
 
+test('生产默认公开缓存十秒到期，读取失败不延长旧结果',async()=>{
+ let now=0,calls=0;const cache=createPublicCache(undefined,4,()=>now);
+ assert.equal(await cache('version',async()=>++calls),1);
+ now=9999;assert.equal(await cache('version',async()=>++calls),1);
+ now=10000;await assert.rejects(cache('version',async()=>{throw new Error('fixture');}));
+ assert.equal(await cache('version',async()=>++calls),2);
+});
+
 test('分页和详情参数受约束；不允许任意实体、跨类型游标或大批版本',()=>{
  assert.deepEqual(parsePublicRead(new URLSearchParams('view=history&filter=banked_reset')).view,'history');
  for(const query of ['view=admin','view=detail&id=one&entity=settings','view=history&filter=paid','view=activity&id=one&day=0','view=detail&entity=events&id=../secret'])assert.throws(()=>parsePublicRead(new URLSearchParams(query)));

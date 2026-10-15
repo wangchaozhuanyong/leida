@@ -365,7 +365,7 @@ test('前台断网保留最近公开资料并提示重试，恢复不会重复�
   client.stop();
 });
 
-test('小程序返回已读页面立即恢复本页资料，轻量检查期间不清屏、不串入其他页面', async () => {
+test('小程序返回有效缓存不重复查版本，冷页面按需读取且不串入其他页面', async () => {
   const mock = network(), client = createClient({wxApi: mock.wx, config: httpsConfig, timers: timerHarness().timers});
   const first = client.start(); mock.calls[0].success(envelope()); await first;
   const homeData = client.getState().data;
@@ -375,24 +375,24 @@ test('小程序返回已读页面立即恢复本页资料，轻量检查期间�
   mock.calls[1].success(envelope(newsData)); await news;
   const back = client.setView({view:'home'});
   assert.equal(client.getState().data,homeData,'返回首页立即呈现原资料');
-  assert.match(mock.calls[2].url,/\/version\?light=1$/);
-  mock.calls[2].success({statusCode:304}); await back;
+  await back;assert.equal(mock.calls.length,2);
   assert.equal(client.getState().data,homeData);
   const again = client.setView({view:'news',filter:'all'});
   assert.equal(client.getState().data.site.name,'隔离动态页');
-  mock.calls[3].success({statusCode:304}); await again;
+  await again;assert.equal(mock.calls.length,2);
   assert.equal(mock.calls.filter(call=>call.url.includes('/bootstrap')).length,2);
   client.stop();
 });
 
 test('页面分类缓存隔离，返回时断网保留原分类，过时在途响应不能覆盖当前首页', async () => {
-  const mock = network(), client = createClient({wxApi:mock.wx,config:httpsConfig,timers:timerHarness().timers});
+  let now=0;const mock = network(), client = createClient({wxApi:mock.wx,config:httpsConfig,timers:timerHarness().timers,now:()=>now});
   const home = client.start(); mock.calls[0].success(envelope()); await home;
   const reset = client.setView({view:'news',filter:'reset'});
   const resetData = fixture(); resetData.site.name='隔离重置分类';
   mock.calls[1].success(envelope(resetData)); await reset;
   const product = client.setView({view:'news',filter:'product'});
   assert.equal(client.getState().data,null);
+  now=5000;
   const back = client.setView({view:'news',filter:'reset'});
   assert.equal(client.getState().data.site.name,'隔离重置分类');
   mock.calls[3].fail(); await back;
@@ -409,10 +409,11 @@ test('页面分类缓存隔离，返回时断网保留原分类，过时在途�
 });
 
 test('缓存正文版本变化时先保留内容，再原子替换；撤回记录不由旧缓存合并回来', async () => {
-  const mock=network(),client=createClient({wxApi:mock.wx,config:httpsConfig,timers:timerHarness().timers});
+  let now=0;const mock=network(),client=createClient({wxApi:mock.wx,config:httpsConfig,timers:timerHarness().timers,now:()=>now});
   const start=client.start();mock.calls[0].success(envelope());await start;
   const old=client.getState().data;
   const news=client.setView({view:'news',filter:'all'});mock.calls[1].success(envelope());await news;
+  now=5000;
   const back=client.setView({view:'home'});
   assert.equal(client.getState().data,old);
   mock.calls[2].success(versionResponse('fixture-v2'));await settle();
@@ -433,12 +434,12 @@ test('动态加载更多后切去首页再返回，保留已加载条目和下�
   const next=fixture();addRound(next,'more-news',[{id:'more-reset',kind:'automatic_reset',stage:'promised'}]);
   mock.calls[2].success({statusCode:200,data:{...(envelope(next).data as object),page:{ids:['more-news'],nextCursor:'page-three',total:8}}});await more;
   assert.equal(client.getState().data.publications.length,5);
-  const home=client.setView({view:'home'});mock.calls[3].success({statusCode:304});await home;
+  const home=client.setView({view:'home'});await home;
   const back=client.setView({view:'news',filter:'all'});
   assert.equal(client.getState().data.publications.length,5);
   assert.equal(client.getState().page.nextCursor,'page-three');
   assert.equal(client.getState().page.ids.length,5);
-  mock.calls[4].success({statusCode:304});await back;
+  await back;assert.equal(mock.calls.length,3);
   client.stop();
 });
 
@@ -514,8 +515,8 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);news.onUnload();
-  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.7 · 体验版');settings.onUnload();
-  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.7');fallback.onUnload();
+  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.8 · 体验版');settings.onUnload();
+  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.8');fallback.onUnload();
 });
 
 test('四个原生导航页先设置 iOS 窗口底色再订阅数据，返回页面恢复底色而资料刷新不重复设置',()=>{
