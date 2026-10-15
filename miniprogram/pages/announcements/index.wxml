@@ -1,3 +1,4 @@
+<page-meta root-background-color="#0b1113" page-style="background-color:#0b1113" />
 <view class="page">
 
     <view class="chips"><button wx:for="{{filters}}" wx:key="value" class="{{filter === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectFilter">{{item.label}}</button></view>

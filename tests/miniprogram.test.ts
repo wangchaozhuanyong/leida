@@ -515,14 +515,14 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);news.onUnload();
-  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.10 · 体验版');settings.onUnload();
-  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.10');fallback.onUnload();
+  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.11 · 体验版');settings.onUnload();
+  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.11');fallback.onUnload();
 });
 
-test('四个原生导航页先设置 iOS 窗口底色再订阅数据，返回页面恢复底色而资料刷新不重复设置',()=>{
+test('四个原生导航页初始化 iOS 窗口底色，缓存返回和资料刷新不反复触碰窗口外观',()=>{
   for(const name of ['home','news','announcements','settings']) {
     const h=nativeHarness(),page=h.page(name);
-    assert.deepEqual(h.ui.lifecycle,['background','background','subscribe'],name);
+    assert.deepEqual(h.ui.lifecycle,['background','subscribe'],name);
     for(const value of h.ui.backgrounds) {
       assert.equal(value.backgroundColor,'#0b1113');
       assert.equal(value.backgroundColorTop,'#0b1113');
@@ -530,10 +530,11 @@ test('四个原生导航页先设置 iOS 窗口底色再订阅数据，返回页
     }
     const previous=structuredClone(page.data);
     h.replace(fixture());
-    assert.equal(h.ui.backgrounds.length,2,'资料更新不触碰原生窗口外观');
+    assert.equal(h.ui.backgrounds.length,1,'资料更新不触碰原生窗口外观');
     page.onHide();assert.equal(h.subscriptions,0);
     page.onShow();assert.equal(h.subscriptions,1);
-    assert.deepEqual(h.ui.lifecycle.slice(-2),['background','subscribe']);
+    assert.equal(h.ui.lifecycle.at(-1),'subscribe');
+    assert.equal(h.ui.backgrounds.length,1,'返回已保留页面不重新设置原生背景');
     assert.equal(page.data.connected,true);
     assert.deepEqual(JSON.parse(JSON.stringify(page.data)),previous,'恢复窗口底色不清空已有页面内容');
     page.onUnload();

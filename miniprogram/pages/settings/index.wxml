@@ -1,3 +1,4 @@
+<page-meta root-background-color="#0b1113" page-style="background-color:#0b1113" />
 <view class="page">
   <view wx:if="{{storageError}}" class="warning">{{storageError}}</view>
   <view class="card inbox-card"><view class="row"><view class="heading">站内信 <text wx:if="{{unread}}" class="inbox-unread">{{unread}} 未读</text></view><button class="text-button" data-path="/pages/notices/index" bindtap="navigate">查看全部提醒 →</button></view>
