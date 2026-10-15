@@ -1,7 +1,7 @@
 import {getPublicData} from '@/server/service';
 import {json,apiError} from '@/server/http';
 import {posterSvg} from '@/server/poster';
-import {statusPosterSvg,currentStatusPosterSvg,type StatusPosterCode} from '@/server/status-poster';
+import {statusPosterSvg,currentStatusPosterSvg,assertStatusPosterRound,type StatusPosterCode} from '@/server/status-poster';
 import {parseStatusPosterOptions,type StatusPosterCodeState} from '@/lib/status-poster-style';
 import {WechatServiceError} from '@/server/wechat-errors';
 import {activityPosterSvg,resolveActivityPoster} from '@/server/activity-poster';
@@ -49,6 +49,7 @@ export async function GET(request:Request,{params}:{params:Promise<{path:string[
   if(url.searchParams.get('layout')==='status'){
    const actionId=url.searchParams.get('action');
    if(!actionId||!p.event.actions.some(action=>action.id===actionId&&action.scope==='public'&&action.stage==='claimed_complete'))throw Object.assign(new Error('未找到可分享的公开完成声明'),{status:400});
+   if(url.searchParams.has('round'))assertStatusPosterRound(data,url.searchParams.get('round')!);
    let code:StatusPosterCode|undefined;
    let options:ReturnType<typeof parseStatusPosterOptions>;
    try{options=parseStatusPosterOptions(url.searchParams);}catch{throw Object.assign(new Error('海报样式或圆码选项无效'),{status:400});}

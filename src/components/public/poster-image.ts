@@ -10,7 +10,7 @@ export async function createPosterImage(publicationId: string, filename: string,
 export async function createPosterFromEndpoint(endpoint: string, filename: string, signal: AbortSignal): Promise<PosterImage> {
   if (!/^\/api\/v1\/(?:posters|activity-posters|forecast-posters)\//.test(endpoint) || /[\r\n]/.test(endpoint)) throw new Error('海报地址无效。');
   const response = await fetch(endpoint, { cache: 'no-store', signal });
-  if (!response.ok) throw new Error(response.status === 410 ? '此内容已撤回，已停止生成海报。' : '海报生成失败，请稍后重试。');
+  if (!response.ok) throw new Error(response.status === 410 ? '此内容已撤回，已停止生成海报。' : response.status === 409 ? '公开状态已变化，请关闭后重新生成海报。' : '海报生成失败，请稍后重试。');
   const svg = await response.blob();
   const source = URL.createObjectURL(svg);
   try {

@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Script } from 'node:vm';
 import type { BenefitAction, PublicData, Publication } from '../src/lib/types';
-import { currentStatusPosterSvg } from '../src/server/status-poster';
+import { currentStatusPosterSvg, assertStatusPosterRound } from '../src/server/status-poster';
 const require=createRequire(import.meta.url);
 const native=require('../miniprogram/utils/status-poster.js');
 const generic=require('../miniprogram/utils/poster.js');
@@ -36,6 +36,11 @@ test('网站两款海报也支持等待状态；公开轮次变化时拒绝旧�
   const waiting=fixture();for(const theme of ['precision','editorial'] as const){const svg=currentStatusPosterSvg(waiting,now,'waiting',theme);assert.match(svg,/1080.*1920/);assert.match(svg,/等待预告/);assert.match(svg,/暂无公开公告/);assert.doesNotMatch(svg,/公告称已|data-poster-code/);}
   const announced=fixture('promised','2026-10-15T03:00:00Z');assert.match(currentStatusPosterSvg(announced,now,'fixed-publication'),/03:00/);
   assert.throws(()=>currentStatusPosterSvg(announced,now,'waiting'),/已变化/);assert.throws(()=>currentStatusPosterSvg(fixture('claimed_complete'),now,'fixed-publication'),/已变化/);
+});
+test('完成海报打开后出现新的预告也会拒绝旧轮次，切换风格不能悄悄改下一次安排',()=>{
+  const completed=fixture('claimed_complete');assert.doesNotThrow(()=>assertStatusPosterRound(completed,'waiting'));
+  const next=fixture('promised','2026-10-15T04:00:00Z');assert.throws(()=>assertStatusPosterRound(next,'waiting'),error=>error instanceof Error&&'status'in error&&error.status===409);
+  assert.doesNotThrow(()=>assertStatusPosterRound(next,'fixed-publication'));
 });
 test('原生艺术海报实际画原背景和品牌后导出1080×1920 PNG，保存相册仍须主动操作',async()=>{
   const calls:any[]=[];
