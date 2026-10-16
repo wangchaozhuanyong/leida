@@ -2,7 +2,7 @@ const validTime = value => typeof value === 'string' ? Date.parse(value) : NaN;
 const validProbability = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
 const displayTime = value => Number.isFinite(validTime(value)) ? new Date(validTime(value) + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ') : '';
 const cadenceSnapshotId = value => typeof value === 'string' && /^forecast_cadence_[a-f0-9]{64}$/.test(value);
-const currentModel = 'conditional-beta-reset-cadence-20261016-1';
+const currentModel = 'conditional-beta-reset-cadence-20261016-2';
 const record = value => !!value && typeof value === 'object' && !Array.isArray(value);
 const text = value => typeof value === 'string' && !!value.trim();
 const count = value => Number.isSafeInteger(value) && value >= 0;
@@ -64,7 +64,7 @@ function validateCadenceSnapshot(value, now = Date.now()) {
 function cadenceModel(forecasts, now, target = 'automatic_reset', fixedSnapshot) {
   const snapshot = fixedSnapshot || (forecasts && forecasts.status === 'ready' && (forecasts.cadenceByKind && forecasts.cadenceByKind[target] || target === 'automatic_reset' && forecasts.cadence));
   const current = validTime(now), generated = validTime(snapshot && snapshot.generatedAt), expires = validTime(snapshot && snapshot.validUntil);
-  const legacy = !!snapshot && (!snapshot.target || snapshot.modelVersion !== 'conditional-beta-reset-cadence-20261016-1');
+  const legacy = !!snapshot && (!snapshot.target || snapshot.modelVersion !== 'conditional-beta-reset-cadence-20261016-2');
   const expired = !!snapshot && (!Number.isFinite(current) || !Number.isFinite(generated) || !Number.isFinite(expires) || generated > current || expires <= current);
   const valid = !legacy && !!snapshot && snapshot.target === target && snapshot.calibrated === false && Number.isInteger(snapshot.sampleCount) && snapshot.sampleCount >= 8 && Number.isInteger(snapshot.eligibleCount) && snapshot.eligibleCount >= 5 && validProbability(snapshot.p24) && validProbability(snapshot.p48) && snapshot.p24 <= snapshot.p48;
   const ready = !!snapshot && snapshot.status === 'ready' && !expired && valid;
