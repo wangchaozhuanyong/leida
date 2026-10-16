@@ -15,43 +15,43 @@
   ],
   "window": {
     "navigationBarTitleText": "模钥重置雷达",
-    "navigationBarBackgroundColor": "#0b1113",
-    "navigationBarTextStyle": "white",
-    "backgroundColor": "#0b1113",
-    "backgroundColorTop": "#0b1113",
-    "backgroundColorBottom": "#0b1113",
-    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#f2f5fb",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f2f5fb",
+    "backgroundColorTop": "#f2f5fb",
+    "backgroundColorBottom": "#f2f5fb",
+    "backgroundTextStyle": "dark",
     "enablePullDownRefresh": true
   },
   "tabBar": {
-    "color": "#9ba9a6",
-    "selectedColor": "#f4c15c",
-    "backgroundColor": "#0b1113",
-    "borderStyle": "black",
+    "color": "#4d607b",
+    "selectedColor": "#2458ce",
+    "backgroundColor": "#fbfdff",
+    "borderStyle": "white",
     "list": [
       {
         "pagePath": "pages/home/index",
         "text": "首页",
-        "iconPath": "assets/radar.png",
-        "selectedIconPath": "assets/radar-gold.png"
+        "iconPath": "assets/neural/radar-muted.png",
+        "selectedIconPath": "assets/neural/radar-blue.png"
       },
       {
         "pagePath": "pages/news/index",
         "text": "动态",
-        "iconPath": "assets/news.png",
-        "selectedIconPath": "assets/news-gold.png"
+        "iconPath": "assets/neural/news-muted.png",
+        "selectedIconPath": "assets/neural/news-blue.png"
       },
       {
         "pagePath": "pages/announcements/index",
         "text": "记录",
-        "iconPath": "assets/records.png",
-        "selectedIconPath": "assets/records-gold.png"
+        "iconPath": "assets/neural/records-muted.png",
+        "selectedIconPath": "assets/neural/records-blue.png"
       },
       {
         "pagePath": "pages/settings/index",
         "text": "提醒",
-        "iconPath": "assets/reminder.png",
-        "selectedIconPath": "assets/reminder-gold.png"
+        "iconPath": "assets/neural/reminder-muted.png",
+        "selectedIconPath": "assets/neural/reminder-blue.png"
       }
     ]
   },

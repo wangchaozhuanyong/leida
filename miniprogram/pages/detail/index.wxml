@@ -24,9 +24,28 @@
         <text class="source-text quote" style="display:block" user-select="{{true}}">{{item.text}}</text><view class="small muted">本站采集：{{item.collectedAt}}</view><button wx:if="{{item.url}}" class="secondary full" style="margin-top:14px" data-url="{{item.url}}" bindtap="copySource">复制原始来源链接</button>
       </view><view wx:if="{{!detail.evidence.length}}" class="card muted">暂未提供可展示的原文。</view>
       </block><view class="card"><button class="disclosure-heading" data-section="recordOpen" bindtap="toggleSection" aria-expanded="{{recordOpen}}"><text>记录信息</text><text class="disclosure-symbol">{{recordOpen ? '−' : '+'}}</text></button><view wx:if="{{recordOpen}}"><view class="fact record-row"><view class="muted">资料截止</view><view>{{detail.cutoff}}</view></view><view class="fact record-row"><view class="muted">本站发布</view><view>{{detail.publishedAt}}</view></view><view class="fact record-row"><view class="muted">版本说明</view><view>{{detail.reason}}</view></view></view></view>
-      <block wx:if="{{detail.canShare}}"><view class="chips poster-themes"><button class="{{posterTheme === 'precision' ? 'active' : ''}}" data-theme="precision" bindtap="selectPosterTheme">深色长图</button><button class="{{posterTheme === 'editorial' ? 'active' : ''}}" data-theme="editorial" bindtap="selectPosterTheme">浅色长图</button></view><button class="primary full" open-type="share">分享此发布版本</button><button class="secondary full" style="margin-top:12px" loading="{{posterBusy}}" disabled="{{posterBusy}}" bindtap="generatePoster">生成公告长图</button></block>
-      <view wx:if="{{posterError}}" class="warning lead">{{posterError}}</view>
-      <view wx:if="{{posterPreview}}" class="card lead"><image src="{{posterPreview}}" mode="widthFix" style="width:100%;display:block" bindtap="previewPoster" aria-label="指定发布版本海报，点击查看大图"/><button class="primary full" style="margin-top:16px" loading="{{posterSaving}}" disabled="{{posterSaving || posterBusy}}" bindtap="savePoster">保存海报到相册</button></view>
+      <view wx:if="{{detail.canShare}}" class="detail-share">
+        <view class="share-heading">分享这条公告</view>
+        <view class="share-description">选一款长图，把这条公告分享给朋友。</view>
+        <view class="announcement-themes" role="group" aria-label="公告长图样式">
+          <button class="announcement-theme {{posterTheme === 'precision' ? 'is-selected' : ''}}" data-theme="precision" bindtap="selectPosterTheme" disabled="{{posterBusy || posterSaving}}" aria-pressed="{{posterTheme === 'precision'}}" aria-label="黑金长图{{posterTheme === 'precision' ? '，已选中' : ''}}">
+            <view class="theme-swatch theme-swatch-dark" aria-hidden="true"><view class="swatch-rule"/><view class="swatch-title"/><view class="swatch-line"/><view class="swatch-line short"/></view>
+            <view class="theme-copy"><view class="theme-name">黑金</view><view class="theme-caption">沉静醒目</view></view><view class="theme-check" aria-hidden="true">{{posterTheme === 'precision' ? '✓' : ''}}</view>
+          </button>
+          <button class="announcement-theme {{posterTheme === 'editorial' ? 'is-selected' : ''}}" data-theme="editorial" bindtap="selectPosterTheme" disabled="{{posterBusy || posterSaving}}" aria-pressed="{{posterTheme === 'editorial'}}" aria-label="米白长图{{posterTheme === 'editorial' ? '，已选中' : ''}}">
+            <view class="theme-swatch theme-swatch-light" aria-hidden="true"><view class="swatch-rule"/><view class="swatch-title"/><view class="swatch-line"/><view class="swatch-line short"/></view>
+            <view class="theme-copy"><view class="theme-name">米白</view><view class="theme-caption">清晰耐读</view></view><view class="theme-check" aria-hidden="true">{{posterTheme === 'editorial' ? '✓' : ''}}</view>
+          </button>
+        </view>
+        <view class="announcement-share-actions"><button class="share-friend" open-type="share">发给朋友</button><button class="share-generate" loading="{{posterBusy}}" disabled="{{posterBusy || posterSaving}}" bindtap="generatePoster">{{posterBusy ? '生成中' : posterPreview ? '更新长图' : '生成长图'}}</button></view>
+        <view wx:if="{{posterError}}" class="warning share-error" role="alert">{{posterError}}<button wx:if="{{!posterBusy}}" class="text-button" bindtap="generatePoster">重新生成 →</button></view>
+        <view wx:if="{{posterPreview}}" class="announcement-preview">
+          <view class="preview-heading"><text>长图预览</text><button class="text-button preview-expand" bindtap="previewPoster" disabled="{{posterBusy}}">查看大图 ↗</button></view>
+          <view class="announcement-poster-stage"><image src="{{posterPreview}}" mode="aspectFit" class="announcement-poster-image" bindtap="previewPoster" aria-label="公告长图，点击查看完整图片"/><view wx:if="{{posterBusy}}" class="poster-progress" role="status">正在生成{{posterTheme === 'precision' ? '黑金' : '米白'}}长图</view></view>
+          <button class="share-save" loading="{{posterSaving}}" disabled="{{posterSaving || posterBusy || !posterReady}}" bindtap="savePoster">保存长图到相册</button>
+          <view class="share-description preview-note">内容对应当前公告版本，点击图片可放大阅读。</view>
+        </view>
+      </view>
       <view wx:if="{{posterPrivacyNeeded}}" class="card stack"><button class="secondary full" bindtap="openPrivacyContract">阅读微信隐私指引</button><button class="primary full" open-type="agreePrivacyAuthorization" bindagreeprivacyauthorization="agreePosterPrivacy">同意并继续保存</button></view>
       <canvas type="2d" id="poster-canvas" style="position:fixed;left:-9999px;top:0;width:900px;height:2400px"/>
       <view class="foot">时间均为北京时间</view>

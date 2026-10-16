@@ -38,53 +38,86 @@ function posterInput(data, publicationId) {
 function createPosterLayout(input, measure, code = {status:'not_configured'}, options = {}) {
   if (!input || !input.publicationId || !Array.isArray(input.actions) || !Number.isInteger(input.version)) throw new PosterError('layout','指定海报版本资料不完整。');
   if (code.status === 'ready' && (code.publicationId !== input.publicationId || !code.filePath)) throw new PosterError('code_version','小程序码与这条发布版本不匹配。');
-  const width = Math.max(600,Math.min(1200,Number(options.width) || 900)), scale = width/900, margin = 60*scale;
+  const width = Math.max(600,Math.min(1200,Number(options.width) || 900)), scale = width/900, margin = 72*scale;
   const theme=options.theme==='editorial'?'editorial':'precision';
+  const palette=theme==='editorial'
+    ? {background:'#f6f0e5',surface:'#ede7da',text:'#202925',body:'#414b44',muted:'#677167',accent:'#9c4234',line:'#cfcabb'}
+    : {background:'#0b1113',surface:'#141b1d',text:'#eee6d0',body:'#c6ccc4',muted:'#9aa79e',accent:'#e8bf6f',line:'#34403d'};
   const commands = [], available = width-margin*2;
   let y = margin;
-  const line = () => { commands.push({type:'rect',x:margin,y,width:available,height:scale,color:'#34516e'}); };
-  const text = (value,size=27,color='#c5d1e5',weight=400,x=margin,maxWidth=available) => {
+  const rect = (x,top,w,h,color) => commands.push({type:'rect',x,y:top,width:w,height:h,color});
+  const rule = top => rect(margin,top,available,scale,palette.line);
+  // Both palettes use the same type metrics, so changing a style cannot reflow facts or the code.
+  const textAt = (value,x,top,maxWidth,size,color=palette.body,weight=400,leading=1.55) => {
     size *= scale;
-    for (const row of wrapText(value, value => measure(value,size,weight,theme==='editorial'&&size>=28*scale?'serif':'sans-serif'),maxWidth)) { commands.push({type:'text',text:row,x,y,size,color,weight}); y += Math.ceil(size*1.6); }
+    const lineHeight=Math.ceil(size*leading);
+    for (const row of wrapText(value,value=>measure(value,size,weight,'sans-serif'),maxWidth)) {
+      commands.push({type:'text',text:row,x,y:top,size,color,weight,font:'sans-serif'});
+      top+=lineHeight;
+    }
+    return top;
   };
-  text(input.name,32,'#e8f5ff',600); y+=30*scale;
-  text(`${input.historical?'历史收录':'公开资料'} · 第${input.version}版`,23,'#9ab8d3');
-  if (input.sourceTime) text(`来源发布：${input.sourceTime} 北京时间`,23,'#9ab8d3');
-  y+=12*scale; text(input.title,44,'#e9f6ff',650); y+=15*scale; text(input.summary);
-  for (const action of input.actions) {
-    y+=28*scale; line(); y+=24*scale;
-    text(action.title,28,action.tone === 'purple' ? '#c9b8f1':'#86e7f1',600);
-    text(`适用范围：${action.eligibility}`,25); text(`发放类型：${action.scope}`,24,'#a7c0d8');
-    text(`声明时间：${action.statementAt} 北京时间`,24,'#a7c0d8');
-    if (action.expectedAt) text(`预计时间：${action.expectedAt} 北京时间`,24,'#a7c0d8');
-    if (action.timeNote) text(action.timeNote,24,'#e9cd9d');
+  const text = (value,size,color=palette.body,weight=400,leading=1.55) => {
+    y=textAt(value,margin,y,available,size,color,weight,leading);
+  };
+
+  // A restrained masthead anchors the fixed template without competing with the announcement.
+  rect(margin,y,48*scale,4*scale,palette.accent);y+=24*scale;
+  text(input.name,27,palette.text,600);y+=22*scale;rule(y);y+=30*scale;
+  text(`${input.historical?'历史收录':input.newsOnly?'新闻更新':'公开公告'} · 第${input.version}版`,21,palette.accent,600);
+  if (input.sourceTime) { y+=6*scale;text(`来源发布：${input.sourceTime} 北京时间`,20,palette.muted); }
+  y+=24*scale;text(input.title,48,palette.text,700,1.32);y+=28*scale;
+  text('公告摘要',21,palette.muted,600);y+=12*scale;text(input.summary,27,palette.body,400,1.7);
+
+  // Each action is an independent fact group. Long values wrap inside a generous inner gutter.
+  for (const [index,action] of input.actions.entries()) {
+    y+=30*scale;
+    const top=y,inside=30*scale,innerX=margin+inside,innerWidth=available-inside*2;
+    const surface={type:'rect',x:margin,y:top,width:available,height:0,color:palette.surface};commands.push(surface);
+    y+=inside;
+    const number=String(index+1).padStart(2,'0'),numberWidth=Math.max(44*scale,measure(number,19*scale,600,'sans-serif'));
+    const titleX=innerX+numberWidth+18*scale;
+    textAt(number,innerX,y+6*scale,numberWidth,19,palette.accent,600);
+    y=textAt(action.title,titleX,y,innerWidth-numberWidth-18*scale,28,palette.text,600,1.45);y+=24*scale;
+    rect(innerX,y,innerWidth,scale,palette.line);y+=22*scale;
+    const labelWidth=114*scale,valueX=innerX+labelWidth+16*scale,valueWidth=innerWidth-labelWidth-16*scale;
+    const fact=(label,value)=>{
+      const start=y;
+      const labelEnd=textAt(label,innerX,start+2*scale,labelWidth,21,palette.muted);
+      const valueEnd=textAt(value,valueX,start,valueWidth,24,palette.body,400,1.55);
+      y=Math.max(labelEnd,valueEnd)+12*scale;
+    };
+    fact('适用范围',action.eligibility);
+    fact('发放类型',action.scope);
+    fact('声明时间',`${action.statementAt} 北京时间`);
+    if(action.expectedAt)fact('预计时间',`${action.expectedAt} 北京时间`);
+    if(action.timeNote){y+=4*scale;y=textAt(action.timeNote,innerX,y,innerWidth,22,palette.accent,400,1.6);y+=12*scale;}
+    y+=18*scale;surface.height=y-top;
   }
-  y=Math.max(850*scale,y+38*scale); line(); y+=30*scale;
-  text('资料截至',23,'#9cb6cf'); text(`${input.cutoff} 北京时间`,25,'#d4e5f4',500);
-  text(input.newsOnly?'仅新闻更新，福利状态以已确认记录为准':'公开声明不代表个人到账',22,'#9cb6cf');
-  y+=16*scale;
+
+  y+=42*scale;rule(y);y+=32*scale;
   let codeRect;
   if (code.status === 'ready') {
-    const size=280*scale; codeRect={x:(width-size)/2,y,width:size,height:size};
-    commands.push({type:'rect',...codeRect,color:'#ffffff'}); commands.push({type:'image',...codeRect});
-    y+=size+18*scale; text('扫码查看此发布版本',24,'#d4e5f4',500);
-  } else text(code.status === 'not_configured'?'小程序码尚未配置':'小程序码暂不可用',23,'#9cb6cf');
-  const palette=theme==='editorial'?{background:'#f6f0e5',text:'#1b211d',muted:'#63695f',accent:'#a63d31',line:'#8f9687'}:{background:'#0b1113',text:'#eee6d0',muted:'#a9b4a9',accent:'#f4c15c',line:'#5b5642'};
-  const oldMuted=['#9ab8d3','#a7c0d8','#9cb6cf'];
-  for(const command of commands){
-    if(command.type==='text'){command.color=['#c9b8f1','#86e7f1','#e9cd9d'].includes(command.color)?palette.accent:oldMuted.includes(command.color)?palette.muted:palette.text;command.font=theme==='editorial'&&command.size>=28*scale?'serif':'sans-serif';}
-    else if(command.type==='rect'&&command.color!=='#ffffff')command.color=palette.line;
+    // The entire genuine square bitmap fits inside a white circular plate, including its corners.
+    const size=220*scale,r=size/Math.sqrt(2)+8*scale,plateTop=y,cx=width-margin-r,cy=plateTop+r;
+    const copyWidth=available-r*2-38*scale;
+    let copyY=textAt('资料截至',margin,y,copyWidth,20,palette.muted,600);
+    copyY+=10*scale;copyY=textAt(`${input.cutoff} 北京时间`,margin,copyY,copyWidth,25,palette.text,500,1.5);
+    copyY+=24*scale;copyY=textAt(input.newsOnly?'仅新闻更新，福利状态以已确认记录为准':'公开声明不代表个人到账',margin,copyY,copyWidth,23,palette.body,400,1.6);
+    copyY+=18*scale;copyY=textAt('原文与更新记录，见此发布版本',margin,copyY,copyWidth,20,palette.muted);
+    // Store the image rectangle itself, never the surrounding decorative plate.
+    codeRect={x:cx-size/2,y:cy-size/2,width:size,height:size};
+    commands.push({type:'circle',x:cx,y:cy,r,color:'#ffffff',stroke:palette.line});
+    commands.push({type:'image',...codeRect});
+    const caption='扫码查看此发布版本',captionWidth=measure(caption,20*scale,500,'sans-serif');
+    const captionEnd=textAt(caption,cx-captionWidth/2,plateTop+r*2+18*scale,r*2,20,palette.muted,500);
+    y=Math.max(copyY,captionEnd);
+  } else {
+    text('资料截至',20,palette.muted,600);y+=8*scale;text(`${input.cutoff} 北京时间`,25,palette.text,500);
+    y+=18*scale;text(input.newsOnly?'仅新闻更新，福利状态以已确认记录为准':'公开声明不代表个人到账',23,palette.body);
+    y+=16*scale;text(code.status === 'not_configured'?'小程序码尚未配置':'小程序码暂不可用',20,palette.muted);
   }
-  if(codeRect){
-    // The complete server bitmap fits inside a circular white plate. No code pixel is clipped.
-    const r=codeRect.width/Math.sqrt(2)+8*scale,cx=width/2,cy=codeRect.y+codeRect.height/2;
-    const added=r-codeRect.height/2;
-    for(const command of commands)if(command.y>=codeRect.y)command.y+=command.type==='text'?added*2:added;
-    codeRect={...codeRect,y:codeRect.y+added};
-    commands.splice(commands.findIndex(item=>item.type==='image'),0,{type:'circle',x:cx,y:cy+added,r,color:'#ffffff',stroke:palette.line});
-    y+=added*2;
-  }
-  const height=Math.ceil(Math.max(1200*scale,y+margin));
+  const height=Math.ceil(y+margin);
   // This is an application memory limit, not a claim about a universal WeChat canvas limit.
   if (height > (Number(options.maxHeight) || 8192)) throw new PosterError('too_long','这条公告内容较长，请直接分享详情。');
   return {publicationId:input.publicationId,width:Math.ceil(width),height,commands,codeRect,codeStatus:code.status,theme,background:palette.background};

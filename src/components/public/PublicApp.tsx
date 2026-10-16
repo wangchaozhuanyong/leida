@@ -224,10 +224,11 @@ export function Home({ data, onWechatReminders, onPoster, onShare, historical, w
           <Link scroll={false} href={outlook.active ? `/events/${encodeURIComponent(outlook.active.eventId)}` : latest ? `/events/${encodeURIComponent(latest.event.id)}` : '/history'} className="pub-button full pub-evidence-action"><Icon name="news"/><span className="pub-evidence-desktop">{outlook.active ? '查看原文依据' : '查看最近发放依据'}</span><span className="pub-evidence-mobile">查看依据</span><Icon name="arrow"/></Link>
           <button onClick={onWechatReminders} className="pub-button full pub-subscribe"><Icon name="bell"/><span>微信提醒</span>{wechatEntry === 'unavailable' && <small>待开放</small>}<Icon name="arrow"/></button>
         </div>
-        <section className="pub-share-panel pub-share-compact" aria-labelledby="home-share-title">
-          <div><h2 id="home-share-title">分享重置动态</h2><p>黑金 / 水墨 · 两款固定海报</p></div>
-          <button className="pub-button" onClick={() => onPoster(latest?.publication, latest?.action.id)}>生成分享海报<Icon name="arrow"/></button>
-        </section>
+        <button className="pub-share-entry" onClick={() => onPoster(latest?.publication, latest?.action.id)} aria-label="生成分享海报，分享重置动态，黑金或水墨两款可选">
+          <span className="pub-share-entry-posters" aria-hidden="true"><span className="pub-share-entry-poster precision"/><span className="pub-share-entry-poster editorial"/></span>
+          <span className="pub-share-entry-copy"><span className="pub-share-entry-title">分享重置动态</span><span className="pub-share-entry-description">黑金 / 水墨 · 两款固定海报</span><span className="pub-share-entry-action">生成分享海报</span></span>
+          <span className="pub-share-entry-arrow" aria-hidden="true">↗</span>
+        </button>
         {outlook.active && latestRecord}
         {activity && <Link scroll={false} className="pub-instrument-activity" href={`/activities/${encodeURIComponent(activity.id)}`}><Icon name="calendar"/><div><h2>{activity.title}</h2><p>{activityPhase} · 已收录{activity.items.length}项进展</p></div><span>查看进展 <Icon name="arrow"/></span></Link>}
       </aside>

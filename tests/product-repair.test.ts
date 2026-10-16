@@ -30,7 +30,7 @@ test('公开来源按已配置周期投影延迟；禁用或人工来源不能�
 test('网页真实小程序码只在主动请求后加载，同一版本复用，不接受错误版本或伪造类型',async()=>{
   let calls=0;const fetcher:typeof fetch=async()=>{calls++;return Response.json({data:{publicationId:'repair-entry',contentType:'image/png',imageBase64:'iVBORw0KGgo='}});};
   const html=renderToStaticMarkup(createElement(WechatEntryGuide,{publicationId:'repair-entry',codeAvailable:true}));
-  assert.equal(calls,0);assert.match(html,/搜一搜/);assert.match(html,/查看我的提醒/);assert.match(html,/显示小程序码/);assert.doesNotMatch(html,/<img/);
+  assert.equal(calls,0);assert.match(html,/搜一搜/);assert.match(html,/即可查看已有次数/);assert.doesNotMatch(html,/查看我的提醒/);assert.match(html,/显示小程序码/);assert.doesNotMatch(html,/<img/);
   const signal=new AbortController().signal;
   assert.match(await loadEntryCode('repair-entry',signal,fetcher),/^data:image\/png;base64,/);
   await loadEntryCode('repair-entry',signal,fetcher);assert.equal(calls,1);

@@ -88,6 +88,59 @@ test('海报黑金与水墨切换只改样式，指定版本、完整事实及�
   assert.deepEqual(dark.commands.filter((c:{type:string})=>c.type==='text').map((c:{text:string})=>c.text),light.commands.filter((c:{type:string})=>c.type==='text').map((c:{text:string})=>c.text));
 });
 
+test('长标题、多动作和完整摘要在各导出宽度下互不覆盖，事实区与底部真码保持留白',()=>{
+  const input=p.posterInput(data(),'fixture-publication');
+  input.title='重置发放进展及不同账户的适用范围说明'.repeat(3);
+  input.summary=('公开公告包含多个独立动作，具体账户是否适用须核对原始声明。'.repeat(6))+'\n\n补充说明保留显式分段与全部限定条件。';
+  input.sourceTime='2026-10-10 08:00';
+  input.actions=[0,1,2].map(index=>({...input.actions[0],
+    title:`动作${index+1} · ${'本轮用量重置及发放预告的完整说明'.repeat(2)}`,
+    eligibility:`第${index+1}类账户，${'满足公告列出的有效订阅及地区条件，'.repeat(4)}以原始说明为准。`,
+    scope:index===1?'定向补偿':'公开发放',
+    timeNote:`动作${index+1}备注：预计时间可能调整，${'发放完成前请等待公开确认，'.repeat(3)}不要将预告视为个人到账。`}));
+  const code={status:'ready',publicationId:input.publicationId,filePath:'wxfile://fixture-server-code.png'};
+  for(const width of [600,900,1200]){
+    const dark=p.createPosterLayout(input,measure,code,{width,theme:'precision'});
+    const light=p.createPosterLayout(input,measure,code,{width,theme:'editorial'});
+    const textCommands=dark.commands.filter((c:{type:string})=>c.type==='text');
+    const texts=textCommands.map((c:{text:string})=>c.text).join('');
+    for(const fact of [input.title,input.summary,...input.actions.flatMap((a:Record<string,string>)=>[a.title,a.eligibility,a.scope,a.statementAt,a.expectedAt,a.timeNote])])assert.ok(texts.includes(fact.replace(/\n/g,'')),`full fact preserved at ${width}`);
+    const boxes=textCommands.map((c:{text:string;x:number;y:number;size:number})=>({x:c.x,y:c.y,width:measure(c.text,c.size),height:c.size,text:c.text}));
+    const margin=72*width/900;
+    for(const box of boxes){
+      assert.ok(box.x>=margin-.01&&box.x+box.width<=width-margin+.01,`horizontal gutter: ${box.text}`);
+      assert.ok(box.y>=margin&&box.y+box.height<=dark.height-margin+.01,`vertical gutter: ${box.text}`);
+    }
+    for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++){
+      const a=boxes[i],b=boxes[j];
+      const overlaps=a.x<b.x+b.width-.01&&a.x+a.width>b.x+.01&&a.y<b.y+b.height-.01&&a.y+a.height>b.y+.01;
+      assert.equal(overlaps,false,`overlapping text at ${width}: ${a.text} / ${b.text}`);
+    }
+    const circle=dark.commands.find((c:{type:string})=>c.type==='circle');
+    assert.ok(circle.x-circle.r>=margin&&circle.x+circle.r<=width-margin+.01);
+    for(const box of boxes){
+      const nearestX=Math.max(box.x,Math.min(circle.x,box.x+box.width));
+      const nearestY=Math.max(box.y,Math.min(circle.y,box.y+box.height));
+      assert.ok(Math.hypot(nearestX-circle.x,nearestY-circle.y)>circle.r,`code plate overlaps text: ${box.text}`);
+    }
+    assert.deepEqual(dark.codeRect,light.codeRect);
+    assert.deepEqual(textCommands.map(({color,...c}:Record<string,unknown>)=>c),light.commands.filter((c:{type:string})=>c.type==='text').map(({color,...c}:Record<string,unknown>)=>c));
+    assert.equal(p.createPosterLayout(input,measure,code,{width,maxHeight:dark.height}).height,dark.height);
+    assert.throws(()=>p.createPosterLayout(input,measure,code,{width,maxHeight:dark.height-1}),/较长/);
+  }
+});
+
+test('简短新闻模板随实际内容收尾，无动作不留空动作框或人为拉长空白',()=>{
+  const input=p.posterInput(data(),'fixture-publication');input.newsOnly=true;input.actions=[];
+  const layout=p.createPosterLayout(input,measure,{status:'unavailable'});
+  assert.ok(layout.height<1200);
+  assert.equal(layout.commands.some((c:{type:string;color?:string})=>c.type==='rect'&&c.color==='#141b1d'),false);
+  assert.ok(layout.commands.some((c:{text?:string})=>c.text==='小程序码暂不可用'));
+  const texts=layout.commands.filter((c:{type:string})=>c.type==='text').map((c:{text:string})=>c.text).join('');
+  assert.ok(texts.includes('仅新闻更新，福利状态以已确认记录为准'));
+  assert.ok(texts.includes('新闻更新 · 第7版'));
+});
+
 test('真实码文件只写微信沙盒，限定体积/类型/版本/scene，绘制后清理且重复清理无重复操作',async()=>{
   const written:Record<string,any>[]=[],removed:string[]=[];
   const wx={env:{USER_DATA_PATH:'wxfile://fixture-user'},getFileSystemManager(){return{writeFile(options:Record<string,any>){written.push(options);options.success();},unlink(options:Record<string,any>){removed.push(options.filePath);options.success();}};}};

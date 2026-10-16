@@ -202,7 +202,9 @@ export function createWechatService(dependencies:WechatDependencies={}) {
       const challengeTimes=(previous?.challengeTimes??[]).filter(at=>at>clock()-60_000);
       if(challengeTimes.length>=10)throw new DomainError('操作太快，请稍后再增加提醒次数',429);
       const nonce=randomBytes(32).toString('base64url'),expiresAt=new Date(clock()+5*60_000).toISOString();
-      const next=withCredits({...previous,id:grantId,readerId:value.id,appId:settings.appId,templateId:settings.templateId,status:'challenged',nonceHash:digest(nonce),nonceExpiresAt:expiresAt,requestedAt:timestamp(),updatedAt:timestamp(),challengeTimes:[...challengeTimes,clock()]},creditsOf(previous),'challenged');
+      // Preparing a fresh choice must not reopen a reader's closed reminder.
+      const status=previous?.status==='revoked'?'revoked':'challenged';
+      const next=withCredits({...previous,id:grantId,readerId:value.id,appId:settings.appId,templateId:settings.templateId,status,nonceHash:digest(nonce),nonceExpiresAt:expiresAt,requestedAt:timestamp(),updatedAt:timestamp(),challengeTimes:[...challengeTimes,clock()]},creditsOf(previous),status);
       await store.put('wechat_grants',next,client);
       return {state:await subscriptionView(value,client),templateId:settings.templateId,nonce,expiresAt};
     });
@@ -216,7 +218,9 @@ export function createWechatService(dependencies:WechatDependencies={}) {
       const receipt=digest(parsed.nonce),credits=creditsOf(grant);
       if(grant.confirmedNonceHash===receipt||credits.some(credit=>credit.id===receipt))return subscriptionView(value,client);
       if(grant.nonceHash!==receipt)throw new DomainError('订阅请求不存在或已失效',409);
-      if(grant.status==='revoked'||Date.parse(grant.nonceExpiresAt)<=clock())throw new DomainError('订阅请求已失效，请重新操作',409);
+      // Revocation expires the old nonce; only a fresh, reader-bound challenge
+      // may be accepted to reopen a closed reminder after an explicit choice.
+      if(Date.parse(grant.nonceExpiresAt)<=clock())throw new DomainError('订阅请求已失效，请重新操作',409);
       // One fresh accepted callback creates one opportunity, never a requested count.
       if(parsed.result==='accept')credits.push({id:receipt,acceptedAt:timestamp(),status:'available'});
       await store.put('wechat_grants',withCredits({...grant,confirmedNonceHash:receipt,acceptedAt:parsed.result==='accept'?timestamp():grant.acceptedAt},credits,parsed.result==='accept'?'available':'rejected'),client);return subscriptionView(value,client);

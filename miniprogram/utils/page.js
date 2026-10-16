@@ -3,7 +3,7 @@ function setWindowBackground() {
   // iOS has separate native top/bottom backdrops outside the page's CSS surface.
   if (typeof wx === 'undefined' || typeof wx.setBackgroundColor !== 'function') return;
   try {
-    wx.setBackgroundColor({ backgroundColor: '#0b1113', backgroundColorTop: '#0b1113', backgroundColorBottom: '#0b1113', fail() {} });
+    wx.setBackgroundColor({ backgroundColor: '#f2f5fb', backgroundColorTop: '#f2f5fb', backgroundColorBottom: '#f2f5fb', fail() {} });
   } catch (_) { /* An unavailable appearance API must never block page data. */ }
 }
 function createPage(build, extra = {}) {

@@ -1,0 +1,10 @@
+:host{display:block;width:100%;height:100%}
+.neural-art{position:relative;width:100%;height:100%;pointer-events:none}
+.neural-static,.neural-canvas{position:absolute;left:0;top:0;width:100%;height:100%}
+.neural-canvas{visibility:hidden}
+.is-ready .neural-canvas{visibility:visible}
+.is-ready .neural-static{visibility:hidden}
+/* Unsupported preference queries leave the ornament static. */
+.motion-preference{position:absolute;left:0;top:0;width:0;height:1px;visibility:hidden;pointer-events:none}
+@media(prefers-reduced-motion:no-preference){.motion-preference{width:1px}}
+@media(prefers-reduced-motion:reduce){.is-ready .neural-canvas{visibility:hidden}.is-ready .neural-static{visibility:visible}}

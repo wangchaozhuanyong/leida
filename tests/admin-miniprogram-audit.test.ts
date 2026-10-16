@@ -17,6 +17,7 @@ import { previewData } from '../src/components/admin/fixtures';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
 const mini = require('../miniprogram/utils/model.js');
+const { createWechatReader } = require('../miniprogram/utils/wechat.js');
 const now = '2026-10-12T00:00:00Z';
 function fixture(serverTime = now): PublicData {
   return { serverTime, site: { name: '隔离测试', description: '', autoPublish: false, version: 1 }, events: [], articles: [], publications: [], evidence: [], activities: [], notices: [], sources: [] };
@@ -33,16 +34,23 @@ function round(data: PublicData, id: string, stage: BenefitAction['stage'], stat
 type NativePage = Record<string, any> & { data: Record<string, any>; setData(patch: Record<string, unknown>): void };
 function home(data: PublicData, name = 'home'): NativePage {
   let definition: any;
-  const app = { preferences: { snapshot() { return { preferences: mini.preferenceDefaults, read: [], error: '' }; } }, client: { getState() { return { data, receivedAt: Date.now(), error: '', loading: false }; }, subscribe(fn: (state: any) => void) { fn(this.getState()); return () => {}; } } };
+  const wechatCalls = { privacy: 0, login: 0, request: 0, authorize: 0 };
+  const wxApi = {
+    getPrivacySetting(options: { success(result: { needAuthorization: boolean }): void }) { wechatCalls.privacy++; options.success({ needAuthorization: true }); },
+    login() { wechatCalls.login++; throw new Error('Privacy has not been accepted'); },
+    request() { wechatCalls.request++; throw new Error('Privacy has not been accepted'); },
+    requestSubscribeMessage() { wechatCalls.authorize++; throw new Error('An explicit subscription choice is required'); },
+  };
+  const app = { wechat: createWechatReader({ wxApi, config: { mode: 'https', baseUrl: 'https://public.example.org', timeoutMs: 10000 } }), preferences: { snapshot() { return { preferences: mini.preferenceDefaults, read: [], error: '' }; } }, client: { getState() { return { data, receivedAt: Date.now(), error: '', loading: false }; }, subscribe(fn: (state: any) => void) { fn(this.getState()); return () => {}; } } };
   const cache = new Map<string, { exports: any }>();
   function load(filename: string): any {
     if (cache.has(filename)) return cache.get(filename)!.exports;
     const module = { exports: {} }; cache.set(filename, module);
-    new Script(readFileSync(filename, 'utf8'), { filename }).runInNewContext({ module, exports: module.exports, Page(value: any) { definition = value; }, getApp() { return app; }, Date, Intl, setInterval() { return 1; }, clearInterval() {}, require(path: string) { const target = resolve(dirname(filename), path.endsWith('.js') ? path : `${path}.js`); assert.ok(target.startsWith(resolve(root, 'miniprogram') + '/')); return load(target); } });
+    new Script(readFileSync(filename, 'utf8'), { filename }).runInNewContext({ module, exports: module.exports, Page(value: any) { definition = value; }, getApp() { return app; }, wx: wxApi, Date, Intl, setInterval() { return 1; }, clearInterval() {}, setTimeout, clearTimeout, require(path: string) { const target = resolve(dirname(filename), path.endsWith('.js') ? path : `${path}.js`); assert.ok(target.startsWith(resolve(root, 'miniprogram') + '/')); return load(target); } });
     return module.exports;
   }
   load(resolve(root, `miniprogram/pages/${name}/index.js`));
-  const page = { ...definition, data: structuredClone(definition.data), setData(patch: Record<string, unknown>) { Object.assign(this.data, patch); } } as NativePage;
+  const page = { ...definition, data: structuredClone(definition.data), wechatCalls, setData(patch: Record<string, unknown>) { Object.assign(this.data, patch); } } as NativePage;
   page.onLoad({}); page.onShow(); return page;
 }
 
@@ -102,9 +110,20 @@ test('后台任务有错误时优先显示异常，即使上次心跳新鲜也�
   assert.match(html, /自动任务暂时异常/); assert.match(html, /隔离测试：预测任务未完成/); assert.doesNotMatch(html, /自动任务运行正常/);
 });
 
-test('小程序客户设置优先显示站内信，运营来源名称和技术操作不进入页面', () => {
+test('小程序客户设置优先显示站内信，隐私未同意不登录，运营来源名称和技术操作不进入页面', async () => {
   const data = fixture(); data.sources = [{ id: 'internal-test', name: '人工补充原文（隔离输入）', status: 'healthy', lastSuccessAt: now }];
-  const page = home(data, 'settings'); assert.equal(page.data.sources, undefined); assert.equal(page.data.connected, true); page.onUnload();
+  data.notices = [{ id: 'isolated-admin-notice', eventId: '', publicationId: '', semanticKey: 'isolated-admin-notice', origin: 'admin', title: '隔离站内信', summary: '提醒页预览', body: '完整站内信正文', categories: ['system'], status: 'active', createdAt: now }];
+  const page = home(data, 'settings');
+  try {
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(page.data.sources, undefined); assert.equal(page.data.connected, true);
+    assert.equal(page.data.notices[0].title, '隔离站内信'); assert.equal(page.data.unread, 1);
+    assert.equal(page.data.wechat.privacyNeeded, true); assert.equal(page.data.wechat.safe, null);
+    assert.deepEqual(page.wechatCalls, { privacy: 1, login: 0, request: 0, authorize: 0 });
+    assert.equal(page._wechatRefreshTimer, undefined, '隐私未同意时不调度后台状态读取');
+  } finally { page.onUnload(); }
+  assert.equal(page._wechatUnsubscribe, null); assert.equal(page._wechatRefreshTimer, null);
   const template = readFileSync(resolve(root, 'miniprogram/pages/settings/index.wxml'), 'utf8');
   assert.doesNotMatch(template, /wx:for="{{sources}}"|item\.name|item\.status|最近采集/); assert.match(template, /站内信/); assert.match(template, /查看全部提醒/); assert.doesNotMatch(template,/重新读取资料|资料截至|刷新授权状态|活动进展/);
+  assert.match(template, /open-type="agreePrivacyAuthorization"/); assert.match(template, /bindtap="openPrivacyContract"/);
 });
