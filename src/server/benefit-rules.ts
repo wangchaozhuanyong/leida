@@ -1,7 +1,7 @@
 import type { ActionKind, ActionStage, BenefitAction } from '../lib/types';
 
 /** Change only when fact interpretation changes, so unchanged inputs are evaluated once. */
-export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261013-8';
+export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261016-9';
 export interface BenefitClaim {
   kind: ActionKind; stage: ActionStage; eligibility: string; scope: BenefitAction['scope'];
   quote: string; expectedAt?: string; timeNote?: string;
@@ -12,7 +12,7 @@ const banked = /banked\s*(?:resets?|重置)|重置卡|存卡|备用重置|累积
 const usage = /(?:usage(?:\s+limits?)?|rate\s+limits?|用量|使用(?:额度|限制|限额|量)).{0,40}(?:reset|重置)|(?:reset|重置).{0,40}(?:usage(?:\s+limits?)?|rate\s+limits?|用量|使用(?:额度|限制|限额|量))/i;
 const globalReset = /\bglobal\s+(?:(?:usage|rate\s+limits?)\s+)?reset\b|全局(?:用量)?重置/i;
 // A short completion can inherit a benefit only through extractReplyClaims' explicit parent.
-const deicticCompletion = /^(?:it|that|this)(?:'s|\s+is)\s+(?:(?:now|already)\s+)?done[.!]?$/i;
+const deicticCompletion = /^(?:done\s+and\s+dusted|(?:it|that|this)(?:'s|\s+is)\s+(?:(?:now|already)\s+)?done)[.!]?$/i;
 const dayEndDeadline = /\b(?:by|before)\s+(?:the\s+)?(?:end\s+of\s+(?:the\s+)?(?:day|today|tomorrow)|EOD)\b|(?:今日|今天|当日|当天|明天)结束(?:之)?前|日终(?:之)?前/i;
 const excluded = /\b(?:purchase[ds]?|buy|bought|referral|invitation|invite[ds]?|redeem(?:ed|ing)?|carry(?:ing)? over|carried over|my resets?|my account|just you|your account only|inventory|store|stock|option)\b|购买|邀请|推荐奖励|个人结转|私人|仅你|仅该账户|自行使用|主动用卡|商店|库存|已有的重置卡/i;
 const targeted = /\b(?:some|certain|selected|subset|specific|affected)\s+(?:\w+\s+){0,3}(?:users?|accounts?)|\b\d[\d,]*(?:\.\d+)?[km]?\s+(?:\w+\s+){0,2}(?:users?|accounts?)\b|部分|特定|选定|受(?:故障)?影响|定向补偿/i;
@@ -76,10 +76,10 @@ export function benefitStage(text: string): ActionStage | undefined {
   if (/(?:not|never|won't|haven't|hasn't|didn't|cannot|can't|not yet).{0,35}(?:reset|giv|add|load|credit|grant|land|propagat|complet|cancel|withdraw)|(?:尚未|没有|并未|未曾|不会|不再|不).{0,15}(?:发放|重置|添加|存入|到账|落地|取消|撤回)/i.test(s) && !/不再发放/.test(s)) return;
   if (/\b(?:cancelled|canceled|withdrawn|withdrew|cancel|withdraw)\b|取消|撤回|不再发放/i.test(s)) return 'cancelled';
   if (/\b(?:will|(?:we|i|they)'ll|going to|scheduled to|plan to|should|expect(?:ed)?)\b.{0,80}(?:reset|giv|add|load|credit|grant|land|propagat|complet|be there|be showing)|将(?:会|于)?|计划|预计|安排|承诺|(?:改为|调整为)(?:稍后|之后|以后).{0,12}(?:发放|重置)/i.test(s)) return 'promised';
-  if (/\blanding\b.{0,60}(?:\btomorrow\b|\btoday\b|\bsoon\b|\bin\b|\bby\b|\d{1,2}(?::\d{2})?\s*[ap]m\b)/i.test(s)) return 'promised';
+  if (/\blanding\b.{0,60}(?:\btomorrow\b|\btoday\b|\bsoon\b|\bin\b|\bwithin\b|\bby\b|\d{1,2}(?::\d{2})?\s*[ap]m\b)/i.test(s)) return 'promised';
   if (/\b(?:are|is|we're)\s+(?:now\s+)?(?:giving|loading|crediting|granting|reset{1,2}ing)|\b(?:loading|rolling out|propagating|in progress)\b|正在|发放中|传播中|加载中/i.test(s)) return 'in_progress';
   if (deicticCompletion.test(s)) return 'claimed_complete';
-  if (/\b(?:have|has)\s+(?:now\s+|already\s+|just\s+|been\s+|fully\s+)*(?:reset|added|credited|granted|given|loaded|deposited|landed|propagated|completed)\b|^(?:added|credited|granted|loaded)\b|\b(?:confirmed|fully|all)\s+(?:landed|propagated|credited|loaded|completed)\b|\b(?:reset|resets)\s+(?:have\s+)?(?:all\s+)?(?:landed|propagated|completed)\b|已(?:经|全部)?(?:为.{0,80})?(?:确认|重置|发放|到账|落地|传播|加载|存入|添加)|全部.{0,20}(?:落地|传播)/i.test(s)) return 'claimed_complete';
+  if (/\b(?:have|has)\s+(?:now\s+|already\s+|just\s+|been\s+|fully\s+)*(?:reset|added|credited|granted|given|loaded|deposited|landed|propagated|completed|processed)\b|^(?:added|credited|granted|loaded)\b|\b(?:confirmed|fully|all)\s+(?:landed|propagated|credited|loaded|completed)\b|\b(?:reset|resets)\s+(?:have\s+)?(?:all\s+)?(?:landed|propagated|completed)\b|已(?:经|全部)?(?:为.{0,80})?(?:确认|重置|发放|到账|落地|传播|加载|存入|添加)|全部.{0,20}(?:落地|传播)/i.test(s)) return 'claimed_complete';
   if (/^all\s+reset\s+for\s+everyone[.!]?$/i.test(s)) return 'claimed_complete';
   // The original's short announcement omits "will", but a global action with
   // a prospective deadline still states a promise, not a completed reset.
@@ -211,7 +211,7 @@ export function benefitTime(text: string, publishedAt: string): Pick<BenefitClai
     const date = new Date(Date.UTC(year, month - 1, day, hour, minute));
     if (hour < 24 && minute < 60 && date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day) return { expectedAt: new Date(date.getTime() - offset * 60_000).toISOString(), timeNote: pointNote };
   }
-  const relative = s.match(/(?:\bin\s+(?:the\s+next\s+)?|\bwithin\s+|发布后|接下来|在)(?:~\s*|about\s+|approximately\s+|roughly\s+|约|大约)?(\d+(?:\.\d+)?|an?|一|二|两|三|四|五|六|七|八|九|十)?\s*(hours?|minutes?|小时|分钟)(?:(?:\s+(?:and\s+)?|\s*(?:和|又)\s*|(?<=小时))(\d+(?:\.\d+)?)\s*(minutes?|分钟))?(?:内)?/i);
+  const relative = s.match(/(?:\bin\s+(?:the\s+next\s+)?|\bwithin\s+(?:the\s+next\s+)?|发布后|接下来|在)(?:~\s*|about\s+|approximately\s+|roughly\s+|约|大约)?(\d+(?:\.\d+)?|an?|一|二|两|三|四|五|六|七|八|九|十)?\s*(hours?|minutes?|小时|分钟)(?:(?:\s+(?:and\s+)?|\s*(?:和|又)\s*|(?<=小时))(\d+(?:\.\d+)?)\s*(minutes?|分钟))?(?:内)?/i);
   if (relative) {
     const numbers: Record<string, number> = { 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };
     const amount = !relative[1] ? /^(?:hour|minute)$/i.test(relative[2]) ? 1 : NaN : /^an?$/i.test(relative[1]) ? 1 : numbers[relative[1]] ?? Number(relative[1]);

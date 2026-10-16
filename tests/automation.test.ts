@@ -203,7 +203,7 @@ test('真实隔离库：自动积压接续、证据关联、有限恢复与人�
       await generateCandidate(child.candidate!);
       const waiting=(await one<Candidate>('candidates',child.candidate!.id))!;
       assert.equal(waiting.status,'pending');assert.ok(waiting.automation?.inputFingerprint);
-      const parent=await fixture({messageId:parentKey,url:`https://x.com/automation_fixture/status/${parentKey}`});
+      const parent=await fixture({messageId:parentKey,url:`https://x.com/automation_fixture/status/${parentKey}`,publishedAt:new Date(Date.parse(child.evidence.publishedAt)-3600000).toISOString()});
       await put('candidates',{...parent.candidate!,status:'ignored'});
       await schedule();const task=(await list<Job>('jobs')).find(job=>job.candidateId===child.candidate!.id&&job.status==='queued')!;
       assert.ok(task);assert.notEqual(task.payload.inputFingerprint,waiting.automation!.inputFingerprint);
@@ -282,7 +282,7 @@ test('真实隔离库：自动积压接续、证据关联、有限恢复与人�
       const jobsBefore=(await list<Job>('jobs')).filter(job=>job.candidateId===child.candidate!.id).length;
       await schedule();
       assert.equal((await list<Job>('jobs')).filter(job=>job.candidateId===child.candidate!.id).length,jobsBefore,'未补齐前不重复收费');
-      const parent=await fixture({text:'We will load a banked reset for all accounts.'});
+      const parent=await fixture({text:'We will load a banked reset for all accounts.',publishedAt:new Date(Date.parse(child.evidence.publishedAt)-3600000).toISOString()});
       assert.equal(parent.evidence.messageId,parentMessage);
       await schedule();
       const resumed=(await list<Job>('jobs')).find(job=>job.candidateId===child.candidate!.id&&job.status==='queued');
@@ -292,8 +292,9 @@ test('真实隔离库：自动积压接续、证据关联、有限恢复与人�
       assert.equal(completed.status,'published');
       assert.ok(generated.length>callsBefore);
       assert.ok(completed.content.evidenceIds.includes(parent.evidence.id));
-      const count=generated.length;await schedule();await completeQueued();await schedule();
-      assert.equal(generated.length,count,'补齐后的同一输入只生成一次');
+      const childCalls=()=>generated.filter(items=>items[0]?.id===child.evidence.id).length;
+      const count=childCalls();await schedule();await completeQueued();await schedule();
+      assert.equal(childCalls(),count,'补齐后的同一输入只生成一次');
     });
     await t.test('无智能接口先发布结构化中文模板，恢复后补充同一文章',async()=>{
       const previous=await one<Source>('sources','official-status');

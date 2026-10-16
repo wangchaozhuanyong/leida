@@ -6,7 +6,7 @@ import { pool, list, one, insert, put, transaction, withAutoPublicationGuard } f
 import type { Candidate, Evidence, Job, Source, SiteSettings, RadarEvent, DraftContent, CandidateAutomation, Article } from '../lib/types';
 import { AIServiceError, generateContent, type AIRecord } from './ai';
 import { collectSource, SourceStructureError, SourceRateLimitError, SourceConfigurationError, SourceTransientError } from './ingestion';
-import { gatherEvidenceContext, hasCompleteContext, evidenceBenefitClaims } from './source-context';
+import { gatherEvidenceContext, gatherExplicitEvidenceContext, hasCompleteContext, evidenceBenefitClaims, directEvidenceBenefitClaims, processingObstacles, isVerifiedCampaignCalendar } from './source-context';
 import { extractBenefitClaims } from './benefit-rules';
 import { buildAutomaticTemplate, evidenceFingerprint, classifyBlockers, isClearlyUnrelated, hasExplicitCorrectionText } from './automatic-content';
 import { enrichKnownEvidence, enrichQuotedResetContext } from './source-enrichment';
@@ -42,7 +42,7 @@ export function sourceRetryAt(source:Source,retryAt?:string,timestamp=Date.now()
 function contextFor(candidate:Candidate,primary:Evidence,all:Evidence[]):Evidence[] {
   const supplemental=all.filter(item=>candidate.content.evidenceIds.includes(item.id)&&all.find(latest=>latest.sourceId===item.sourceId&&latest.messageId===item.messageId)?.id===item.id);
   const context=[...new Map([...gatherEvidenceContext(primary,all),...supplemental].map(item=>[item.id,item])).values()];
-  return hasCompleteContext(primary,context)?context.filter(item=>hasCompleteContext(item,context)):context;
+  return hasCompleteContext(primary,context)?context.filter(item=>hasCompleteContext(item,context)||isVerifiedCampaignCalendar(item,context)):context;
 }
 export function canEnrich(primary:Evidence):boolean {
   return (primary.provenance==='archive'||primary.provenance==='official'&&primary.sourceId==='tibo-timeline') && (primary.textOrigin!=='original'||!primary.contextComplete&&(!!primary.parentId||/https:\/\/t\.co\/[A-Za-z0-9]+\b/.test(primary.text))) && /^https:\/\/(?:x|twitter)\.com\/[A-Za-z0-9_]+\/status\/\d+(?:[?#].*)?$/.test(primary.url);
@@ -119,7 +119,12 @@ export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichme
       if(enrichArticle&&!actualArticle)continue;
       const publishedRecheck=enrichArticle&&actualArticle?.publicationMode==='news_only'&&inputChanged;
       const template=allowTemplates&&(!enrichArticle||publishedRecheck)?buildAutomaticTemplate(context):undefined;
-      const probeDue=options.allowEnrichment!==false && canEnrich(original) && (!candidate.automation?.resumeAt||Date.parse(candidate.automation.resumeAt)<=Date.now());
+      const obstacles=processingObstacles(context);
+      if(!template&&!ready&&!enrichArticle&&!obstacles.missing){
+        if(inputChanged||!savedFingerprint)await put('candidates',{...candidate,automation:{state:obstacles.conflict?'conflict':'deferred',reasonCodes:obstacles.codes,dependencyIds:[],inputFingerprint:fingerprint,evaluatedAt:now()},updatedAt:now()},c);
+        continue;
+      }
+      const probeDue=obstacles.missing && options.allowEnrichment!==false && canEnrich(original) && (!candidate.automation?.resumeAt||Date.parse(candidate.automation.resumeAt)<=Date.now());
       const newsContextProbe=enrichArticle&&actualArticle?.publicationMode==='news_only'&&!hasCompleteContext(original,context)&&probeDue;
       const candidateEvent=events.find(event=>event.id===(candidate.content.eventId??actualArticle?.eventId));
       if(ruleOnly&&candidate.automation?.state==='conflict'&&!isStaleMachineConflict(candidate,candidateEvent))continue;
@@ -184,9 +189,11 @@ function messageKey(evidence:Evidence,messageId=evidence.messageId):string {
 function linkedBenefitContext(primary:Evidence,context:Evidence[]):{context:Evidence[];bounded:boolean} {
   // A self-contained benefit statement is the referent for its completion.
   // Its older product/activity ancestors remain lineage, not another reset round.
-  const benefit=evidenceBenefitClaims(primary,context).length>0;
-  const referent=benefit?context.findIndex((item,index)=>index>0&&hasCompleteContext(item,context)&&extractBenefitClaims(item.text,item.publishedAt).length>0):-1;
-  const standalone=benefit&&referent<0&&extractBenefitClaims(primary.text,primary.publishedAt).length>0;
+  const full=context;
+  context=gatherExplicitEvidenceContext(primary,context);
+  const benefit=evidenceBenefitClaims(primary,full).length>0;
+  const referent=benefit?context.findIndex((item,index)=>index>0&&hasCompleteContext(item,full)&&directEvidenceBenefitClaims(item,full).length>0):-1;
+  const standalone=benefit&&referent<0&&directEvidenceBenefitClaims(primary,full).length>0;
   return {context:referent>0?context.slice(0,referent+1):standalone?[primary]:context,bounded:referent>0||standalone};
 }
 /** Action identity and event links must use the same verified benefit boundary. */
@@ -268,9 +275,10 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
   if(generatedCheckpoint&&job.payload.inputFingerprint!==fingerprint)generatedCheckpoint=false;
   if(job.payload.contextProbe&&previousFingerprint===fingerprint) {
     const blocked=classifyBlockers(candidate.reasons,context);
-    const waiting=!hasCompleteContext(primary,context)||blocked.reasonCodes.includes('missing_context');
-    const state=waiting?Date.now()-Date.parse(candidate.createdAt)>24*3600_000?'deferred':'waiting_evidence':'configuration';
-    await saveAutomation(candidate,{...blocked,state,reasonCodes:waiting?blocked.reasonCodes:['ai_not_configured'],inputFingerprint:fingerprint,evaluatedAt:now(),resumeAt:new Date(Date.now()+CONTEXT_PROBE_INTERVAL).toISOString(),articleId:candidate.automation?.articleId,templatePublished:candidate.automation?.templatePublished});
+    const obstacles=processingObstacles(context);
+    const waiting=obstacles.missing;
+    const state=waiting?Date.now()-Date.parse(candidate.createdAt)>24*3600_000?'deferred':'waiting_evidence':obstacles.conflict?'conflict':'deferred';
+    await saveAutomation(candidate,{...blocked,state,reasonCodes:obstacles.codes,inputFingerprint:fingerprint,evaluatedAt:now(),resumeAt:waiting?new Date(Date.now()+CONTEXT_PROBE_INTERVAL).toISOString():undefined,articleId:candidate.automation?.articleId,templatePublished:candidate.automation?.templatePublished});
     return false;
   }
   const ai=await one<AIRecord>('settings','ai');
@@ -284,8 +292,9 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
   else if(aiReady(ai)||generator!==generateContent)draft={...await generator(context,candidate.content),contentOrigin:'generated'};
   else {
     const blocked=classifyBlockers(candidate.reasons,context);
-    const waiting=!hasCompleteContext(primary,context)||blocked.reasonCodes.includes('missing_context');
-    await saveAutomation(candidate,{...blocked,state:waiting?'waiting_evidence':'configuration',reasonCodes:waiting?blocked.reasonCodes:['ai_not_configured'],inputFingerprint:fingerprint,evaluatedAt:now(),resumeAt:waiting||canEnrich(primary)?new Date(Date.now()+CONTEXT_PROBE_INTERVAL).toISOString():undefined,articleId:candidate.automation?.articleId,templatePublished:candidate.automation?.templatePublished});
+    const obstacles=processingObstacles(context);
+    const waiting=obstacles.missing;
+    await saveAutomation(candidate,{...blocked,state:waiting?'waiting_evidence':obstacles.conflict?'conflict':'deferred',reasonCodes:obstacles.codes,inputFingerprint:fingerprint,evaluatedAt:now(),resumeAt:waiting?new Date(Date.now()+CONTEXT_PROBE_INTERVAL).toISOString():undefined,articleId:candidate.automation?.articleId,templatePublished:candidate.automation?.templatePublished});
     return false;
   }
   // Hold only the short link/publish phase, never an external model request.

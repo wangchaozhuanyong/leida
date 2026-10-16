@@ -26,11 +26,13 @@ test('中文双动作分别绑定资格与阶段，含歧义时间的预告不�
  const clear=ev('已为所有付费账户发放重置卡。');const ready=buildAutomaticTemplate([clear])!;
  assert.equal(ready.actions[0].kind,'banked_reset');assert.equal(ready.actions[0].stage,'claimed_complete');assert.deepEqual(validateDraft(ready,[clear],true),[]);
 });
-test('辅助归档标题不可构成动作，截断正文不自动发布',()=>{
+test('辅助归档标题不可构成动作，截断正文只发布待确认消息',()=>{
  const e=ev('已确认在所有账户落地。',{contextComplete:false,metadata:{title:'给所有人一张重置卡',benefitKind:'banked_reset'}});
  const d=buildAutomaticTemplate([e])!;assert.equal(d.publicationMode,'news_only');assert.equal(d.actions.length,0);assert.equal(canUseNewsOnlyAttribution(d,[e]),true);assert.deepEqual(validateDraft(d,[e],true),[]);
- assert.equal(buildAutomaticTemplate([ev('因此……重置已经',{contextComplete:false})]),undefined);
- assert.equal(buildAutomaticTemplate([ev('因此……重置已经… https://t.co/test',{contextComplete:false})]),undefined);
+ for(const text of ['因此……重置已经','因此……重置已经… https://t.co/test']){
+  const e=ev(text,{contextComplete:false}),pending=buildAutomaticTemplate([e])!;
+  assert.equal(pending.reviewStatus,'pending');assert.equal(pending.publicationMode,'news_only');assert.deepEqual(pending.actions,[]);assert.deepEqual(validateDraft(pending,[e],true),[]);
+ }
 });
 test('原帖补成英文后可沿用归档中文消息，不能借翻译确认发卡',()=>{
  const e=ev('Confirmed landed across all accounts.',{contextComplete:false,textOrigin:'original',metadata:{summary:'已确认在所有账户落地。'}});
