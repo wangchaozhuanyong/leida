@@ -515,14 +515,14 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);news.onUnload();
-  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.13 · 体验版');settings.onUnload();
-  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.13');fallback.onUnload();
+  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.14 · 体验版');settings.onUnload();
+  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.14');fallback.onUnload();
   for(const [envVersion,label] of [['release','正式版'],['develop','开发版']]){
     const page=nativeHarness(fixture(),{accountInfo:{miniProgram:{envVersion,version:'99.0.0'}}}).page('settings');
-    assert.equal(page.data.clientVersion,`1.0.13 · ${label}`,'微信返回的包号不能覆盖本次随包代码版本');page.onUnload();
+    assert.equal(page.data.clientVersion,`1.0.14 · ${label}`,'微信返回的包号不能覆盖本次随包代码版本');page.onUnload();
   }
   const unavailable=nativeHarness(fixture(),{wxApi:{getAccountInfoSync(){throw new Error('Account information unavailable');}}}).page('settings');
-  assert.equal(unavailable.data.clientVersion,'1.0.13');assert.equal(unavailable.data.connected,true);unavailable.onUnload();
+  assert.equal(unavailable.data.clientVersion,'1.0.14');assert.equal(unavailable.data.connected,true);unavailable.onUnload();
 });
 
 test('四个原生导航页初始化 iOS 窗口底色，缓存返回和资料刷新不反复触碰窗口外观',()=>{
@@ -696,4 +696,18 @@ test('观察记录缓存返回不制造遮罩，迟到请求不改变当前页�
   finishes[1]();await new Promise(resolve=>setImmediate(resolve));assert.equal(page.data.navigationLoading,false);
   h.replace(fixture());assert.equal(page.data.navigationLoading,false,'后台同步不重复遮住页面');
   page.onUnload();assert.equal(h.subscriptions,0);assert.equal(page.data.navigationLoading,false);
+});
+
+test('待确认及定向跟踪在原生列表和详情保留原因，不增加福利次数；损坏标记拒绝载入',()=>{
+ for(const reviewStatus of ['pending','targeted_update'] as const){
+  const data=fixture(),before=mini.publicActions(data).length;
+  const p=addRound(data,'review-'+reviewStatus,[]);
+  p.mode='news_only';Object.assign(p.article,{publicationMode:'news_only',reviewStatus,reviewReasons:['资格或轮次等待原文核对']});
+  Object.assign(data.articles.find(a=>a.id===p.articleId)!,p.article);
+  assert.equal(validateBootstrap(data),true);
+  assert.equal(mini.publicationCard(data,p).reviewStatus,reviewStatus);
+  const detail=mini.resolveDetail(data,{publicationId:p.id});assert.equal(detail.reviewStatus,reviewStatus);assert.match(detail.reviewReasons,/原文核对/);assert.deepEqual(detail.actions,[]);
+  assert.equal(mini.publicActions(data).length,before);
+  const broken=structuredClone(data);(broken.articles.find(a=>a.id===p.articleId)! as unknown as {reviewReasons:unknown}).reviewReasons='wrong-shape';assert.equal(validateBootstrap(broken),false);
+ }
 });

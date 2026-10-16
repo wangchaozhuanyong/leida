@@ -1,2 +1,2 @@
 .replay-controls { display:flex; flex-wrap:wrap; gap:8px; margin:16px 0; }
-.replay-controls button { flex:1; min-width:72px; margin:0; }
+.replay-controls button { flex:1 1 calc(50% - 4px); min-width:0; margin:0; padding:11px 8px; white-space:nowrap; }

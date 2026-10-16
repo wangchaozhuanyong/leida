@@ -1,0 +1,407 @@
+[
+  {
+    "sourceId": "tibo-public",
+    "messageId": "2102254445082116335",
+    "url": "https://x.com/thsottiaux/status/2102254445082116335",
+    "text": "Ladies and gentlemen... start... your... ENGINES. We are almost Tuesday and I promised a reset for Tuesday. Among some other things. See you soon.",
+    "publishedAt": "2026-09-22T04:31:32.000Z",
+    "collectedAt": "2026-10-15T17:35:53.175Z",
+    "contextComplete": false,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "metadata": {
+      "sourceGroup": "fxembed:thsottiaux",
+      "category": "reset"
+    }
+  },
+  {
+    "sourceId": "tibo-public",
+    "messageId": "2103911959544610829",
+    "url": "https://x.com/thsottiaux/status/2103911959544610829",
+    "text": "Resets all propagated. That will be all. Have a fantastic weekend.",
+    "publishedAt": "2026-09-26T18:17:54.000Z",
+    "collectedAt": "2026-10-15T17:35:52.383Z",
+    "contextComplete": false,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "metadata": {
+      "sourceGroup": "fxembed:thsottiaux",
+      "category": "reset"
+    }
+  },
+  {
+    "sourceId": "reset-archive",
+    "messageId": "2103911959544610829",
+    "url": "https://x.com/thsottiaux/status/2103911959544610829",
+    "text": "所有重置均已传播。就这些。祝周末愉快。",
+    "publishedAt": "2026-09-26T18:17:54.000Z",
+    "collectedAt": "2026-10-14T10:34:45.042Z",
+    "contextComplete": false,
+    "provenance": "archive",
+    "textOrigin": "archive_excerpt",
+    "metadata": {
+      "summary": "所有重置均已传播。就这些。祝周末愉快。",
+      "category": "reset",
+      "sourceGroup": "codex-resets"
+    }
+  },
+  {
+    "sourceId": "tibo-public",
+    "messageId": "2106233145163141249",
+    "url": "https://x.com/thsottiaux/status/2106233145163141249",
+    "text": "Seeing some reports that the Pro 500 didn’t get the reset as expected earlier. Investigating and will make up for it",
+    "publishedAt": "2026-10-03T04:01:28.000Z",
+    "collectedAt": "2026-10-15T17:35:47.899Z",
+    "contextComplete": false,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "metadata": {
+      "sourceGroup": "fxembed:thsottiaux",
+      "category": "reset"
+    }
+  },
+  {
+    "sourceId": "tibo-public",
+    "messageId": "2106239435461579088",
+    "url": "https://x.com/thsottiaux/status/2106239435461579088",
+    "text": "All fixed. Surprising number of Pro 500 users on here.",
+    "parentId": "2106233145163141249",
+    "publishedAt": "2026-10-03T04:26:28.000Z",
+    "collectedAt": "2026-10-15T17:35:47.899Z",
+    "contextComplete": false,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "metadata": {
+      "sourceGroup": "fxembed:thsottiaux",
+      "category": "product"
+    }
+  },
+  {
+    "sourceId": "tibo-public",
+    "messageId": "2106845241357824205",
+    "url": "https://x.com/thsottiaux/status/2106845241357824205",
+    "text": "Over the next 28 days, each day we’ll either ship one thing that is a clear improvement and relevant for most codex/work users or ship a full reset. Let the improvements begin.",
+    "parentId": "2106610099720720811",
+    "publishedAt": "2026-10-04T20:33:43.000Z",
+    "collectedAt": "2026-10-15T17:35:47.071Z",
+    "contextComplete": false,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "metadata": {
+      "sourceGroup": "fxembed:thsottiaux",
+      "category": "reset"
+    }
+  },
+  {
+    "sourceId": "tibo-public",
+    "messageId": "2107158998495748264",
+    "url": "https://x.com/thsottiaux/status/2107158998495748264",
+    "text": "Day 1/\n\nWe have optimized the default speed to be ~50% faster across GPT-6 Astra and GPT-6.1 Sol through the subscription across all our products and partners using Sign in With ChatGPT (including OpenCode, Pi, Amp, Devin, ...).\n\nNo changes needed on your end and this should be felt within the next two hours.",
+    "parentId": "2106845241357824205",
+    "publishedAt": "2026-10-05T17:20:29.000Z",
+    "collectedAt": "2026-10-15T17:35:46.304Z",
+    "contextComplete": true,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "metadata": {
+      "sourceGroup": "fxembed:thsottiaux",
+      "category": "product"
+    }
+  },
+  {
+    "sourceId": "activity-archive",
+    "messageId": "2107158998495748264",
+    "url": "https://x.com/thsottiaux/status/2107158998495748264",
+    "text": "默认速度优化覆盖订阅中的所有产品及使用 Sign in With ChatGPT 的合作伙伴产品。改进将在两小时内逐步生效，用户无需操作。",
+    "publishedAt": "2026-10-05T17:20:29.019Z",
+    "collectedAt": "2026-10-14T10:34:17.744Z",
+    "contextComplete": true,
+    "provenance": "archive",
+    "textOrigin": "archive_excerpt",
+    "metadata": {
+      "title": "GPT-6 Astra 和 GPT-6.1 Sol 默认速度提升约 50%",
+      "summary": "默认速度优化覆盖订阅中的所有产品及使用 Sign in With ChatGPT 的合作伙伴产品。改进将在两小时内逐步生效，用户无需操作。",
+      "activity": {
+        "id": "challenge-28",
+        "days": 28,
+        "rules": "“接下来的 28 天，我们每天要么推出一项对大多数 Codex/Work 用户有用的明显改进，要么进行一次完整的额度重置。让改进开始吧。”",
+        "title": "Tibo 的 28 天挑战",
+        "startsOn": "2026-10-05",
+        "timezone": "America/Los_Angeles"
+      },
+      "category": "product",
+      "activityDay": 1,
+      "sourceGroup": "codex-resets"
+    }
+  },
+  {
+    "sourceId": "tibo-public",
+    "messageId": "2107575657014468879",
+    "url": "https://x.com/thsottiaux/status/2107575657014468879",
+    "text": "Roundup of Day 2/\n\n2.1/ Approve for me (auto-review) is now included and does not use usage. Can be between 2-10% of plan when used. Also better for you.\n2.2/ Simplified API for builders.\n2.3/ Meeting notes integrated.\n2.4/ Decisions API live for builders. Will use in the app to improve the experience.",
+    "publishedAt": "2026-10-06T20:56:08.000Z",
+    "collectedAt": "2026-10-15T17:35:45.418Z",
+    "contextComplete": true,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "metadata": {
+      "sourceGroup": "fxembed:thsottiaux",
+      "category": "product"
+    }
+  },
+  {
+    "sourceId": "tibo-public",
+    "messageId": "2107676072871600470",
+    "url": "https://x.com/thsottiaux/status/2107676072871600470",
+    "text": "We shipped four things that were deemed good to great and some math proofs, but the vote is clear and the community demands a reset. I did calibrate it and it *seems* that the game is rigged in reset's favor, but such are the rules at the moment.\n\nTherefore ... the reset has been processed. Enjoy!",
+    "parentId": "2107575657014468879",
+    "publishedAt": "2026-10-07T03:35:09.000Z",
+    "collectedAt": "2026-10-15T17:35:44.612Z",
+    "contextComplete": false,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "metadata": {
+      "sourceGroup": "fxembed:thsottiaux",
+      "category": "reset"
+    }
+  },
+  {
+    "sourceId": "reset-archive",
+    "messageId": "2107676072871600470",
+    "url": "https://x.com/thsottiaux/status/2107676072871600470",
+    "text": "我们发布了四件被评为良好到优秀的东西以及一些数学证明，但投票结果很明确，社区要求一次重置。我确实校准了它，而且*似乎*游戏被操纵成对重置有利，但目前规则就是这样。\n\n因此……重置已经",
+    "publishedAt": "2026-10-07T03:35:09.000Z",
+    "collectedAt": "2026-10-14T10:34:45.042Z",
+    "contextComplete": false,
+    "provenance": "archive",
+    "textOrigin": "archive_excerpt",
+    "metadata": {
+      "summary": "我们发布了四件被评为良好到优秀的东西以及一些数学证明，但投票结果很明确，社区要求一次重置。我确实校准了它，而且*似乎*游戏被操纵成对重置有利，但目前规则就是这样。\n\n因此……重置已经",
+      "category": "reset",
+      "sourceGroup": "codex-resets"
+    }
+  },
+  {
+    "sourceId": "activity-archive",
+    "messageId": "2107676072871600470",
+    "url": "https://x.com/thsottiaux/status/2107676072871600470",
+    "text": "“我们发布了四件被评为良好到优秀的东西以及一些数学证明，但投票结果很明确，社区要求一次重置。我确实校准了它，而且*似乎*游戏被操纵成对重置有利，但目前规则就是这样。\n\n因此……重置已经”",
+    "publishedAt": "2026-10-07T03:35:09.157Z",
+    "collectedAt": "2026-10-14T10:34:17.744Z",
+    "contextComplete": false,
+    "provenance": "archive",
+    "textOrigin": "archive_excerpt",
+    "metadata": {
+      "title": "所有人的用量额度已重置",
+      "summary": "“我们发布了四件被评为良好到优秀的东西以及一些数学证明，但投票结果很明确，社区要求一次重置。我确实校准了它，而且*似乎*游戏被操纵成对重置有利，但目前规则就是这样。\n\n因此……重置已经”",
+      "activity": {
+        "id": "challenge-28",
+        "days": 28,
+        "rules": "“接下来的 28 天，我们每天要么推出一项对大多数 Codex/Work 用户有用的明显改进，要么进行一次完整的额度重置。让改进开始吧。”",
+        "title": "Tibo 的 28 天挑战",
+        "startsOn": "2026-10-05",
+        "timezone": "America/Los_Angeles"
+      },
+      "category": "reset",
+      "activityDay": 2,
+      "sourceGroup": "codex-resets"
+    }
+  },
+  {
+    "sourceId": "tibo-public",
+    "messageId": "2109045220411351517",
+    "url": "https://x.com/thsottiaux/status/2109045220411351517",
+    "text": "Day 6/ Reset",
+    "publishedAt": "2026-10-10T22:15:39.000Z",
+    "collectedAt": "2026-10-15T17:35:42.789Z",
+    "contextComplete": false,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "metadata": {
+      "sourceGroup": "fxembed:thsottiaux",
+      "category": "reset"
+    }
+  },
+  {
+    "sourceId": "tibo-public",
+    "messageId": "2109812216212099456",
+    "url": "https://x.com/thsottiaux/status/2109812216212099456",
+    "text": "Day 8/ Reset",
+    "publishedAt": "2026-10-13T01:03:25.000Z",
+    "collectedAt": "2026-10-15T17:35:41.785Z",
+    "contextComplete": false,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "metadata": {
+      "sourceGroup": "fxembed:thsottiaux",
+      "category": "reset"
+    }
+  },
+  {
+    "sourceId": "tibo-public",
+    "messageId": "2110595484180214059",
+    "url": "https://x.com/thsottiaux/status/2110595484180214059",
+    "text": "The reports of my reset button being lost are greatly exaggerated\n\nDay 10/ Reset",
+    "publishedAt": "2026-10-15T04:55:51.000Z",
+    "collectedAt": "2026-10-15T17:35:41.012Z",
+    "contextComplete": false,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "metadata": {
+      "sourceGroup": "fxembed:thsottiaux",
+      "category": "reset"
+    }
+  },
+  {
+    "sourceId": "tibo-public",
+    "messageId": "2110595554036400151",
+    "url": "https://x.com/thsottiaux/status/2110595554036400151",
+    "text": "Landing within the next 2 hours",
+    "parentId": "2110595484180214059",
+    "publishedAt": "2026-10-15T04:56:07.000Z",
+    "collectedAt": "2026-10-15T17:35:41.012Z",
+    "contextComplete": false,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "metadata": {
+      "sourceGroup": "fxembed:thsottiaux",
+      "category": "product"
+    }
+  },
+  {
+    "sourceId": "tibo-public",
+    "messageId": "2110618732666257557",
+    "url": "https://x.com/thsottiaux/status/2110618732666257557",
+    "text": "Done and dusted",
+    "parentId": "2110595554036400151",
+    "publishedAt": "2026-10-15T06:28:13.000Z",
+    "collectedAt": "2026-10-15T17:35:41.012Z",
+    "contextComplete": false,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "metadata": {
+      "sourceGroup": "fxembed:thsottiaux",
+      "category": "product"
+    }
+  },
+  {
+    "sourceId": "reset-archive",
+    "messageId": "2110618732666257557",
+    "url": "https://x.com/thsottiaux/status/2110618732666257557",
+    "text": "搞定了",
+    "publishedAt": "2026-10-15T06:28:13.000Z",
+    "collectedAt": "2026-10-15T11:49:43.266Z",
+    "contextComplete": false,
+    "provenance": "archive",
+    "textOrigin": "archive_excerpt",
+    "metadata": {
+      "summary": "搞定了",
+      "category": "reset",
+      "sourceGroup": "codex-resets"
+    }
+  },
+  {
+    "sourceId": "activity-archive",
+    "messageId": "2110618732666257557",
+    "url": "https://x.com/thsottiaux/status/2110618732666257557",
+    "text": "“搞定了”",
+    "publishedAt": "2026-10-15T06:28:13.924Z",
+    "collectedAt": "2026-10-15T11:50:23.724Z",
+    "contextComplete": false,
+    "provenance": "archive",
+    "textOrigin": "archive_excerpt",
+    "metadata": {
+      "title": "所有人的用量额度已重置",
+      "summary": "“搞定了”",
+      "activity": {
+        "id": "challenge-28",
+        "days": 28,
+        "rules": "“接下来的 28 天，我们每天要么推出一项对大多数 Codex/Work 用户有用的明显改进，要么进行一次完整的额度重置。让改进开始吧。”",
+        "title": "Tibo 的 28 天挑战",
+        "startsOn": "2026-10-05",
+        "timezone": "America/Los_Angeles"
+      },
+      "category": "reset",
+      "activityDay": 10,
+      "sourceGroup": "codex-resets"
+    }
+  },
+  {
+    "sourceId": "tibo-public",
+    "messageId": "2102440619616682120",
+    "url": "https://x.com/thsottiaux/status/2102440619616682120",
+    "text": "We have been focusing on efficiency and intelligence for all. \n\nVery proud of the team. Only possible when you have incredible models at the top end of the capability that you can then use to make a big difference in everything else.",
+    "publishedAt": "2026-09-22T16:51:19.000Z",
+    "collectedAt": "2026-10-15T17:35:53.175Z",
+    "contextComplete": false,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "metadata": {
+      "sourceGroup": "fxembed:thsottiaux",
+      "category": "product"
+    }
+  },
+  {
+    "sourceId": "tibo-public",
+    "messageId": "2102463847714247142",
+    "url": "https://x.com/thsottiaux/status/2102463847714247142",
+    "text": "GPT-6 Sol and Luna are out. Not only are they a very significant improvement across the board, but also in writing and general \"you know when you try it\" quality. \n\nWe are also permanently reducing the API price by 50% making both of them viable for a ton of new usecases and making your usage go further too, even on the subscriptions.\n\nAnd one more thing. We are loading a banked reset into all accounts of our Plus, Pro and Business users. Let's go!\n\nhttps://t.co/00DRh1sRrO",
+    "parentId": "2102440619616682120",
+    "publishedAt": "2026-09-22T18:23:37.000Z",
+    "collectedAt": "2026-10-15T17:35:53.175Z",
+    "contextComplete": true,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "metadata": {
+      "sourceGroup": "fxembed:thsottiaux",
+      "category": "reset"
+    }
+  },
+  {
+    "sourceId": "tibo-public",
+    "messageId": "2103620061156290622",
+    "url": "https://x.com/thsottiaux/status/2103620061156290622",
+    "text": "We are aware that codex is down and are working hard to bring back normal service.",
+    "publishedAt": "2026-09-25T22:58:00.000Z",
+    "collectedAt": "2026-10-15T17:35:52.383Z",
+    "contextComplete": false,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "metadata": {
+      "sourceGroup": "fxembed:thsottiaux",
+      "category": "product"
+    }
+  },
+  {
+    "sourceId": "tibo-public",
+    "messageId": "2103622639386574979",
+    "url": "https://x.com/thsottiaux/status/2103622639386574979",
+    "text": "o no :(",
+    "parentId": "2103620061156290622",
+    "publishedAt": "2026-09-25T23:08:15.000Z",
+    "collectedAt": "2026-10-15T17:35:52.383Z",
+    "contextComplete": false,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "metadata": {
+      "sourceGroup": "fxembed:thsottiaux",
+      "category": "product"
+    }
+  },
+  {
+    "sourceId": "tibo-public",
+    "messageId": "2103637477760311522",
+    "url": "https://x.com/thsottiaux/status/2103637477760311522",
+    "text": "o yes… we’re back in action and we’ll reset usage limits for all paid users across codex and ChatGPT work\n\nsorry about the brief disruption!\n\n(and yes we have a special spare codex when things are down to help us out)",
+    "parentId": "2103622639386574979",
+    "publishedAt": "2026-09-26T00:07:13.000Z",
+    "collectedAt": "2026-10-15T17:35:52.383Z",
+    "contextComplete": true,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "metadata": {
+      "sourceGroup": "fxembed:thsottiaux",
+      "category": "reset"
+    }
+  }
+]

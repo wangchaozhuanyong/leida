@@ -44,6 +44,9 @@ export async function testCloudbasePublic(pool:pg.Pool,rpc:CloudbaseRpc,pass:(na
     const forecastCase:ForecastCase={id:caseId,identity:'public-qa-signal',sourceId:source.id,title:'公开测试信号',url:'https://status.openai.com',target:'automatic_reset',signalEvidenceIds:['public-qa-evidence-000'],signalAt:at,collectedAt:at,windows:{24:new Date(Date.parse(at)+86400_000).toISOString(),48:new Date(Date.parse(at)+172800_000).toISOString()},status:'watching',coverage:{status:'unverified',sourceIds:[source.id],reason:'测试'},late:false,snapshotId,createdAt:at,updatedAt:at};
     await put('forecast_cases',forecastCase);
     await put('forecast_snapshots',{...buildForecastSnapshot({id:snapshotId,signature:'qa-frozen-snapshot',case:forecastCase,generatedAt:at,evidenceCutoffAt:at,cases:[forecastCase],outcomes:[]}),trainingObservationIds:['training-qa']} as {id:string});
+    // A month of replay records must not turn the legacy/bootstrap response
+    // into an oversized transfer or change the current forecast projection.
+    for(let i=0;i<120;i++)await put('forecast_snapshots',{id:`replay_step_qa_${String(i).padStart(3,'0')}`,recordType:'historical_replay_step',text:'Synthetic saved replay content. '.repeat(900)} as {id:string});
     await seed.query('COMMIT');
   }catch(error){await seed.query('ROLLBACK');throw error;}finally{seed.release();}
   pass('public_empty_schema_and_read_permissions','eleven new read-only tables and three STABLE backend RPC functions installed in disposable PostgreSQL');
@@ -74,6 +77,8 @@ export async function testCloudbasePublic(pool:pg.Pool,rpc:CloudbaseRpc,pass:(na
   const now=new Date().toISOString(),version=await readPublicVersion(nativeModule.pool,now);
   const cloudVersion=await createCloudbasePublicReader(rpc,()=>now).version();assert.deepEqual(cloudVersion,{version:version.version,contentVersion:version.contentVersion});
   const nativeData=await getPublicData(),cloudData=await createCloudbasePublicReader(rpc,()=>nativeData.forecasts?.generatedAt??nativeData.serverTime).legacy();assert.deepEqual(canonical(cloudData),canonical(nativeData));
+  assert.ok(Buffer.byteLength(JSON.stringify(cloudData))<1024*1024);assert.equal((await pool.query("SELECT count(*)::int AS n FROM radar_forecast_snapshots WHERE payload->>'recordType'='historical_replay_step'")).rows[0].n,120);
+  pass('legacy_replay_rows_are_separate','more than 3 MB of immutable replay steps remain stored while legacy/bootstrap returns only the current forecast records');
   assert.equal(await createCloudbasePublicReader(rpc,()=>nativeData.forecasts?.generatedAt??nativeData.serverTime).legacyVersion(),publicRevision(nativeData));
   pass('light_and_legacy_version_parities','light hashes and legacy bootstrap/version remain coherent; no forced-refresh compatibility loop');
   const bursts=createCloudbasePublicReader(rpc,()=>now),beforeBurst=countCalls();

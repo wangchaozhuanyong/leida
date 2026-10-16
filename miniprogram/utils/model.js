@@ -185,7 +185,7 @@ function publicationCard(data, publication) {
   const withdrawn = publicationWithdrawn(data, publication);
   const kinds = [...new Set(actions.map(action => actionLabels[action.kind]))].join('＋');
   return {
-    id: publication.id, path: sharePath(publication), title: publication.article.title, summary: publication.article.summary,
+    id: publication.id, path: sharePath(publication), title: publication.article.title, summary: publication.article.summary, reviewStatus: publication.article.reviewStatus || '', reviewReasons: (publication.article.reviewReasons || []).join(''),
     time: displayTime(publicationSourceTime(publication)), historical: isHistoricalArticle(publication.article, data.evidence),
     label: withdrawn ? '已撤回' : isNewsOnly(publication) ? '来源消息' : kinds || (publication.article.category === 'activity' ? '活动动态' : '产品更新'),
     note: withdrawn ? '已撤回，不能作为当前发放依据' : isNewsOnly(publication) ? '仅新闻收录，不改变发放状态' : '公开公告',
@@ -225,7 +225,7 @@ function resolveDetail(data, query) {
   const current = newsOnly ? data.publications.find(item => item.id === currentArticle.publicationId) : currentPublication(data, currentEvent);
   const ids = new Set([...(isNewsOnly(publication) ? publication.article.evidenceIds : publication.event.evidenceIds), ...(publication.article.contextEvidenceIds || [])]);
   return {
-    missing: false, publicationId: publication.id, title: publication.article.title, summary: publication.article.summary,
+    missing: false, publicationId: publication.id, title: publication.article.title, summary: publication.article.summary, reviewStatus: publication.article.reviewStatus || '', reviewReasons: (publication.article.reviewReasons || []).join(''),
     body: publication.article.translation || publication.article.summary, time: displayTime(articleSourceTime(publication.article)),
     historical: isHistoricalArticle(publication.article, data.evidence), newsOnly, withdrawn, merged, isOld,
     version: newsOnly ? publication.article.version : publication.event.version, cutoff: displayTime(publication.cutoffAt), publishedAt: displayTime(publication.publishedAt), reason: publication.reason || '公开资料核验发布',

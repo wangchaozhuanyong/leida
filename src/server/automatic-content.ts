@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { CandidateAutomation, DraftContent, Evidence, BenefitAction } from '../lib/types';
-import { evidenceBenefitClaims, hasCompleteContext, hasStandaloneContext, isTruncatedText } from './source-context';
+import { evidenceBenefitClaims, hasCompleteContext, hasStandaloneContext, isTruncatedText, isCampaignResetShorthand, isVerifiedCampaignCalendar, originalConflict } from './source-context';
 import { AUTOMATIC_RULES_VERSION, benefitStage, eligibilityKey } from './benefit-rules';
 export { AUTOMATIC_RULES_VERSION } from './benefit-rules';
 
@@ -28,7 +28,7 @@ export function buildAutomaticTemplate(evidence:Evidence[]):DraftContent|undefin
   if(!primary||primary.provenance==='manual')return;
   // Keep complete supporting statements; older unrelated ancestors remain saved
   // for lineage but must not become required publication citations.
-  if(hasCompleteContext(primary,evidence))evidence=evidence.filter(item=>hasCompleteContext(item,evidence));
+  if(hasCompleteContext(primary,evidence))evidence=evidence.filter(item=>hasCompleteContext(item,evidence)||isVerifiedCampaignCalendar(item,evidence));
   const base:DraftContent={title:'',summary:'',translation:'',category:'product',actions:[],evidenceIds:evidence.map(item=>item.id),publicationMode:'news_only',contentOrigin:'template'};
   const attachment=primary.metadata?.activity;
   if(attachment&&primary.metadata?.activityDay){base.activityId=attachment.id;base.activityDay=primary.metadata.activityDay;base.category='activity';}
@@ -42,6 +42,8 @@ export function buildAutomaticTemplate(evidence:Evidence[]):DraftContent|undefin
     if(!tag||!/^[\w.+-]{1,80}$/.test(tag))return;
     return {...base,title:`Codex 官方稳定版本发布：${tag}`,summary:`官方发布了 Codex 稳定版本 ${tag}。已保存发布说明；完整中文改动会在智能服务可用后自动补充。`};
   }
+  const review=resetReview(primary,evidence);
+  if(review&&(review.reviewStatus==='targeted_update'||isTruncated(primary.text)||originalConflict(primary,evidence)||isCampaignResetShorthand(primary)))return {...base,...review,category:'reset'};
   if(isTruncated(primary.text))return;
   const complete=hasCompleteContext(primary,evidence);
   const claims=evidenceBenefitClaims(primary,evidence);
@@ -61,6 +63,7 @@ export function buildAutomaticTemplate(evidence:Evidence[]):DraftContent|undefin
     return {...base,title,summary:`根据${primary.provenance==='archive'?'公开归档保存的原帖':'公开原文'}，${summary}\n原文发布时间：${sourceTime}（北京时间）。这是中文事实摘要，个人账户是否到账尚未观测。`,category:base.activityId?'activity':'reset',publicationMode:'state_change',actions};
   }
   if(complete&&claims.length&&claims.every(claim=>claim.scope!=='public'))return {...base,title:'定向重置相关动态',category:base.activityId?'activity':'reset',summary:`公开原文提到面向限定账户的重置相关安排。此条只记录定向动态，不计入公共发放次数；具体资格请查看原文。`};
+  if(review)return {...base,...review,category:'reset'};
   // A fixed activity archive may supply a Chinese product excerpt, while its
   // evidence remains auxiliary. Never turn a mixed benefit statement into news.
   const contextLengthExcerpt=attributedContextLengthUpdate(primary);
@@ -122,4 +125,24 @@ export function hasExplicitCorrectionText(text:string):boolean {
 
 export function normalizedEligibility(value:string):string {
   return eligibilityKey(value);
+}
+
+/** A visible source record is separate from a qualified public benefit. */
+export function resetReview(primary:Evidence,context:Evidence[]):Pick<DraftContent,'title'|'summary'|'reviewStatus'|'reviewReasons'>|undefined {
+  const text=primary.text.replace(/[’‘]/g,"'");
+  const campaign=/over the next \d+ days, each day we['’]ll either ship/i.test(text)&&/full reset/i.test(text);
+  const incident=/\bPro\s+500\b/i.test(text)&&(/didn't get the reset|investigating/i.test(text)||/^All fixed\./i.test(text)&&context.some(e=>e.id!==primary.id&&primary.parentId===e.messageId&&/Pro 500.*(?:didn[’']t get the reset)/i.test(e.text)));
+  const explicit=/(?:resets? (?:all propagated|has been processed|coming next week)|promised a reset|reset (?:will|by|in)|(?:^|\n)\s*Day \d+\/\s*Reset|(?:重置|发卡|存卡).{0,50}(?:预告|安排|传播|发放|已)|(?:will|promis|ship|give|load).{0,50}\b(?:reset|banked)\b)/i.test(text);
+  const reply=/^(?:done and dusted|it['’]s done|all fixed)[.!]?$/i.test(text.trim())&&context.some(e=>e.id!==primary.id&&/reset|重置/i.test(e.text));
+  if(!incident&&!campaign&&!explicit&&!reply)return;
+  if(!campaign&&!incident&&(/[?？]/.test(text)||/\b(?:can['’]t|won['’]t|didn['’]t)|the day we reach perfection/i.test(text)||/\b(?:if|unless|would|could|maybe|hypothetical|not|never|cannot|cancelled)\b|假设|希望|传闻/i.test(text)))return;
+  if(incident)return {title:'Pro 500 重置异常跟踪',summary:/^All fixed\./i.test(text)?'作者回复称 Pro 500 相关异常已修复。此记录只跟踪受影响用户，不新增全体重置次数，个人账户到账尚未观测。':'作者报告部分 Pro 500 用户未如期收到重置，正在调查并表示将补偿。此记录不代表全体用户新增一次重置。',reviewStatus:'targeted_update',reviewReasons:['仅涉及原文所述 Pro 500 异常及后续处理，不作为公共发放完成声明。']};
+  const reasons:string[]=[];
+  if(originalConflict(primary,context))reasons.push('同一消息存在相互冲突的原文版本，等待核对。');
+  if(isTruncatedText(text)||primary.textOrigin==='archive_excerpt')reasons.push('保存的正文为摘要或存在截断，等待完整原文。');
+  if(primary.parentId&&!context.some(e=>e.messageId===primary.parentId))reasons.push('缺少原文明确引用的父帖。');
+  if(isCampaignResetShorthand(primary))reasons.push('活动简写已收录；套餐资格和具体发放安排仍需后续声明核对。');
+  if(campaign)reasons.push('这是活动规则，不能据此认定每天已进行重置。');
+  if(!reasons.length)reasons.push('原文涉及重置安排或完成表述，福利类型、适用资格或对应轮次尚未完全核清。');
+  return {title:campaign?'活动规则收录待确认':'重置相关消息待确认',summary:'已保存公开来源消息。'+reasons.join('')+'此条不计入已重置、已发卡或预测准确率；请查看原文依据。',reviewStatus:'pending',reviewReasons:reasons};
 }

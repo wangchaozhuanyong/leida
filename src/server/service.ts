@@ -124,6 +124,7 @@ export function publishedTemplateArticle(candidate:Candidate,primary:Evidence,ev
 const sameIds=(first:string[]|undefined,second:string[]|undefined)=>JSON.stringify([...(first??[])].sort())===JSON.stringify([...(second??[])].sort());
 export function samePublishedContent(content:DraftContent,article:Article,event:RadarEvent|undefined,activity?:Activity,correction=false):boolean {
  if(!event||event.status!=='published'||article.status!=='published')return false;
+ if(content.reviewStatus!==article.reviewStatus||JSON.stringify(content.reviewReasons)!==JSON.stringify(article.reviewReasons))return false;
  if(content.title!==article.title||content.summary!==article.summary||content.translation!==article.translation||content.category!==article.category||(content.publicationMode??'state_change')!==(article.publicationMode??'state_change')||content.evidenceIds[0]!==article.evidenceIds[0]||!sameIds(content.evidenceIds,article.evidenceIds)||!sameIds(content.contextEvidenceIds,article.contextEvidenceIds))return false;
  if(content.activityId&&(!activity||activity.id!==content.activityId||!activity.items.some(item=>item.articleId===article.id&&item.eventId===event.id&&item.day===content.activityDay)))return false;
  if(content.publicationMode==='news_only')return true;
@@ -156,7 +157,7 @@ async function publish(content:DraftContent, c:Client, opts:PublishOptions):Prom
   const cited=evidence.filter(e=>content.evidenceIds.includes(e.id)); const cutoffAt=new Date(Math.max(...cited.map(e=>Date.parse(e.collectedAt)))).toISOString();
   const firstPublishedAt=opts.existingArticle?.publishedAt??time;
   const historical=isHistoricalContent(cited,firstPublishedAt);
-  const article:Article={id:articleId,eventId,title:content.title,summary:content.summary,translation:content.translation,category:content.category,version:(opts.existingArticle?.version??0)+1,status:opts.withdrawn?'withdrawn':'published',publicationId,evidenceIds:content.evidenceIds,contextEvidenceIds:content.contextEvidenceIds,publishedAt:firstPublishedAt,updatedAt:time,publicationMode:content.publicationMode??'state_change',contentOrigin:content.contentOrigin,manualFields:opts.existingArticle?.manualFields,sourcePublishedAt:new Date(Math.max(...cited.map(e=>Date.parse(e.publishedAt)))).toISOString(),historical};
+  const article:Article={id:articleId,eventId,title:content.title,summary:content.summary,translation:content.translation,category:content.category,version:(opts.existingArticle?.version??0)+1,status:opts.withdrawn?'withdrawn':'published',publicationId,evidenceIds:content.evidenceIds,contextEvidenceIds:content.contextEvidenceIds,publishedAt:firstPublishedAt,updatedAt:time,publicationMode:content.publicationMode??'state_change',contentOrigin:content.contentOrigin,reviewStatus:content.reviewStatus,reviewReasons:content.reviewReasons,manualFields:opts.existingArticle?.manualFields,sourcePublishedAt:new Date(Math.max(...cited.map(e=>Date.parse(e.publishedAt)))).toISOString(),historical};
   const publication:Publication={id:publicationId,eventId,articleId,event,article,cutoffAt,publishedAt:time,reason:opts.reason,mode:content.publicationMode??'state_change',contentOrigin:content.contentOrigin};
   await insert('publications',publication,c); if(!newsOnly||!existing)await put('events',event,c); await put('articles',article,c);
   const factKey=noticeKey(event,existing);
@@ -260,7 +261,8 @@ export async function publishCandidate(candidateId:string,version:number,actor:s
       const source=primary?await one<Source>('sources',primary.sourceId,c):undefined;
       if(!source?.enabled||!source.validated||source.publicationPaused)throw new DomainError('来源已暂停或未验证，暂不自动发布');
       if(candidate.humanEdited||primary?.provenance==='manual')throw new DomainError('人工修改的内容需人工发布');
-      const duplicates=events.filter(event=>event.status==='published'&&event.evidenceIds.some(eid=>{const item=evidence.find(e=>e.id===eid);return item&&primary&&providerIdentity(item)===providerIdentity(primary);}));
+      const duplicates=events.filter(event=>event.status==='published'&&event.evidenceIds.some(eid=>{const item=evidence.find(e=>e.id===eid);return item&&primary&&providerIdentity(item)===providerIdentity(primary);})&&
+        (content.publicationMode!=='news_only'||!content.reviewStatus||articles.some(article=>article.eventId===event.id&&article.status==='published'&&evidence.some(item=>item.id===article.evidenceIds[0]&&primary&&providerIdentity(item)===providerIdentity(primary)))));
       if(duplicates.length>1)throw new DomainError('同一原帖存在多个事件，关联冲突');
       if(!content.eventId&&duplicates[0])content.eventId=duplicates[0].id;
       else if(duplicates[0]&&duplicates[0].id!==content.eventId){
@@ -290,6 +292,18 @@ export async function publishCandidate(candidateId:string,version:number,actor:s
     const matchingArticle=newsUpgrade?.article??articleForPrimary(candidate,content,primary,evidence,articles,automatic);
     const previousArticle=matchingArticle?await one<Article>('articles',matchingArticle.id,c,true):undefined;
     if(enrichment&&!previousArticle)throw new DomainError('模板文章不存在，不能补充另一文章');
+    // A later translated excerpt of the same post cannot replace an already
+    // qualified full-original article with an untyped news/pending shell.
+    const canonical=previousArticle&&evidence.find(item=>item.id===previousArticle.evidenceIds[0]);
+    if(automatic&&primary?.textOrigin==='archive_excerpt'&&content.publicationMode==='news_only'&&previousArticle?.publicationMode==='state_change'&&canonical?.textOrigin==='original'&&providerIdentity(primary)===providerIdentity(canonical)&&hasCompleteContext(canonical,gatherEvidenceContext(canonical,evidence))){
+      const retained=await one<Publication>('publications',previousArticle.publicationId,c);
+      if(!retained||retained.mode==='news_only')throw new DomainError('完整原文的发布快照缺失，不能替换为摘要',409);
+      if(content.activityId&&content.activityDay){const activity=await one<Activity>('activities',content.activityId,c,true);if(activity&&!activity.items.some(item=>item.articleId===previousArticle.id&&item.day===content.activityDay))await put('activities',{...activity,version:activity.version+1,items:[...activity.items,{day:content.activityDay,articleId:previousArticle.id,eventId:previousArticle.eventId}]},c);}
+      const canonicalContent:DraftContent={...content,title:previousArticle.title,summary:previousArticle.summary,translation:previousArticle.translation,category:previousArticle.category,eventId:previousArticle.eventId,evidenceIds:previousArticle.evidenceIds,contextEvidenceIds:previousArticle.contextEvidenceIds,actions:retained.event.actions.filter(action=>action.evidenceIds.includes(canonical.id)&&Math.abs(Date.parse(action.statementAt)-Date.parse(canonical.publishedAt))<1000),publicationMode:'state_change',contentOrigin:previousArticle.contentOrigin,reviewStatus:undefined,reviewReasons:undefined};
+      await put('candidates',{...candidate,status:'published',version:candidate.version+1,updatedAt:now(),content:canonicalContent,reasons:[],automation:{...candidate.automation,state:'ready',reasonCodes:['canonical_original_retained'],dependencyIds:[],articleId:previousArticle.id,templatePublished:previousArticle.contentOrigin==='template',evaluatedAt:now()}},c);
+      await audit(actor,'candidate.original_retained',candidate.id,'归档副本保留出处，沿用同一原帖已核验的完整原文发布版本',candidate,{publicationId:retained.id,evidenceId:primary.id},c);
+      return retained;
+    }
     if(automatic&&previousArticle?.manualFields)for(const field of previousArticle.manualFields)content[field]=previousArticle[field];
     const correction=automatic&&automaticCorrection(content,existing,evidence);
     const activity=content.activityId?await one<Activity>('activities',content.activityId,c):undefined;
