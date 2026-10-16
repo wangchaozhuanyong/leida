@@ -515,8 +515,14 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);news.onUnload();
-  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.13 · 体验版');settings.onUnload();
-  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.13');fallback.onUnload();
+  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.14 · 体验版');settings.onUnload();
+  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.14');fallback.onUnload();
+  for(const [envVersion,label] of [['release','正式版'],['develop','开发版']]){
+    const page=nativeHarness(fixture(),{accountInfo:{miniProgram:{envVersion,version:'99.0.0'}}}).page('settings');
+    assert.equal(page.data.clientVersion,`1.0.14 · ${label}`,'微信返回的包号不能覆盖本次随包代码版本');page.onUnload();
+  }
+  const unavailable=nativeHarness(fixture(),{wxApi:{getAccountInfoSync(){throw new Error('Account information unavailable');}}}).page('settings');
+  assert.equal(unavailable.data.clientVersion,'1.0.14');assert.equal(unavailable.data.connected,true);unavailable.onUnload();
 });
 
 test('四个原生导航页初始化 iOS 窗口底色，缓存返回和资料刷新不反复触碰窗口外观',()=>{
@@ -524,9 +530,9 @@ test('四个原生导航页初始化 iOS 窗口底色，缓存返回和资料刷
     const h=nativeHarness(),page=h.page(name);
     assert.deepEqual(h.ui.lifecycle,['background','subscribe'],name);
     for(const value of h.ui.backgrounds) {
-      assert.equal(value.backgroundColor,'#0b1113');
-      assert.equal(value.backgroundColorTop,'#0b1113');
-      assert.equal(value.backgroundColorBottom,'#0b1113');
+      assert.equal(value.backgroundColor,'#f2f5fb');
+      assert.equal(value.backgroundColorTop,'#f2f5fb');
+      assert.equal(value.backgroundColorBottom,'#f2f5fb');
     }
     const previous=structuredClone(page.data);
     h.replace(fixture());
@@ -621,7 +627,7 @@ test('原生项目配置与页面完整，支持游客或真实AppID，正文与
   assert.ok(app.pages.includes('pages/replay/index'));
   assert.equal(app.window.backgroundColorTop,app.window.backgroundColor);
   assert.equal(app.window.backgroundColorBottom,app.window.backgroundColor);
-  assert.equal(app.tabBar.backgroundColor,app.window.backgroundColor);
+  assert.equal(app.tabBar.backgroundColor,'#fbfdff'); // Selected silver navigation surface.
   assert.match(project.appid, /^(?:touristappid|wx[0-9a-z]{16})$/i);
   assert.equal(project.compileType, 'miniprogram');
   assert.equal(project.miniprogramRoot, './');

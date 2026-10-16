@@ -218,6 +218,38 @@ test('发送前撤回内容会释放预留次数，关闭提醒清空剩余并�
   assert.ok(job);assert.equal((await f.service.processWechatJob(job)).state,'sent');
 });
 
+test('关闭后自动预备与冷启动读取仍显示已关闭，只有新选择才能重新开启',async()=>{
+  const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);
+  const old=await f.service.wechatSubscriptionChallenge(session.sessionToken);
+  assert.equal((await f.service.revokeWechatSubscription(session.sessionToken)).state,'revoked');
+  const prepared=await f.service.wechatSubscriptionChallenge(session.sessionToken);
+  assert.ok(prepared.nonce);assert.equal(typeof prepared.state,'object');
+  assert.equal((prepared.state as {state:string}).state,'revoked');
+  await Promise.all(Array.from({length:3},()=>assert.rejects(f.service.confirmWechatSubscription(session.sessionToken,{nonce:old.nonce,templateId:old.templateId,result:'accept'}),{status:409})));
+  const cold=await f.login();const restarted=createWechatService({store:f.store,fetcher:f.fetcher,clock:f.now,encryptionKey:()=>Buffer.alloc(32,7),preparePublicPage:async()=>{}});
+  assert.equal((await restarted.wechatSubscriptionState(cold.sessionToken)).state,'revoked');
+  f.advance(20*60_000);
+  const fresh=await restarted.wechatSubscriptionChallenge(cold.sessionToken);
+  assert.ok(fresh.nonce);const closed=await restarted.wechatSubscriptionState(cold.sessionToken);
+  assert.equal(closed.state,'revoked');assert.equal(closed.remainingCount,0);assert.equal(closed.pendingCount,0);
+  await f.notice();await restarted.scheduleWechatDeliveries();assert.equal((await f.store.list('wechat_deliveries')).length,0);
+  const reopened=await Promise.all(Array.from({length:3},()=>restarted.confirmWechatSubscription(cold.sessionToken,{nonce:fresh.nonce,templateId:fresh.templateId,result:'accept'})));
+  for(const state of reopened){assert.equal(state.state,'available');assert.equal(state.remainingCount,1);}
+  assert.equal((await restarted.confirmWechatSubscription(cold.sessionToken,{nonce:fresh.nonce,templateId:fresh.templateId,result:'accept'})).remainingCount,1);
+  assert.equal(f.calls.some(call=>call.url.includes('subscribe/send')),false);
+});
+
+test('关闭后预备仍受读者绑定、过期与再次关闭保护，不复活已撤销的选择',async()=>{
+  const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);await f.service.revokeWechatSubscription(session.sessionToken);
+  const fresh=await f.service.wechatSubscriptionChallenge(session.sessionToken),other=await f.login('another-code');
+  await assert.rejects(f.service.confirmWechatSubscription(other.sessionToken,{nonce:fresh.nonce,templateId:fresh.templateId,result:'accept'}),/不存在/);
+  await f.service.revokeWechatSubscription(session.sessionToken);
+  await assert.rejects(f.service.confirmWechatSubscription(session.sessionToken,{nonce:fresh.nonce,templateId:fresh.templateId,result:'accept'}),/失效/);
+  const expired=await f.service.wechatSubscriptionChallenge(session.sessionToken);f.advance(5*60_000);
+  await assert.rejects(f.service.confirmWechatSubscription(session.sessionToken,{nonce:expired.nonce,templateId:expired.templateId,result:'accept'}),/失效/);
+  const closed=await f.service.wechatSubscriptionState(session.sessionToken);assert.equal(closed.state,'revoked');assert.equal(closed.remainingCount,0);
+});
+
 test('旧版单次授权只迁移一次，次数不能用于授权之前的消息或活动',async()=>{
   const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);
   const grant=(await f.store.list<WechatGrant>('wechat_grants'))[0];const {credits:_credits,challengeTimes:_times,...legacy}=grant;await f.store.put('wechat_grants',legacy);

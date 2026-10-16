@@ -436,7 +436,7 @@
   .pub-instrument-last .pub-record-detail p{font-size:10px;margin-top:3px;line-height:1.6}
   .pub-instrument-last .pub-record-time{justify-content:flex-start;text-align:left}
   .pub-instrument-last .pub-record-empty p{display:none}
-  .pub-instrument-summary>.pub-share-panel{order:3;margin-top:7px;margin-bottom:18px}
+  .pub-instrument-summary>.pub-share-entry{order:3;margin-top:7px;margin-bottom:18px}
   .pub-instrument-activity{order:4}
   .pub-instrument-layout+.pub-recent{margin-top:22px}
 }
@@ -452,4 +452,15 @@
 .pub-poster-preview{position:relative;min-height:300px}.pub-poster-preview .pub-poster-loading{position:absolute;inset:0;background:#0b1113e6}.pub-poster-preview>.pub-warning{position:absolute;bottom:0;left:0;right:0;margin:0!important}
 @media(prefers-reduced-motion:reduce){.pub-page-loading>.pub-loading-ring{animation:pub-loader-reveal 0s .2s forwards}}
 
-.pub-share-compact{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0}.pub-share-compact h2{font-size:15px;margin:0 0 4px}.pub-share-compact p{font-size:12px;color:var(--pub-muted);margin:0}.pub-share-compact .pub-button{font-size:12px;padding:8px 12px;flex:none}.pub-news-item h3{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.pub-news-item>p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+/* The whole sharing row is the action, with room for both fixed poster styles. */
+.pub-share-entry{width:100%;display:flex;align-items:center;justify-content:flex-start;gap:18px;min-height:116px;margin:16px 0 20px;padding:20px 18px;border:0;border-top:1px solid #706344;border-bottom:1px solid #343c34;border-radius:0;background:linear-gradient(105deg,#d9c18d08,#d9c18d00);text-align:left;font:inherit;font-weight:400;cursor:pointer}
+.pub-share-entry:hover{background:#d9c18d0d;border-top-color:#b29a65}.pub-share-entry:focus-visible{outline:2px solid #d9c18d;outline-offset:4px}
+.pub-share-entry-posters{position:relative;display:block;flex:none;width:50px;height:62px}
+.pub-share-entry-poster{position:absolute;display:block;width:34px;height:53px;border-radius:3px;background-size:cover;background-position:center;box-shadow:0 3px 8px #0005}
+.pub-share-entry-poster.precision{left:0;top:6px;transform:rotate(-9deg);border:1px solid #6f6448;background-image:url('/posters/precision-background.png')}
+.pub-share-entry-poster.editorial{left:17px;top:0;transform:rotate(8deg);border:1px solid #d5d0bd;background-image:url('/posters/editorial-background.png')}
+.pub-share-entry-copy{display:block;flex:1;min-width:0}.pub-share-entry-title{display:block;font-size:16px;line-height:24px;font-weight:600;letter-spacing:.3px;color:#e7ebe3}
+.pub-share-entry-description{display:block;margin-top:3px;font-size:11px;line-height:18px;color:#9eaaa3}.pub-share-entry-action{display:block;margin-top:7px;font-size:12px;line-height:18px;color:#d9c18d}
+.pub-share-entry-arrow{display:block;flex:none;margin-left:2px;font-size:25px;line-height:28px;color:#d9c18d}.pub-share-entry:disabled{background:transparent;color:#98a6a5;cursor:default}
+@media(max-width:350px){.pub-share-entry{gap:14px;padding-left:16px;padding-right:16px}.pub-share-entry-title{font-size:15px}.pub-share-entry-description{font-size:10px}}
+.pub-news-item h3{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.pub-news-item>p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}

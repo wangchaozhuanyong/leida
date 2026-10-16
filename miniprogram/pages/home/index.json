@@ -1,1 +1,6 @@
-{"navigationBarTitleText":"模钥重置雷达"}
+{
+  "navigationBarTitleText": "模钥重置雷达",
+  "usingComponents": {
+    "neural-orb": "/components/neural-orb/index"
+  }
+}

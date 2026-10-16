@@ -11,7 +11,7 @@ function canvasNode(page){return new Promise((resolve,reject)=>{
 });}
 Page(createPage((data, query, page) => data && !page.sceneLoading && !page.sceneError && query.publicationId ? { detail: m.resolveDetail(data, query) } : { detail:null }, {
   view:query=>query.publicationId?({view:'detail',entity:'publications',id:query.publicationId}):({view:'home'}),
-  data: { detail: null,sceneLoading:false,sceneError:'',sceneCanRetry:false,posterBusy:false,posterSaving:false,posterError:'',posterPreview:'',posterPrivacyNeeded:false,bodyOpen:false,evidenceOpen:false,recordOpen:false,posterTheme:'precision' },
+  data: { detail: null,sceneLoading:false,sceneError:'',sceneCanRetry:false,posterBusy:false,posterSaving:false,posterError:'',posterPreview:'',posterReady:false,posterPrivacyNeeded:false,bodyOpen:false,evidenceOpen:false,recordOpen:false,posterTheme:'precision' },
   load(query){this._wantPoster=query.poster==='1';if(query.scene){this._params={};try{const scene=decodeURIComponent(query.scene).toLowerCase();if(!/^[a-f0-9]{32}$/.test(scene))throw new Error();this._scene=scene;this.setData({sceneLoading:true,sceneCanRetry:true});}catch(_){this.setData({sceneError:'这个小程序码场景无效，请返回公开公告。'});}}
     else if(!query.publicationId)this.setData({sceneError:'缺少指定发布版本，请返回公开公告。'});},
   show(){this._active=true;this.setData({posterBusy:false});if(this._scene&&!this._sceneResolved)void this.resolveScene();this.maybeGeneratePoster();},hide(){stopPage(this);},unload(){stopPage(this);this.clearPosters();this._codeData=null;},
@@ -19,7 +19,7 @@ Page(createPage((data, query, page) => data && !page.sceneLoading && !page.scene
     const canShare = this.data.detail && this.data.detail.canShare;
     if (canShare && typeof wx.showShareMenu === 'function') wx.showShareMenu({ menus: ['shareAppMessage'] });
     else if (typeof wx.hideShareMenu === 'function') wx.hideShareMenu({ menus: ['shareAppMessage', 'shareTimeline'] });
-    if(this.data.detail&&!canShare){this.clearPosters();this.setData({posterPreview:'',posterError:'此内容已撤回或合并，不能继续分享海报。'});}
+    if(this.data.detail&&!canShare){this.clearPosters();this.setData({posterPreview:'',posterReady:false,posterError:'此内容已撤回或合并，不能继续分享海报。'});}
     this.maybeGeneratePoster();
   },
   methods: {
@@ -29,7 +29,13 @@ Page(createPage((data, query, page) => data && !page.sceneLoading && !page.scene
     },
     toggleSection(event){const key=event.currentTarget.dataset.section;if(['bodyOpen','evidenceOpen','recordOpen'].includes(key))this.setData({[key]:!this.data[key]});},
     maybeGeneratePoster(){if(this._active&&this._wantPoster&&this.data.detail&&this.data.detail.canShare){this._wantPoster=false;void this.generatePoster();}},
-    selectPosterTheme(event){const theme=event.currentTarget.dataset.theme;if(!['precision','editorial'].includes(theme)||this.data.posterBusy||theme===this.data.posterTheme)return;this.setData({posterTheme:theme});void this.generatePoster();},
+    selectPosterTheme(event){
+      const theme=event.currentTarget.dataset.theme;
+      if(!['precision','editorial'].includes(theme)||this.data.posterBusy||this.data.posterSaving||theme===this.data.posterTheme)return;
+      this.setData({posterTheme:theme,posterError:''});
+      // Choosing a style before the first generation should not make a network request.
+      if(this.data.posterPreview)void this.generatePoster();
+    },
     async resolveScene(){
       const generation=(this._sceneGeneration||0)+1;this._sceneGeneration=generation;this.setData({sceneLoading:true,sceneError:''});
       try{this._sceneRequest=getApp().publicApi(`/api/v1/wechat/scene/${this._scene}`);const result=await this._sceneRequest.promise;
@@ -39,11 +45,11 @@ Page(createPage((data, query, page) => data && !page.sceneLoading && !page.scene
     },
     retryScene(){if(this._scene)void this.resolveScene();},
     async generatePoster(){
-      if(this.data.posterBusy||!this.data.detail||!this.data.detail.canShare)return;
+      if(this.data.posterBusy||this.data.posterSaving||!this.data.detail||!this.data.detail.canShare)return;
       const id=this.data.detail.publicationId,generation=(this._posterGeneration||0)+1;this._posterGeneration=generation;let asset;
       this._posterCache=this._posterCache||{};const theme=this.data.posterTheme,cached=this._posterCache[theme];
-      if(cached){this._posterArtifact=cached;this.setData({posterPreview:cached.tempFilePath,posterError:'',posterBusy:false});return;}
-      this._posterArtifact=null;this.setData({posterBusy:true,posterError:'',posterPrivacyNeeded:false});
+      if(cached){this._posterArtifact=cached;this.setData({posterPreview:cached.tempFilePath,posterReady:true,posterError:'',posterBusy:false});return;}
+      this._posterArtifact=null;this.setData({posterBusy:true,posterReady:false,posterError:'',posterPrivacyNeeded:false});
       this._posterTimeout=setTimeout(()=>{if(this._active&&generation===this._posterGeneration){this._posterGeneration++;if(this._codeRequest)this._codeRequest.abort();this.setData({posterBusy:false,posterError:'海报生成超时，请重试。'});}},20000);
       try{if(!this._codeData){this._codeRequest=getApp().publicApi(`/api/v1/wechat/code/${encodeURIComponent(id)}`);const response=await this._codeRequest.promise;if(!this._active||generation!==this._posterGeneration)return;this._codeData=response.data;}
         if(!this._active||generation!==this._posterGeneration)return;
@@ -53,7 +59,7 @@ Page(createPage((data, query, page) => data && !page.sceneLoading && !page.scene
         const work=()=>current()?poster.renderPoster({wxApi:wx,canvas,data:getApp().client.getState().data,publicationId:id,code:asset,page:this,options:{theme},isCurrent:current}):null;
         this._renderQueue=(this._renderQueue||Promise.resolve()).catch(()=>{}).then(work);
         const artifact=await this._renderQueue;
-        if(artifact&&current()&&m.resolveDetail(getApp().client.getState().data,{publicationId:id}).canShare){this._posterArtifact=artifact;this._posterCache[theme]=artifact;this.setData({posterPreview:artifact.tempFilePath});}}
+        if(artifact&&current()&&m.resolveDetail(getApp().client.getState().data,{publicationId:id}).canShare){this._posterArtifact=artifact;this._posterCache[theme]=artifact;this.setData({posterPreview:artifact.tempFilePath,posterReady:true});}}
       catch(error){if(this._active&&generation===this._posterGeneration)this.setData({posterError:error.message||'海报暂时无法生成，请重试。'});}
       finally{if(asset)await asset.dispose();if(this._active&&generation===this._posterGeneration){clearTimeout(this._posterTimeout);this.setData({posterBusy:false});}}
     },

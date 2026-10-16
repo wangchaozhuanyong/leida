@@ -1,4 +1,5 @@
 import '@/app/public.css';
+import '@/app/public-neural.css';
 import PublicApp from '@/components/public/PublicApp';
 import { PublicSessionProvider } from '@/components/public/PublicSession';
 import { FixedSnapshotProvider } from '@/components/public/useFixedSnapshot';

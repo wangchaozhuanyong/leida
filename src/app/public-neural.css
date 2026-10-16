@@ -1,0 +1,295 @@
+/* Selected skin: silver-white neural network. Public routes only.
+   Root selectors are evaluated on the server-rendered surface before hydration;
+   management pages retain their existing dark canvas. */
+html:has(.public-surface) { background: #f2f5fb; color-scheme: light; }
+html:has(.public-surface) body { background: #f2f5fb; color: #14263e; }
+.public-surface {
+  --skin-page: #f2f5fb;
+  --skin-surface: #ffffff;
+  --skin-surface-soft: #e8eef8;
+  --skin-text: #14263e;
+  --skin-muted: #4d607b;
+  --skin-accent: #2458ce;
+  --skin-accent-hover: #1d45a3;
+  --skin-on-accent: #ffffff;
+  --skin-timeline: #e1eaf8;
+  --skin-timeline-text: #355a86;
+  --skin-border: #ccd9ed;
+  --skin-border-strong: #91aaca;
+  --skin-nav-active: #2458ce;
+  --skin-nav-surface: #fbfdff;
+  --skin-share: #e8effa;
+  --skin-selected: #d9e6fb;
+  --skin-success: #21634b;
+  --skin-success-soft: #e1f0e9;
+  --skin-purple: #624b9a;
+  --skin-purple-soft: #ece6f7;
+  --skin-warning: #765422;
+  --skin-warning-soft: #f4ead6;
+  --skin-shadow: #1b457314;
+  --skin-overlay: #12223e4d;
+  --skin-scheme: light;
+  --art-ink: #3979ff;
+  --art-secondary: #73d4f6;
+  --art-surface: #e7f0ff;
+}
+.public-surface {
+  --pub-bg: var(--skin-page);
+  --pub-text: var(--skin-text);
+  --pub-muted: var(--skin-muted);
+  --pub-line: var(--skin-border);
+  --pub-cyan: var(--skin-accent);
+  --pub-purple: var(--skin-purple);
+  --pub-amber: var(--skin-warning);
+  background: radial-gradient(ellipse 450px 330px at 95% 0%, #73d4f617, transparent), var(--skin-page);
+  color: var(--skin-text);
+  color-scheme: light;
+}
+/* Fixed navigation and page canvas use the same family of surfaces. */
+.public-surface .pub-topbar { background: var(--skin-page); border-color: var(--skin-border); }
+.public-surface .pub-bottom-nav { background: var(--skin-nav-surface); border-color: var(--skin-border); box-shadow: 0 -4px 20px var(--skin-shadow); }
+.public-surface .pub-desktop-nav a,
+.public-surface .pub-bottom-nav a { color: var(--skin-muted); }
+.public-surface .pub-desktop-nav a.active,
+.public-surface .pub-bottom-nav a.active { color: var(--skin-nav-active); }
+.public-surface .pub-desktop-nav a.active { background: var(--skin-selected); }
+.public-surface .pub-desktop-nav a.active::after { background: var(--skin-nav-active); }
+.public-surface .pub-desktop-nav a:hover { background: var(--skin-surface-soft); }
+.public-surface .pub-icon-button { background: var(--skin-surface-soft); color: var(--skin-text); border-color: transparent; }
+.public-surface .pub-icon-button:hover { background: var(--skin-selected); }
+.public-surface .pub-more-button { background: transparent; border-color: var(--skin-border); }
+.public-surface .pub-context-bar,
+.public-surface .pub-sidebar-note,
+.public-surface .pub-header-back,
+.public-surface .pub-refresh,
+.public-surface .pub-freshness > summary,
+.public-surface .pub-home-heading-copy p { color: var(--skin-muted); }
+.public-surface .pub-home-heading-copy strong,
+.public-surface .pub-topbar-title { color: var(--skin-text); }
+.public-surface .pub-footer { color: var(--skin-text); }
+.public-surface .pub-context-count { background: var(--skin-surface-soft); color: var(--skin-muted); border-color: var(--skin-border); }
+.public-surface .pub-sidebar-note,
+.public-surface .pub-page-heading,
+.public-surface .pub-page-back,
+.public-surface .pub-home-share,
+.public-surface .pub-recent,
+.public-surface .pub-instrument-brand,
+.public-surface .pub-instrument-last,
+.public-surface .pub-record-detail + .pub-record-detail,
+.public-surface .pub-instrument-activity { border-color: var(--skin-border); }
+
+/* Buttons keep their exact geometry; action ink is readable in each palette. */
+.public-surface .pub-button,
+.public-surface .pub-instrument-actions .pub-evidence-action,
+.public-surface .pub-reminder-intro > .pub-button:not(.primary) { background: var(--skin-surface); border-color: var(--skin-border-strong); color: var(--skin-accent); box-shadow: none; }
+.public-surface .pub-button:hover { background: var(--skin-selected); border-color: var(--skin-accent); }
+.public-surface .pub-button.primary,
+.public-surface .pub-instrument-actions .pub-subscribe { background: var(--skin-accent); border-color: var(--skin-accent); color: var(--skin-on-accent); box-shadow: 0 3px 12px var(--skin-shadow); }
+.public-surface .pub-button.primary:hover,
+.public-surface .pub-instrument-actions .pub-subscribe:hover { background: var(--skin-accent-hover); border-color: var(--skin-accent-hover); }
+.public-surface .pub-instrument-actions .pub-subscribe small { color: var(--skin-on-accent); }
+.public-surface .pub-instrument-actions .pub-evidence-action > .pub-icon:first-child,
+.public-surface .pub-refresh:hover { color: var(--skin-accent); }
+.public-surface .pub-text-link,
+.public-surface .pub-text-button,
+.public-surface .pub-instrument-summary .pub-reset-outlook > .pub-text-link,
+.public-surface .pub-instrument-last .pub-text-button { color: var(--skin-accent) !important; }
+.public-surface .pub-filter { border-color: var(--skin-border); }
+.public-surface .pub-filter button { background: transparent; color: var(--skin-muted); }
+.public-surface .pub-filter button.active { color: var(--skin-accent); border-bottom-color: var(--skin-accent); }
+.public-surface .pub-update-prompt { background: var(--skin-selected); color: var(--skin-accent); border-color: var(--skin-border-strong); }
+.public-surface :focus-visible,
+.public-surface :focus-visible { outline-color: var(--skin-accent); }
+
+/* Timeline: tint only. The approved progress layout and all status text remain. */
+.public-surface .pub-status-timeline { background: var(--skin-timeline); border-color: var(--skin-border-strong); }
+.public-surface .pub-timeline-head,
+.public-surface .pub-status-timeline .pub-timeline-note { color: var(--skin-timeline-text); }
+.public-surface .pub-timeline-row h1 { color: var(--skin-text); }
+.public-surface .pub-timeline-row h1 small { color: var(--skin-timeline-text); }
+.public-surface .pub-timeline-row svg { stroke: var(--skin-timeline-text); }
+.public-surface .pub-status-timeline.is-scheduled h1 { color: var(--skin-accent); }
+.public-surface .pub-status-timeline.is-completed h1 { color: var(--skin-success); }
+.public-surface .pub-timeline-stages::before { background: var(--skin-border-strong); }
+.public-surface .pub-timeline-stages li { color: var(--skin-timeline-text); }
+.public-surface .pub-timeline-stages li::before { background: var(--skin-timeline); border-color: var(--skin-border-strong); }
+.public-surface .pub-timeline-stages li.current { color: var(--skin-accent); }
+.public-surface .pub-timeline-stages li.current::before { background: var(--skin-accent); border-color: var(--skin-accent); box-shadow: none; }
+.public-surface .pub-status-timeline.is-completed .pub-timeline-stages li.current { color: var(--skin-success); }
+.public-surface .pub-status-timeline.is-completed .pub-timeline-stages li.current::before { background: var(--skin-success); border-color: var(--skin-success); }
+.public-surface .pub-status-dot,
+.public-surface .pub-freshness .pub-status-dot { background: var(--skin-success); }
+.public-surface .pub-freshness .pub-status-dot.is-delayed { background: var(--skin-warning); }
+.public-surface .pub-instrument-last .pub-record-detail h2,
+.public-surface .pub-instrument-last .pub-record-detail + .pub-record-detail h2 { color: var(--skin-text); }
+.public-surface .pub-instrument-last .pub-record-detail p.pub-record-time,
+.public-surface .pub-instrument-last > .pub-icon,
+.public-surface .pub-instrument-activity p { color: var(--skin-muted); }
+.public-surface .pub-instrument-activity > .pub-icon,
+.public-surface .pub-instrument-activity > span { color: var(--skin-accent); }
+
+/* Sharing row and news: poster images are the original fixed artwork. */
+.public-surface .pub-share-entry { background: var(--skin-share); border-top-color: var(--skin-border-strong); border-bottom-color: var(--skin-border); }
+.public-surface .pub-share-entry:hover { background: var(--skin-selected); border-top-color: var(--skin-accent); }
+.public-surface .pub-share-entry-title { color: var(--skin-text); }
+.public-surface .pub-share-entry-description { color: var(--skin-muted); }
+.public-surface .pub-share-entry-action,
+.public-surface .pub-share-entry-arrow { color: var(--skin-accent); }
+.public-surface .pub-share-entry:disabled { background: var(--skin-surface-soft); color: var(--skin-muted); }
+.public-surface .pub-card,
+.public-surface .pub-action-card,
+.public-surface .pub-inbox-link,
+.public-surface .pub-notice.is-read { background: var(--skin-surface); border-color: var(--skin-border); color: var(--skin-text); box-shadow: 0 2px 10px var(--skin-shadow); }
+.public-surface .pub-card:hover { border-color: var(--skin-border-strong); }
+.public-surface .pub-recent .pub-card,
+.public-surface .route-news .pub-card.pub-news-item { background: transparent; border-color: var(--skin-border); box-shadow: none; }
+.public-surface .pub-announcement p,
+.public-surface .pub-source-row .pub-source-excerpt,
+.public-surface .pub-notice p,
+.public-surface .pub-inbox-preview p,
+.public-surface .pub-inbox-preview small,
+.public-surface .pub-inbox-empty { color: var(--skin-muted); }
+.public-surface .pub-badge { background: var(--skin-surface-soft); color: var(--skin-muted); border-color: var(--skin-border); }
+.public-surface .pub-badge.cyan { background: var(--skin-selected); color: var(--skin-accent); border-color: var(--skin-border-strong); }
+.public-surface .pub-badge.purple { background: var(--skin-purple-soft); color: var(--skin-purple); border-color: var(--skin-border); }
+.public-surface .pub-badge.amber { background: var(--skin-warning-soft); color: var(--skin-warning); border-color: var(--skin-border-strong); }
+
+/* Records, calendar, inbox and preference controls. */
+.public-surface .pub-history-month > h2,
+.public-surface .pub-history-item > time,
+.public-surface .pub-activity-legend { color: var(--skin-muted); }
+.public-surface .pub-history-list,
+.public-surface .pub-history-item,
+.public-surface .pub-notice-version,
+.public-surface .pub-inbox-preview,
+.public-surface .pub-setting-row,
+.public-surface .pub-source-row,
+.public-surface .pub-facts > div,
+.public-surface .pub-prediction-facts > div { border-color: var(--skin-border); }
+.public-surface .pub-history-item::before { background: var(--skin-accent); border-color: var(--skin-page); }
+.public-surface .pub-activity-days button { background: var(--skin-surface); color: var(--skin-text); border-color: var(--skin-border); }
+.public-surface .pub-activity-days button.is-future:not(.active) { background: var(--skin-surface-soft); color: var(--skin-muted); border-color: var(--skin-border-strong); }
+.public-surface .pub-activity-days button.active { background: var(--skin-accent); border-color: var(--skin-accent); color: var(--skin-on-accent); }
+.public-surface .pub-activity-days button.is-today { box-shadow: inset 0 0 0 1px var(--skin-accent); }
+.public-surface .pub-activity-legend span::before,
+.public-surface .pub-activity-legend .future::before { border-color: var(--skin-border-strong); }
+.public-surface .pub-activity-legend .today::before { border-color: var(--skin-accent); }
+.public-surface .pub-activity-legend .recorded::before { background: var(--skin-success); border-color: var(--skin-success); }
+.public-surface .pub-activity-legend .future { color: var(--skin-muted); }
+.public-surface .pub-reminder-intro,
+.public-surface .pub-activity-link { background: var(--skin-timeline); border-color: var(--skin-border-strong); }
+.public-surface .pub-reminder-icon { background: transparent; color: var(--skin-accent); }
+.public-surface .pub-activity-symbol { background: var(--skin-selected); color: var(--skin-accent); }
+.public-surface .pub-inbox-unread { color: var(--skin-accent); }
+.public-surface .pub-switch { background: var(--skin-border-strong); }
+.public-surface .pub-switch::before,
+.public-surface .pub-switch::after { background: var(--skin-surface); box-shadow: 0 1px 3px var(--skin-shadow); }
+.public-surface .pub-setting-row input:checked + .pub-switch { background: var(--skin-accent); }
+.public-surface .pub-setting-row input:focus-visible + .pub-switch { outline-color: var(--skin-accent); }
+
+/* Loading, empty, warning and dialog states belong to the selected skin too. */
+.public-surface .pub-page-loading,
+.public-surface .pub-poster-loading,
+.public-surface .pub-original { background: var(--skin-page); color: var(--skin-muted); }
+.public-surface .pub-loading-ring { border-color: var(--skin-border); border-top-color: var(--skin-accent); }
+.public-surface .pub-content-placeholder > div { background: var(--skin-surface-soft); border-color: var(--skin-border); }
+.public-surface .pub-empty,
+.public-surface .pub-dialog .pub-empty { background: var(--skin-surface); color: var(--skin-muted); border-color: var(--skin-border-strong); }
+.public-surface .pub-empty .pub-icon,
+.public-surface .pub-entry-pending > .pub-icon { color: var(--skin-accent); }
+.public-surface .pub-warning { background: var(--skin-warning-soft); color: var(--skin-warning); border-color: var(--skin-border-strong); }
+.public-surface .pub-pagination-error { color: var(--skin-warning); }
+.public-surface .pub-background-status { background: var(--skin-surface); color: var(--skin-muted); border-color: var(--skin-border); }
+.public-surface .pub-dialog,
+.public-surface .pub-dialog-heading,
+.public-surface .pub-freshness > div { background: var(--skin-surface); color: var(--skin-text); border-color: var(--skin-border-strong); box-shadow: 0 12px 32px var(--skin-shadow); }
+.public-surface .pub-dialog::backdrop { background: var(--skin-overlay); }
+.public-surface .pub-share-link-input { background: var(--skin-page); color: var(--skin-text); border-color: var(--skin-border-strong); }
+.public-surface .pub-toast { background: var(--skin-text); color: var(--skin-surface); box-shadow: 0 4px 20px var(--skin-shadow); }
+.public-surface .pub-poster-dialog .pub-poster-style { background: var(--skin-surface-soft); color: var(--skin-muted); border-color: var(--skin-border); }
+.public-surface .pub-poster-dialog .pub-poster-style.is-selected { background: var(--skin-selected); color: var(--skin-text); border-color: var(--skin-accent); }
+.public-surface .pub-poster-dialog .pub-poster-preview,
+.public-surface .pub-poster-image { background: var(--skin-page); border-color: var(--skin-border); }
+.public-surface .pub-poster-preview .pub-poster-loading { background: var(--skin-page); }
+.public-surface .pub-poster-code-option input { accent-color: var(--skin-accent); }
+
+/* The desktop clock retains its geometry; its existing SVG ink is recolored. */
+.public-surface .pub-dial-orbit,
+.public-surface .pub-dial-rim,
+.public-surface .pub-dial-inner { stroke: var(--skin-border-strong); }
+.public-surface .pub-dial-inner { fill: var(--skin-timeline); }
+.public-surface .pub-dial-rim { fill: var(--skin-surface); }
+.public-surface .pub-dial-face circle[fill="#f4bf5522"] { fill: var(--skin-selected); }
+.public-surface .pub-dial-face circle[fill="#ffc85a"],
+.public-surface .pub-dial-face rect[fill="#f4c15c"] { fill: var(--skin-accent); }
+.public-surface .pub-dial-face text[fill="#111719"] { fill: var(--skin-on-accent); }
+.public-surface .pub-dial-tick { stroke: var(--skin-muted); }
+.public-surface .pub-dial-tick.major { stroke: var(--skin-text); }
+.public-surface .pub-dial-axis,
+.public-surface .pub-dial-arc { stroke: var(--skin-accent); }
+.public-surface .pub-dial-hour { fill: var(--skin-text); }
+.public-surface .pub-dial-readout strong,
+.public-surface .pub-instrument-dial.is-waiting .pub-dial-state { color: var(--skin-text); text-shadow: none; }
+.public-surface .pub-dial-readout p,
+.public-surface .pub-dial-readout > span,
+.public-surface .pub-dial-caption small,
+.public-surface .pub-instrument-brand > span { color: var(--skin-muted); }
+.public-surface .pub-dial-caption,
+.public-surface .pub-instrument-summary .pub-reset-outlook h2 { color: var(--skin-accent); }
+.public-surface .pub-instrument-summary .pub-outlook-countdown { color: var(--skin-text); }
+.public-surface .pub-instrument-summary .pub-badge,
+.public-surface .pub-instrument-summary .pub-outlook-recap summary { color: var(--skin-muted); }
+.public-surface .pub-reset-outlook.is-active,
+.public-surface .pub-reset-prediction { background: var(--skin-timeline); }
+.public-surface .pub-prediction-probabilities > div { background: var(--skin-surface-soft); }
+
+@media (max-width: 700px) {
+  .public-surface .pub-topbar { background: transparent; }
+}
+
+/* Secondary states and existing desktop dial use the same approved ink. */
+.public-surface .pub-skip { background: var(--skin-surface); color: var(--skin-accent); }
+.public-surface .pub-announcement:hover { border-color: var(--skin-border-strong); }
+.public-surface .pub-setting-row input:checked + .pub-switch::after { background: var(--skin-surface); }
+.public-surface .pub-instrument-last p,
+.public-surface .pub-freshness time,
+.public-surface .pub-mini-entry-code figcaption { color: var(--skin-muted); }
+.public-surface .pub-share-panel { background: var(--skin-share); border-color: var(--skin-border); }
+.public-surface .pub-share-panel-heading > .pub-icon,
+.public-surface .pub-dial-elapsed small { color: var(--skin-accent); }
+.public-surface .pub-instrument-dial.is-completed .pub-dial-rim { stroke: var(--skin-accent); }
+.public-surface .pub-share-entry:focus-visible { outline-color: var(--skin-accent); }
+.public-surface .pub-dialog::backdrop { backdrop-filter: none; }
+
+/* Small decorative island: no page transitions or animated document backdrop. */
+.public-surface .pub-status-timeline {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-image: linear-gradient(110deg, var(--skin-surface) 0%, var(--skin-surface) 34%, transparent 100%), linear-gradient(#365bd209 1px, transparent 1px), linear-gradient(90deg, #365bd209 1px, transparent 1px);
+  background-size: auto, 18px 18px, 18px 18px;
+  background-color: var(--skin-timeline);
+  box-shadow: inset 0 1px 0 #fff, 0 8px 24px var(--skin-shadow);
+}
+.public-surface .pub-neural-art { position: absolute; right: 0; top: 15px; width: 46%; max-width: 170px; height: 80px; z-index: -1; pointer-events: none; }
+.public-surface .pub-neural-art > canvas,
+.public-surface .pub-neural-art > svg { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.public-surface .pub-neural-art > canvas { visibility: hidden; }
+.public-surface .pub-neural-art[data-ready] > canvas { visibility: visible; }
+.public-surface .pub-neural-art[data-ready] > svg { visibility: hidden; }
+.public-surface .pub-timeline-row > svg { opacity: 0; }
+.public-surface .pub-share-entry { background: linear-gradient(120deg, var(--skin-surface), var(--skin-share)); box-shadow: inset 0 1px 0 #fff9; }
+.public-surface .pub-button.primary,
+.public-surface .pub-instrument-actions .pub-subscribe { background: linear-gradient(105deg, var(--skin-accent-hover), var(--skin-accent)); box-shadow: 0 4px 13px var(--skin-shadow); }
+.public-surface .pub-bottom-nav { background: var(--skin-nav-surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.public-surface .pub-bottom-nav a.active { background: linear-gradient(0deg, var(--skin-selected), transparent 85%); }
+.public-surface .pub-button,
+.public-surface .pub-share-entry,
+.public-surface .pub-bottom-nav a { transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease; }
+.public-surface .pub-button:active,
+.public-surface .pub-share-entry:active { box-shadow: inset 0 0 0 1px var(--skin-accent); }
+@media (prefers-reduced-motion: reduce) {
+  .public-surface *, .public-surface *::before, .public-surface *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  /* Loading remains legible when its delayed reveal animation is disabled. */
+  .public-surface .pub-page-loading > span { opacity: 1; }
+}

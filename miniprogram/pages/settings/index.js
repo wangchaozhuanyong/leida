@@ -1,11 +1,11 @@
 const { createPage } = require('../../utils/page');
 const { noticeModel } = require('../../utils/model');
 // Bundled client version; keep this aligned with the development-tool upload.
-const buildVersion = '1.0.13';
+const buildVersion = '1.0.14';
 Page(createPage((data, query, page, app) => {
   const stored=app.preferences.snapshot(),notices=data?noticeModel(data,stored.preferences,stored.read):[];
   return { notices:notices.slice(0,3),unread:notices.filter(n=>!n.read).length,storageError:stored.error };
-}, { view:()=>({view:'notices'}),data: { notices:[],unread:0,storageError: '', clientVersion:buildVersion, wechat:{label:'点击后连接微信提醒',busy:false,ready:false,canPrepare:true,canRevoke:false,error:'',privacyNeeded:false} },
+}, { view:()=>({view:'notices'}),data: { notices:[],unread:0,storageError: '', clientVersion:buildVersion, wechat:{safe:null,label:'加载中',busy:true,ready:false,canPrepare:false,canRevoke:false,error:'',privacyNeeded:false} },
   load(){
     try {
       const info=typeof wx.getAccountInfoSync==='function' ? wx.getAccountInfoSync().miniProgram : null;
@@ -13,17 +13,26 @@ Page(createPage((data, query, page, app) => {
       if(channel)this.setData({clientVersion:`${buildVersion} · ${channel}`});
     }catch(_){ /* Version information is optional and never blocks settings. */ }
   },
-  show(){const reader=getApp().wechat;if(reader){this._wechatUnsubscribe=reader.subscribe(state=>this.setData({wechat:state}));if(reader.refreshConnected){void reader.refreshConnected();if(typeof setInterval==='function')this._wechatRefreshTimer=setInterval(()=>void reader.refreshConnected(),300000);}}},
-  hide(){if(this._wechatUnsubscribe)this._wechatUnsubscribe();this._wechatUnsubscribe=null;if(typeof clearInterval==='function')clearInterval(this._wechatRefreshTimer);this._wechatRefreshTimer=null;},
-  unload(){if(this._wechatUnsubscribe)this._wechatUnsubscribe();this._wechatUnsubscribe=null;if(typeof clearInterval==='function')clearInterval(this._wechatRefreshTimer);this._wechatRefreshTimer=null;},
+  show(){const reader=getApp().wechat;if(reader){this._wechatUnsubscribe=reader.subscribe(state=>this.setData({wechat:state}));void this.loadWechat();}},
+  hide(){if(this._wechatUnsubscribe)this._wechatUnsubscribe();this._wechatUnsubscribe=null;clearTimeout(this._wechatRefreshTimer);this._wechatRefreshTimer=null;},
+  unload(){if(this._wechatUnsubscribe)this._wechatUnsubscribe();this._wechatUnsubscribe=null;clearTimeout(this._wechatRefreshTimer);this._wechatRefreshTimer=null;},
   methods: {
   openNotice(event){const notice=this.data.notices.find(n=>n.id===event.currentTarget.dataset.id);if(!notice)return;getApp().preferences.markRead([notice.id]);this.redraw();const url=notice.origin==='admin'?`/pages/notices/index?id=${encodeURIComponent(notice.id)}`:notice.path;if(url)wx.navigateTo({url});},
-  prepareWechat(){if(getApp().wechat)void getApp().wechat.prepare({userInitiated:true});},
-  authorizeWechat(){if(getApp().wechat)void getApp().wechat.authorize({userInitiated:true});},
-  refreshWechat(){if(getApp().wechat)void getApp().wechat.refresh({userInitiated:true});},
-  addWechat(){this._wechatPrivacyAction='add';const reader=getApp().wechat;if(!reader)return;const state=reader.getState();if(state.confirmNeeded)void reader.retryConfirmation({userInitiated:true});else if(state.ready)void reader.authorize({userInitiated:true});else void reader.prepare({userInitiated:true});},
-  async revokeWechat(){this._wechatPrivacyAction='close';const reader=getApp().wechat;if(reader)await reader.revoke({userInitiated:true});},
-  viewWechat(){this._wechatPrivacyAction='view';const reader=getApp().wechat;if(reader)void reader.refresh({userInitiated:true});},
-  agreeWechatPrivacy(){if(this._wechatPrivacyAction==='close')void this.revokeWechat();else if(this._wechatPrivacyAction==='view')this.viewWechat();else this.addWechat();},
+  async loadWechat(){
+    clearTimeout(this._wechatRefreshTimer);
+    const reader=getApp().wechat;if(!reader)return;
+    await reader.loadForPage();
+    clearTimeout(this._wechatRefreshTimer);
+    if(this._visible&&!reader.getState().privacyNeeded)this._wechatRefreshTimer=setTimeout(()=>void this.loadWechat(),reader.nextRefreshDelay());
+  },
+  addWechat(){
+    this._wechatPrivacyAction='add';const reader=getApp().wechat;if(!reader)return;const state=reader.getState();if(state.busy)return;
+    // Keep the WeChat prompt synchronous with this tap; page entry has prepared it.
+    if(!state.ready&&!state.confirmNeeded)return this.loadWechat();
+    const work=state.confirmNeeded?reader.retryConfirmation({userInitiated:true}):reader.authorize({userInitiated:true});
+    return work.then(()=>{if(this._visible&&!reader.getState().error)return this.loadWechat();});
+  },
+  async revokeWechat(){this._wechatPrivacyAction='close';const reader=getApp().wechat;if(reader){await reader.revoke({userInitiated:true});if(this._visible&&!reader.getState().privacyNeeded&&!reader.getState().error)await this.loadWechat();}},
+  agreeWechatPrivacy(){if(this._wechatPrivacyAction==='close')return this.revokeWechat();return this.loadWechat();},
   openPrivacyContract(){if(typeof wx.openPrivacyContract==='function')wx.openPrivacyContract({fail(){wx.showToast({title:'隐私指引暂不可用',icon:'none'});}});}
 } }));

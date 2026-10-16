@@ -3,6 +3,7 @@ import type {ResetOutlook} from '@/lib/reset-outlook';
 import type {BenefitAction} from '@/lib/types';
 import {announcementCountdown, completionElapsed} from './model';
 import {usePublicClock} from './PublicSession';
+import {NeuralNetworkArt} from './NeuralNetworkArt';
 
 type Completion = Pick<BenefitAction, 'kind' | 'stage' | 'statementAt'> | null | undefined;
 
@@ -29,6 +30,7 @@ export function StatusTimeline({outlook, serverTime, completion = outlook.latest
   const now = usePublicClock(serverTime);
   const model = statusTimelineModel(outlook, now, completion);
   return <section className={`pub-status-timeline${model.completed ? ' is-completed' : ''}${model.scheduled ? ' is-scheduled' : ''}`} aria-label="公开重置进展">
+    <NeuralNetworkArt/>
     <div className="pub-timeline-head"><span>{model.lead}</span><span>北京时间</span></div>
     <div className="pub-timeline-row"><h1>{model.title}{model.scheduled && <small>小时 : 分钟</small>}</h1><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19V5M3 15l5-5 4 3 8-9M15 4h5v5"/></svg></div>
     <p className="pub-timeline-note">{model.note}</p>

@@ -1,0 +1,5 @@
+<view class="neural-art {{ready ? 'is-ready' : ''}}" aria-hidden="true">
+  <image class="neural-static" src="/assets/neural/orb.png" mode="aspectFit" aria-hidden="true" />
+  <canvas class="neural-canvas" id="neural-canvas" type="2d" binderror="onCanvasError" aria-hidden="true" />
+  <view class="motion-preference" id="motion-preference" aria-hidden="true" />
+</view>
