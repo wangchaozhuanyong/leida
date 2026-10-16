@@ -68,3 +68,32 @@
 .home-page>.home-heading,.home-page>.freshness-detail,.home-page>status-panel,.home-page>.warning,.home-page>.status-timeline,.home-page>.timeline-time-note,.home-page>.instrument-actions,.home-page>.completion-records,.home-page>.share-entry,.home-page>.previous-records,.home-page>.activity-entry,.home-page>.section,.home-page>publication-card,.home-page>.card,.home-page>.foot{position:relative;z-index:1}
 .home-heading{flex-direction:column;align-items:flex-start;justify-content:center;gap:6px;min-height:124px;margin-bottom:12px}
 .home-heading .freshness-summary{justify-content:flex-start;min-height:28px;max-width:100%}
+
+/* Keep status, factual records and their actions in one stable reading group. */
+.home-page>.status-card{position:relative;z-index:1;border:1px solid #ccd9ed;border-radius:17px;background:linear-gradient(130deg,#ffffffed,#f6f9fff2);overflow:hidden;box-shadow:0 8px 24px #264f8b06}
+.status-card .status-timeline{min-height:136px;padding:16px 17px 14px;border:0;border-radius:0;background-color:transparent;box-shadow:none}
+.status-card .timeline-time-note{margin:0;padding:0 17px 12px;font-size:10px}
+.recent-complete{margin:0 17px;padding:10px 0;border-top:1px solid #e2eaf5}
+.section-overline{font-size:10px;line-height:17px;color:#6d819d;letter-spacing:.3px;margin-bottom:4px}
+.completion-line{display:flex;align-items:center;gap:7px;min-height:32px;font-size:12px;border-radius:4px}
+.completion-line-pressed{background:#e8effa}
+.completion-check{width:13px;flex:none;font-size:13px;color:#428971}
+.completion-label{flex:none;color:#294264;font-weight:500}
+.completion-date{margin-left:auto;color:#6d819d;font-size:10px;line-height:17px;text-align:right;font-variant-numeric:tabular-nums}
+.status-card .instrument-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 17px;padding:13px 0 15px;border-top:1px solid #e2eaf5}
+.status-card .instrument-action-button{flex:none;min-width:112px;min-height:44px;width:auto;padding:10px 17px;border-radius:10px;font-size:13px}
+.status-card .evidence-action{display:flex;align-items:center;justify-content:flex-end;gap:7px;min-width:0;min-height:44px;padding:8px 0;border:0;border-radius:0;background:transparent;color:#617b9c;font-size:11px;box-shadow:none}
+.status-card .evidence-action .action-arrow{font-size:19px;margin:0;color:#718eaf}
+
+/* Blend the share row into the page; the small signal alone carries motion. */
+.home-page>.share-entry{position:relative;overflow:hidden;min-height:102px;margin:12px 0 14px;padding:18px 16px;gap:14px;border:0;border-radius:0;background:transparent;box-shadow:none}
+.share-entry::before,.share-entry::after{content:"";position:absolute;left:0;right:0;top:0;bottom:auto;width:auto;height:1px;border:0;border-radius:0;transform:none;background:linear-gradient(90deg,transparent,#c6d8f0 23%,#c6d8f0 77%,transparent);pointer-events:none}
+.share-entry::after{top:auto;bottom:0}
+.home-page>.share-entry-pressed{background:transparent}
+.share-entry-pressed .share-entry-signal{transform:translate(1px,-1px)}
+.share-entry .share-entry-title{font-size:15px;line-height:23px;letter-spacing:0}
+.share-entry .share-entry-description{margin-top:5px;font-size:10px;line-height:17px}
+.share-entry-signal{flex:none;width:44px;height:44px;margin-left:0;border-radius:50%;background:radial-gradient(circle,#dce9fd8a,transparent 70%)}
+.share-entry .share-entry-posters{width:50px;height:59px}
+.home-page>.activity-entry{border-top:0;min-height:78px;padding:14px 0}
+@media(max-width:350px){.status-card .status-timeline{padding-left:15px;padding-right:15px}.recent-complete,.status-card .instrument-actions{margin-left:15px;margin-right:15px}.completion-date{font-size:9px}.status-card .instrument-action-button{min-width:105px;padding:10px 13px}.home-page>.share-entry{padding-left:12px;padding-right:12px;gap:11px}.share-entry .share-entry-title{font-size:14px}.share-entry .share-entry-description{font-size:9px}.share-entry-signal{width:40px}}

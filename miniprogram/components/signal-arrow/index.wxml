@@ -1,0 +1,7 @@
+<view class="signal-arrow {{animated ? 'is-animated' : ''}}" aria-hidden="true">
+  <view class="arrow-orbit" />
+  <view class="arrow-track track-one" /><view class="arrow-track track-two" />
+  <view class="arrow-core"><view class="arrow-shaft" /><view class="arrow-head" /></view>
+  <view class="arrow-pulse" />
+  <view class="motion-preference" id="motion-preference" />
+</view>

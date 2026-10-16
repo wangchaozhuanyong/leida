@@ -202,36 +202,73 @@ export default function PublicApp() {
 }
 
 export function Home({ data, onWechatReminders, onPoster, onShare, historical, wechatEntry = 'checking' }: { data: PublicData; onWechatReminders: () => void; onPoster: (p?: Publication, actionId?: string) => void; onShare: (p?: Publication) => Promise<void>; historical: boolean; wechatEntry?: WechatEntryState }) {
+  const shareEntryRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const entry = shareEntryRef.current;
+    if (!entry || typeof window.matchMedia !== 'function') return;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (typeof reducedMotion.addEventListener !== 'function' || typeof reducedMotion.removeEventListener !== 'function') return;
+    let inViewport = false;
+    let pageVisible = true;
+    const sync = () => {
+      entry.dataset.motion = inViewport && pageVisible && document.visibilityState === 'visible' && !reducedMotion.matches ? 'running' : 'paused';
+    };
+    const observer = typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver(entries => {
+      inViewport = entries[0]?.isIntersecting ?? false;
+      sync();
+    }) : undefined;
+    // The existing neural artwork uses the same visibility lifecycle; no observer means a static arrow.
+    const hide = () => { pageVisible = false; sync(); };
+    const show = () => { pageVisible = true; sync(); };
+    observer?.observe(entry);
+    document.addEventListener('visibilitychange', sync);
+    reducedMotion.addEventListener('change', sync);
+    window.addEventListener('pagehide', hide);
+    window.addEventListener('pageshow', show);
+    sync();
+    return () => {
+      observer?.disconnect();
+      document.removeEventListener('visibilitychange', sync);
+      reducedMotion.removeEventListener('change', sync);
+      window.removeEventListener('pagehide', hide);
+      window.removeEventListener('pageshow', show);
+    };
+  }, []);
   const outlook = data.forecasts?.outlook ?? publicResetOutlook(data);
   const completions = latestCompletedBenefits(data), latest = completions[0];
   const recent = sortedArticles(data.articles).map(article => data.publications.find(p => p.id === article.publicationId)).filter((p): p is Publication => !!p).slice(0, 3);
   const activity = data.activities.find(item => activityHomeVisible(item, data.serverTime));
   const activityDay = activity ? activityDayNumber(activity, data.serverTime) : undefined;
   const activityPhase = activityDay === undefined ? '活动动态' : activityDay < 1 ? '尚未开始' : activity && activityDay > activity.days ? '活动已结束' : `第${activityDay}天 / 共${activity?.days}天`;
-  const latestRecord = <section className={`pub-instrument-last${outlook.active ? '' : ' is-featured'}`} aria-label="各类福利最近完成公告">
-    {completions.length ? completions.map(item => <div className="pub-record-detail" key={item.action.kind}>
-      <h2><Link scroll={false} href={`/events/${encodeURIComponent(item.event.id)}`} aria-label={`查看最近${item.action.kind === 'banked_reset' ? '重置卡发放' : '用量重置'}的公开依据`}>公告称已{item.action.kind === 'banked_reset' ? '发放重置卡' : '重置用量'}</Link></h2>
-      <p className="pub-record-time"><time dateTime={item.action.statementAt}>{completionTime(item.action.statementAt)}</time><span> · 北京时间</span></p>
-    </div>) : <div className="pub-record-detail pub-record-empty"><h2>暂无公开完成记录</h2><p className="pub-record-time">收录后将在这里更新</p></div>}
-  </section>;
+  const latestRecord = completions.length ? <section className="pub-home-completions" aria-label="各类福利最近完成公告">
+    <div className="pub-home-completions-heading"><h2>最近完成</h2><span>以公开公告为准</span></div>
+    {completions.map(item => <Link scroll={false} className="pub-home-completion" key={item.action.kind} href={`/events/${encodeURIComponent(item.event.id)}`} aria-label={`公告称已${item.action.kind === 'banked_reset' ? '发放重置卡' : '重置用量'}，${completionTime(item.action.statementAt)}，查看公开依据`}>
+      <Icon name="check"/><span className="pub-home-completion-name">{item.action.kind === 'banked_reset' ? '重置卡发放' : '用量重置'}</span>
+      <time dateTime={item.action.statementAt} title={`${displayTime(item.action.statementAt)} · 北京时间`}>{completionTime(item.action.statementAt).replace(/^(\d{4})\/(\d{2})\/(\d{2}) /, (_, year: string, month: string, day: string) => `${year === dateKey(data.serverTime).slice(0, 4) ? '' : `${year}年`}${Number(month)}月${Number(day)}日 `)}</time>
+    </Link>)}
+  </section> : null;
+  const evidenceHref = outlook.active ? `/events/${encodeURIComponent(outlook.active.eventId)}` : latest ? `/events/${encodeURIComponent(latest.event.id)}` : '/history';
+  const evidenceLabel = outlook.active ? '查看本次公告' : latest ? '查看最近公告' : '浏览历史记录';
   return <>
     {historical && <p className="pub-warning">当前展示历史收录资料。</p>}
     <div className={`pub-instrument-layout${outlook.active ? '' : ' is-idle'}`}>
       <div className="pub-home-dial"><InstrumentDial outlook={outlook} serverTime={data.serverTime} completion={latest?.action ?? null}/></div>
-      <StatusTimeline outlook={outlook} serverTime={data.serverTime} completion={latest?.action ?? null}/>
       <aside className="pub-instrument-summary" aria-label="重置状态与操作">
-        {outlook.active?.timeNote && <details className="pub-home-time-note"><summary>预告时间说明</summary><p>{outlook.active.timeNote}</p></details>}
-        {outlook.active ? <ResetOutlookPanel outlook={outlook} serverTime={data.serverTime} instrument /> : latestRecord}
-        <div className="pub-instrument-actions">
-          <Link scroll={false} href={outlook.active ? `/events/${encodeURIComponent(outlook.active.eventId)}` : latest ? `/events/${encodeURIComponent(latest.event.id)}` : '/history'} className="pub-button full pub-evidence-action"><Icon name="news"/><span className="pub-evidence-desktop">{outlook.active ? '查看原文依据' : '查看最近发放依据'}</span><span className="pub-evidence-mobile">查看依据</span><Icon name="arrow"/></Link>
-          <button onClick={onWechatReminders} className="pub-button full pub-subscribe"><Icon name="bell"/><span>微信提醒</span>{wechatEntry === 'unavailable' && <small>待开放</small>}<Icon name="arrow"/></button>
+        <div className="pub-home-state-zone">
+          <StatusTimeline outlook={outlook} serverTime={data.serverTime} completion={latest?.action ?? null}/>
+          {outlook.active?.timeNote && <details className="pub-home-time-note"><summary>预告时间说明</summary><p>{outlook.active.timeNote}</p></details>}
+          {outlook.active && <ResetOutlookPanel outlook={outlook} serverTime={data.serverTime} instrument />}
+          {latestRecord}
+          <div className="pub-home-actions">
+          <button onClick={onWechatReminders} className="pub-button pub-home-reminder"><Icon name="bell"/><span>微信提醒</span>{wechatEntry === 'unavailable' && <small>待开放</small>}</button>
+          <Link scroll={false} href={evidenceHref} className="pub-home-evidence">{evidenceLabel}<Icon name="arrow"/></Link>
+          </div>
         </div>
-        <button className="pub-share-entry" onClick={() => onPoster(latest?.publication, latest?.action.id)} aria-label="生成分享海报，分享重置动态，黑金或水墨两款可选">
+        <button ref={shareEntryRef} data-motion="paused" className="pub-share-entry" onClick={() => onPoster(latest?.publication, latest?.action.id)} aria-label="生成分享海报，分享重置动态，黑金或水墨两款可选">
           <span className="pub-share-entry-posters" aria-hidden="true"><span className="pub-share-entry-poster precision"/><span className="pub-share-entry-poster editorial"/></span>
-          <span className="pub-share-entry-copy"><span className="pub-share-entry-title">分享重置动态</span><span className="pub-share-entry-description">黑金 / 水墨 · 两款固定海报</span><span className="pub-share-entry-action">生成分享海报</span></span>
-          <span className="pub-share-entry-arrow" aria-hidden="true">↗</span>
+          <span className="pub-share-entry-copy"><span className="pub-share-entry-title">分享重置动态</span><span className="pub-share-entry-description">黑金 / 水墨 · 两款固定海报</span></span>
+          <span className="pub-share-entry-arrow" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none"><circle className="pub-share-orbit" cx="24" cy="24" r="20.5"/><path className="pub-share-rail" d="M10 30 30 10M18 38 38 18"/><g className="pub-share-vector"><path d="m15 33 18-18M20 15h13v13"/></g><circle className="pub-share-signal" cx="15" cy="33" r="1.8"/></svg></span>
         </button>
-        {outlook.active && latestRecord}
         {activity && <Link scroll={false} className="pub-instrument-activity" href={`/activities/${encodeURIComponent(activity.id)}`}><Icon name="calendar"/><div><h2>{activity.title}</h2><p>{activityPhase} · 已收录{activity.items.length}项进展</p></div><span>查看进展 <Icon name="arrow"/></span></Link>}
       </aside>
     </div>

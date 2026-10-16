@@ -9,6 +9,7 @@
   <block wx:else>
     <view wx:if="{{error}}" class="warning">连接暂时中断，保留最近读取的资料。<button class="text-button" bindtap="retry" loading="{{loading}}">重新连接 →</button></view>
     <view wx:if="{{historical}}" class="warning">当前公告为历史收录，不代表刚刚发放。</view>
+    <view class="status-card">
     <view wx:if="{{timeline}}" class="status-timeline {{timeline.completed ? 'is-completed' : ''}} {{timeline.scheduled ? 'is-scheduled' : ''}}" aria-label="公开重置进展">
       <neural-orb class="timeline-orb" aria-hidden="true" />
       <view class="timeline-head"><text>{{timeline.lead}}</text><text class="timeline-timezone">北京时间</text></view>
@@ -17,14 +18,14 @@
       <view class="timeline-stages" aria-label="公开进展阶段"><view wx:for="{{timeline.stages}}" wx:key="*this" class="timeline-stage {{timeline.currentStage === index ? 'current' : ''}}" aria-label="{{item}}{{timeline.currentStage === index ? '，当前阶段' : ''}}"><view class="stage-dot"/>{{item}}</view></view>
     </view>
     <view wx:if="{{pending.timeNote}}" class="timeline-time-note small muted">{{pending.timeNote}}</view>
-    <view class="instrument-actions"><button class="primary full subscribe-action instrument-action-button" bindtap="openWechatSettings"><view class="button-label"><image src="/assets/neural/reminder-white.png" class="action-icon" aria-hidden="true"/><text>微信提醒</text></view></button><button class="secondary full evidence-action instrument-action-button" data-path="{{pending ? pending.path : latest ? latest.path : '/pages/announcements/index'}}" bindtap="navigate"><view class="button-label"><image src="/assets/neural/news-blue.png" class="action-icon" aria-hidden="true"/><text>查看依据</text></view><text class="action-arrow">›</text></button></view>
-    <view wx:if="{{!pending}}" class="completion-records"><view wx:for="{{completions}}" wx:key="kind" class="completion-record" data-path="{{item.path}}" bindtap="navigate" role="button" aria-label="查看{{item.title}}的原文"><view class="title {{index > 0 ? 'secondary-title' : ''}}">{{item.title}}</view><view class="completion-time muted">{{item.time}} · 北京时间</view></view><view wx:if="{{!completions.length}}" class="completion-record"><view class="title">暂无公开完成记录</view></view></view>
+    <view wx:if="{{completions.length}}" class="recent-complete"><view class="section-overline">最近完成 · 以公开公告为准</view><view wx:for="{{completions}}" wx:key="kind" class="completion-line" data-path="{{item.path}}" bindtap="navigate" hover-class="completion-line-pressed" role="button" aria-label="{{item.title}}，{{item.time}}，查看公告"><text class="completion-check" aria-hidden="true">✓</text><text class="completion-label">{{item.label}}</text><text class="completion-date">{{item.shortTime}}</text></view></view>
+    <view class="instrument-actions"><button class="primary subscribe-action instrument-action-button" bindtap="openWechatSettings"><view class="button-label"><image src="/assets/neural/reminder-white.png" class="action-icon" aria-hidden="true"/><text>微信提醒</text></view></button><button class="text-button evidence-action" data-path="{{evidencePath}}" bindtap="navigate"><text>{{evidenceLabel}}</text><text class="action-arrow" aria-hidden="true">›</text></button></view>
+    </view>
     <button class="share-entry" disabled="{{!connected}}" bindtap="openPoster" hover-class="share-entry-pressed" aria-label="生成分享海报，分享重置动态，黑金或水墨两款可选">
       <view class="share-entry-posters" aria-hidden="true"><image class="share-entry-poster precision" src="/assets/posters/precision.jpg" mode="aspectFill"/><image class="share-entry-poster editorial" src="/assets/posters/editorial.jpg" mode="aspectFill"/></view>
-      <view class="share-entry-copy"><view class="share-entry-title">分享重置动态</view><view class="share-entry-description">黑金 / 水墨 · 两款固定海报</view><view class="share-entry-action">生成分享海报</view></view>
-      <text class="share-entry-arrow" aria-hidden="true">↗</text>
+      <view class="share-entry-copy"><view class="share-entry-title">分享重置动态</view><view class="share-entry-description">黑金 / 水墨 · 两款固定海报</view></view>
+      <signal-arrow class="share-entry-signal" aria-hidden="true" />
     </button>
-    <view wx:if="{{pending && completions.length}}" class="previous-records"><view class="small muted">最近公开完成声明</view><view wx:for="{{completions}}" wx:key="kind" class="previous-record"><view class="row"><view class="grow">{{item.title}}</view><button class="text-button" data-path="{{item.path}}" bindtap="navigate">查看依据 →</button></view><view class="completion-time muted">{{item.time}} · 北京时间</view></view></view>
     <view wx:if="{{activity}}" class="activity-entry" data-path="{{activity.path}}" bindtap="navigate" role="button"><image src="/assets/neural/calendar-blue.png" class="action-icon" aria-hidden="true"/><view class="grow"><view class="activity-title">{{activity.title}}</view><view class="small muted">{{activity.phase}} · 已收录{{activity.entries}}项进展</view></view><text class="activity-link">查看进展 →</text></view>
     <reset-forecast forecasts="{{cadenceForecasts}}" now="{{forecastNow}}" />
     <view class="row section"><view class="heading">最近动态</view><button class="text-button" data-path="/pages/news/index" bindtap="navigate">全部动态 →</button></view>

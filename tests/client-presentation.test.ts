@@ -55,11 +55,14 @@ test('等待期间完成公告前置，明确预告才进入倒计时布局',()=
   const data=fixture();
   const render=()=>renderToStaticMarkup(createElement(Home,{data,historical:false,onWechatReminders(){},onPoster(){},onShare:async()=>{}}));
   const idle=render();assert.match(idle,/pub-instrument-layout is-idle/);assert.doesNotMatch(idle,/等待下一次预告/);
-  assert.ok(idle.indexOf('最近完成公告')<idle.indexOf('查看最近发放依据'));
+  assert.ok(idle.indexOf('最近完成公告')<idle.indexOf('查看最近公告'));
+  assert.ok(idle.indexOf('pub-home-completions')<idle.indexOf('pub-home-actions'));
   const pending=structuredClone(publication);pending.id='v2';pending.article.id='article2';pending.article.publicationId='v2';pending.event.id='event2';pending.eventId='event2';pending.event.publicationId='v2';
   pending.event.actions=[{...pending.event.actions[0],id:'new-action',stage:'promised',statementAt:'2026-10-12T04:30:00Z',expectedAt:'2026-10-12T08:20:00Z',timeNote:'原文预计时刻'}];
   data.publications.push(pending);data.events.push(pending.event);data.articles.push(pending.article);
   const active=render();assert.doesNotMatch(active,/pub-instrument-layout is-idle/);assert.match(active,/03:20/);assert.match(active,/公开预告/);
+  assert.match(active,/查看本次公告/);assert.match(active.match(/<a\b[^>]*class="pub-home-evidence"[^>]*>/)?.[0]||'',/href="\/events\/event2"/);
+  assert.equal((active.match(/class="pub-home-completions"/g)||[]).length,1,'完成记录不因当前预告重复分组');
 });
 test('同轮提醒只归组展示，保留全部版本与原始顺序',()=>{
   const row=(id:string,eventId:string,createdAt:string):Notice=>({id,eventId,publicationId:`pub-${id}`,semanticKey:id,title:id,summary:id,categories:['result'],status:'active',createdAt});

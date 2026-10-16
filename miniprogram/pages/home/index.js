@@ -1,6 +1,12 @@
 const { createPage } = require('../../utils/page');
 const m = require('../../utils/model');
 const { statusTimelineModel } = require('../../utils/status-timeline');
+function completionDate(value, now) {
+  const full = m.completionTime(value);
+  if (full === '暂无记录') return full;
+  const year = full.slice(0, 4) === m.dateKey(now).slice(0, 4) ? '' : `${full.slice(0, 4)}年`;
+  return `${year}${full.slice(5, 7)}月${full.slice(8, 10)}日 ${full.slice(11, 16)}`;
+}
 Page(createPage((data, query, page, app) => {
   if (!data) return { name: '模钥重置雷达', latest: null, completions: [], pending: null, forecast: null, recent: [], activity: null, sharePath: '', timeline: null, posterPath: '', posterDescription: '' };
   const outlook = m.resetOutlookModel(data), completed = m.latestCompletedBenefits(data), latestItem = completed[0], pending = outlook.active;
@@ -22,7 +28,9 @@ Page(createPage((data, query, page, app) => {
     name: data.site.name || '模钥重置雷达',
     cadenceForecasts: data.forecasts || null, forecastNow: data.serverTime,
     latest: latest ? { title: latest.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', elapsed: m.elapsed(latest.statementAt, data.serverTime), time: m.completionTime(latest.statementAt), eligibility: latestAction.eligibility, path: pathFor(latest) } : null,
-    completions: completed.map(item => ({ kind: item.action.kind, title: item.action.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', time: m.completionTime(item.action.statementAt), path: pathFor({ publicationId: item.publication.id }) })),
+    completions: completed.map(item => ({ kind: item.action.kind, title: item.action.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', label: item.action.kind === 'banked_reset' ? '重置卡发放' : '用量重置', time: m.completionTime(item.action.statementAt), shortTime: completionDate(item.action.statementAt, data.serverTime), path: pathFor({ publicationId: item.publication.id }) })),
+    evidencePath: pathFor(pending || latest) || '/pages/announcements/index',
+    evidenceLabel: pending ? '查看本次公告' : latest ? '查看最近公告' : '浏览历史记录',
     pending: pending ? { label: m.actionLabels[pending.kind], stage: m.stageText(pending, data.serverTime), countdown: countdown.label, timed: countdown.status !== 'unknown', counting: countdown.status === 'upcoming', time: pending.expectedAt ? m.displayTime(pending.expectedAt) : '', timeNote: pending.timeNote || '', path: pathFor(pending) } : null,
     forecast: null, outlookStatus: outlook.status,
     timeline: statusTimelineModel(outlook, data.serverTime, latestAction || null), posterPath, posterDescription,

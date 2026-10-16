@@ -550,17 +550,18 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 }
 
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
+  const buildVersion=JSON.parse(readFileSync(resolve(root,'package.json'),'utf8')).version;
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);assert.equal(news.data.navigationTitle,'动态 · 共42篇');news.onUnload();
   const records=h.page('announcements');assert.equal(records.data.navigationTitle,'重置公告 · 42个事件');records.onUnload();
-  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.16 · 体验版');settings.onUnload();
-  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.16');fallback.onUnload();
+  const settings=h.page('settings');assert.equal(settings.data.clientVersion,`${buildVersion} · 体验版`);settings.onUnload();
+  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,buildVersion);fallback.onUnload();
   for(const [envVersion,label] of [['release','正式版'],['develop','开发版']]){
     const page=nativeHarness(fixture(),{accountInfo:{miniProgram:{envVersion,version:'99.0.0'}}}).page('settings');
-    assert.equal(page.data.clientVersion,`1.0.16 · ${label}`,'微信返回的包号不能覆盖本次随包代码版本');page.onUnload();
+    assert.equal(page.data.clientVersion,`${buildVersion} · ${label}`,'微信返回的包号不能覆盖本次随包代码版本');page.onUnload();
   }
   const unavailable=nativeHarness(fixture(),{wxApi:{getAccountInfoSync(){throw new Error('Account information unavailable');}}}).page('settings');
-  assert.equal(unavailable.data.clientVersion,'1.0.16');assert.equal(unavailable.data.connected,true);unavailable.onUnload();
+  assert.equal(unavailable.data.clientVersion,buildVersion);assert.equal(unavailable.data.connected,true);unavailable.onUnload();
 });
 
 test('四个原生导航页初始化 iOS 窗口底色，缓存返回和资料刷新不反复触碰窗口外观',()=>{
