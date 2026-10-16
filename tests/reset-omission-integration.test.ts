@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {pool,list,one,put} from '../src/db';
-import {createEvidence,defaultSite} from '../src/server/service';
+import {createEvidence,defaultSite,publishCandidate} from '../src/server/service';
 import {runOne,scheduleDue} from '../src/server/worker';
 import type {Evidence,Candidate,Source,Publication,Article,Job,Notice} from '../src/lib/types';
 
@@ -23,12 +23,21 @@ test('隔离库：漏报补录保留旧快照、完整闭环、幂等且不发�
    const saved=await createEvidence({...input,sourceId:r.sourceId==='activity-archive'?calendarSource:sourceId,historical:true,collectedAt:new Date().toISOString()});
    if(r.sourceId==='tibo-public')byMessage.set(r.messageId,saved.candidate!.id);
   };
-  const drain=async()=>{for(let i=0;i<50;i++){await scheduleDue({allowEnrichment:false});let n=0;for(;n<20;n++)if(!await runOne({schedule:false,enrich:async()=>undefined,enrichQuoted:async()=>[],wechat:async()=>{throw new Error('不得发送历史通知');}}))break;if(!n)return;}throw new Error('队列未收敛');};
+  const drain=async()=>{for(let i=0;i<50;i++){await scheduleDue({allowEnrichment:false});let n=0;for(;n<20;n++)if(!await runOne({schedule:false,enrich:async()=>undefined,enrichQuoted:async()=>[],wechat:async()=>{throw new Error('不得发送历史通知');}}))break;if(!n){if(!(await list<Job>('jobs')).some(j=>j.status==='queued'||j.status==='running'))return;await new Promise(resolve=>setTimeout(resolve,100));}}throw new Error('队列未收敛');};
   for(const r of inputs.filter(r=>!['2110595554036400151','2110618732666257557'].includes(r.messageId)))await add(r);
+  // Two independent product articles may both cite campaign rules as background.
+  const ruleCandidate=(await one<Candidate>('candidates',byMessage.get('2106845241357824205')!))!;
+  for(const [i,id] of ['2107158998495748264','2107575657014468879'].entries()){
+   const c=(await one<Candidate>('candidates',byMessage.get(id)!))!;
+   await put('candidates',{...c,content:{title:'活动产品动态'+(i+1),summary:'依据活动背景记录独立产品改进。',translation:'',category:'product',publicationMode:'news_only',contentOrigin:'generated',actions:[],evidenceIds:[c.evidenceId,ruleCandidate.evidenceId]},reasons:[]});
+   await publishCandidate(c.id,c.version,'qa','隔离产品消息，背景引用不作为同一事件');
+  }
   await drain();
+  assert.equal((await one<Candidate>('candidates',ruleCandidate.id))?.status,'published','活动规则不能因多条背景引用卡在事件关联不明');
   const root=(await one<Candidate>('candidates',byMessage.get('2110595484180214059')!))!;
   assert.equal(root.status,'published');assert.equal(root.content.reviewStatus,'pending');
-  for(const id of ['2110595554036400151','2110618732666257557']){await add(inputs.find(r=>r.messageId===id)!);await drain();}
+  for(const id of ['2110618732666257557','2110595554036400151'])await add(inputs.find(r=>r.messageId===id)!);
+  await drain();
   for(const id of ['2102463847714247142','2103637477760311522']){const c=(await one<Candidate>('candidates',byMessage.get(id)!))!;assert.equal(c.status,'published',JSON.stringify(c.reasons));assert.equal(c.content.actions.length,1);}
   const deadline=(await one<Candidate>('candidates',byMessage.get('2110595554036400151')!))!,done=(await one<Candidate>('candidates',byMessage.get('2110618732666257557')!))!;
   assert.equal(deadline.status,'published',JSON.stringify(deadline.reasons));assert.equal(done.status,'published',JSON.stringify(done.reasons));

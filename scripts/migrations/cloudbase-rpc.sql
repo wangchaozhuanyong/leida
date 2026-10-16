@@ -98,7 +98,8 @@ BEGIN
     ORDER BY CASE WHEN payload->>'status'='running' THEN 0 WHEN payload->>'kind'='collect' THEN 1
       WHEN payload->>'kind'='generate' AND coalesce(payload#>>'{payload,historical}','false')<>'true' THEN 2
       WHEN payload->>'kind'='generate' THEN 3 ELSE 4 END,
-      CASE WHEN payload->>'kind'='generate' THEN payload#>>'{payload,evidencePublishedAt}' END DESC NULLS LAST,
+      CASE WHEN payload->>'kind'='generate' AND coalesce(payload#>>'{payload,historical}','false')<>'true' THEN payload#>>'{payload,evidencePublishedAt}' END DESC NULLS LAST,
+      CASE WHEN payload->>'kind'='generate' AND payload#>>'{payload,historical}'='true' THEN payload#>>'{payload,evidencePublishedAt}' END ASC NULLS LAST,
       created_at ASC FOR UPDATE SKIP LOCKED LIMIT 1;
   IF job_id IS NULL THEN RETURN NULL; END IF;
   claimed:=current_job || jsonb_build_object('status','running','attempts',(current_job->>'attempts')::integer+1,

@@ -89,7 +89,11 @@ export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichme
     let historicalActive=generating.filter(job=>activeJob(job)&&(job.payload.historical===true||evidence.some(item=>item.id===candidates.find(candidate=>candidate.id===job.candidateId)?.evidenceId&&isHistoricalContent([item],job.createdAt)))).length;
     const sorted=candidates.filter(candidate=>untouched(candidate)&&!candidate.reasons.some(reason=>reason.includes('由人工草稿'))).sort((a,b)=>{
       const first=evidence.find(item=>item.id===a.evidenceId),second=evidence.find(item=>item.id===b.evidenceId);
-      return Number(!!first&&isHistoricalContent([first],now()))-Number(!!second&&isHistoricalContent([second],now())) || Date.parse(second?.publishedAt??b.createdAt)-Date.parse(first?.publishedAt??a.createdAt);
+      const firstHistorical=!!first&&isHistoricalContent([first],now()),secondHistorical=!!second&&isHistoricalContent([second],now());
+      const firstTime=Date.parse(first?.publishedAt??a.createdAt),secondTime=Date.parse(second?.publishedAt??b.createdAt);
+      // Fresh messages remain first. Historical catch-up follows source order so
+      // an older promise is saved before its already available completion.
+      return Number(firstHistorical)-Number(secondHistorical)||(firstHistorical?firstTime-secondTime:secondTime-firstTime);
     });
     for(const candidate of sorted) {
       if(active>=MAX_ACTIVE_GENERATION)break;
@@ -168,7 +172,8 @@ export async function claimJob():Promise<Job|undefined> {
         WHEN payload->>'kind'='collect' THEN 1
         WHEN payload->>'kind'='generate' AND coalesce(payload#>>'{payload,historical}','false')<>'true' THEN 2
         WHEN payload->>'kind'='generate' THEN 3 ELSE 4 END,
-        CASE WHEN payload->>'kind'='generate' THEN payload#>>'{payload,evidencePublishedAt}' END DESC NULLS LAST,
+        CASE WHEN payload->>'kind'='generate' AND coalesce(payload#>>'{payload,historical}','false')<>'true' THEN payload#>>'{payload,evidencePublishedAt}' END DESC NULLS LAST,
+        CASE WHEN payload->>'kind'='generate' AND payload#>>'{payload,historical}'='true' THEN payload#>>'{payload,evidencePublishedAt}' END ASC NULLS LAST,
         created_at ASC FOR UPDATE SKIP LOCKED LIMIT 1`);
     const old=row.rows[0]?.payload as Job|undefined;
     if(!old)return;
@@ -307,6 +312,12 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
     if(linked.length>1){
       const articles=await list<Article>('articles');
       linked=linked.filter(event=>!linked.some(target=>target.id!==event.id&&automaticNewsContextUpgrade(primary,draft,event,target,all,articles)));
+    }
+    if(draft.publicationMode==='news_only'&&draft.reviewStatus){
+      // Campaign/background citations do not make independent product posts the
+      // same event. Reuse only an article whose primary post has this identity.
+      const articles=await list<Article>('articles');
+      linked=linked.filter(event=>articles.some(article=>article.eventId===event.id&&article.status==='published'&&all.some(item=>item.id===article.evidenceIds[0]&&messageKey(item)===messageKey(primary))));
     }
     const requestedEventId=draft.eventId;
     // A previously saved human link is retained only for manual regeneration; all automatic links are evidence-derived.

@@ -1,7 +1,7 @@
 import type { ActionKind, ActionStage, BenefitAction } from '../lib/types';
 
 /** Change only when fact interpretation changes, so unchanged inputs are evaluated once. */
-export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261016-9';
+export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261016-12';
 export interface BenefitClaim {
   kind: ActionKind; stage: ActionStage; eligibility: string; scope: BenefitAction['scope'];
   quote: string; expectedAt?: string; timeNote?: string;

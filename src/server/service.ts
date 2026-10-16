@@ -261,7 +261,8 @@ export async function publishCandidate(candidateId:string,version:number,actor:s
       const source=primary?await one<Source>('sources',primary.sourceId,c):undefined;
       if(!source?.enabled||!source.validated||source.publicationPaused)throw new DomainError('来源已暂停或未验证，暂不自动发布');
       if(candidate.humanEdited||primary?.provenance==='manual')throw new DomainError('人工修改的内容需人工发布');
-      const duplicates=events.filter(event=>event.status==='published'&&event.evidenceIds.some(eid=>{const item=evidence.find(e=>e.id===eid);return item&&primary&&providerIdentity(item)===providerIdentity(primary);}));
+      const duplicates=events.filter(event=>event.status==='published'&&event.evidenceIds.some(eid=>{const item=evidence.find(e=>e.id===eid);return item&&primary&&providerIdentity(item)===providerIdentity(primary);})&&
+        (content.publicationMode!=='news_only'||!content.reviewStatus||articles.some(article=>article.eventId===event.id&&article.status==='published'&&evidence.some(item=>item.id===article.evidenceIds[0]&&primary&&providerIdentity(item)===providerIdentity(primary)))));
       if(duplicates.length>1)throw new DomainError('同一原帖存在多个事件，关联冲突');
       if(!content.eventId&&duplicates[0])content.eventId=duplicates[0].id;
       else if(duplicates[0]&&duplicates[0].id!==content.eventId){

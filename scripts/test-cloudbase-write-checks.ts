@@ -91,12 +91,15 @@ export async function testCloudbaseWrite(pool: pg.Pool, rpc: CloudbaseRpc, anony
     await put('sources', source); const site={ id:'site', ...defaultSite, autoPublish: true };await put('settings',site);
     let candidate: Candidate | undefined;
     const input = { sourceId: source.id, messageId: 'write-completion-001', url: 'https://x.com/write_fixture/status/1790000000000000001', text: 'We have reset all usage limits for all accounts.', publishedAt: new Date().toISOString(), collectedAt: new Date().toISOString(), contextComplete: true, historical: false, provenance: 'official' as const, textOrigin: 'original' as const };
+    // Host and disposable PostgreSQL clocks can differ by a few milliseconds.
+    // Poll the real worker as its normal loop does; do not make future jobs claimable.
+    const work=async(options:Parameters<typeof runOne>[0])=>{for(let i=0;i<20;i++){if(await runOne(options))return true;await new Promise(resolve=>setTimeout(resolve,50));}return false;};
     const collection = await transaction(client => queueJob('collect', { sourceId: source.id }, client));
-    assert.equal(await runOne({ schedule: false, collect: async () => { const result = await createEvidence(input); candidate = result.candidate; return {seen:1,created:result.created?1:0}; }, enrich: async () => undefined, enrichQuoted: async () => [] }), true);
+    assert.equal(await work({ schedule: false, collect: async () => { const result = await createEvidence(input); candidate = result.candidate; return {seen:1,created:result.created?1:0}; }, enrich: async () => undefined, enrichQuoted: async () => [] }), true);
     assert.equal((await one<Job>('jobs', collection.id))?.status, 'succeeded'); assert.ok(candidate);
     assert.equal((await createEvidence(input)).created, false);
     await transaction(client => queueJob('generate', { candidateId: candidate!.id, expectedVersion: candidate!.version }, client));
-    assert.equal(await runOne({ schedule: false, allowTemplates: true, enrich: async () => undefined, enrichQuoted: async () => [] }), true);
+    assert.equal(await work({ schedule: false, allowTemplates: true, enrich: async () => undefined, enrichQuoted: async () => [] }), true);
     const completed = await one<Candidate>('candidates', candidate.id); assert.equal(completed?.status, 'published'); assert.equal(completed?.content.contentOrigin, 'template');
     const publication = (await list<Publication>('publications')).find(row => row.article.evidenceIds.includes(candidate!.evidenceId)); assert.ok(publication);
     assert.equal(publication.event.actions[0]?.stage, 'claimed_complete');
@@ -105,11 +108,11 @@ export async function testCloudbaseWrite(pool: pg.Pool, rpc: CloudbaseRpc, anony
     pass('actual_collection_and_template_publication', 'actual worker/domain functions saved original evidence, deduplicated collection and atomically published template/event/article/publication/notice; no external AI or source calls');
 
     const failing = await transaction(client => queueJob('collect', { sourceId: source.id }, client));
-    await runOne({ schedule: false, collect: async () => { throw new Error('synthetic collection failure with no private data'); } });
+    assert.equal(await work({ schedule: false, collect: async () => { throw new Error('synthetic collection failure with no private data'); } }),true);
     assert.equal((await one<Job>('jobs', failing.id))?.status, 'failed'); assert.equal((await one<Source>('sources', source.id))?.status, 'failed');
     assert.ok((await list<{ action: string; objectId: string }>('audits')).some(row => row.action === 'job.failed' && row.objectId === failing.id));
     const human={...completed!,id:'write-human-protected',status:'pending' as const,humanEdited:true,version:3,content:{...completed!.content,title:'Human retained title'}};await put('candidates',human);
-    await transaction(client=>queueJob('generate',{candidateId:human.id,expectedVersion:human.version},client));await runOne({schedule:false,allowTemplates:true,enrich:async()=>undefined,enrichQuoted:async()=>[]});
+    await transaction(client=>queueJob('generate',{candidateId:human.id,expectedVersion:human.version},client));assert.equal(await work({schedule:false,allowTemplates:true,enrich:async()=>undefined,enrichQuoted:async()=>[]}),true);
     assert.deepEqual(await one('candidates',human.id),human);assert.equal((await list('publications')).length,publishedCount);
     pass('cloud_worker_human_edit_protection','actual cloud worker refused automatic overwrite/publication of human-edited candidate');
     pass('persistent_collect_failure_audit', 'actual worker persisted failed collection job, source health and immutable failure audit');
