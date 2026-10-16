@@ -1,0 +1,16 @@
+:host{display:block;width:44px;height:44px;flex:none}
+.signal-arrow{position:relative;width:44px;height:44px;pointer-events:none;color:#2458ce}
+.arrow-orbit{position:absolute;inset:1px;border:1px solid #c6d8f6;border-radius:50%;opacity:.7}
+.arrow-core{position:absolute;inset:0;transform:translate(0,0)}
+.arrow-shaft{position:absolute;width:22px;height:2px;left:10px;top:23px;background:linear-gradient(90deg,#81a7e8,#2458ce);transform:rotate(-45deg);border-radius:2px}
+.arrow-head{position:absolute;top:12px;right:11px;width:12px;height:12px;border-top:2px solid #2458ce;border-right:2px solid #2458ce;border-radius:1px}
+.arrow-track{position:absolute;width:22px;height:1px;background:linear-gradient(90deg,transparent,#a7c9ef);transform:rotate(-45deg);opacity:.4}
+.track-one{left:4px;top:19px}.track-two{left:19px;top:31px}
+.arrow-pulse{position:absolute;top:10px;right:9px;width:4px;height:4px;border-radius:50%;background:#64b5e9;opacity:0}
+.is-animated .arrow-core{animation:signal-travel 3.6s ease-in-out infinite}
+.is-animated .arrow-pulse{animation:signal-pulse 3.6s ease-in-out infinite}
+@keyframes signal-travel{0%,55%,100%{transform:translate(0,0)}70%,82%{transform:translate(2px,-2px)}}
+@keyframes signal-pulse{0%,56%,88%,100%{opacity:0;transform:translate(-5px,5px)}68%,76%{opacity:.8;transform:translate(0,0)}}
+.motion-preference{position:absolute;left:0;top:0;width:0;height:1px;visibility:hidden}
+@media(prefers-reduced-motion:no-preference){.motion-preference{width:1px}}
+@media(prefers-reduced-motion:reduce){.is-animated .arrow-core,.is-animated .arrow-pulse{animation:none}}

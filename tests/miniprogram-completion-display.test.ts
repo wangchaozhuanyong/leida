@@ -74,3 +74,26 @@ test('最近发卡与重置独立计时，分享原文绑定最近完成；隐�
  h.advance(60000);h.page.onShow();assert.match(h.page.data.timeline.note,/^36分钟前/);assert.equal(h.timers.size,1);
  h.page.onUnload();assert.equal(h.timers.size,0);
 });
+test('首页公告入口有预告时对应当前轮次，无预告时对应最近完成，无记录时进入历史',()=>{
+ const complete=publication('complete','automatic_reset','2026-10-13T05:45:00Z');
+ const waiting=nativeHome(fixture([complete]));
+ assert.equal(waiting.page.data.evidenceLabel,'查看最近公告');
+ assert.equal(waiting.page.data.evidencePath,'/pages/detail/index?publicationId=complete');waiting.page.onUnload();
+ const next=publication('next','automatic_reset','2026-10-13T07:45:00Z');
+ next.event.actions[0].stage='promised';next.event.actions[0].expectedAt='2026-10-13T09:00:00Z';
+ const scheduled=nativeHome(fixture([complete,next]));
+ assert.equal(scheduled.page.data.evidenceLabel,'查看本次公告');
+ assert.equal(scheduled.page.data.evidencePath,'/pages/detail/index?publicationId=next');
+ assert.equal(scheduled.page.data.completions.length,1,'新预告不清空最近完成事实');scheduled.page.onUnload();
+ const empty=nativeHome(fixture([]));
+ assert.equal(empty.page.data.evidenceLabel,'浏览历史记录');
+ assert.equal(empty.page.data.evidencePath,'/pages/announcements/index');empty.page.onUnload();
+});
+test('首页紧凑完成记录使用北京时间，跨年保留年份且不冒充个人到账',()=>{
+ const h=nativeHome(fixture([publication('new','automatic_reset','2026-10-12T18:30:00Z'),publication('old','banked_reset','2025-12-31T07:25:00Z')]));
+ assert.equal(h.page.data.completions[0].label,'用量重置');
+ assert.equal(h.page.data.completions[0].shortTime,'10月13日 02:30');
+ assert.equal(h.page.data.completions[1].label,'重置卡发放');
+ assert.equal(h.page.data.completions[1].shortTime,'2025年12月31日 15:25');
+ assert.equal(h.page.data.completions[0].title,'公告称已重置用量');h.page.onUnload();
+});

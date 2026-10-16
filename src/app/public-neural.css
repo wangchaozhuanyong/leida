@@ -130,13 +130,13 @@ html:has(.public-surface) body { background: #f2f5fb; color: #14263e; }
 .public-surface .pub-instrument-activity > span { color: var(--skin-accent); }
 
 /* Sharing row and news: poster images are the original fixed artwork. */
-.public-surface .pub-share-entry { background: var(--skin-share); border-top-color: var(--skin-border-strong); border-bottom-color: var(--skin-border); }
-.public-surface .pub-share-entry:hover { background: var(--skin-selected); border-top-color: var(--skin-accent); }
+.public-surface .pub-share-entry { background: transparent; border: 0; box-shadow: none; }
+.public-surface .pub-share-entry:hover { background: transparent; }
 .public-surface .pub-share-entry-title { color: var(--skin-text); }
 .public-surface .pub-share-entry-description { color: var(--skin-muted); }
 .public-surface .pub-share-entry-action,
 .public-surface .pub-share-entry-arrow { color: var(--skin-accent); }
-.public-surface .pub-share-entry:disabled { background: var(--skin-surface-soft); color: var(--skin-muted); }
+.public-surface .pub-share-entry:disabled { background: transparent; color: var(--skin-muted); }
 .public-surface .pub-card,
 .public-surface .pub-action-card,
 .public-surface .pub-inbox-link,
@@ -279,7 +279,6 @@ html:has(.public-surface) body { background: #f2f5fb; color: #14263e; }
 .public-surface .pub-neural-art[data-ready] > canvas { visibility: visible; }
 .public-surface .pub-neural-art[data-ready] > svg { visibility: hidden; }
 .public-surface .pub-timeline-row > svg { opacity: 0; }
-.public-surface .pub-share-entry { background: linear-gradient(120deg, var(--skin-surface), var(--skin-share)); box-shadow: inset 0 1px 0 #fff9; }
 .public-surface .pub-button.primary,
 .public-surface .pub-instrument-actions .pub-subscribe { background: linear-gradient(105deg, var(--skin-accent-hover), var(--skin-accent)); box-shadow: 0 4px 13px var(--skin-shadow); }
 .public-surface .pub-bottom-nav { background: var(--skin-nav-surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
@@ -287,8 +286,8 @@ html:has(.public-surface) body { background: #f2f5fb; color: #14263e; }
 .public-surface .pub-button,
 .public-surface .pub-share-entry,
 .public-surface .pub-bottom-nav a { transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease; }
-.public-surface .pub-button:active,
-.public-surface .pub-share-entry:active { box-shadow: inset 0 0 0 1px var(--skin-accent); }
+.public-surface .pub-button:active { box-shadow: inset 0 0 0 1px var(--skin-accent); }
+.public-surface .pub-share-entry:active { box-shadow: none; }
 @media (prefers-reduced-motion: reduce) {
   .public-surface *, .public-surface *::before, .public-surface *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   /* Loading remains legible when its delayed reveal animation is disabled. */
@@ -327,4 +326,17 @@ html:has(.public-surface) body { background: #f2f5fb; color: #14263e; }
   .public-surface .route-home .pub-freshness > div { left: 0; right: auto; }
   .public-surface .pub-topbar-heading { min-width: 0; }
   .public-surface .pub-topbar-title { overflow: hidden; text-overflow: ellipsis; }
+}
+
+/* A quiet status group, one primary reminder action, and a signal on the page canvas. */
+.public-surface .pub-home-completions-heading { color: var(--skin-muted); }
+.public-surface .pub-home-completion > .pub-icon { color: var(--skin-success); }
+.public-surface .pub-home-actions .pub-home-reminder { background: var(--skin-accent); border-color: var(--skin-accent); color: var(--skin-on-accent); box-shadow: none; }
+.public-surface .pub-home-actions .pub-home-reminder:hover { background: var(--skin-accent-hover); border-color: var(--skin-accent-hover); }
+.public-surface .pub-home-reminder small { color: var(--skin-on-accent); }
+.public-surface .pub-home-evidence { color: var(--skin-accent); }
+.public-surface .pub-share-entry-arrow::before { background: radial-gradient(circle, #3979ff14, transparent 70%); }
+@media (max-width: 700px) {
+  .public-surface .pub-home-state-zone { background: var(--skin-surface); border-color: var(--skin-border); box-shadow: 0 8px 24px var(--skin-shadow); }
+  .public-surface .pub-home-state-zone .pub-status-timeline { box-shadow: none; }
 }
