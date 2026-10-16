@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { BenefitAction, DraftContent, Evidence, RadarEvent } from '../lib/types';
-import { evidenceBenefitClaims, hasCompleteContext, isTruncatedText } from './source-context';
+import { evidenceBenefitClaims, hasCompleteContext, isTruncatedText, isVerifiedCampaignCalendar } from './source-context';
 import { canUseNewsOnlyAttribution, normalizedEligibility } from './automatic-content';
 import { benefitClauses, benefitKinds, benefitStage, eligibilityMatches, extractReplyClaims } from './benefit-rules';
 export class DomainError extends Error { constructor(message: string, public status = 400) { super(message); } }
@@ -10,7 +10,7 @@ export const hash = (value: string) => createHash('sha256').update(value).digest
 export const now = () => new Date().toISOString();
 const date = z.string().datetime({ offset: true });
 export const actionSchema = z.object({ id:z.string().min(1).max(180),kind:z.enum(['automatic_reset','banked_reset']),stage:z.enum(['promised','in_progress','claimed_complete','cancelled']),eligibility:z.string().min(1).max(400),scope:z.enum(['public','targeted','private']),expectedAt:date.optional(),timeNote:z.string().max(300).optional(),evidenceIds:z.array(z.string()).min(1),statementAt:date,evidenceQuote:z.string().min(2).max(3000).optional() });
-export const draftSchema = z.object({ title:z.string().trim().min(2).max(160), summary:z.string().trim().min(2).max(2400), translation:z.string().max(12000), category:z.enum(['reset','product','activity']), eventId:z.string().optional(), actions:z.array(actionSchema).max(20), evidenceIds:z.array(z.string()).min(1).max(30), contextEvidenceIds:z.array(z.string()).max(20).optional(), activityId:z.string().optional(), activityDay:z.number().int().min(1).max(366).optional(),publicationMode:z.enum(['news_only','state_change']).optional(),contentOrigin:z.enum(['template','generated']).optional() });
+export const draftSchema = z.object({ title:z.string().trim().min(2).max(160), summary:z.string().trim().min(2).max(2400), translation:z.string().max(12000), category:z.enum(['reset','product','activity']), eventId:z.string().optional(), actions:z.array(actionSchema).max(20), evidenceIds:z.array(z.string()).min(1).max(30), contextEvidenceIds:z.array(z.string()).max(20).optional(), activityId:z.string().optional(), activityDay:z.number().int().min(1).max(366).optional(),publicationMode:z.enum(['news_only','state_change']).optional(),contentOrigin:z.enum(['template','generated']).optional(),reviewStatus:z.enum(['pending','targeted_update']).optional(),reviewReasons:z.array(z.string().min(1).max(300)).max(10).optional() });
 const benefitWords = /reset|重置|发卡|存卡|额度|banked/i;
 export function hasCompletion(text: string): boolean { return !isTruncatedText(text)&&benefitClauses(text).some(clause=>benefitStage(clause)==='claimed_complete'&&(benefitKinds(clause).length>0||/confirmed\s+landed|已确认.{0,12}(?:落地|到账)/i.test(clause))); }
 export function isBenefitText(text: string): boolean { return benefitWords.test(text); }
@@ -32,9 +32,10 @@ export function validateDraft(content: DraftContent, evidence: Evidence[], autom
   if ((content.contextEvidenceIds??[]).some(id=>!content.evidenceIds.includes(id))||supplemental.some(e=>!e||!hasCompleteContext(e,evidence,true))) reasons.push('补充上下文须引用已保存的完整原文');
   const validCited = cited.filter((e): e is Evidence => Boolean(e));
   const newsOnly=content.publicationMode==='news_only';
+  if(content.reviewStatus&&(!newsOnly||content.actions.length||!content.reviewReasons?.length))reasons.push('待确认或定向跟踪必须说明原因且不能包含福利动作');
   if(newsOnly&&content.actions.length)reasons.push('仅新闻更新不能包含福利动作');
   const attributed=canUseNewsOnlyAttribution(content,validCited)||(!automatic&&newsOnly&&content.actions.length===0&&/公开归档|消息记录|来源/.test(content.summary));
-  if (cited.some(e => e && !hasCompleteContext(e,validCited,!automatic) && !(!automatic && !isTruncatedText(e.text) && supplemental.some(parent=>parent&&hasCompleteContext(parent,evidence,true))))&&!attributed) reasons.push('原文上下文不完整，请补充父帖或完整证据');
+  if (cited.some(e => e && !hasCompleteContext(e,validCited,!automatic) && !isVerifiedCampaignCalendar(e,validCited) && !(!automatic && !isTruncatedText(e.text) && supplemental.some(parent=>parent&&hasCompleteContext(parent,evidence,true))))&&!attributed) reasons.push('原文上下文不完整，请补充父帖或完整证据');
   if (!/[\u3400-\u9fff]/.test(content.title) || !/[\u3400-\u9fff]/.test(content.summary)) reasons.push('标题和摘要必须使用中文');
   if (/已(?:全部)?(?:发放|到账|重置|落地)|发放完成/.test(content.title) && !content.actions.some(a=>a.stage==='claimed_complete')) reasons.push('标题宣称完成，但动作尚无完成状态');
   if (content.category === 'reset' && content.actions.length === 0&&!newsOnly) reasons.push('重置新闻必须明确至少一个福利动作');

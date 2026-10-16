@@ -6,7 +6,7 @@ import { pool, list, one, insert, put, transaction, withAutoPublicationGuard } f
 import type { Candidate, Evidence, Job, Source, SiteSettings, RadarEvent, DraftContent, CandidateAutomation, Article } from '../lib/types';
 import { AIServiceError, generateContent, type AIRecord } from './ai';
 import { collectSource, SourceStructureError, SourceRateLimitError, SourceConfigurationError, SourceTransientError } from './ingestion';
-import { gatherEvidenceContext, hasCompleteContext, evidenceBenefitClaims } from './source-context';
+import { gatherEvidenceContext, gatherExplicitEvidenceContext, hasCompleteContext, evidenceBenefitClaims, directEvidenceBenefitClaims, processingObstacles, isVerifiedCampaignCalendar } from './source-context';
 import { extractBenefitClaims } from './benefit-rules';
 import { buildAutomaticTemplate, evidenceFingerprint, classifyBlockers, isClearlyUnrelated, hasExplicitCorrectionText } from './automatic-content';
 import { enrichKnownEvidence, enrichQuotedResetContext } from './source-enrichment';
@@ -42,7 +42,7 @@ export function sourceRetryAt(source:Source,retryAt?:string,timestamp=Date.now()
 function contextFor(candidate:Candidate,primary:Evidence,all:Evidence[]):Evidence[] {
   const supplemental=all.filter(item=>candidate.content.evidenceIds.includes(item.id)&&all.find(latest=>latest.sourceId===item.sourceId&&latest.messageId===item.messageId)?.id===item.id);
   const context=[...new Map([...gatherEvidenceContext(primary,all),...supplemental].map(item=>[item.id,item])).values()];
-  return hasCompleteContext(primary,context)?context.filter(item=>hasCompleteContext(item,context)):context;
+  return hasCompleteContext(primary,context)?context.filter(item=>hasCompleteContext(item,context)||isVerifiedCampaignCalendar(item,context)):context;
 }
 export function canEnrich(primary:Evidence):boolean {
   return (primary.provenance==='archive'||primary.provenance==='official'&&primary.sourceId==='tibo-timeline') && (primary.textOrigin!=='original'||!primary.contextComplete&&(!!primary.parentId||/https:\/\/t\.co\/[A-Za-z0-9]+\b/.test(primary.text))) && /^https:\/\/(?:x|twitter)\.com\/[A-Za-z0-9_]+\/status\/\d+(?:[?#].*)?$/.test(primary.url);
@@ -89,7 +89,11 @@ export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichme
     let historicalActive=generating.filter(job=>activeJob(job)&&(job.payload.historical===true||evidence.some(item=>item.id===candidates.find(candidate=>candidate.id===job.candidateId)?.evidenceId&&isHistoricalContent([item],job.createdAt)))).length;
     const sorted=candidates.filter(candidate=>untouched(candidate)&&!candidate.reasons.some(reason=>reason.includes('由人工草稿'))).sort((a,b)=>{
       const first=evidence.find(item=>item.id===a.evidenceId),second=evidence.find(item=>item.id===b.evidenceId);
-      return Number(!!first&&isHistoricalContent([first],now()))-Number(!!second&&isHistoricalContent([second],now())) || Date.parse(second?.publishedAt??b.createdAt)-Date.parse(first?.publishedAt??a.createdAt);
+      const firstHistorical=!!first&&isHistoricalContent([first],now()),secondHistorical=!!second&&isHistoricalContent([second],now());
+      const firstTime=Date.parse(first?.publishedAt??a.createdAt),secondTime=Date.parse(second?.publishedAt??b.createdAt);
+      // Fresh messages remain first. Historical catch-up follows source order so
+      // an older promise is saved before its already available completion.
+      return Number(firstHistorical)-Number(secondHistorical)||(firstHistorical?firstTime-secondTime:secondTime-firstTime);
     });
     for(const candidate of sorted) {
       if(active>=MAX_ACTIVE_GENERATION)break;
@@ -119,7 +123,12 @@ export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichme
       if(enrichArticle&&!actualArticle)continue;
       const publishedRecheck=enrichArticle&&actualArticle?.publicationMode==='news_only'&&inputChanged;
       const template=allowTemplates&&(!enrichArticle||publishedRecheck)?buildAutomaticTemplate(context):undefined;
-      const probeDue=options.allowEnrichment!==false && canEnrich(original) && (!candidate.automation?.resumeAt||Date.parse(candidate.automation.resumeAt)<=Date.now());
+      const obstacles=processingObstacles(context);
+      if(!template&&!ready&&!enrichArticle&&!obstacles.missing){
+        if(inputChanged||!savedFingerprint)await put('candidates',{...candidate,automation:{state:obstacles.conflict?'conflict':'deferred',reasonCodes:obstacles.codes,dependencyIds:[],inputFingerprint:fingerprint,evaluatedAt:now()},updatedAt:now()},c);
+        continue;
+      }
+      const probeDue=obstacles.missing && options.allowEnrichment!==false && canEnrich(original) && (!candidate.automation?.resumeAt||Date.parse(candidate.automation.resumeAt)<=Date.now());
       const newsContextProbe=enrichArticle&&actualArticle?.publicationMode==='news_only'&&!hasCompleteContext(original,context)&&probeDue;
       const candidateEvent=events.find(event=>event.id===(candidate.content.eventId??actualArticle?.eventId));
       if(ruleOnly&&candidate.automation?.state==='conflict'&&!isStaleMachineConflict(candidate,candidateEvent))continue;
@@ -163,7 +172,8 @@ export async function claimJob():Promise<Job|undefined> {
         WHEN payload->>'kind'='collect' THEN 1
         WHEN payload->>'kind'='generate' AND coalesce(payload#>>'{payload,historical}','false')<>'true' THEN 2
         WHEN payload->>'kind'='generate' THEN 3 ELSE 4 END,
-        CASE WHEN payload->>'kind'='generate' THEN payload#>>'{payload,evidencePublishedAt}' END DESC NULLS LAST,
+        CASE WHEN payload->>'kind'='generate' AND coalesce(payload#>>'{payload,historical}','false')<>'true' THEN payload#>>'{payload,evidencePublishedAt}' END DESC NULLS LAST,
+        CASE WHEN payload->>'kind'='generate' AND payload#>>'{payload,historical}'='true' THEN payload#>>'{payload,evidencePublishedAt}' END ASC NULLS LAST,
         created_at ASC FOR UPDATE SKIP LOCKED LIMIT 1`);
     const old=row.rows[0]?.payload as Job|undefined;
     if(!old)return;
@@ -184,9 +194,11 @@ function messageKey(evidence:Evidence,messageId=evidence.messageId):string {
 function linkedBenefitContext(primary:Evidence,context:Evidence[]):{context:Evidence[];bounded:boolean} {
   // A self-contained benefit statement is the referent for its completion.
   // Its older product/activity ancestors remain lineage, not another reset round.
-  const benefit=evidenceBenefitClaims(primary,context).length>0;
-  const referent=benefit?context.findIndex((item,index)=>index>0&&hasCompleteContext(item,context)&&extractBenefitClaims(item.text,item.publishedAt).length>0):-1;
-  const standalone=benefit&&referent<0&&extractBenefitClaims(primary.text,primary.publishedAt).length>0;
+  const full=context;
+  context=gatherExplicitEvidenceContext(primary,context);
+  const benefit=evidenceBenefitClaims(primary,full).length>0;
+  const referent=benefit?context.findIndex((item,index)=>index>0&&hasCompleteContext(item,full)&&directEvidenceBenefitClaims(item,full).length>0):-1;
+  const standalone=benefit&&referent<0&&directEvidenceBenefitClaims(primary,full).length>0;
   return {context:referent>0?context.slice(0,referent+1):standalone?[primary]:context,bounded:referent>0||standalone};
 }
 /** Action identity and event links must use the same verified benefit boundary. */
@@ -268,9 +280,10 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
   if(generatedCheckpoint&&job.payload.inputFingerprint!==fingerprint)generatedCheckpoint=false;
   if(job.payload.contextProbe&&previousFingerprint===fingerprint) {
     const blocked=classifyBlockers(candidate.reasons,context);
-    const waiting=!hasCompleteContext(primary,context)||blocked.reasonCodes.includes('missing_context');
-    const state=waiting?Date.now()-Date.parse(candidate.createdAt)>24*3600_000?'deferred':'waiting_evidence':'configuration';
-    await saveAutomation(candidate,{...blocked,state,reasonCodes:waiting?blocked.reasonCodes:['ai_not_configured'],inputFingerprint:fingerprint,evaluatedAt:now(),resumeAt:new Date(Date.now()+CONTEXT_PROBE_INTERVAL).toISOString(),articleId:candidate.automation?.articleId,templatePublished:candidate.automation?.templatePublished});
+    const obstacles=processingObstacles(context);
+    const waiting=obstacles.missing;
+    const state=waiting?Date.now()-Date.parse(candidate.createdAt)>24*3600_000?'deferred':'waiting_evidence':obstacles.conflict?'conflict':'deferred';
+    await saveAutomation(candidate,{...blocked,state,reasonCodes:obstacles.codes,inputFingerprint:fingerprint,evaluatedAt:now(),resumeAt:waiting?new Date(Date.now()+CONTEXT_PROBE_INTERVAL).toISOString():undefined,articleId:candidate.automation?.articleId,templatePublished:candidate.automation?.templatePublished});
     return false;
   }
   const ai=await one<AIRecord>('settings','ai');
@@ -284,8 +297,9 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
   else if(aiReady(ai)||generator!==generateContent)draft={...await generator(context,candidate.content),contentOrigin:'generated'};
   else {
     const blocked=classifyBlockers(candidate.reasons,context);
-    const waiting=!hasCompleteContext(primary,context)||blocked.reasonCodes.includes('missing_context');
-    await saveAutomation(candidate,{...blocked,state:waiting?'waiting_evidence':'configuration',reasonCodes:waiting?blocked.reasonCodes:['ai_not_configured'],inputFingerprint:fingerprint,evaluatedAt:now(),resumeAt:waiting||canEnrich(primary)?new Date(Date.now()+CONTEXT_PROBE_INTERVAL).toISOString():undefined,articleId:candidate.automation?.articleId,templatePublished:candidate.automation?.templatePublished});
+    const obstacles=processingObstacles(context);
+    const waiting=obstacles.missing;
+    await saveAutomation(candidate,{...blocked,state:waiting?'waiting_evidence':obstacles.conflict?'conflict':'deferred',reasonCodes:obstacles.codes,inputFingerprint:fingerprint,evaluatedAt:now(),resumeAt:waiting?new Date(Date.now()+CONTEXT_PROBE_INTERVAL).toISOString():undefined,articleId:candidate.automation?.articleId,templatePublished:candidate.automation?.templatePublished});
     return false;
   }
   // Hold only the short link/publish phase, never an external model request.
@@ -298,6 +312,12 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
     if(linked.length>1){
       const articles=await list<Article>('articles');
       linked=linked.filter(event=>!linked.some(target=>target.id!==event.id&&automaticNewsContextUpgrade(primary,draft,event,target,all,articles)));
+    }
+    if(draft.publicationMode==='news_only'&&draft.reviewStatus){
+      // Campaign/background citations do not make independent product posts the
+      // same event. Reuse only an article whose primary post has this identity.
+      const articles=await list<Article>('articles');
+      linked=linked.filter(event=>articles.some(article=>article.eventId===event.id&&article.status==='published'&&all.some(item=>item.id===article.evidenceIds[0]&&messageKey(item)===messageKey(primary))));
     }
     const requestedEventId=draft.eventId;
     // A previously saved human link is retained only for manual regeneration; all automatic links are evidence-derived.

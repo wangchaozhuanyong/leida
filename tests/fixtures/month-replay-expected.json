@@ -1,0 +1,2653 @@
+{
+  "version": "month-manual-expectations-20261016-v1",
+  "scope": {
+    "start": "2026-09-15T17:21:34.166Z",
+    "end": "2026-10-15T17:21:34.166Z"
+  },
+  "notes": [
+    "预期由逐条核对冻结原文建立，独立于识别器输出；non_benefit 只指没有福利动作，不要求产品消息不得发布。",
+    "不能据此证明来源覆盖完整或个人账户实际到账。"
+  ],
+  "rows": [
+    {
+      "identity": "x:thsottiaux:2099922535521693877",
+      "messageId": "2099922535521693877",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "54c3d2af6a1cb330198b6b5dd6505debe8d328ef4c8d984a2a2c970a56ce49ad"
+    },
+    {
+      "identity": "x:thsottiaux:2099922755655479624",
+      "messageId": "2099922755655479624",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "278d8e025ae364b8e038f32ea09eb15df8b4031ebf56d5f895cfd5a134299b88"
+    },
+    {
+      "identity": "x:thsottiaux:2099923055636250714",
+      "messageId": "2099923055636250714",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "6256c7c568f6c0f610dc0b5fdb6ecdecaf4b718e4695e41f5a6994269b3d4511"
+    },
+    {
+      "identity": "x:thsottiaux:2100121084817502216",
+      "messageId": "2100121084817502216",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "46d016bc8c92f95a8af3e2dd08ce80903c1510ce78256b82d4bd405451066d18"
+    },
+    {
+      "identity": "x:thsottiaux:2100122479947817059",
+      "messageId": "2100122479947817059",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "5e302a4048a1cb432e1dc1a4f1af34470fbc72963b8e4ed4a3335a4ef43550b6"
+    },
+    {
+      "identity": "x:thsottiaux:2100295443620007993",
+      "messageId": "2100295443620007993",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "8ebec431d4ce05ed0867044358093accf9f134507df1f951efd0ace62482378c"
+    },
+    {
+      "identity": "x:thsottiaux:2100297380968997327",
+      "messageId": "2100297380968997327",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "127454f5550d6e14dbb9ab3d47463e987d96ce9331629bc1396963454e4abd3d"
+    },
+    {
+      "identity": "x:thsottiaux:2100363668051603608",
+      "messageId": "2100363668051603608",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "d2a1768410c0169a01e3688da3b5c6896c24773258ddea0c43caaf37802feffe"
+    },
+    {
+      "identity": "x:thsottiaux:2100461541145587999",
+      "messageId": "2100461541145587999",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "c298bf45b160d0cf492097b56f5d786f52a346153a5c17b35c0ce5235b198c14"
+    },
+    {
+      "identity": "x:thsottiaux:2100461944860020851",
+      "messageId": "2100461944860020851",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "7744a6969f82d950f97c14c288a55418dc03fa62265a6a852ed31dd8e6f9d27e"
+    },
+    {
+      "identity": "x:thsottiaux:2100473666635280768",
+      "messageId": "2100473666635280768",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ed861613cb50f38950be390f9cfd22431481cf346ea74c444bf48af43e29995d"
+    },
+    {
+      "identity": "x:thsottiaux:2100474737420111956",
+      "messageId": "2100474737420111956",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "231fbd96312c9946a73c46a619ad957bc44a72fe8b3b5479dcd0c9e55537446c"
+    },
+    {
+      "identity": "x:thsottiaux:2100474870044016922",
+      "messageId": "2100474870044016922",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "6467003f10f18784dd127093f6aeb6c4f8a2791649679cd63d91fb8cc45cfad2"
+    },
+    {
+      "identity": "x:thsottiaux:2100645454245720513",
+      "messageId": "2100645454245720513",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "d8c2dd3058f41d2fd8d8e96a53d7ce9e69bef7ebc1c9e45df2be631290ff7c89"
+    },
+    {
+      "identity": "x:thsottiaux:2100649624860254629",
+      "messageId": "2100649624860254629",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "d186c94ee9702e207f9a5c9f8a40ce3892564c7417a0694976c47666654ee778"
+    },
+    {
+      "identity": "x:thsottiaux:2100821375812530458",
+      "messageId": "2100821375812530458",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "3e81d90d95a860bf0511d494a4a3cfa49fd506eeb79451a138f94783b66e1aa1"
+    },
+    {
+      "identity": "x:thsottiaux:2100985777962537277",
+      "messageId": "2100985777962537277",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "16431bd503f630d1affe2004157f2902e082de66cfa7bd6a3e7ae680662c3299"
+    },
+    {
+      "identity": "x:thsottiaux:2101026876647170092",
+      "messageId": "2101026876647170092",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "223c1f0ad4d9d6d0841bc7327bec982a73f5533c0a427d4cfcb2201e66d91d26"
+    },
+    {
+      "identity": "x:thsottiaux:2101054196703522861",
+      "messageId": "2101054196703522861",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "2a3dcfa51c6a90adccee59bcd26128b507595ae01902fbe8143043c27b94601e"
+    },
+    {
+      "identity": "x:thsottiaux:2101055411394904265",
+      "messageId": "2101055411394904265",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "501982d7b39c8e004b9483f641af792d08fc7e9b1f180772dab9722131a4d6f8"
+    },
+    {
+      "identity": "x:thsottiaux:2101124031567262054",
+      "messageId": "2101124031567262054",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "e8c3a3389684d9669ab101f1d0b441a0edb71c358860c90ab3209ca146601911"
+    },
+    {
+      "identity": "x:thsottiaux:2101125563448705092",
+      "messageId": "2101125563448705092",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "3bf26260464949d7c75d8a072148dc3328317ebe68d503a1376b06f8b0937f08"
+    },
+    {
+      "identity": "x:thsottiaux:2101156632088735758",
+      "messageId": "2101156632088735758",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "d75e34eb3e80bd3eda6fec26cdf99e7c75edb472aeed54c14ae4053c9f7e9dda"
+    },
+    {
+      "identity": "x:thsottiaux:2101156788011962700",
+      "messageId": "2101156788011962700",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "c5dafd9e8fff0dbc34543a7412312735b774147cf46d07595a5b6c7d3f63ecd7"
+    },
+    {
+      "identity": "x:thsottiaux:2101157729037586694",
+      "messageId": "2101157729037586694",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ea959344280abccba6ed2a288d6e4bc982b43eb764f93e10551a3478a6f22bc1"
+    },
+    {
+      "identity": "x:thsottiaux:2101158161994699036",
+      "messageId": "2101158161994699036",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "1f5ac6479c53511b2555c6fb5d162505a1c98dbbf12a6764489447a5eb209cbb"
+    },
+    {
+      "identity": "x:thsottiaux:2101158751290233190",
+      "messageId": "2101158751290233190",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "b60913250682a4827389cef4bcadd71c1878270041a9746a9436ba9b596124d4"
+    },
+    {
+      "identity": "x:thsottiaux:2101352396140278226",
+      "messageId": "2101352396140278226",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "1ceeac0eb3abd9b7e8222d019540bbd45474552fd0ee2d4aeb788d26d108ba45"
+    },
+    {
+      "identity": "x:thsottiaux:2101352781219258527",
+      "messageId": "2101352781219258527",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "4a095df0973c94050a4532d288cbbe0fd47f0b842019f3c2ccd8e9c455ed62aa"
+    },
+    {
+      "identity": "x:thsottiaux:2101353058110480808",
+      "messageId": "2101353058110480808",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "bed7dfae8c4bd477db4ba0081d10f0274196f5b19254a3479250db4f382f17d5"
+    },
+    {
+      "identity": "x:thsottiaux:2101353743275135306",
+      "messageId": "2101353743275135306",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "22686ccba271f2d15dd955468a6e1bcdcf5fb7ad61d766cfd15482f40b68698c"
+    },
+    {
+      "identity": "x:thsottiaux:2101354419829010896",
+      "messageId": "2101354419829010896",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ba1b9c1a761ddd80bb8ec7c4b2d6f3f02dfbbc4eff43f89c130b3202d6226730"
+    },
+    {
+      "identity": "x:thsottiaux:2101431497437950458",
+      "messageId": "2101431497437950458",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ac570a29428d9452d5c996cd7eb2c62025ff7f892e5681655634c4f8020aeb3a"
+    },
+    {
+      "identity": "x:thsottiaux:2101432368682983749",
+      "messageId": "2101432368682983749",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "120cee5897604fafe7867a69a0c875273298b731d8dca61e847290d3304db7ba"
+    },
+    {
+      "identity": "x:thsottiaux:2101432860892901859",
+      "messageId": "2101432860892901859",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "14e4d29f9a1efb093e73c6f835021b2bbc7817754a135b2929e32798734abd12"
+    },
+    {
+      "identity": "x:thsottiaux:2101448279712207203",
+      "messageId": "2101448279712207203",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "487cb7ebe9a0d2559010ca6b7887bfd6cc20acce9c07b39d6423b74e1879e2f8"
+    },
+    {
+      "identity": "x:thsottiaux:2101531597820596462",
+      "messageId": "2101531597820596462",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "d224ade0058d11982ebc61f74d1199eac13d5f2bf7e631681ab0856e3280104c"
+    },
+    {
+      "identity": "x:thsottiaux:2101554478940070162",
+      "messageId": "2101554478940070162",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "b2e05f6e3d1c65ad312bd397db467e0a5d6a51ead17aa0c06dbbd17b38ea2136"
+    },
+    {
+      "identity": "x:thsottiaux:2101772015028130032",
+      "messageId": "2101772015028130032",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "42952b21136350f1ae1c9edc980ecee9734165075116800687fc1335ee20a9d6"
+    },
+    {
+      "identity": "x:thsottiaux:2101920329346195690",
+      "messageId": "2101920329346195690",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "f3ad0dc10587a8b1b72c7e27ad6aaea687640f331083ad8781c4b84ec73ee8a0"
+    },
+    {
+      "identity": "x:thsottiaux:2101920928070562029",
+      "messageId": "2101920928070562029",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "65dbc8af7c6009b78714553e9189400853f330e510a33918da95bb264f2f4d0a"
+    },
+    {
+      "identity": "x:thsottiaux:2101921202436702657",
+      "messageId": "2101921202436702657",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "af263f1cf78db09b143d010a1eac61097ceeffa0bef10306b9f07bd435746ef5"
+    },
+    {
+      "identity": "x:thsottiaux:2102253723879670183",
+      "messageId": "2102253723879670183",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "3ab6b7b3f435a253b1667426a543d4a9db44c8181b98463d2802fc9e1329971e"
+    },
+    {
+      "identity": "x:thsottiaux:2102254445082116335",
+      "messageId": "2102254445082116335",
+      "expected": "pending",
+      "reason": "重置承诺未列明类型、资格和明确时区",
+      "preferredTextSha256": "257267bf18cc9ddf7eeab3ca09b1880eba19b49fc4ec103b75e787735218e767"
+    },
+    {
+      "identity": "x:thsottiaux:2102284352801427520",
+      "messageId": "2102284352801427520",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "16c0c47ea2cf49be02a56e21394963d0a1b649f19fb12c74f9e5cacd8833f391"
+    },
+    {
+      "identity": "x:thsottiaux:2102284586713522193",
+      "messageId": "2102284586713522193",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "36fd1357fa65b1bbc7b8988858e7293237aa4d51e8b7969e48c654539dbdd7bc"
+    },
+    {
+      "identity": "x:thsottiaux:2102289383068180659",
+      "messageId": "2102289383068180659",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "d938171a79ad8b2867e3c9f8f50c873593c994b78fee48a26c5c9a0340ba280c"
+    },
+    {
+      "identity": "x:thsottiaux:2102289624945352906",
+      "messageId": "2102289624945352906",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "a2058aefa38dc0f4010d92dbe170e6020a9451ce7d3303ade4e786697116fc6d"
+    },
+    {
+      "identity": "x:thsottiaux:2102290126344974551",
+      "messageId": "2102290126344974551",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "1ca19622459cbe9489f4e32b3ff3645013338903c2874561a63e19c39f2cf4d6"
+    },
+    {
+      "identity": "x:thsottiaux:2102292452329820272",
+      "messageId": "2102292452329820272",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "10b441bc73e7bee847850b863620c7c93061777a6e679d87b1c9fcd7db0d17fe"
+    },
+    {
+      "identity": "x:thsottiaux:2102440619616682120",
+      "messageId": "2102440619616682120",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "030a07c6a4e3287a9db566eb6f369f1398cd52944f76548a9243fab5875e7ade"
+    },
+    {
+      "identity": "x:thsottiaux:2102463847714247142",
+      "messageId": "2102463847714247142",
+      "expected": "in_progress",
+      "reason": "产品长帖最后明确向 Plus、Pro、Business 账户加载重置卡，按原文保留福利动作",
+      "preferredTextSha256": "4ac9290d6548527970e017547345489ef39dd0524473d62d748ba3d7f30f7d66",
+      "kind": "banked_reset",
+      "round": "2102463847714247142"
+    },
+    {
+      "identity": "x:thsottiaux:2102464575790854290",
+      "messageId": "2102464575790854290",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "293ec330fb2e1ae8817a23696533d5cf75b3723eb1db7f2bd85599befc89623f"
+    },
+    {
+      "identity": "x:thsottiaux:2102466361398378912",
+      "messageId": "2102466361398378912",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "aedd859d9e5533e69e9736b9c09ddf52efcc473001cb3d6645d3df13d938446e"
+    },
+    {
+      "identity": "x:thsottiaux:2102466463156285686",
+      "messageId": "2102466463156285686",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "bd2630caf08199c8338db6b9e39d72fb706b5097f3010f81530c8ade051ce7e1"
+    },
+    {
+      "identity": "x:thsottiaux:2102484207163584745",
+      "messageId": "2102484207163584745",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "4a216718d43b5aabee6cd677a24697e795e65750f41a8cb685469ddca462656f"
+    },
+    {
+      "identity": "x:thsottiaux:2102497184805720459",
+      "messageId": "2102497184805720459",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "cf1d4fc6967394b49b676cfae22f96e92f5a735c9016dfeb313a1aba8e450690"
+    },
+    {
+      "identity": "x:thsottiaux:2102501432884891720",
+      "messageId": "2102501432884891720",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "6f3b44854e594b9260ee2d0c5444948b228e53a005984179bf2310b7624dfdd7"
+    },
+    {
+      "identity": "x:thsottiaux:2102501670647472147",
+      "messageId": "2102501670647472147",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "d07f51d5112b2f8df07b0b4054ce57cd75eca579c6b38a8382e8cffccf9873d5"
+    },
+    {
+      "identity": "x:thsottiaux:2102509507415048245",
+      "messageId": "2102509507415048245",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "5068360ee796c189cf45a665d7a86fcd778b84bc36b8d3437b3c942a62395dd3"
+    },
+    {
+      "identity": "x:thsottiaux:2102509629536346422",
+      "messageId": "2102509629536346422",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "8147d3286e597332610d5f58b817314ef75955d2653581cfbf744756d71b903a"
+    },
+    {
+      "identity": "x:thsottiaux:2102814202117411196",
+      "messageId": "2102814202117411196",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "4761ed28d0c66d8e717c6c68e9aba028a7e139e7ba3e5266233f86020ac03422"
+    },
+    {
+      "identity": "x:thsottiaux:2102884039145521487",
+      "messageId": "2102884039145521487",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "1f4d7dba7bd9a83303b18ff4751e37f313476164a78ada2f8760a510fc3f30a3"
+    },
+    {
+      "identity": "x:thsottiaux:2102884137749315973",
+      "messageId": "2102884137749315973",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "c534c9fd1b52d1dbd92fd9fd7d44999469fe3118de6b26e4a40df5dfdc9ed7f1"
+    },
+    {
+      "identity": "x:thsottiaux:2102890573481050167",
+      "messageId": "2102890573481050167",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "30f9d4e1477fc3c006842b741f6e6f3c1cf68a580f5314def68e66bbd48de596"
+    },
+    {
+      "identity": "x:thsottiaux:2102982591628648784",
+      "messageId": "2102982591628648784",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "70f9cf717a942d2e6d6c6396d8a068eb33cf57b64b5449faa82b479ba0e148bc"
+    },
+    {
+      "identity": "x:thsottiaux:2102996313780736363",
+      "messageId": "2102996313780736363",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "54d68980aae85d493885eda9fc2cbf9dcef893f1f9560c4bb7733b5c165d56e2"
+    },
+    {
+      "identity": "x:thsottiaux:2103375711797211460",
+      "messageId": "2103375711797211460",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "4db3f87a4dfeb4ce416eaf7d949f52f0150428466cb9a11b8eb4b8438cf0035e"
+    },
+    {
+      "identity": "x:thsottiaux:2103620061156290622",
+      "messageId": "2103620061156290622",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "b4085daac03cf1ddef15c736bcd711d64c9c61de3855accbbb26b415d863e5fd"
+    },
+    {
+      "identity": "x:thsottiaux:2103622639386574979",
+      "messageId": "2103622639386574979",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "781c0e1646f690af3d7ef79ac73fdf6e5221ee92c4d842120ee301242ef0178d"
+    },
+    {
+      "identity": "x:thsottiaux:2103637477760311522",
+      "messageId": "2103637477760311522",
+      "expected": "promised",
+      "reason": "故障后承诺为付费 Codex/Work 用户重置用量",
+      "preferredTextSha256": "d7b13796da3548f665c218f835a73359a2fb05a5167149b3fdedd9506ae9fc0e",
+      "kind": "automatic_reset",
+      "round": "2103637477760311522"
+    },
+    {
+      "identity": "x:thsottiaux:2103911959544610829",
+      "messageId": "2103911959544610829",
+      "expected": "pending",
+      "reason": "完成表述未明确福利类型及对应轮次，不按临近时间猜测",
+      "preferredTextSha256": "33028b1e3dc42196e305d27b627c725522162a0f1d4ac3ca79638d09a5d7790b"
+    },
+    {
+      "identity": "x:thsottiaux:2103953907278045548",
+      "messageId": "2103953907278045548",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "0019ec31fd8eb4886d58fd348462835d3606bef5f79e13397b49dcf5ca69f57f"
+    },
+    {
+      "identity": "x:thsottiaux:2103954313068642787",
+      "messageId": "2103954313068642787",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "cd7257a403849cd8ccb70deabc73855ec812d3c2c9b995c3ef74b14eb0e77efa"
+    },
+    {
+      "identity": "x:thsottiaux:2103954577817260036",
+      "messageId": "2103954577817260036",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "652177709cc33ff3fc01e388b51c06fedbc02254f2e0a62398d97c1394d5df8b"
+    },
+    {
+      "identity": "x:thsottiaux:2103961852153913371",
+      "messageId": "2103961852153913371",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "fd22c5463903bf2e15f75af1621da907d12d44f78e75450c69ad3caf3bfa7fec"
+    },
+    {
+      "identity": "x:thsottiaux:2103962250885390436",
+      "messageId": "2103962250885390436",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "f390a1f62996d434cb770e151237bf5272351f11e0901f6b73fa76e112616287"
+    },
+    {
+      "identity": "x:thsottiaux:2103963215885701493",
+      "messageId": "2103963215885701493",
+      "expected": "pending",
+      "reason": "回复提及下周将有更多重置，类型、资格和时刻未明",
+      "preferredTextSha256": "22f44ea510671227439a9482c1ac3b7ab8cf9d70c5c8c9378a1f9df393772b62"
+    },
+    {
+      "identity": "x:thsottiaux:2104100881100890402",
+      "messageId": "2104100881100890402",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "794e19993f6d5a71b7507140cb9f28224ebd2347cb9bdc7643c84d2a998d43ae"
+    },
+    {
+      "identity": "x:thsottiaux:2104101496606618082",
+      "messageId": "2104101496606618082",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "f14f505cb3c4a6b2e7e8a9380806219ea7fc0c6f97d2349f7dae390e88040eb7"
+    },
+    {
+      "identity": "x:thsottiaux:2104108167806550046",
+      "messageId": "2104108167806550046",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "069b11a40dd60f144de257b91a41658800317276676d292a215d78f492cea81c"
+    },
+    {
+      "identity": "x:thsottiaux:2104313314901958706",
+      "messageId": "2104313314901958706",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "206cabac77193d5361069f442a6375fca40107b508b9ea1acffa49e511f2616d"
+    },
+    {
+      "identity": "x:thsottiaux:2104313502697660428",
+      "messageId": "2104313502697660428",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "f455d18b5dfb23ac861c75f1270e05b571e3f9104ee82a5fa1cb5e301c80a5ed"
+    },
+    {
+      "identity": "x:thsottiaux:2104313777013526880",
+      "messageId": "2104313777013526880",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "90430a6787aeafd139f3fb31ab21c70300473d57977fb96804e8cc6f282cafe4"
+    },
+    {
+      "identity": "x:thsottiaux:2104383749723128052",
+      "messageId": "2104383749723128052",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "2c6a254a683fecdc9219ed2f997dc7353a34fbdc6d82f392a751e02ce4dc0f3c"
+    },
+    {
+      "identity": "x:thsottiaux:2104388401218932888",
+      "messageId": "2104388401218932888",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "0286f732c7cce4dc90fd2a06e46c7d54367573f466e3dcad5cb9443deccb093a"
+    },
+    {
+      "identity": "x:thsottiaux:2104451970983768270",
+      "messageId": "2104451970983768270",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "46073bc495c43c1a1bb274ebf6d463c70f96221b900e33f317b6ee975cbc8cd4"
+    },
+    {
+      "identity": "x:thsottiaux:2104462572644888780",
+      "messageId": "2104462572644888780",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "30d60e1bb3ef75b058b18c722d2959d94f7a7346ee9a45985cc3b1d81766b6aa"
+    },
+    {
+      "identity": "x:thsottiaux:2104462713296683467",
+      "messageId": "2104462713296683467",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "f7be4873f713d2fa0245fa3bcc1d474c7ca72b1f31840f36dde1f26eb076f324"
+    },
+    {
+      "identity": "x:thsottiaux:2104462923661988233",
+      "messageId": "2104462923661988233",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "f4a07472eab616127514a0d02dcd3f577b9874c40d11c82ded96e70d2c748d26"
+    },
+    {
+      "identity": "x:thsottiaux:2104465709384491519",
+      "messageId": "2104465709384491519",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "a73803c54678c194848fb1730dfc57f3a265de72aa13bf6ac8c60d7da8e70c01"
+    },
+    {
+      "identity": "x:thsottiaux:2104467346945675347",
+      "messageId": "2104467346945675347",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "2bb34fb4eff4f02bb8f220fc44db7d4e7ef5b675772d5c185597894929a8f60e"
+    },
+    {
+      "identity": "x:thsottiaux:2104823812042940713",
+      "messageId": "2104823812042940713",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "bac58e1c0de9ce1d75148187aa206ac30eea63d4735a3a4a04a1352b7c58f92c"
+    },
+    {
+      "identity": "x:thsottiaux:2104827790440935508",
+      "messageId": "2104827790440935508",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "e1ce0e5103ee76569eec0e270b1eb0a7b8e5955e4779bdf6348d3998604ce7b3"
+    },
+    {
+      "identity": "x:thsottiaux:2104838506363408740",
+      "messageId": "2104838506363408740",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "6bbbc73a4a563d5407408bd5b0469fe03f281e24ff4d6dcb283e23809d80fa99"
+    },
+    {
+      "identity": "x:thsottiaux:2104934849970913519",
+      "messageId": "2104934849970913519",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "68e21b5f0c4d16c65a9009bdd25dc6998c1a8cec8d06eb6d229abe190187e32c"
+    },
+    {
+      "identity": "x:thsottiaux:2104936468624105813",
+      "messageId": "2104936468624105813",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "0c0987f61dff6a5dd05e51ca5a21ff4828dc79b851b157fa14029c6436b040cf"
+    },
+    {
+      "identity": "x:thsottiaux:2104951965184925941",
+      "messageId": "2104951965184925941",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "9b439d9a7b8a779aeac5f9899b763e2be97369c686a18b2170b5195139ee4459"
+    },
+    {
+      "identity": "x:thsottiaux:2104952602710638877",
+      "messageId": "2104952602710638877",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "53ec9681db12317b6981eb49149b4f635faaf8828d77db033116b82ee79a7b03"
+    },
+    {
+      "identity": "x:thsottiaux:2104961497055240633",
+      "messageId": "2104961497055240633",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "e5f8dafb16bdaf01e1c7e091b7d2d7e6b2704d80966cfb116559fec2157f25aa"
+    },
+    {
+      "identity": "x:thsottiaux:2104981170685616361",
+      "messageId": "2104981170685616361",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "aeffeb2bab70818af60e46898024c6675cfbad7cc231dc223bd2d340db0cfa9f"
+    },
+    {
+      "identity": "x:thsottiaux:2104983716049379472",
+      "messageId": "2104983716049379472",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "df67accef499bcb758ba618929f123ac1ff2a03582587d07f7a2eb0994fb6c7b"
+    },
+    {
+      "identity": "x:thsottiaux:2104986027953930613",
+      "messageId": "2104986027953930613",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "78ac200bde5cf315839105ac78618e448aac01a66cab72c928c78ffaa65f1ad8"
+    },
+    {
+      "identity": "x:thsottiaux:2104986448269279399",
+      "messageId": "2104986448269279399",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "7da50ac6e8aa36aeb3c2f8caef0724b87d727875f3d8478b49e18315a4ac37fa"
+    },
+    {
+      "identity": "x:thsottiaux:2104987594719461796",
+      "messageId": "2104987594719461796",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "c93337f8f750718c984a1a483e7055b2d0e8d7be778271c32426d369275b17fb"
+    },
+    {
+      "identity": "x:thsottiaux:2104988071188148495",
+      "messageId": "2104988071188148495",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "0eafde572e769da1f199ba0f1982adfec7504bccf97f96e0bc6098edee5bc82e"
+    },
+    {
+      "identity": "x:thsottiaux:2104989161774322009",
+      "messageId": "2104989161774322009",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ce86d12595a60285d27af81df848a0ea5314f6609a9219ac1234661edbb89b50"
+    },
+    {
+      "identity": "x:thsottiaux:2104991765904375896",
+      "messageId": "2104991765904375896",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "be597b815677bcbf2a21fa4ad277a39db7fb6eb8be577288ff69a9f1c2166774"
+    },
+    {
+      "identity": "x:thsottiaux:2104992080095564111",
+      "messageId": "2104992080095564111",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ccc19b8ab72754f7a157c0011782321ae5f55c84b2409145fb02ca2909a26a75"
+    },
+    {
+      "identity": "x:thsottiaux:2104994835212226681",
+      "messageId": "2104994835212226681",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "154b1e254429be581f16558790a814c7669359e5552428e61d1171e7847233fd"
+    },
+    {
+      "identity": "x:thsottiaux:2105006253986738615",
+      "messageId": "2105006253986738615",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "07f14c4a1ef477f187415a5408328327d75971ebee51e1b0e3c974d8d52b21e1"
+    },
+    {
+      "identity": "x:thsottiaux:2105007628460109953",
+      "messageId": "2105007628460109953",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "563d2bab6ec72fbb1f8b40c82351a26015484159eaa6563451d6f2e8a9bc473b"
+    },
+    {
+      "identity": "x:thsottiaux:2105007775676072381",
+      "messageId": "2105007775676072381",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "cf183ba65fb3e378fd51c27113472e1f616925c16d783bddcddc77f144bfba9d"
+    },
+    {
+      "identity": "x:thsottiaux:observed-20260929T190000Z",
+      "messageId": "observed-20260929T190000Z",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "55bb164c9fce0e3a9dea54a0a2bfe287e85301f5d63e51798e3c34d6118d5f52"
+    },
+    {
+      "identity": "x:thsottiaux:2105013661534454145",
+      "messageId": "2105013661534454145",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ad6050885f7fd479b637e0d9d58f733d6878c17e8f3b319a2f7ddccb5275064c"
+    },
+    {
+      "identity": "x:thsottiaux:2105028036240552179",
+      "messageId": "2105028036240552179",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ae9d241cfde294053895b8eb9eb16dcfcd19d2b9869bfdff28ac514e5c413991"
+    },
+    {
+      "identity": "x:thsottiaux:2105039482013757749",
+      "messageId": "2105039482013757749",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "5c508f515bedb2de5e177e1ccc33018ebd5519608f91222df222433d83327170"
+    },
+    {
+      "identity": "x:thsottiaux:2105039500149948878",
+      "messageId": "2105039500149948878",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "9af17c3e9772788bb254f36928a24dc3800a774d7d9cd59e6c3e71f4ee767f01"
+    },
+    {
+      "identity": "x:thsottiaux:2105039816438227206",
+      "messageId": "2105039816438227206",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "64ba72336c7b27e6b5366acf8c9ca3c6632693a8495ff145580190a73df8bc04"
+    },
+    {
+      "identity": "x:thsottiaux:2105040486314696737",
+      "messageId": "2105040486314696737",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "f0bc0327935cd7ecc0bd974e5af738766810a1fba2c3fcc342864edd55ed8e6e"
+    },
+    {
+      "identity": "x:thsottiaux:2105040569924002048",
+      "messageId": "2105040569924002048",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "b1ea89c28a5d6ddb21623fd5b100c7920c67556504571b82ce4ab1f69fb69301"
+    },
+    {
+      "identity": "x:thsottiaux:2105040722613412135",
+      "messageId": "2105040722613412135",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "42b8f659a2685f4b236325805436fd36a68648e62d2cdbce97ff2b4c1e0583c4"
+    },
+    {
+      "identity": "x:thsottiaux:2105041299934187874",
+      "messageId": "2105041299934187874",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "168c0d533b22d7798b9bd14897cbb8706fa690af42091455a18709a331b469cf"
+    },
+    {
+      "identity": "x:thsottiaux:2105097443847332188",
+      "messageId": "2105097443847332188",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "84fd533fdac38e15f04a84c07887d11cc6ca8a02862d90552be5bc1347900ee8"
+    },
+    {
+      "identity": "x:thsottiaux:2105102312167575701",
+      "messageId": "2105102312167575701",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "71a1c77ccf70f021fb283dc38f30994fcd05878eb93a1d223d674738113e39b7"
+    },
+    {
+      "identity": "x:thsottiaux:2105102820706058498",
+      "messageId": "2105102820706058498",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "e048096e3906074ff864dce61ec28d0f3cf812c62eb678ab31386df136abb198"
+    },
+    {
+      "identity": "x:thsottiaux:2105103752185458869",
+      "messageId": "2105103752185458869",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "3f5903b6614bd1bc99aab99aab4aeed0e86c2059f7a37bbffec255e50abf6182"
+    },
+    {
+      "identity": "x:thsottiaux:2105105086506840421",
+      "messageId": "2105105086506840421",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "58789900ae38622f9dbf9055beebe84efa2ef5a83b275dcb993469d1cb3a0f0a"
+    },
+    {
+      "identity": "x:thsottiaux:2105106052874375281",
+      "messageId": "2105106052874375281",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "62c6faa431b54f5606672364b27b1eb43e26e2601f82558e6468275160cb0517"
+    },
+    {
+      "identity": "x:thsottiaux:2105106575866364103",
+      "messageId": "2105106575866364103",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "07c2a90060e953fcf6b484f698dc11890057c23c6ab16702730eb9dd88462b7c"
+    },
+    {
+      "identity": "x:thsottiaux:2105108212219572319",
+      "messageId": "2105108212219572319",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "021688d60b98857c2e039b4c03b7635fa7e25ca8a4d96eaccba9bc6448a0b89f"
+    },
+    {
+      "identity": "x:thsottiaux:2105108807693246808",
+      "messageId": "2105108807693246808",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "bdcd5e85023472cb9b4ff659332896fe3e68ebacfa8cf8071957a80c79265a00"
+    },
+    {
+      "identity": "x:thsottiaux:2105109005135962589",
+      "messageId": "2105109005135962589",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "2899a25ca7a26c6f5f3decd8dd6a5677d786ff759901a8f40a82f4075b65b398"
+    },
+    {
+      "identity": "x:thsottiaux:2105120226027450685",
+      "messageId": "2105120226027450685",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ce08d8004a166d067c7a3466b60bddc3288306b6c33e3c8c83cd18453ff111c1"
+    },
+    {
+      "identity": "x:thsottiaux:2105120499177230798",
+      "messageId": "2105120499177230798",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "08983d8fe10b07bd41a445d0b0cbe6b70681485a9cb43af0c732497ff72315fa"
+    },
+    {
+      "identity": "x:thsottiaux:2105121970883076422",
+      "messageId": "2105121970883076422",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "1e3bd75d52429b93bf966f256185f01b86e3fc225317000c0139836e7745ed32"
+    },
+    {
+      "identity": "x:thsottiaux:2105122298646888806",
+      "messageId": "2105122298646888806",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "719200332cc8e79f8e1b7215a488c765f6d6b9ff8bc944767da7396899efc67d"
+    },
+    {
+      "identity": "x:thsottiaux:2105122693721010600",
+      "messageId": "2105122693721010600",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "8f7781e10d6d03feb0893d64dc192e85103681e3c0816c32fa0855ca587fc8df"
+    },
+    {
+      "identity": "x:thsottiaux:2105124771310739821",
+      "messageId": "2105124771310739821",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ffb671e31e9587aefde9bb46549ce9a6c2788ab684654d2c700c92e219e7d42e"
+    },
+    {
+      "identity": "x:thsottiaux:2105141623315374507",
+      "messageId": "2105141623315374507",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "c824bc8c83d384b9a0338e742a97a55a2859401e386b65e59e6f2aff63e86013"
+    },
+    {
+      "identity": "x:thsottiaux:2105172665095069886",
+      "messageId": "2105172665095069886",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ef90248132d6ccb5873c22c6d219b6acae2707dc206d78168818b03a6ec7e5d4"
+    },
+    {
+      "identity": "x:thsottiaux:2105173168281506088",
+      "messageId": "2105173168281506088",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "87773321bcf5245b8222abe49ba9bc4cdd75cf064503d79bd32de261e735a0ef"
+    },
+    {
+      "identity": "x:thsottiaux:2105174607439544669",
+      "messageId": "2105174607439544669",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "2bbdb30a791c34804d41593e8a121f99f6bc643c4d9a33bf5490d8464c74b778"
+    },
+    {
+      "identity": "x:thsottiaux:2105175197821399122",
+      "messageId": "2105175197821399122",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "c5208cf2679b8bda00b9b4d5cf905bc78624f6a883b4f01502f7f194401e8e7b"
+    },
+    {
+      "identity": "x:thsottiaux:2105176545304436942",
+      "messageId": "2105176545304436942",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "2951cd201e3239f42f4a60bf123d5190804d1ea988932cef6e69071522c97861"
+    },
+    {
+      "identity": "x:thsottiaux:2105178959327756396",
+      "messageId": "2105178959327756396",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ac7425e7b236307c30d6892ca5d4dd6a43eb52563fbb1d748dbf99884230f554"
+    },
+    {
+      "identity": "x:thsottiaux:2105188957437002208",
+      "messageId": "2105188957437002208",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "65a762cfbb33c0caff9db0ca283ed066a97c887e6c28bf9b6c82b2c8f7f0a6d7"
+    },
+    {
+      "identity": "x:thsottiaux:2105189201679630385",
+      "messageId": "2105189201679630385",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "5aaefb2224e0431e6a060b42d2f492e697f9b6d52d7aa3d41a9edc07664a967a"
+    },
+    {
+      "identity": "x:thsottiaux:2105305239398285514",
+      "messageId": "2105305239398285514",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "571e0adc1278f903c46d1fa0f63c3460fef9d4582f9f89d595ff25fbe264d299"
+    },
+    {
+      "identity": "x:thsottiaux:2105308727947755599",
+      "messageId": "2105308727947755599",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "3136fdc4bcbc6a66a5ead61df7056f85c3801cc953f73a8decdbf7fee45ed08c"
+    },
+    {
+      "identity": "x:thsottiaux:2105308913176658267",
+      "messageId": "2105308913176658267",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "24d0d3638ed81d1d534a5cca49babd9c087707673c8b33d44b41b4b485094c3f"
+    },
+    {
+      "identity": "x:thsottiaux:2105309464492691524",
+      "messageId": "2105309464492691524",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "fbb2ab436ed6bc78e4acc776dc3e361fe93d1decaf8478f7fb34dd8808dfe7e7"
+    },
+    {
+      "identity": "x:thsottiaux:2105310973532012793",
+      "messageId": "2105310973532012793",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "c57740e7578f1fd4691a477ad9dd6616f2f5186d6883c6d2f13d8b16c947fc9c"
+    },
+    {
+      "identity": "x:thsottiaux:2105344469923221941",
+      "messageId": "2105344469923221941",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "5078e692d603c14cc97273a863cf7d7c66ac42191ba8726a969006780ff47bde"
+    },
+    {
+      "identity": "x:thsottiaux:2105344482149613853",
+      "messageId": "2105344482149613853",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "1be525f18472a47f1559c2ca1273f019450e41263ef384d52e11b0421e81ab37"
+    },
+    {
+      "identity": "x:thsottiaux:2105348026416140781",
+      "messageId": "2105348026416140781",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ce0646d74e644047aa658ea494833fdd43caa654b3357bdfc44a58770e21da61"
+    },
+    {
+      "identity": "x:thsottiaux:2105394405238886517",
+      "messageId": "2105394405238886517",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "735d173f4e6cf4dbcb51e146535507cafc8b8769afec0f850eadcbbdea50c77d"
+    },
+    {
+      "identity": "x:thsottiaux:2105395200248156556",
+      "messageId": "2105395200248156556",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "74dfd49da7513be4c9b813279a01129424b02644ad345241bdd59f2b887b8746"
+    },
+    {
+      "identity": "x:thsottiaux:2105456105954648292",
+      "messageId": "2105456105954648292",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "6654851701cd25709461e1c4b726b3f820666de3036cff84796b35446fc68aec"
+    },
+    {
+      "identity": "x:thsottiaux:2105464274747527543",
+      "messageId": "2105464274747527543",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "b85fcff548103ad6b190420aa7f4c53d249acdd35b90609fd302f4f67d6042a8"
+    },
+    {
+      "identity": "x:thsottiaux:2105489877727064272",
+      "messageId": "2105489877727064272",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "6d29fe5848959f43fe0a5e109715e9fcde7cf4eedbb4ab6eae46be93af094d56"
+    },
+    {
+      "identity": "x:thsottiaux:2105519215092584786",
+      "messageId": "2105519215092584786",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "e6acd24c851cb1217efce7fd30965bec2193637df4301988bdec0983506a2167"
+    },
+    {
+      "identity": "x:thsottiaux:2105519686280790252",
+      "messageId": "2105519686280790252",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "2adc4bdd5c7fedc8d81e04fd8d80f46448a2f3bdacf2cca84eab5407a138cabd"
+    },
+    {
+      "identity": "x:thsottiaux:2105522533139452359",
+      "messageId": "2105522533139452359",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "4d29b2a4cc70570ebed3b25b9aa83415ac1732138dd535caa7bbf66e7e605d6f"
+    },
+    {
+      "identity": "x:thsottiaux:2105670256094326849",
+      "messageId": "2105670256094326849",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "0d91b0471afda097ec7fc960bdd384cf4c49d53b26089f3083d13c8444144db0"
+    },
+    {
+      "identity": "x:thsottiaux:2105672058269212820",
+      "messageId": "2105672058269212820",
+      "expected": "non_benefit",
+      "reason": "原文表示不能为主 dot 发重置，不是预告",
+      "preferredTextSha256": "eda9cd3a79289fdd639e4e0f9553b723264ade9e142bec5518d60ac95625a251"
+    },
+    {
+      "identity": "x:thsottiaux:2105689002905153761",
+      "messageId": "2105689002905153761",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "d9b01ca335e1ee0184929b3dfe95cf8b01312e7587116060b3001175fd618e8a"
+    },
+    {
+      "identity": "x:thsottiaux:2105689875655897093",
+      "messageId": "2105689875655897093",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "e36ea945ae65b37e3800eb70921afe478017204402bc4475ff64d0189477c4a5"
+    },
+    {
+      "identity": "x:thsottiaux:2105718728658993153",
+      "messageId": "2105718728658993153",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "03cc0a80d58ae63cdc4622f6528212306b4383df8a93fd247a4d14a0b745be02"
+    },
+    {
+      "identity": "x:thsottiaux:2105718931235508277",
+      "messageId": "2105718931235508277",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "08c4279ab8d0963d95cb2fa7c70479b6a7df8ef06d415691d113bb9039438a27"
+    },
+    {
+      "identity": "x:thsottiaux:2105727933579137159",
+      "messageId": "2105727933579137159",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "b20e82a05455f737ad4a3e4e4a56d66e38f3b4f7c9ee2af0941bb45aa8da569b"
+    },
+    {
+      "identity": "official-releases:release:401312540",
+      "messageId": "release:401312540",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "504c603c722f1c335cb61164eaa6c4d99dbeb615588f18e1b965ab00962f47d7"
+    },
+    {
+      "identity": "x:thsottiaux:2105828364879876207",
+      "messageId": "2105828364879876207",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "16d364e6ed1af07cd1f35b5c642a2e11bf91bc78d22ddd760750ce189c0c4a77"
+    },
+    {
+      "identity": "x:thsottiaux:2105843550936302055",
+      "messageId": "2105843550936302055",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "6dfcb7061567fae53d05270ac4a1e7636e258d142ae54746cfb614e32c098763"
+    },
+    {
+      "identity": "x:thsottiaux:2105843926221660585",
+      "messageId": "2105843926221660585",
+      "expected": "promised",
+      "reason": "明示付费账户的全局重置与 PST 时刻",
+      "preferredTextSha256": "6ff4b7ace879159dc59556ace703ca9a4246ab012d3cfc8e552758efd3364e86",
+      "kind": "automatic_reset",
+      "round": "oct02"
+    },
+    {
+      "identity": "x:thsottiaux:2105844753522938214",
+      "messageId": "2105844753522938214",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "84ab5499ba3ba0fe5e3fbd9996c3a4956ace14b36dc8df57330828957ed0345e"
+    },
+    {
+      "identity": "x:thsottiaux:2105862010521219406",
+      "messageId": "2105862010521219406",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "15e38c6ab321d2ad6044a04a7dfba1e252900fa60abe287d8cd166307b6d041f"
+    },
+    {
+      "identity": "x:thsottiaux:2105863294267560169",
+      "messageId": "2105863294267560169",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "d235ec80b60abf45271952fe7508da6a3396cc555312f2cce38278e197f4273d"
+    },
+    {
+      "identity": "x:thsottiaux:2105863620433453166",
+      "messageId": "2105863620433453166",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "fb78bb1261e517b1441fedb7f8f91161e95c6843f070c93d02bc15ca1d22129a"
+    },
+    {
+      "identity": "x:thsottiaux:2105899634032025682",
+      "messageId": "2105899634032025682",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "9dd7a54201892bf78834d5f665dcae38be3d119e200570c149b1442ad83834d4"
+    },
+    {
+      "identity": "x:thsottiaux:2106046594277954010",
+      "messageId": "2106046594277954010",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "7525405737c7d2d12f03493347b86d2407e906a83fc973d41f140ff3ae9e6c4c"
+    },
+    {
+      "identity": "x:thsottiaux:2106131810921136451",
+      "messageId": "2106131810921136451",
+      "expected": "claimed_complete",
+      "reason": "明确回复上条重置预告，称传播完毕",
+      "preferredTextSha256": "8c1e94dab450ab1074427e389293bb9e0a2e67b5edcb39af4fdc7fba3ab17521",
+      "kind": "automatic_reset",
+      "round": "oct02"
+    },
+    {
+      "identity": "x:thsottiaux:2106224612271112207",
+      "messageId": "2106224612271112207",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "86c31a9ab5e6ca8d2474e7969aa4cd2b93058f6602b089c7d4fca18c8fe43021"
+    },
+    {
+      "identity": "x:thsottiaux:2106226725428572371",
+      "messageId": "2106226725428572371",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ef03fe5cee00f09e45bdf7e49fac7a815e91f35a3d3a1dc2ffe941a6eb4b408c"
+    },
+    {
+      "identity": "x:thsottiaux:2106227571088392653",
+      "messageId": "2106227571088392653",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "edbee82092d325e54fc453b9959abb91acb3da4f72218e91bbd80160daf14cd5"
+    },
+    {
+      "identity": "x:thsottiaux:2106233145163141249",
+      "messageId": "2106233145163141249",
+      "expected": "targeted_update",
+      "reason": "Pro500 未收到重置的调查与补偿安排",
+      "preferredTextSha256": "e832cf4c7e349477e4f78fe017b5914055cdd80ef00e227516af190f5847c03a"
+    },
+    {
+      "identity": "x:thsottiaux:2106239435461579088",
+      "messageId": "2106239435461579088",
+      "expected": "targeted_update",
+      "reason": "明确回复 Pro500 异常称已修复，不新增普发",
+      "preferredTextSha256": "32f9d21499562b9c4b1a079c1fbd0325164715eb22609a54b328781aba790f9a"
+    },
+    {
+      "identity": "x:thsottiaux:2106239912932692085",
+      "messageId": "2106239912932692085",
+      "expected": "non_benefit",
+      "reason": "解释先前传播不准时，无父帖和新的发放声明",
+      "preferredTextSha256": "aff71e76262b639669408c8a415ac9a80167cf927166a60dbb305cc96ec28eb1"
+    },
+    {
+      "identity": "x:thsottiaux:2106250124863389920",
+      "messageId": "2106250124863389920",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "5657d5709413b992641d71e760368d35571430af0b1d34f5c6316a7102adbac1"
+    },
+    {
+      "identity": "x:thsottiaux:2106252868307271752",
+      "messageId": "2106252868307271752",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "2b14ad54250f3fcc59c52320f9878a0a55dd4c4121e9e23ec2c316935b04cdb1"
+    },
+    {
+      "identity": "x:thsottiaux:2106253534132089110",
+      "messageId": "2106253534132089110",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "9ba495cdfc2a9a8ff20429414c2cc6db9b616cae0d5edce8fd101e8bbb916d05"
+    },
+    {
+      "identity": "x:thsottiaux:2106255580772061332",
+      "messageId": "2106255580772061332",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "243e504e140c7082f2b89ed0c78cc29d256863b397622eeae1769011f4e9de11"
+    },
+    {
+      "identity": "x:thsottiaux:2106257453679808676",
+      "messageId": "2106257453679808676",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "a6296edcf2f087fe143647f44fea7b8d098ddd405dd621251d346e5baa4f8507"
+    },
+    {
+      "identity": "x:thsottiaux:2106439068557144179",
+      "messageId": "2106439068557144179",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "f85684d7083399fb19d01078884109aa4dbdf8a4a3cd2a5663b2faa290c5c9f9"
+    },
+    {
+      "identity": "x:thsottiaux:2106499926956060984",
+      "messageId": "2106499926956060984",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "25af80161451c098919ebbf3be8b23e700807b00c51da1399ba34a6c5fec692d"
+    },
+    {
+      "identity": "x:thsottiaux:2106500823253754004",
+      "messageId": "2106500823253754004",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "1d4c406fa13852b9955bb1077fe83c023e1d38f2f1725a73b7157981a1e36c79"
+    },
+    {
+      "identity": "x:thsottiaux:2106501204285239560",
+      "messageId": "2106501204285239560",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "6bf1864ff5dc2a94cb5f3fe5ce2321125e43196143512b831a9219a55bb6a449"
+    },
+    {
+      "identity": "x:thsottiaux:2106541589007114420",
+      "messageId": "2106541589007114420",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "4e74364f6b2bde9bdf36ec607ce8dce555882e9e7324374d7c0f92f709b49b8b"
+    },
+    {
+      "identity": "x:thsottiaux:2106543375088488596",
+      "messageId": "2106543375088488596",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "91ff758310ee2f323706c173914549bc3c69beec29fed330d8df35d10c253a29"
+    },
+    {
+      "identity": "x:thsottiaux:2106544544892518815",
+      "messageId": "2106544544892518815",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "f1696208c3a2db9b9755d548bb9176c6305d3cdb333cdf50bcd4fbf6a76abcac"
+    },
+    {
+      "identity": "x:thsottiaux:2106546689012281771",
+      "messageId": "2106546689012281771",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "b1a0348b458f940ca73b0a9f6461ca8dacd2b7a09c5f7aaea22656bac09de262"
+    },
+    {
+      "identity": "x:thsottiaux:2106593009806815429",
+      "messageId": "2106593009806815429",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "4472a356ff006671dc20aa173234a441e353815bdcf8b506ceb9869db0ae2f91"
+    },
+    {
+      "identity": "x:thsottiaux:2106602729875685780",
+      "messageId": "2106602729875685780",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "8417740db153d089a26cf052d73b5ddf65b392b077437d1264187973209ed82c"
+    },
+    {
+      "identity": "x:thsottiaux:2106603980386394123",
+      "messageId": "2106603980386394123",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "5559b621f645479fd79be6a72c5f5b4cfdd408558cf88a478f78504c3aba411f"
+    },
+    {
+      "identity": "x:thsottiaux:2106605571168510149",
+      "messageId": "2106605571168510149",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "d59f0a1c9d2290734bcfc85f9d4e587e7f9c75b7c8dfc07fddb499581836100a"
+    },
+    {
+      "identity": "x:thsottiaux:2106607456130592861",
+      "messageId": "2106607456130592861",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "dc3d9c458838d81312cf5a2907164484585ab61951f15e8bbf1c91fb84df2430"
+    },
+    {
+      "identity": "x:thsottiaux:2106609390577156384",
+      "messageId": "2106609390577156384",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "8f1822d00471cce5547997a341a7045f8d156164a7ef7767924f1061e5114b47"
+    },
+    {
+      "identity": "x:thsottiaux:2106610099720720811",
+      "messageId": "2106610099720720811",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "539e630c50781a63bd3c133ee7f88218ca189af009f2ad81524e90624c6539f9"
+    },
+    {
+      "identity": "x:thsottiaux:2106769163620671823",
+      "messageId": "2106769163620671823",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "b0f1ebe7979a774c03c91322dd7d330ebe819ae3c5bf93415bfd08bdb1c1f39e"
+    },
+    {
+      "identity": "x:thsottiaux:2106842998214717876",
+      "messageId": "2106842998214717876",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "5c66e9066f77eb3aef778f20066248ef98c7124904ad1815b06b9772d2e38d53"
+    },
+    {
+      "identity": "x:thsottiaux:2106845241357824205",
+      "messageId": "2106845241357824205",
+      "expected": "pending",
+      "reason": "活动的条件规则，不是每天实际完成重置",
+      "preferredTextSha256": "475366fe53d83fa6571e6ed1a9369448b13a6b88b4b4ea71c17b2e27f3cbb7fc"
+    },
+    {
+      "identity": "x:thsottiaux:2106858395370389784",
+      "messageId": "2106858395370389784",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "b71713f3ce5a65b3f64829ea3e2bdfa06a24c43d058400679de59bedd6602035"
+    },
+    {
+      "identity": "x:thsottiaux:2106858787151995288",
+      "messageId": "2106858787151995288",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "385ea2bd5aa10778e1d25588e56e8db5b2f7400424615ae1661748c185754d74"
+    },
+    {
+      "identity": "x:thsottiaux:2106893559962144962",
+      "messageId": "2106893559962144962",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "9d511f05ebe2bb52a86a084836fad384cd86b266e85710c18f6a76d18ca20d9a"
+    },
+    {
+      "identity": "x:thsottiaux:2106893863663321520",
+      "messageId": "2106893863663321520",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "072d17015f5209a65daff4f642f534579a21586ff4ab9c42f2783070621be9ed"
+    },
+    {
+      "identity": "x:thsottiaux:2106894238541918707",
+      "messageId": "2106894238541918707",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "91603dd7f81270400c83bde6d1059f5b6d1216603fd4c6bc28f8a1c98c8a3548"
+    },
+    {
+      "identity": "x:thsottiaux:2106894683523928229",
+      "messageId": "2106894683523928229",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "fd4dc0f23b7c0dd5eb57c753cbf2912fcc1592386d3d81f10014e761e2a2fe35"
+    },
+    {
+      "identity": "x:thsottiaux:2106957975147676025",
+      "messageId": "2106957975147676025",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "4a53b4b0d778609bc208c98e4453b88a62e5c1cbeccb745462ac2432e7cf386a"
+    },
+    {
+      "identity": "x:thsottiaux:2106958559695282202",
+      "messageId": "2106958559695282202",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "a8f0bff0ca1d978635cbeed85194ce5f5c9f1f65aa7cf197eac8c4afc07790b2"
+    },
+    {
+      "identity": "x:thsottiaux:2106959403782184960",
+      "messageId": "2106959403782184960",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "b311ea7bcf156b341ff9edac9b8b526e5c94d7041c10d8c7e0c9e78524671e52"
+    },
+    {
+      "identity": "x:thsottiaux:2106963521561083946",
+      "messageId": "2106963521561083946",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "36bfadcb6df717e3cb3d15adea2f4a22c42e6ce4ebfaf969b058aa0cd75252ef"
+    },
+    {
+      "identity": "x:thsottiaux:2106966244314567159",
+      "messageId": "2106966244314567159",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "a6c33270b1d0507d69c8781e2ccd9613d178afdc5e2d4352de29ec86a3b54531"
+    },
+    {
+      "identity": "x:thsottiaux:2106967126250791091",
+      "messageId": "2106967126250791091",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "af1995286c2838fa1954ffdad0f05d58de9abd44ee7285513075adb2372708b3"
+    },
+    {
+      "identity": "x:thsottiaux:2107158998495748264",
+      "messageId": "2107158998495748264",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "21f34e249f7b609d484dbfd5c3ebde94354913355ff632d36693aa543aa723a0"
+    },
+    {
+      "identity": "x:thsottiaux:2107159119107146237",
+      "messageId": "2107159119107146237",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "b041c375d395b9661736d6b25b547fbea3a4e85489a9af90591223d75158a757"
+    },
+    {
+      "identity": "official-status:01M46KED6KB3NM92PT7YWKRE8V",
+      "messageId": "01M46KED6KB3NM92PT7YWKRE8V",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "6465c2bbd251db9996718860b509ce768ae0fb8eecf26501bd7b652b254dcc42"
+    },
+    {
+      "identity": "official-status:01M46KYVQ1SFC773JGJ26M4BQ2",
+      "messageId": "01M46KYVQ1SFC773JGJ26M4BQ2",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "7e1d1e3b045c4eeca4027d1c51da0dd342b6f6ac4c933946888ad6187a646022"
+    },
+    {
+      "identity": "official-releases:release:404001397",
+      "messageId": "release:404001397",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "7638886b559ec84dc51cd8d27970374551384eed9e12ac54dd28265326094134"
+    },
+    {
+      "identity": "x:thsottiaux:2107185534359761051",
+      "messageId": "2107185534359761051",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "648e2e3a4340e2cceac2f6ddd475eb75f148dab7d6905cd77b83b82f4df7e08f"
+    },
+    {
+      "identity": "x:thsottiaux:2107200530477101461",
+      "messageId": "2107200530477101461",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "aa636b78a1d694d9ce9ec224357d0c5d3513ffb9a582e34d0f60647101f6d31a"
+    },
+    {
+      "identity": "x:thsottiaux:2107294063011733505",
+      "messageId": "2107294063011733505",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "983064d4286a139e4fe1cb44a2a38a4bd1421a24cc3a5cd30bf68b80f080fd36"
+    },
+    {
+      "identity": "x:thsottiaux:2107295089416708515",
+      "messageId": "2107295089416708515",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "20379dcad597c9c67ce41a5e00c3b848322ae4ac871a84fb146539765073582c"
+    },
+    {
+      "identity": "x:thsottiaux:2107295306794905929",
+      "messageId": "2107295306794905929",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "f9cd37759ef540fcab387a87b4854684c84d5554c6f75f63c00cf9d2395cc2a9"
+    },
+    {
+      "identity": "x:thsottiaux:2107295543563362784",
+      "messageId": "2107295543563362784",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "48433f4a9e0dda9b52b4f4fe8786415a8d5a98cee99a0505e14307e7fdec4971"
+    },
+    {
+      "identity": "x:thsottiaux:2107295839655952486",
+      "messageId": "2107295839655952486",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "1bf92df946b3277abe5892d3aecbc0e9218fe76a9c1eda7322f43bfd7aad5ad2"
+    },
+    {
+      "identity": "x:thsottiaux:2107301501215613206",
+      "messageId": "2107301501215613206",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "2a1d2b00cb286516a72b6301eacd2f8bbc30d849fa76969877a325e8aa1fbb3a"
+    },
+    {
+      "identity": "x:thsottiaux:2107310074209407069",
+      "messageId": "2107310074209407069",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "cb70dd16fa918745ac428a8601abfc8f28070690df65fd17f5c68a2c07e44851"
+    },
+    {
+      "identity": "x:thsottiaux:2107311729768353844",
+      "messageId": "2107311729768353844",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "6dc628a51bcdae0f64f3c5bd3785ea8240ad46cafc98d55988e1ab4b14176155"
+    },
+    {
+      "identity": "x:thsottiaux:2107314076993155297",
+      "messageId": "2107314076993155297",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "a962304bf632364e2d3ff7ac9a7d6c36c7be783a25900a5e7a048a7b2933674e"
+    },
+    {
+      "identity": "x:thsottiaux:2107314411975381479",
+      "messageId": "2107314411975381479",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "c92bd73075925a180def24c637af53341a5e5a8bf73e0cbc7e83629715df6301"
+    },
+    {
+      "identity": "x:thsottiaux:2107314912963989821",
+      "messageId": "2107314912963989821",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "066434b807f994d9f4acf6842bef823e8d1bc870f6933169118ccdcce2ea19d7"
+    },
+    {
+      "identity": "x:thsottiaux:2107320000554123426",
+      "messageId": "2107320000554123426",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "33b4c806db25cd9930828920c383623c58aef5d4d390c56b30189c343cf1a5e2"
+    },
+    {
+      "identity": "x:thsottiaux:2107320918200693212",
+      "messageId": "2107320918200693212",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "fcb9859e95eab216430084fc324f6a000e2a466ce66924a72c0cd3bb0c4499d0"
+    },
+    {
+      "identity": "x:thsottiaux:2107368734981517634",
+      "messageId": "2107368734981517634",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "f3c9e6218de6521829a526a423908a1947b7762035e54af43f0f9b24054bf642"
+    },
+    {
+      "identity": "x:thsottiaux:2107368786353398184",
+      "messageId": "2107368786353398184",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "24230abb08d60b78ab125c1c0cbbd211efdb7b41ea17167aefeaf63cb14e9ca7"
+    },
+    {
+      "identity": "x:thsottiaux:2107370852564021582",
+      "messageId": "2107370852564021582",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "13026ffa4b6bce42a25caa300f73194c655cfb9bd02f731d64ada1ff537e5b3c"
+    },
+    {
+      "identity": "official-status:01M484XTFA8PAPT7DS3N9TGW6T",
+      "messageId": "01M484XTFA8PAPT7DS3N9TGW6T",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "f9f8eb10fcfb060d8938364564565621f3b2929a640e5f70606e8f1cc5233b35"
+    },
+    {
+      "identity": "x:thsottiaux:2107504197012988007",
+      "messageId": "2107504197012988007",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "1099fbeedbf6bfefd2d56c538256121b75b802e7a9cfb24c632d3171e29c6973"
+    },
+    {
+      "identity": "x:thsottiaux:2107517084884521030",
+      "messageId": "2107517084884521030",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "b9b9bfa6efdc33dfc48838364b205b6b068665b4efd27c6ddb990a4a33e9adc7"
+    },
+    {
+      "identity": "x:thsottiaux:2107548725359104441",
+      "messageId": "2107548725359104441",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "0b42db0aea93273899bfb5a3e9613fdc1ce7df78058c766454ce55914aaf9245"
+    },
+    {
+      "identity": "x:thsottiaux:2107558288934216153",
+      "messageId": "2107558288934216153",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "2f1e18ed9ffa6a2d56778260e6e9fd8314ef2a737c1a71161b282c8905a100d7"
+    },
+    {
+      "identity": "x:thsottiaux:2107573405553938664",
+      "messageId": "2107573405553938664",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "3ebcbe53aed6ccc95f11fe2e0984f2d77147ebcc14af50f16b817f7f6abb21b7"
+    },
+    {
+      "identity": "x:thsottiaux:2107574912349303197",
+      "messageId": "2107574912349303197",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "d546ae76c19d20bed3a6177bba2e162631d93a8ba2aef4cf4f916bf6063ef2eb"
+    },
+    {
+      "identity": "x:thsottiaux:2107575657014468879",
+      "messageId": "2107575657014468879",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "a2f3d4b2ca6c14f1a33bd41063460634f1336c7cabec41670b1714ecd6fe6828"
+    },
+    {
+      "identity": "x:thsottiaux:2107576143285219799",
+      "messageId": "2107576143285219799",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "cd5588db6fc6fb44dd76b006202f9efa2ba5d715272a1ae06fb3c805e6a25289"
+    },
+    {
+      "identity": "x:thsottiaux:2107577536779870210",
+      "messageId": "2107577536779870210",
+      "expected": "non_benefit",
+      "reason": "喜欢发重置的聊天，不是具体预告",
+      "preferredTextSha256": "caff67bbf3199d01343b225c9daebc7f0e1e40f5c267a465b2f80f5145a42722"
+    },
+    {
+      "identity": "x:thsottiaux:2107578625419866469",
+      "messageId": "2107578625419866469",
+      "expected": "non_benefit",
+      "reason": "投票和提问，不是重置承诺或完成声明",
+      "preferredTextSha256": "579c20371c959dc07eaa3b61164667f14682b4ca2488c9b2e7096c84cfc2fdd3"
+    },
+    {
+      "identity": "x:thsottiaux:2107578816638177408",
+      "messageId": "2107578816638177408",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "a1c4d3c87a9b25689455ded2ba18d60f0c40aec3c0c0fe73cd2f5fa1ac46e765"
+    },
+    {
+      "identity": "x:thsottiaux:2107579151322591412",
+      "messageId": "2107579151322591412",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "264aea7efa19cc358d4912316e5f98a207938dd7ff496e0211d3bc5efc381fe2"
+    },
+    {
+      "identity": "x:thsottiaux:2107586339860631980",
+      "messageId": "2107586339860631980",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "a908690d974095c2ef9fb9e787bdf9b273183eed410d0daae5d8065acafbb47a"
+    },
+    {
+      "identity": "x:thsottiaux:2107586622766366739",
+      "messageId": "2107586622766366739",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "6443fb616b9550f3d3dc61f43ecc0a9526fbdb5e9d716aeb9bb6bc604eb4b2d8"
+    },
+    {
+      "identity": "x:thsottiaux:2107587158001496242",
+      "messageId": "2107587158001496242",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "7dd1ce3cf54f64a38833268a5b1b0461cc825d8b70437e8c0829b6a5398270a9"
+    },
+    {
+      "identity": "x:thsottiaux:2107587334661378382",
+      "messageId": "2107587334661378382",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "03215b97ad8b75c3b4ded161b46707cb81d6d7cb7e1e05736a089e374a25916b"
+    },
+    {
+      "identity": "x:thsottiaux:2107587734810525809",
+      "messageId": "2107587734810525809",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "c4336bead36bedb8ec0dfe0cd693ffdfe36ec582916db26bb8a6524a731c6d26"
+    },
+    {
+      "identity": "x:thsottiaux:2107592271952748814",
+      "messageId": "2107592271952748814",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "4fc756c1cabf2db1f263223a5046c1b8da52f7d3492e54c91946aaec75dac4f3"
+    },
+    {
+      "identity": "x:thsottiaux:2107592473048715573",
+      "messageId": "2107592473048715573",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "7c714d04b1fcb1c408a4936d96a759dbab3624a2926146f1cd9e0779daf5a6ee"
+    },
+    {
+      "identity": "x:thsottiaux:2107597780352950624",
+      "messageId": "2107597780352950624",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "9f6ac75badb0d006123874839f3462bb8fc826c91b54a040d33009fd1fcfb193"
+    },
+    {
+      "identity": "x:thsottiaux:2107599996225007892",
+      "messageId": "2107599996225007892",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ce05697dd370d5adad5838ed5b73b56805187f5074d8604bd0129b6ae600e3ac"
+    },
+    {
+      "identity": "x:thsottiaux:2107603154699173997",
+      "messageId": "2107603154699173997",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "18fc288a309ddda9a4a861c2ec0a482f77149042f38e72277a001d637cf41bd0"
+    },
+    {
+      "identity": "x:thsottiaux:2107613966692409653",
+      "messageId": "2107613966692409653",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "807b4efe096c6d5365020cff784845e7920ce97aa8db67d94f0cb07f886d0536"
+    },
+    {
+      "identity": "x:thsottiaux:2107628890550399465",
+      "messageId": "2107628890550399465",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "37ae178fb40cc62212005ba8bfe69770e6348bf8d1f33ffcab5703eba88f34dc"
+    },
+    {
+      "identity": "x:thsottiaux:2107647667925135663",
+      "messageId": "2107647667925135663",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "bbcfa9510b6fd99a389d0fbef71542bb52899ec25a5aa7ce59bbfe5ef77099d0"
+    },
+    {
+      "identity": "x:thsottiaux:2107647946032664948",
+      "messageId": "2107647946032664948",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "94e7bf6b62b9c27fee78cfccfb9b8797aabaa8238c8f6282512a792bcec74e9c"
+    },
+    {
+      "identity": "x:thsottiaux:2107676072871600470",
+      "messageId": "2107676072871600470",
+      "expected": "claimed_complete",
+      "reason": "活动 Day2 明确父帖，原文称 reset has been processed",
+      "preferredTextSha256": "1f63992ad36e3974b81537726aa309046ceecccb6730a178e22703240ca4eb2a",
+      "kind": "automatic_reset",
+      "round": "2107676072871600470"
+    },
+    {
+      "identity": "x:thsottiaux:2107676261099426030",
+      "messageId": "2107676261099426030",
+      "expected": "non_benefit",
+      "reason": "说明产品改进仍保留，没有新重置状态",
+      "preferredTextSha256": "a7ca8adb407e38e1c89ede2946f2430301bc8829c87e060fb41bb79b186dd7ad"
+    },
+    {
+      "identity": "x:thsottiaux:2107676653895967106",
+      "messageId": "2107676653895967106",
+      "expected": "non_benefit",
+      "reason": "晚安问候，无重置状态",
+      "preferredTextSha256": "e2120e6820bebc8f2e8a277561dd0ed4ebba313cdb5d6bf0650729e5e379e110"
+    },
+    {
+      "identity": "x:thsottiaux:2107676900894417277",
+      "messageId": "2107676900894417277",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "511420c1a270a74c4b8158d415433928018fb902edf2a51fbeb0c6cdb177b278"
+    },
+    {
+      "identity": "x:thsottiaux:2107699068499841309",
+      "messageId": "2107699068499841309",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "3a74a7e3da348ebeca7e43fe50bb00896161a96a57d81749b59f9b56e93a7ee7"
+    },
+    {
+      "identity": "x:thsottiaux:2107699167808356482",
+      "messageId": "2107699167808356482",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "b84e2a7ad9255bfe19dfba8cefa95a5a94f4366b7a3caac78265b3271e6af18c"
+    },
+    {
+      "identity": "x:thsottiaux:2107700139066593612",
+      "messageId": "2107700139066593612",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ccb2e241fe656e655b4d3769900f4672c6e4b72ffe9deb6bac190ab0939c6f33"
+    },
+    {
+      "identity": "official-releases:release:405921402",
+      "messageId": "release:405921402",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "630cc92d60674d32382b47a9e64eaa321e450edc817874a87c246038103528d1"
+    },
+    {
+      "identity": "official-status:01M4BK9J2MDQQSD8TAGA38YBK0",
+      "messageId": "01M4BK9J2MDQQSD8TAGA38YBK0",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "23a0a800a95d82fa23c34824a4d3d0eedc90dd3b32f0b5e7f8d49ce2b7a8f578"
+    },
+    {
+      "identity": "official-status:01M4BP5JE7F83X8ADMZ0QCP0M7",
+      "messageId": "01M4BP5JE7F83X8ADMZ0QCP0M7",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "23a0a800a95d82fa23c34824a4d3d0eedc90dd3b32f0b5e7f8d49ce2b7a8f578"
+    },
+    {
+      "identity": "official-status:01M4BPN9VE6WNPN517BMFA0KAQ",
+      "messageId": "01M4BPN9VE6WNPN517BMFA0KAQ",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "7e1d1e3b045c4eeca4027d1c51da0dd342b6f6ac4c933946888ad6187a646022"
+    },
+    {
+      "identity": "official-status:01M4BRQGAQ1JG649HCZ009WCZX",
+      "messageId": "01M4BRQGAQ1JG649HCZ009WCZX",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "f9f8eb10fcfb060d8938364564565621f3b2929a640e5f70606e8f1cc5233b35"
+    },
+    {
+      "identity": "official-status:01M4BSP91DH6TR384HZ2FZV4GS",
+      "messageId": "01M4BSP91DH6TR384HZ2FZV4GS",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "f9f8eb10fcfb060d8938364564565621f3b2929a640e5f70606e8f1cc5233b35"
+    },
+    {
+      "identity": "x:thsottiaux:2107912709715132482",
+      "messageId": "2107912709715132482",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "03ca53f3fda9ab9bd5b607f00d103b233ca18b5cb1a98efced2257c1f47422d4"
+    },
+    {
+      "identity": "x:thsottiaux:2107913674593644711",
+      "messageId": "2107913674593644711",
+      "expected": "in_progress",
+      "reason": "向付费账户加载 banked reset，不能误作自动用量重置",
+      "preferredTextSha256": "38ed184e49e4ecc06b346bb520c03ab99c2f259daefc162170bc582a8f11d3d8",
+      "kind": "banked_reset",
+      "round": "oct07-card"
+    },
+    {
+      "identity": "x:thsottiaux:2107913738791596286",
+      "messageId": "2107913738791596286",
+      "expected": "in_progress",
+      "reason": "同轮重置卡回复给出 PST 日终期限，不回退发放中阶段",
+      "preferredTextSha256": "8641eec7bb5cb7ad94e46f81d485b8af387696a2d8631ce8d1020848e5910283",
+      "kind": "banked_reset",
+      "round": "oct07-card"
+    },
+    {
+      "identity": "x:thsottiaux:2108014292910113006",
+      "messageId": "2108014292910113006",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "22cf9dee4911b7fa94df2e69ae24c286ddc3afd2c81b92062fad251dea6c0d8a"
+    },
+    {
+      "identity": "x:thsottiaux:2108017418136330678",
+      "messageId": "2108017418136330678",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "31fe1a1d0af65d0dbaf3bbeb0b00a87ccf7a3907d6bab68192004c3c4592dd08"
+    },
+    {
+      "identity": "x:thsottiaux:2108040921044639779",
+      "messageId": "2108040921044639779",
+      "expected": "claimed_complete",
+      "reason": "同轮重置卡明确完成声明",
+      "preferredTextSha256": "10da2baa37f59d9498a822b75553561659deb7228ea360c2290e4671ad65fc64",
+      "kind": "banked_reset",
+      "round": "oct07-card"
+    },
+    {
+      "identity": "x:thsottiaux:2108046065857679614",
+      "messageId": "2108046065857679614",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "5ef05648edbb1c70abdd77938ef5ced84ce11fdac78466fb02d2e0ce725f4096"
+    },
+    {
+      "identity": "x:thsottiaux:2108046671309685096",
+      "messageId": "2108046671309685096",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "12c6bdfdf891341c196308fd1b1e75c5e9f6131d1b7596dc322031d381e31433"
+    },
+    {
+      "identity": "x:thsottiaux:2108064454831427702",
+      "messageId": "2108064454831427702",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "9cda11602e792c9027adfc01f4342b549b2279e4238ed83b85e9986a9bc1de7d"
+    },
+    {
+      "identity": "x:thsottiaux:2108064684549230815",
+      "messageId": "2108064684549230815",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "d142492edf11b2470caed059b8206bd3970ea3efdadd6a5c4f26b64c4e7c7b90"
+    },
+    {
+      "identity": "x:thsottiaux:2108067119980319111",
+      "messageId": "2108067119980319111",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "2018ac7a9067ebf2c515f8de004723d5f524c0c8e4934f0a691e902320f6032b"
+    },
+    {
+      "identity": "x:thsottiaux:2108080036725354918",
+      "messageId": "2108080036725354918",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "861161f264c2d80240710286cea5a9cd747311bfd7e9e4a8ddd4e309a3f17fa2"
+    },
+    {
+      "identity": "x:thsottiaux:2108084615349170480",
+      "messageId": "2108084615349170480",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "eccc3aeb9e22c1958462cef1d2a4c41628b8b8eb34f8c237fafbfbe86a064a3d"
+    },
+    {
+      "identity": "x:thsottiaux:2108086116683526498",
+      "messageId": "2108086116683526498",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "2698bd5ea39828002b0cff70cce3ed057ea87bbf50aea9cce87bd1977b2cfb42"
+    },
+    {
+      "identity": "x:thsottiaux:2108199520836485472",
+      "messageId": "2108199520836485472",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "59e8bfc49a0271bb4b49b9028a4b9bc8c4d67f317fe0bc7d9ca4e7ecad9a01cd"
+    },
+    {
+      "identity": "official-releases:release:407151970",
+      "messageId": "release:407151970",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "324451b597f6b98b8eaf18f270560a32b187df0d984d501fb18909e2d50ff817"
+    },
+    {
+      "identity": "x:thsottiaux:2108275041276420573",
+      "messageId": "2108275041276420573",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "4fa1ad2dff640b22fbc4a5b4132643537b549043854a068ffbf0d70120888670"
+    },
+    {
+      "identity": "x:thsottiaux:2108349826727588000",
+      "messageId": "2108349826727588000",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "7b432c81aab7474bbbb7d094058f6406af50bb7698c42971d84c857d9b48b0dc"
+    },
+    {
+      "identity": "x:thsottiaux:2108391597834727636",
+      "messageId": "2108391597834727636",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "c62c4e9d3fe28ce4b1c9f68507f28dd907bbf05956566ae743ef3e98307d6820"
+    },
+    {
+      "identity": "x:thsottiaux:2108428560822424062",
+      "messageId": "2108428560822424062",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "96c18027f7751d49d7705b0e934bfe557aa71a2b8e02507d00746dd5e85c773a"
+    },
+    {
+      "identity": "official-releases:release:408271623",
+      "messageId": "release:408271623",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "ad543d66f33d32971d477bf781a773fd19da583c4ed9ead6c5c5320fcc315f7b"
+    },
+    {
+      "identity": "x:thsottiaux:2108645667451318747",
+      "messageId": "2108645667451318747",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "f9273396694df942e2e1d57f6728d01f862dbfe32dc458f4548175e7f7aa647f"
+    },
+    {
+      "identity": "x:thsottiaux:2108646052178092403",
+      "messageId": "2108646052178092403",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ec5d386cd125dc725f1966406ee6766dbf4b4376d928f31f0446adae296b7c31"
+    },
+    {
+      "identity": "x:thsottiaux:2108650026671231468",
+      "messageId": "2108650026671231468",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "c5a704174956b49eae25952d7210884ffee4285018733419a2f20d50b71064ea"
+    },
+    {
+      "identity": "x:thsottiaux:2108773703064657936",
+      "messageId": "2108773703064657936",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "3371a4ae2b036d60272763c8495c0b3277bb8ceb5f5778bacc1c2e629c0ac80c"
+    },
+    {
+      "identity": "x:thsottiaux:2108773866281795814",
+      "messageId": "2108773866281795814",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "29719785750b56d928f844cbd724878ec150f7245db5d4d81256f1b062ae0550"
+    },
+    {
+      "identity": "x:thsottiaux:2108777962053292398",
+      "messageId": "2108777962053292398",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ea233f86c28cf95d5b4087529637fd012beb78ac9541bf0adf407772fb341e98"
+    },
+    {
+      "identity": "x:thsottiaux:2108778939057664357",
+      "messageId": "2108778939057664357",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "1bd965079f0688359f902811b34c26fe81eb20d5b2d056d1088c1fe089e69f26"
+    },
+    {
+      "identity": "x:thsottiaux:2108780620583403652",
+      "messageId": "2108780620583403652",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "d18e7e20a678e6bea4db0294fc2bbd4048e21e3000f0ae058ea295a09a4880c3"
+    },
+    {
+      "identity": "x:thsottiaux:2108840070648397933",
+      "messageId": "2108840070648397933",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "3e772f40eb23b20319969b2f024d86f093dfef10e7398113d8da630fe1ea43f1"
+    },
+    {
+      "identity": "x:thsottiaux:2108852361536098422",
+      "messageId": "2108852361536098422",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "1c9f9c0050dcf7ef6f14b1c5d45931bfe1c43d5a7017f1b416ef2bdc287e3943"
+    },
+    {
+      "identity": "x:thsottiaux:2109021594576470290",
+      "messageId": "2109021594576470290",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "95a66781c110cf644909949533eb0b618b7fdb41908e838b41e1e67737921d01"
+    },
+    {
+      "identity": "x:thsottiaux:2109045220411351517",
+      "messageId": "2109045220411351517",
+      "expected": "pending",
+      "reason": "Day6 活动简写先公开待确认，具体安排由后续原文提供",
+      "preferredTextSha256": "12c8da8032adfa1c00ee63642248456d90b5d41a591797e98f98b5ab23dad84c"
+    },
+    {
+      "identity": "x:thsottiaux:2109045392684032299",
+      "messageId": "2109045392684032299",
+      "expected": "promised",
+      "reason": "明确全局重置及 EOD，无时区不造精确截止",
+      "preferredTextSha256": "ffc17aa008c3eb1b166eaac808dd44a5c203e6035fae3f42d71ac685ba1458cd",
+      "kind": "automatic_reset",
+      "round": "day6"
+    },
+    {
+      "identity": "x:thsottiaux:2109072811113488768",
+      "messageId": "2109072811113488768",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "5121c04c3790821c643d692957fdb59391b32f41fef978fbe02951d6ddabc242"
+    },
+    {
+      "identity": "x:thsottiaux:2109084804625158541",
+      "messageId": "2109084804625158541",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "e87f5357c87d27cb297f8780bba47951d836f6dc27415e2d006ac51900d06b87"
+    },
+    {
+      "identity": "x:thsottiaux:2109089556675137886",
+      "messageId": "2109089556675137886",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "0e16b3db5cfc945ea9b1a22fc4a7c920de35b32683b9a768a503f2f6c9ada9ff"
+    },
+    {
+      "identity": "x:thsottiaux:2109090080497508356",
+      "messageId": "2109090080497508356",
+      "expected": "non_benefit",
+      "reason": "达到完美以后才重置的条件假设",
+      "preferredTextSha256": "cbe3fcd3a5e0418f988876df4510cb672a627f2e26bc00061714163d3a72e2bc"
+    },
+    {
+      "identity": "x:thsottiaux:2109091159784198475",
+      "messageId": "2109091159784198475",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "db3cb37da174bf2607fe637a7e328193281a887c15502fbb8951281c61fa3ee8"
+    },
+    {
+      "identity": "x:thsottiaux:2109092087501332816",
+      "messageId": "2109092087501332816",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "d040ece2c0ecd8f509320c9f7f894fc316c05468579edf360ec3092e372035c4"
+    },
+    {
+      "identity": "x:thsottiaux:2109132167112782291",
+      "messageId": "2109132167112782291",
+      "expected": "claimed_complete",
+      "reason": "明确回复 Day6 全局重置称传播完毕",
+      "preferredTextSha256": "dc80e3a7abbf06f3471a9b05ab48b47f68de755a2d9d74c286a72a2f2b0c7d94",
+      "kind": "automatic_reset",
+      "round": "day6"
+    },
+    {
+      "identity": "x:thsottiaux:2109135750054957556",
+      "messageId": "2109135750054957556",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "e9495bf2a11f1284f4eb6f3e5ba099babe38c50ad3b254fc3b318c9115dee83a"
+    },
+    {
+      "identity": "x:thsottiaux:2109142061014466866",
+      "messageId": "2109142061014466866",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "f0e24f0b2b505288f17b8545dafedeaa34f631705bb0e891ad56ffddd9ba5c5f"
+    },
+    {
+      "identity": "x:thsottiaux:2109152716954222849",
+      "messageId": "2109152716954222849",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ae6ab17bb3aac1e508616669b772c7cfca0b64109ddb60387418236a2d9ac8b6"
+    },
+    {
+      "identity": "x:thsottiaux:2109430343346581527",
+      "messageId": "2109430343346581527",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "ccfd247675de48a4f02fe33a130f06a23b512cf15868893dbc4ed78f2fb6dd14"
+    },
+    {
+      "identity": "x:thsottiaux:2109430894604026039",
+      "messageId": "2109430894604026039",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "1090a95c17eea0c635f2964e611edfb77943d2c4710680521de1792e5d5be262"
+    },
+    {
+      "identity": "x:thsottiaux:2109438305188327838",
+      "messageId": "2109438305188327838",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "579ed19a341eaaae9c2b7b65b8c303a37ab1baf41e675a7aef7ddd8301df2436"
+    },
+    {
+      "identity": "x:thsottiaux:2109439315570999598",
+      "messageId": "2109439315570999598",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "7a066cb0002a6629143bf9f60437a5c0fb2d8f949af1e6375f25a8a78d03ab77"
+    },
+    {
+      "identity": "x:thsottiaux:2109439813900493102",
+      "messageId": "2109439813900493102",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "366e2aa8bfdefad87952dd15ce47782f9b65e734c74f6b0adbc6b9fc947460b7"
+    },
+    {
+      "identity": "x:thsottiaux:2109491121441402912",
+      "messageId": "2109491121441402912",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "555c286fc708299bcd47325747a0439ca2441b0061339f67cb5d8e403ad84e4b"
+    },
+    {
+      "identity": "x:thsottiaux:2109491524358795714",
+      "messageId": "2109491524358795714",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "45ca1d45f31335f145c66629737b7b81add2c0314bcf43036b74e0314c144520"
+    },
+    {
+      "identity": "x:thsottiaux:2109730998867112161",
+      "messageId": "2109730998867112161",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "705bdb8710b618a63838c7e90b290e4454ab73f1fd78cec5b967da2928c111e4"
+    },
+    {
+      "identity": "x:thsottiaux:2109778880341151901",
+      "messageId": "2109778880341151901",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "b2654dd951f52c456d7dd0548bb89a3d736c3424b30e1165a4e80414382562ae"
+    },
+    {
+      "identity": "x:thsottiaux:2109812216212099456",
+      "messageId": "2109812216212099456",
+      "expected": "pending",
+      "reason": "Day8 活动简写公开待确认",
+      "preferredTextSha256": "8164749d90ecd96301d2918bf1737d0c70308d4822448565319da533cae9775b"
+    },
+    {
+      "identity": "x:thsottiaux:2109812360596865224",
+      "messageId": "2109812360596865224",
+      "expected": "promised",
+      "reason": "明确全局重置与 PST 日终期限",
+      "preferredTextSha256": "b91707f3032cf867bff652256672ebdf2845b99bf09cf0e2898cdac65d23bb7b",
+      "kind": "automatic_reset",
+      "round": "day8"
+    },
+    {
+      "identity": "x:thsottiaux:2109819027912798611",
+      "messageId": "2109819027912798611",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "40e001a513efc04114d98992f4bcdcc827bed9c707c1b50e715b0379031146fe"
+    },
+    {
+      "identity": "x:thsottiaux:2109819517325205735",
+      "messageId": "2109819517325205735",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "0d7e64ffeff5f4e4462f28e4b20d7ed4b6f087392bc7ced9c204c5a813ad6108"
+    },
+    {
+      "identity": "x:thsottiaux:2109831908620390553",
+      "messageId": "2109831908620390553",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "4b2f0cb69b81a9358aebb0ca7c3eaaabddc08ce97668b831705d50c928e30034"
+    },
+    {
+      "identity": "x:thsottiaux:2109832216029352391",
+      "messageId": "2109832216029352391",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "275e54292e28fe331312d9cd0a60e5dbe99f5f1495d4235e38b138268f0d7129"
+    },
+    {
+      "identity": "x:thsottiaux:2109832541956194798",
+      "messageId": "2109832541956194798",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "542b522edcb46ecf3fed52e25e4c79efc77698288c658b00c23dfebf56861151"
+    },
+    {
+      "identity": "x:thsottiaux:2109864370465628584",
+      "messageId": "2109864370465628584",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "f1d856352bb55dbe029bc328fba6d3309e69964e917cda5eed8a159d4079b2f3"
+    },
+    {
+      "identity": "x:thsottiaux:2109865627628507222",
+      "messageId": "2109865627628507222",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "1534f6efecc36bb8123a196bcf4a945c8b9a99b04d0608f220cec1f08decd5e9"
+    },
+    {
+      "identity": "x:thsottiaux:2109873287853707513",
+      "messageId": "2109873287853707513",
+      "expected": "claimed_complete",
+      "reason": "明确回复 Day8 预告称已完成",
+      "preferredTextSha256": "6bda9e585c088fe70dc525514f648224f529946104f63ec3106bf66933c8b326",
+      "kind": "automatic_reset",
+      "round": "day8"
+    },
+    {
+      "identity": "x:thsottiaux:2109873307722121591",
+      "messageId": "2109873307722121591",
+      "expected": "non_benefit",
+      "reason": "配菜玩笑，不新增完成声明",
+      "preferredTextSha256": "c0d75a73ce0a82d788fc3135dbea21a60113bf29d9bfda18c8b760d04d2d1feb"
+    },
+    {
+      "identity": "x:thsottiaux:2109892247580000595",
+      "messageId": "2109892247580000595",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "87c87fef2e852f84a5df79c4292137c39a3f3d7f62faa2996fa8955ae908412f"
+    },
+    {
+      "identity": "official-status:01M4T4ZCM5787AJ5YDEGTB37CH",
+      "messageId": "01M4T4ZCM5787AJ5YDEGTB37CH",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "23a0a800a95d82fa23c34824a4d3d0eedc90dd3b32f0b5e7f8d49ce2b7a8f578"
+    },
+    {
+      "identity": "official-status:01M4T5F0WE88N1HM8SCCZ99P10",
+      "messageId": "01M4T5F0WE88N1HM8SCCZ99P10",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "e58b964777ba5fea2bc174849d3afebfa2d42613ba84fbafedf038c8ea3d7e79"
+    },
+    {
+      "identity": "official-status:01M4T5NV85W4C2RDCPSSK72E93",
+      "messageId": "01M4T5NV85W4C2RDCPSSK72E93",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "23a0a800a95d82fa23c34824a4d3d0eedc90dd3b32f0b5e7f8d49ce2b7a8f578"
+    },
+    {
+      "identity": "official-status:01M4T9HW5AVE1TJ3EXBY2YYDY1",
+      "messageId": "01M4T9HW5AVE1TJ3EXBY2YYDY1",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "7e1d1e3b045c4eeca4027d1c51da0dd342b6f6ac4c933946888ad6187a646022"
+    },
+    {
+      "identity": "official-status:01M4V1Z5R8G88Z72ASVZZ9JFHV",
+      "messageId": "01M4V1Z5R8G88Z72ASVZZ9JFHV",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "74ff9e06b5cad784dd1590244e5e90593012faa4d3bcce44215e6f9eeca195a1"
+    },
+    {
+      "identity": "x:thsottiaux:2110151690641154499",
+      "messageId": "2110151690641154499",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "a7a0a6a47b334cd7dc2115fb28d97b3d8d69a4cfdd8f03a6ea21a42c940cd645"
+    },
+    {
+      "identity": "x:thsottiaux:2110151780478927344",
+      "messageId": "2110151780478927344",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "6e580abcc7a333255ed822b8c7144f9c84cf606ebdfcdf4497d8d8631dc9da59"
+    },
+    {
+      "identity": "x:thsottiaux:2110152344029778279",
+      "messageId": "2110152344029778279",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "1ae3b7448f1976b811f6b6c54c454b144e49d12ef3ec403a148d981bfc376ceb"
+    },
+    {
+      "identity": "x:thsottiaux:2110167061632819447",
+      "messageId": "2110167061632819447",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "4c8f7bcf9a6a0cd8eb2feb300ae83f8934d5273061314ba7611f2c48866d2b1e"
+    },
+    {
+      "identity": "x:thsottiaux:2110188326422819047",
+      "messageId": "2110188326422819047",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "9d699572215e077da004c66447f1512c07c891c8bf90dfee284a543635fa4748"
+    },
+    {
+      "identity": "official-status:01M4WKPE1E2EM1QWXDGRYMJ8EZ",
+      "messageId": "01M4WKPE1E2EM1QWXDGRYMJ8EZ",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "aeba320ee8c4f614db43d55f262c03ceb08f9b6e988c3a35d29e18b47017b21c"
+    },
+    {
+      "identity": "official-status:01M4WVBTV71NE3A4NEGZ5EFD9S",
+      "messageId": "01M4WVBTV71NE3A4NEGZ5EFD9S",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "fc35b7315373b0e6d2d0975dba836e90fe30749ae04e765456f88409edc38cf4"
+    },
+    {
+      "identity": "official-status:01M4WX91GC41Q1JX9S8RCP77RS",
+      "messageId": "01M4WX91GC41Q1JX9S8RCP77RS",
+      "expected": "source_news",
+      "reason": "官方状态或版本记录，不是福利发放",
+      "preferredTextSha256": "f9f8eb10fcfb060d8938364564565621f3b2929a640e5f70606e8f1cc5233b35"
+    },
+    {
+      "identity": "x:thsottiaux:2110589470911418414",
+      "messageId": "2110589470911418414",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "daf81b0e8cb7e59dea62a22e275ca62ba02e89f78976f779fe32e70f18739825"
+    },
+    {
+      "identity": "x:thsottiaux:2110591392691159317",
+      "messageId": "2110591392691159317",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "049e55c63555ea0f1a1bd79cc7d892ca5e4587e1a8db78f551af26b25dca0d43"
+    },
+    {
+      "identity": "x:thsottiaux:2110595484180214059",
+      "messageId": "2110595484180214059",
+      "expected": "pending",
+      "reason": "Day10 活动简写，不能补造具体套餐资格",
+      "preferredTextSha256": "587d6b5239545a6a8413672d01bea6d5f87f9dbebbdd2b7a5716dc67da939d6f"
+    },
+    {
+      "identity": "x:thsottiaux:2110595554036400151",
+      "messageId": "2110595554036400151",
+      "expected": "promised",
+      "reason": "明确回复 Day10，期限从本帖起两小时",
+      "preferredTextSha256": "8516c339fed841a33c4834a2d43ead6a08ddbcf42508579c8144b6eabec9f634",
+      "kind": "automatic_reset",
+      "round": "day10",
+      "expectedAt": "2026-10-15T06:56:07.000Z"
+    },
+    {
+      "identity": "x:thsottiaux:2110595987542868381",
+      "messageId": "2110595987542868381",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "3bd99199c93d564bdb0e263990a7044aa44d268f4fe07afc0e409de7f2fe0393"
+    },
+    {
+      "identity": "x:thsottiaux:2110612268962779352",
+      "messageId": "2110612268962779352",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "68298c0a4ed6cb7bebe76ce57748984b55f2270b700393107dc67c55b38cb749"
+    },
+    {
+      "identity": "x:thsottiaux:2110618732666257557",
+      "messageId": "2110618732666257557",
+      "expected": "claimed_complete",
+      "reason": "明确回复两小时预告称 Done and dusted",
+      "preferredTextSha256": "4e68971b3a0de09a3fad966bc99a5c3322e6881369d6ba534c81b4e19cf81db7",
+      "kind": "automatic_reset",
+      "round": "day10"
+    },
+    {
+      "identity": "x:thsottiaux:2110624335463584028",
+      "messageId": "2110624335463584028",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "fa7b83de255ab21a3bf49b52ba2cd428cc7994476772a68e9a44f0c0c58fc7a5"
+    },
+    {
+      "identity": "x:thsottiaux:2110750421367287996",
+      "messageId": "2110750421367287996",
+      "expected": "non_benefit",
+      "reason": "已核对：产品、日常交流或辅助上下文，不包含独立重置承诺或完成声明",
+      "preferredTextSha256": "fd0a5948c01b02d9f701302135ef52d5ccb45588c89f6400ab32575281ff5d80"
+    }
+  ]
+}
