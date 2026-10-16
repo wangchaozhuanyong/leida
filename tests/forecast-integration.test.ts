@@ -38,9 +38,9 @@ test('真实隔离库：预测独立闭环、固定快照、公告关联和未�
    await insert('evidence',e);await put('events',event);await put('articles',article);await insert('publications',publication);return {publication,event,article};
   };
   await t.test('时间近邻不关联；明确来源关联记录预告/進展/完成，不当个人到账',async()=>{
-   await publishFixture('promised','2026-10-10T00:30:00Z','We will reset Codex usage for all accounts.');await runForecastCycle('2026-10-10T01:00:00Z');
+   await publishFixture('promised','2026-10-10T00:30:00Z','We will reset Codex usage for all accounts.');await runForecastCycle('2026-10-10T01:00:00Z',{inputsChanged:true});
    assert.equal((await list<ForecastOutcome>('forecast_outcomes')).filter(o=>o.caseId===caseId).length,0);
-   for(const [stage,time] of [['promised','2026-10-10T02:00:00Z'],['in_progress','2026-10-10T03:00:00Z'],['claimed_complete','2026-10-10T04:00:00Z']] as const){await publishFixture(stage,time,`Codex usage reset statement (${stage}) for all accounts, in response to the usage issue: ${signal.url}`);await runForecastCycle(time);}
+   for(const [stage,time] of [['promised','2026-10-10T02:00:00Z'],['in_progress','2026-10-10T03:00:00Z'],['claimed_complete','2026-10-10T04:00:00Z']] as const){await publishFixture(stage,time,`Codex usage reset statement (${stage}) for all accounts, in response to the usage issue: ${signal.url}`);await runForecastCycle(time,{inputsChanged:true});}
    const outcomes=(await list<ForecastOutcome>('forecast_outcomes')).filter(o=>o.caseId===caseId);assert.deepEqual(outcomes.map(o=>o.stage).sort(),['claimed_complete','in_progress','promised']);assert.ok(outcomes.every(o=>o.actualDelivery==='unobserved'));
    const c=(await one<ForecastCase>('forecast_cases',caseId))!;assert.equal(c.status,'observed');assert.deepEqual(await getForecastSnapshot(c.snapshotId),firstSnapshot);
    await runForecastCycle('2026-10-10T04:02:00Z');assert.equal((await list<ForecastOutcome>('forecast_outcomes')).filter(o=>o.caseId===caseId).length,3);
@@ -48,10 +48,10 @@ test('真实隔离库：预测独立闭环、固定快照、公告关联和未�
   await t.test('首采前已有公告只作事后观察；取消保留结局但旧正例失效',async()=>{
    const known={...signal,id:`known-${tag}`,messageId:`known-update-${tag}`,url:`https://status.openai.com/incidents/known${tag.replaceAll('-','')}`,collectedAt:'2026-10-10T07:00:00Z',hash:`known-${tag}`};await insert('evidence',known);
    await publishFixture('promised','2026-10-10T06:00:00Z',`Codex usage will be reset for all accounts in response to the usage issue ${known.url}`);
-   await runForecastCycle('2026-10-10T08:00:00Z');
+   await runForecastCycle('2026-10-10T08:00:00Z',{inputsChanged:true});
    const c=(await list<ForecastCase>('forecast_cases')).find(c=>c.url===known.url&&c.target==='automatic_reset')!,snapshot=(await getForecastSnapshot(c.snapshotId))!;
    assert.equal(snapshot.basis,'already_known');assert.equal(snapshot.p24,null);assert.equal(snapshot.p48,null);assert.match(snapshot.explanation,/生成时已存在/);
-   await publishFixture('cancelled','2026-10-10T09:00:00Z',`Correction: Codex usage reset for all accounts is cancelled in response to the usage issue ${known.url}`);await runForecastCycle('2026-10-10T09:00:00Z');
+   await publishFixture('cancelled','2026-10-10T09:00:00Z',`Correction: Codex usage reset for all accounts is cancelled in response to the usage issue ${known.url}`);await runForecastCycle('2026-10-10T09:00:00Z',{inputsChanged:true});
    const related=(await list<ForecastOutcome>('forecast_outcomes')).filter(outcome=>outcome.caseId===c.id);
    const effective=effectiveForecastOutcome(related,c.id,'automatic_reset','2026-10-10T09:00:00Z');
    assert.equal(effective.positive,undefined,'明确取消使先前预告不再有效');assert.equal(effective.invalidated,true);
@@ -67,7 +67,7 @@ test('真实隔离库：预测独立闭环、固定快照、公告关联和未�
   await t.test('到期未找到保持unknown；来源暂停不复活；原始快照数据库也不可覆盖',async()=>{
    await runForecastCycle('2026-10-12T01:00:00Z');const data=await getPublicForecast(undefined,'2026-10-12T01:00:00Z');
    const card=data.cases.find(c=>c.sourceId===sourceId&&c.target==='banked_reset')!;assert.equal(card.status,'elapsed');assert.equal(card.outcomes[0].stage,'unknown');assert.equal(card.snapshot?.p48,null);
-   await put('sources',{...source,enabled:false,status:'paused'});await runForecastCycle('2026-10-12T01:02:00Z');assert.equal((await getPublicForecast(undefined,'2026-10-12T01:02:00Z')).cases.find(c=>c.id===caseId)?.status,'paused');assert.equal((await one<Source>('sources',sourceId))?.enabled,false);
+   await put('sources',{...source,enabled:false,status:'paused'});await runForecastCycle('2026-10-12T01:02:00Z',{inputsChanged:true});assert.equal((await getPublicForecast(undefined,'2026-10-12T01:02:00Z')).cases.find(c=>c.id===caseId)?.status,'paused');assert.equal((await one<Source>('sources',sourceId))?.enabled,false);
    await assert.rejects(put('forecast_snapshots',{...firstSnapshot!,p48:1}),/不可变/);
    await assert.rejects(pool.query('UPDATE radar_forecast_snapshots SET payload=payload WHERE id=$1',[firstSnapshot!.id]),/immutable forecast/);
    assert.deepEqual(await getForecastSnapshot(firstSnapshot!.id),firstSnapshot);

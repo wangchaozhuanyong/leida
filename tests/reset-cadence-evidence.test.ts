@@ -195,3 +195,32 @@ test('明确多级父链可解析；循环父链和私下完成声明拒绝', ()
   assert.equal(observations([parentPost(undefined, { parentId: middle.messageId }), middle, leaf]).some(item => item.url.endsWith('/2109132167112782291')), false);
   assert.equal(observations([parentPost(), replyPost('Confirmed landed in my account only.')]).some(item => item.url.endsWith('/2108040921044639779')), false);
 });
+
+test('只有原帖契约或匹配Snowflake能证实小时精度，归档午夜保持日期精度',()=>{
+  const text='We have reset usage limits for all paid Codex users.';
+  const exact=observations([evidence(text)])[0];
+  assert.equal(exact.timePrecision,'exact');assert.equal(exact.firstKnownAt,'2026-10-10T00:00:00.000Z');
+  const midnight=observations([evidence(text,{publishedAt:'2026-10-02T00:00:00.000Z'})])[0];
+  assert.equal(midnight.timePrecision,'date');assert.equal(midnight.at,'2026-10-02');
+  const date=observations([evidence(text,{publishedAt:'2026-10-02'})])[0];
+  assert.equal(date.timePrecision,'date');assert.equal(date.at,'2026-10-02');
+  const unverified=observations([evidence(text,{publishedAt:'2026-10-02T12:00:00Z'})])[0];
+  assert.equal(unverified.timePrecision,'unknown');
+  const original=observations([evidence(text,{sourceId:official.id,provenance:'official',textOrigin:'structured',messageId:'update',url:'https://status.openai.com/incidents/precise',publishedAt:'2026-10-02T00:00:00Z'})],[official])[0];
+  assert.equal(original.timePrecision,'exact');assert.equal(original.at,'2026-10-02T00:00:00.000Z');
+});
+
+test('最早相同原文版本提供首次可知时间，新增父帖证据不能提前可知',()=>{
+  const text='We have reset usage limits for all paid Codex users.';
+  const first=evidence(text,{collectedAt:'2026-10-03T00:00:00Z'}),again=evidence(text,{id:'again',collectedAt:'2026-10-10T00:00:00Z'});
+  assert.equal(observations([first,again])[0].firstKnownAt,'2026-10-03T00:00:00.000Z');
+  const parent=parentPost(undefined,{collectedAt:'2026-10-10T01:00:00Z'}),reply=replyPost(undefined,{collectedAt:'2026-10-09T00:00:00Z'});
+  const row=observations([parent,reply]).find(item=>item.evidenceIds.includes(reply.id));
+  assert.equal(row?.firstKnownAt,'2026-10-10T01:00:00.000Z');
+});
+
+test('无时区、越界日期和采集早于原帖不进入观察，同刻时间冲突副本拒绝',()=>{
+  const text='We have reset usage limits for all paid Codex users.';
+  for(const changes of [{publishedAt:'2026-10-02T21:18:48'},{publishedAt:'2026-02-30T00:00:00Z'},{collectedAt:'2026-10-01T00:00:00Z'},{collectedAt:'2026-10-10T00:00:00'}])assert.equal(observations([evidence(text,changes)]).length,0);
+  assert.equal(observations([evidence(text),evidence(text,{id:'conflicting-time',publishedAt:'2026-10-02T00:00:00Z'})]).length,0);
+});

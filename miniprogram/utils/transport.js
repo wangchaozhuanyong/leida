@@ -1,6 +1,7 @@
 /** @typedef {{mode:string,baseUrl:string,cloudEnv:string,serviceName:string,timeoutMs?:number,pollMs?:number}} Config */
 const { validateForecastPublicData, validateForecastSnapshot } = require('./model');
 const {replayPath,validateReplay}=require('./replay');
+const {validateCadenceSnapshot}=require('./cadence');
 /** @param {Config} config */
 function configurationError(config) {
   if (!config || !['https', 'cloud'].includes(config.mode)) return '尚未连接，请先配置公开接口或微信云托管。';
@@ -28,7 +29,9 @@ function validateBootstrap(value) {
   return value.sources.every(x => x && text(x.id) && text(x.name) && ['unconnected','healthy','delayed','failed','paused'].includes(x.status)) && (value.forecasts === undefined || validateForecastPublicData(value.forecasts));
 }
 const forecastSnapshotPath = /^\/api\/v1\/forecasts\/[A-Za-z0-9][A-Za-z0-9._-]{0,179}$/;
+const cadenceSnapshotPath = /^\/api\/v1\/forecasts\/cadence\/forecast_cadence_[a-f0-9]{64}$/;
 function validForecastBody(path, value) {
+  if (cadenceSnapshotPath.test(path)) return validateCadenceSnapshot(value) && value.id === path.slice(path.lastIndexOf('/') + 1);
   return path === '/api/v1/forecasts' ? validateForecastPublicData(value) : forecastSnapshotPath.test(path) && validateForecastSnapshot(value) && value.id === path.slice(path.lastIndexOf('/') + 1);
 }
 const subscriptionStates = ['unavailable','none','challenged','available','reserved','consumed','rejected','revoked','unknown'];
@@ -36,7 +39,9 @@ function validateSubscription(value) {
   return !!value && typeof value.configured==='boolean' && typeof value.enabled==='boolean' && subscriptionStates.includes(value.state)
     && (value.remainingCount===undefined || Number.isSafeInteger(value.remainingCount) && value.remainingCount>=0)
     && (value.pendingCount===undefined || Number.isSafeInteger(value.pendingCount) && value.pendingCount>=0 && value.pendingCount<=value.remainingCount)
-    && (value.templateId===undefined || typeof value.templateId==='string') && (value.lastResult===undefined || ['sent','rejected','unknown','cancelled'].includes(value.lastResult));
+    && (value.templateId===undefined || typeof value.templateId==='string') && (value.lastResult===undefined || ['sent','rejected','unknown','cancelled'].includes(value.lastResult))
+    && (value.preferencesSupported===undefined || typeof value.preferencesSupported==='boolean')
+    && (value.reminderPreferences===undefined ? value.preferencesSupported!==true : value.reminderPreferences && ['announcement','result','correction'].every(key=>typeof value.reminderPreferences[key]==='boolean'));
 }
 function validWechatBody(path,value) {
   if(!value || typeof value!=='object') return false;
@@ -63,8 +68,8 @@ function createTransport(wxApi, config, {privateRequests=false}={}) {
     const promise = new Promise((resolve, reject) => {
       rejectPending = reject;
       if (error) { reject(new Error(error)); return; }
-      const allowed=privateRequests ? ((path==='/api/wechat/login' && method==='POST') || (path==='/api/wechat/subscription' && ['GET','DELETE'].includes(method)) || (['/api/wechat/subscription/challenge','/api/wechat/subscription/confirm'].includes(path) && method==='POST'))
-        : (readPath || versionPath || replayPath.test(path) || ['/api/v1/bootstrap','/api/v1/forecasts'].includes(path) || forecastSnapshotPath.test(path) || /^\/api\/v1\/wechat\/code\/[^/?#]+$/.test(path) || /^\/api\/v1\/wechat\/scene\/[a-f0-9]{32}$/.test(path));
+      const allowed=privateRequests ? ((path==='/api/wechat/login' && method==='POST') || (path==='/api/wechat/subscription' && ['GET','DELETE'].includes(method)) || (['/api/wechat/subscription/challenge','/api/wechat/subscription/confirm','/api/wechat/subscription/preferences'].includes(path) && method==='POST'))
+        : (readPath || versionPath || replayPath.test(path) || ['/api/v1/bootstrap','/api/v1/forecasts'].includes(path) || forecastSnapshotPath.test(path) || cadenceSnapshotPath.test(path) || /^\/api\/v1\/wechat\/code\/[^/?#]+$/.test(path) || /^\/api\/v1\/wechat\/scene\/[a-f0-9]{32}$/.test(path));
       if (!allowed) { reject(new Error('请求路径不受支持')); return; }
       if(privateRequests && path!=='/api/wechat/login' && !options.sessionToken){reject(requestError(401,{error:'请先点击微信提醒，重新建立当前会话。'}));return;}
       const header = typeof etag==='string' && etag ? { 'If-None-Match': `"${etag}"` } : {};
@@ -75,7 +80,7 @@ function createTransport(wxApi, config, {privateRequests=false}={}) {
         if (response.statusCode < 200 || response.statusCode >= 300) { reject(requestError(response.statusCode,response.data)); return; }
         const body = response.data;
         if(body?.page && (!Array.isArray(body.page.ids)||!body.page.ids.every(id=>typeof id==='string')||!(body.page.nextCursor===null||typeof body.page.nextCursor==='string')||!Number.isSafeInteger(body.page.total)||body.page.total<0)){reject(new Error('分页资料格式不完整，请重试。'));return;}
-        if (!body || typeof body !== 'object' || (basePath==='/api/v1/bootstrap' ? !validateBootstrap(body.data) || typeof body.version !== 'string' : versionPath ? !body.data || typeof body.data.version !== 'string' : replayPath.test(path) ? !validateReplay(path,body.data) : path==='/api/v1/forecasts'||forecastSnapshotPath.test(path) ? !validForecastBody(path,body.data) : !validWechatBody(path,body.data))) { reject(new Error('接口返回的公开资料格式不完整，请稍后重试。')); return; }
+        if (!body || typeof body !== 'object' || (basePath==='/api/v1/bootstrap' ? !validateBootstrap(body.data) || typeof body.version !== 'string' : versionPath ? !body.data || typeof body.data.version !== 'string' : replayPath.test(path) ? !validateReplay(path,body.data) : path==='/api/v1/forecasts'||forecastSnapshotPath.test(path)||cadenceSnapshotPath.test(path) ? !validForecastBody(path,body.data) : !validWechatBody(path,body.data))) { reject(new Error('接口返回的公开资料格式不完整，请稍后重试。')); return; }
         resolve(basePath==='/api/v1/bootstrap' ? { data: body.data, version: body.version, ...(body.contentVersion?{contentVersion:body.contentVersion}:{}), ...(body.page?{page:body.page}:{}) } : versionPath ? { version: body.data.version, ...(body.data.contentVersion?{contentVersion:body.data.contentVersion}:{}) } : {data:body.data});
       };
       const fail = () => { if (!cancelled) reject(new Error('连接失败，请检查网络或接口设置后重试。')); };

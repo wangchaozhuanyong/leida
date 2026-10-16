@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { CloudbaseRpc, CloudbaseRpcError, type CloudbaseOperation } from '../src/server/cloudbase/rpc';
 import { apiError } from '../src/server/http';
+import {setTimeout as delay} from 'node:timers/promises';
 
 test('CloudBase后端调用限定环境与函数，不允许任意SQL或转发秘密', async () => {
   const token=randomBytes(24).toString('hex'); let count=0;
@@ -99,4 +100,35 @@ test('CloudBase配置失败及普通接口错误不暴露调用参数或伪造�
   assert.deepEqual(await apiError({status:401,message:'请先登录'}).json(),{error:'请先登录'});
   const validation=apiError({name:'ZodError',message:canary});assert.equal(validation.status,400);
   assert.deepEqual(await validation.json(),{error:'提交内容不完整或格式有误，请检查必填项'});
+});
+
+test('CloudBase可选signal中断忽略取消的transport，已中断调用不启动请求且不重发',async()=>{
+  const controller=new AbortController();let attempts=0,finish!:()=>void,cancelled=0,transportSignal:AbortSignal|undefined;
+  const rpc=new CloudbaseRpc('leida-test-qa','qa-only',async(_input,init)=>{
+    attempts++;transportSignal=init?.signal as AbortSignal;
+    await new Promise<void>(resolve=>{finish=resolve;});
+    return new Response(new ReadableStream({start(c){c.enqueue(new TextEncoder().encode('{}'));},cancel(){cancelled++;}}));
+  });
+  const started=performance.now(),pending=rpc.call('radar_cb_store_read',{},{signal:controller.signal});
+  await delay(20);controller.abort(new Error('private-abort-reason'));
+  await assert.rejects(pending,error=>error instanceof CloudbaseRpcError&&error.diagnosticCode==='CB_UNKNOWN_0_REQUEST_TIMEOUT'&&!String(error).includes('private-abort-reason'));
+  assert.ok(performance.now()-started<500);assert.equal(transportSignal?.aborted,true);assert.equal(attempts,1);
+  await assert.rejects(rpc.call('radar_cb_store_read',{},{signal:controller.signal}),CloudbaseRpcError);assert.equal(attempts,1);
+  finish();await delay(10);assert.equal(cancelled,1,'迟到的响应体应取消，不再解析');
+});
+
+test('CloudBase可选signal中断已开始但不响应取消的正文读取',async()=>{
+  const controller=new AbortController();let cancelled=0;
+  const rpc=new CloudbaseRpc('leida-test-qa','qa-only',async()=>new Response(new ReadableStream({pull(){return new Promise(()=>{});},cancel(){cancelled++;}})));
+  const pending=rpc.call('radar_cb_public_version',{},{signal:controller.signal});await delay(20);controller.abort();
+  await assert.rejects(pending,error=>error instanceof CloudbaseRpcError&&error.diagnosticCode==='CB_UNKNOWN_0_REQUEST_TIMEOUT');
+  assert.equal(cancelled,1);
+});
+
+test('CloudBase默认调用仍采用8秒独立预算，写调用超过兼容1.5秒仍成功且仅执行一次',async t=>{
+  const original=setTimeout,timeouts:number[]=[];let attempts=0;
+  t.mock.method(globalThis,'setTimeout',((...args:Parameters<typeof setTimeout>)=>{timeouts.push(Number(args[1]));return original(...args);}) as typeof setTimeout);
+  const rpc=new CloudbaseRpc('leida-test-qa','qa-only',async()=>{attempts++;await delay(1600);return Response.json({ok:true});});
+  assert.deepEqual(await rpc.call('radar_cb_store_commit',{p_changes:[]}),{ok:true});
+  assert.deepEqual(timeouts,[8000]);assert.equal(attempts,1);
 });

@@ -157,10 +157,47 @@ test('详情和朋友分享固定发布版本，新消息不能悄悄替换旧�
   assert.equal(result.isOld, true); assert.equal(result.latestPath, '/pages/detail/index?publicationId=news-done');
   assert.equal(mini.sharePath(pub), '/pages/detail/index?publicationId=pub-done');
   assert.equal(result.evidence[0].text, data.evidence[0].text);
-  assert.equal(result.evidence[0].title, '测试归档标题');
+  assert.equal(result.evidence[0].label, '第三方收录');
+  assert.equal(result.evidence[0].title, undefined);
+  assert.equal(result.evidence[0].description, undefined);
   assert.match(result.evidence[0].origin, /片段/);
   const news = mini.resolveDetail(data, { publicationId: 'news-done' });
   assert.equal(news.newsOnly, true); assert.equal(news.actions.length, 0);
+});
+
+test('公告仅在正文包含额外内容时提供全文，空白差异不重复，两端规则一致', () => {
+  const input = fixture(), publication = input.publications[0];
+  for (const [summary, translation, extra] of [
+    ['用量重置已完成。', '', false],
+    ['用量重置已完成。', '用量重置已完成。', false],
+    ['用量重置 已完成。', '\n用量重置\n已完成。\u200b ', false],
+    ['', '只有这一份正文。', false],
+    [' ', ' ', false],
+    ['预计 13:00 完成。', '预计 15:00 完成。', true],
+    ['公告称已完成。', '公告称已完成。适用于活动中的用户。', true],
+  ] as const) {
+    Object.assign(publication.article, { summary, translation });
+    const detail = mini.resolveDetail(input, { publicationId: publication.id });
+    assert.equal(detail.hasAdditionalContent, extra, `${summary} / ${translation}`);
+    assert.deepEqual(mini.publicArticleContent(publication.article), web.publicArticleContent(publication.article));
+    if (!summary.trim()) assert.equal(detail.summary, translation.trim());
+  }
+  Object.assign(publication.article, {contentOrigin:'template', summary:'根据公开原文，用量重置已完成。', translation:'根据公开原文，用量重置已完成。'});
+  assert.equal(mini.resolveDetail(input, {publicationId:publication.id}).hasAdditionalContent, false);
+  assert.deepEqual(mini.publicArticleContent(publication.article), web.publicArticleContent(publication.article));
+  const template = readFileSync(resolve(root,'miniprogram/pages/detail/index.wxml'),'utf8');
+  assert.match(template, /wx:if="{{detail.hasAdditionalContent}}"/);
+  assert.doesNotMatch(template, /辅助归档|附加标题|附加摘要|本站采集|完整内容/);
+});
+
+test('详情精简来源不冒充官方，不重复同一原文，不改变后台保存的资料', () => {
+  const data=fixture(), publication=data.publications[0], original=data.evidence.find(e=>publication.event.evidenceIds.includes(e.id))!;
+  const copy={...original,id:'official-copy',provenance:'official' as const,textOrigin:'original' as const};
+  data.evidence.push(copy);publication.event.evidenceIds.push(copy.id);
+  const before=structuredClone(data.evidence), detail=mini.resolveDetail(data,{publicationId:publication.id});
+  assert.equal(detail.evidence.filter((e:{text:string})=>e.text===original.text).length,1);
+  assert.equal(detail.evidence[0].label,'官方原文');assert.equal(detail.evidence[0].url,original.url);
+  assert.deepEqual(data.evidence,before);
 });
 
 test('最新仅新闻版本按当前文章判断；事件保留旧事实指针不会把新文章误标历史', () => {
@@ -514,15 +551,16 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
-  const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);news.onUnload();
-  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.14 · 体验版');settings.onUnload();
-  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.14');fallback.onUnload();
+  const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);assert.equal(news.data.navigationTitle,'动态 · 共42篇');news.onUnload();
+  const records=h.page('announcements');assert.equal(records.data.navigationTitle,'重置公告 · 42个事件');records.onUnload();
+  const settings=h.page('settings');assert.equal(settings.data.clientVersion,'1.0.15 · 体验版');settings.onUnload();
+  const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,'1.0.15');fallback.onUnload();
   for(const [envVersion,label] of [['release','正式版'],['develop','开发版']]){
     const page=nativeHarness(fixture(),{accountInfo:{miniProgram:{envVersion,version:'99.0.0'}}}).page('settings');
-    assert.equal(page.data.clientVersion,`1.0.14 · ${label}`,'微信返回的包号不能覆盖本次随包代码版本');page.onUnload();
+    assert.equal(page.data.clientVersion,`1.0.15 · ${label}`,'微信返回的包号不能覆盖本次随包代码版本');page.onUnload();
   }
   const unavailable=nativeHarness(fixture(),{wxApi:{getAccountInfoSync(){throw new Error('Account information unavailable');}}}).page('settings');
-  assert.equal(unavailable.data.clientVersion,'1.0.14');assert.equal(unavailable.data.connected,true);unavailable.onUnload();
+  assert.equal(unavailable.data.clientVersion,'1.0.15');assert.equal(unavailable.data.connected,true);unavailable.onUnload();
 });
 
 test('四个原生导航页初始化 iOS 窗口底色，缓存返回和资料刷新不反复触碰窗口外观',()=>{
@@ -671,6 +709,15 @@ test('缓存返回、重试和下拉刷新均保持正文；隐藏后迟到请�
   page.onShow();assert.equal(page.data.navigationLoading,false);
   const refresh=page.onPullDownRefresh();assert.equal(page.data.navigationLoading,false);finish();await refresh;assert.equal(page.data.navigationLoading,false);assert.equal(h.pullStops,1);
   h.replace(fixture());assert.equal(page.data.navigationLoading,false,'后台资料更新不制造前景加载');page.onUnload();
+});
+test('已加载列表再次显示时没有变化就不向视图层提交数据',()=>{
+  const h=nativeHarness(),page=h.page('news');let submissions=0;
+  const setData=page.setData;
+  page.setData=function(patch){submissions++;return setData.call(this,patch);};
+  for(let index=0;index<10;index++){page.onHide();page.onShow();}
+  assert.equal(page.data.connected,true);assert.ok(page.data.items.length>0);
+  assert.equal(submissions,0,'缓存返回不重复提交已经为false的加载标记');
+  page.onUnload();assert.equal(h.subscriptions,0);
 });
 test('动态更新后恢复仍存在的阅读条目；已撤回锚点选择下一条有效记录',()=>{
   const scrolls:number[]=[];let measurements=0;

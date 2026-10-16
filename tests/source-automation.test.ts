@@ -20,7 +20,7 @@ test('公开官方版本只收录稳定发布，保留官方身份和原文',()=
   assert.equal(rows[0].messageId,'release:123');
   assert.equal(rows[0].contextComplete,true);
   assert.match(rows[0].text,/Added support/);
-  assert.equal(releases.intervalMinutes,5);
+  assert.equal(releases.intervalMinutes,360);
 });
 
 test('官方版本字段或外部链接异常不能作为正常产品发布',()=>{

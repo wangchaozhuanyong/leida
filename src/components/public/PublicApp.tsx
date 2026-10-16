@@ -6,7 +6,7 @@ import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import {WechatEntryGuide} from './WechatEntryGuide';
 import {sourceStatus} from './model';
 import { customerNotice } from '@/lib/notice-display';
-import type { Activity, BenefitAction, Evidence, Notice, PublicData, Publication } from '@/lib/types';
+import type { Activity, Article, BenefitAction, Evidence, Notice, PublicData, Publication } from '@/lib/types';
 import { usePublicClock, usePublicQuery, useWechatAvailability } from './PublicSession';
 import { parsePublicRoute } from './public-navigation';
 import { usePublicNavigation } from './usePublicNavigation';
@@ -17,6 +17,7 @@ import {ForecastPanel} from './ForecastPanel';
 import {InstrumentDial} from './InstrumentDial';
 import {StatusTimeline} from './StatusTimeline';
 import {ResetOutlookPanel} from './ResetOutlookPanel';
+import {ResetForecastCard} from './ResetForecastCard';
 import {publicResetOutlook} from '@/lib/reset-outlook';
 import { actionLabels } from '@/lib/labels';
 import { activityDayNumber, activityHomeVisible } from '@/lib/activity-display';
@@ -25,7 +26,7 @@ import { createPosterFromEndpoint, savePosterImage, type PosterImage } from './p
 import { statusPosterStyles, statusPosterVariant, type StatusPosterStyle } from '@/lib/status-poster-style';
 import { activityPublicationUrl, activityShareQuery, buildActivityShare, parseActivityShare, resolveActivityShare, type ActivityDayShare } from '@/lib/activity-share';
 import { briefTime, articleSourceTime, publicationSourceTime, publicationWithdrawn, sortedArticles, sortedStatePublications, currentPublication, dateKey, displayTime, elapsed, publicActions, safeUrl, statePublication, isNewsOnly, stageText } from './model';
-import { latestSourceSuccess, publicArticleSummary, publicNavSection, latestCompletedBenefits, completionTime } from './model';
+import { latestSourceSuccess, publicArticleSummary, publicArticleContent, publicNavSection, latestCompletedBenefits, completionTime } from './model';
 
 type IconName = 'radar' | 'home' | 'settings' | 'arrow' | 'back' | 'bell' | 'link' | 'share' | 'card' | 'clock' | 'check' | 'close' | 'external' | 'info' | 'refresh' | 'calendar' | 'news' | 'more';
 function Icon({ name, className = '' }: { name: IconName; className?: string }) {
@@ -166,9 +167,10 @@ export default function PublicApp() {
   else if (route === 'articles' && path[1]) content = <ArticlePage data={data} id={path[1]} onPoster={setPoster} />;
   else if (route === 'sources' && path[1]) content = <EvidencePage data={data} id={path[1]} />;
   else if (route === 'notices') content = <Notices publications={data.publications} notices={visibleNotices} read={read} markRead={markRead} storageError={storageError} selectedId={query.get('message')} />;
-  else if (route === 'methodology') content = <Methodology data={data} snapshotId={query.get('snapshot')} cadenceId={query.get('cadence')} onPoster={setForecastPoster} onShare={s=>shareUrl(`${location.origin}/methodology?snapshot=${encodeURIComponent(s.id)}`,'重置实验预测快照')} />;
+  else if (route === 'methodology') content = <Methodology data={data} snapshotId={query.get('snapshot')} cadenceId={query.get('cadence')} target={query.get('target')==='banked_reset'?'banked_reset':'automatic_reset'} onPoster={setForecastPoster} onShare={s=>shareUrl(`${location.origin}/methodology?snapshot=${encodeURIComponent(s.id)}`,'重置实验预测快照')} />;
   else content = <><Empty title="暂时没有这条记录" detail="链接可能已变化，请返回首页查看公开动态。" /><TextLink href="/">返回首页</TextLink></>;
   return <div className={`pub-shell route-${route} ${subpage ? 'is-detail' : ''}`} onClickCapture={onNavigateCapture}>
+    {route === 'home' && <div className="pub-home-atmosphere" aria-hidden="true"><img src="/skin/observatory-header.jpg" alt="" width="1152" height="768" fetchPriority="high" /></div>}
     <Suspense fallback={null}><PublicRouteReader onChange={onLocation} /></Suspense>
     <a className="pub-skip" href="#public-main">跳到主要内容</a>
     <header className="pub-topbar">
@@ -233,6 +235,7 @@ export function Home({ data, onWechatReminders, onPoster, onShare, historical, w
         {activity && <Link scroll={false} className="pub-instrument-activity" href={`/activities/${encodeURIComponent(activity.id)}`}><Icon name="calendar"/><div><h2>{activity.title}</h2><p>{activityPhase} · 已收录{activity.items.length}项进展</p></div><span>查看进展 <Icon name="arrow"/></span></Link>}
       </aside>
     </div>
+    <ResetForecastCard data={data.forecasts} now={data.serverTime}/>
     <section className="pub-recent"><div className="pub-section-heading"><div><h2>最近动态</h2></div><TextLink href="/news">全部动态</TextLink></div><div className="pub-recent-grid">{recent.length ? recent.map(p => <Announcement key={p.id} publication={p} withdrawn={publicationWithdrawn(data,p)} />) : <Empty title="暂无公开公告" detail="采集并核验后的重置记录会显示在这里。" />}</div></section>
   </>;
 }
@@ -291,8 +294,6 @@ export function EventPage({ data, id, onPoster, onShare }: { data: PublicData; i
   const withdrawn = publicationWithdrawn(data, publication);
   const currentArticle = data.articles.find(article => article.id === publication.articleId);
   const currentReason = publication.event.status === 'withdrawn' || publication.article.status === 'withdrawn' ? publication.reason : currentArticle?.status === 'withdrawn' ? data.publications.find(p => p.id === currentArticle.publicationId)?.reason : current ? currentPublication(data, current)?.reason : publication.reason;
-  const translation = publication.article.translation?.trim();
-  const hasAdditionalContent = !!translation && translation !== publication.article.summary.trim();
   const actions = isNewsOnly(publication) ? [] : publication.event.actions;
   const evidenceIds = new Set([...(isNewsOnly(publication) ? publication.article.evidenceIds : publication.event.evidenceIds), ...actions.flatMap(action => action.evidenceIds)]);
   return <>
@@ -302,39 +303,43 @@ export function EventPage({ data, id, onPoster, onShare }: { data: PublicData; i
     {actions.length ? <>
       {actions.map(action => <ActionCard action={action} now={historicalVersion ? publication.cutoffAt : data.serverTime} key={action.id} />)}
       <p className="pub-event-boundary"><Icon name="info"/>完成状态依据公开声明，个人账户是否到账尚未观测。</p>
-    </> : <section className="pub-card pub-summary"><h2>消息摘要</h2><p>{publicArticleSummary(publication.article)}</p><PublicationNote publication={publication} /></section>}
+    </> : null}
+    <section className="pub-card pub-summary"><ArticleContent article={publication.article} heading /><PublicationNote publication={publication} /></section>
     <EvidenceList collapsed evidence={data.evidence.filter(e => evidenceIds.has(e.id))} actions={actions} sources={data.sources} />
-    {actions.length > 0 ? <details className="pub-card pub-disclosure"><summary>公告补充</summary><p className="pub-prose">{publicArticleSummary(publication.article)}</p>{hasAdditionalContent && <><h3>完整内容</h3><p className="pub-prose">{translation}</p></>}</details> : hasAdditionalContent && <details className="pub-card pub-disclosure"><summary>完整内容</summary><p className="pub-prose">{translation}</p></details>}
     <details className="pub-card pub-disclosure"><summary>记录信息</summary><dl className="pub-facts"><div><dt>发布版本</dt><dd>第{isNewsOnly(publication) ? publication.article.version : publication.event.version}版</dd></div><div><dt>资料截止</dt><dd>{displayTime(publication.cutoffAt)}</dd></div><div><dt>本站发布</dt><dd>{displayTime(publication.publishedAt)}</dd></div><div><dt>版本说明</dt><dd>{publication.reason || '公开资料核验发布'}</dd></div></dl></details>
     <div className="pub-share-row"><button className="pub-button" onClick={() => void onShare(publication)}>分享此版本<Icon name="link" /></button><button className="pub-button" disabled={withdrawn} onClick={() => onPoster(publication)}>生成海报<Icon name="share" /></button></div><TextLink href="/history">查看全部公告</TextLink>
   </>;
 }
-function ArticlePage({ data, id, onPoster }: { data: PublicData; id: string; onPoster: (p: Publication) => void }) {
+export function ArticlePage({ data, id, onPoster }: { data: PublicData; id: string; onPoster: (p: Publication) => void }) {
   const article = data.articles.find(a => a.id === id);
   const publication = article && data.publications.find(p => p.id === article.publicationId);
   if (!article || !publication) return <Empty title="未找到这篇新闻" detail="该内容可能尚未发布。" />;
-  return <>{article.status === 'withdrawn' && <p className="pub-warning">这篇新闻已撤回，不能作为当前发放依据。</p>}<div className="pub-page-heading"><h1>{publication.article.title}</h1><p>{publication.article.historical ? '历史收录 · ' : ''}{displayTime(articleSourceTime(publication.article))}</p></div><section className="pub-card pub-summary"><h2>中文摘要</h2><p>{publicArticleSummary(publication.article)}</p><PublicationNote publication={publication} /></section>{publication.article.translation?.trim() && publication.article.translation.trim() !== publication.article.summary.trim() && <details className="pub-card pub-disclosure"><summary>完整内容</summary><p className="pub-prose">{publication.article.translation}</p></details>}<EvidenceList collapsed evidence={data.evidence.filter(e => publication.article.evidenceIds.includes(e.id))} sources={data.sources} /><div className="pub-share-row"><Link scroll={false} className="pub-button" href={`/events/${encodeURIComponent(article.eventId)}`}>查看事件进展<Icon name="arrow" /></Link><button className="pub-button" disabled={article.status === 'withdrawn' || data!.events.find(event => event.id === article.eventId)?.status === 'withdrawn'} onClick={() => onPoster(publication)}>生成海报<Icon name="share" /></button></div><details className="pub-card pub-disclosure"><summary>记录信息</summary><dl className="pub-facts"><div><dt>发布版本</dt><dd>第{publication.article.version}版</dd></div><div><dt>资料截止</dt><dd>{displayTime(publication.cutoffAt)}</dd></div><div><dt>本站发布</dt><dd>{displayTime(publication.publishedAt)}</dd></div></dl></details></>;
+  return <>{article.status === 'withdrawn' && <p className="pub-warning">这篇新闻已撤回，不能作为当前发放依据。</p>}<div className="pub-page-heading"><h1>{publication.article.title}</h1><p>{publication.article.historical ? '历史收录 · ' : ''}{displayTime(articleSourceTime(publication.article))}</p></div><section className="pub-card pub-summary"><ArticleContent article={publication.article} heading /><PublicationNote publication={publication} /></section><EvidenceList collapsed evidence={data.evidence.filter(e => publication.article.evidenceIds.includes(e.id))} sources={data.sources} /><div className="pub-share-row"><Link scroll={false} className="pub-button" href={`/events/${encodeURIComponent(article.eventId)}`}>查看事件进展<Icon name="arrow" /></Link><button className="pub-button" disabled={article.status === 'withdrawn' || data!.events.find(event => event.id === article.eventId)?.status === 'withdrawn'} onClick={() => onPoster(publication)}>生成海报<Icon name="share" /></button></div><details className="pub-card pub-disclosure"><summary>记录信息</summary><dl className="pub-facts"><div><dt>发布版本</dt><dd>第{publication.article.version}版</dd></div><div><dt>资料截止</dt><dd>{displayTime(publication.cutoffAt)}</dd></div><div><dt>本站发布</dt><dd>{displayTime(publication.publishedAt)}</dd></div></dl></details></>;
 }
+function ArticleContent({ article, heading = false }: { article: Article; heading?: boolean }) {
+  const { summary, body, hasAdditionalContent } = publicArticleContent(article);
+  return <>{heading && <h2>{hasAdditionalContent ? '中文摘要' : '公告内容'}</h2>}<p className="pub-prose">{summary || '暂无可展示的公告内容，请查看来源。'}</p>{hasAdditionalContent && <details className="pub-disclosure"><summary>阅读全文</summary><p className="pub-prose">{body}</p></details>}</>;
+}
+const evidenceKind = (evidence: Evidence) => evidence.provenance === 'official' ? '官方原文' : evidence.provenance === 'archive' ? '第三方收录' : '补充来源';
+const evidenceSourceName = (evidence: Evidence, sources: PublicData['sources']) => (sources.find(source => source.id === evidence.sourceId)?.name || '原文记录').replace('（辅助来源）', '').replace('（免费）', '');
 function EvidenceList({ evidence, collapsed = false, actions = [], sources = [] }: { evidence: Evidence[]; collapsed?: boolean; actions?: BenefitAction[]; sources?: PublicData['sources'] }) {
   const priority = (item: Evidence) => actions.some(action => action.stage === 'claimed_complete' && action.evidenceIds.includes(item.id) && Date.parse(action.statementAt) === Date.parse(item.publishedAt)) ? 1 : 0;
-  const rows = evidence.slice().sort((a, b) => priority(b) - priority(a) || Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
-  const grouped = new Map<string, Evidence[]>();
+  const rows = evidence.slice().sort((a, b) => priority(b) - priority(a) || Date.parse(b.publishedAt) - Date.parse(a.publishedAt) || Number(b.provenance === 'official') - Number(a.provenance === 'official'));
+  const grouped = new Map<string, Evidence>();
   for (const item of rows) {
     const key = `${item.publishedAt}:${item.text.replace(/\s+/g, ' ').trim()}`;
-    grouped.set(key, [...(grouped.get(key) ?? []), item]);
+    if (!grouped.has(key) || (grouped.get(key)?.provenance !== 'official' && item.provenance === 'official')) grouped.set(key, item);
   }
-  const row = (item: Evidence, excerpt: boolean) => <Link scroll={false} className="pub-source-row" key={item.id} href={`/sources/${encodeURIComponent(item.id)}`}><div><strong>{(sources.find(source => source.id === item.sourceId)?.name || '原文记录').replace('（辅助来源）', '').replace('（免费）', '')}</strong><span>{briefTime(item.publishedAt)} · 北京时间 · {item.provenance === 'official' ? '官方资料' : item.provenance === 'archive' ? '辅助归档' : '人工补充'}{item.historical ? ' · 历史收录' : ''}</span>{excerpt && <p className="pub-source-excerpt" dir="auto">{item.text}</p>}{excerpt && item.metadata?.title && <span className="pub-source-description">{item.provenance === 'archive' ? '归档标题' : '附加标题'}：{item.metadata.title}</span>}</div><Icon name="arrow" /></Link>;
-  const contents = rows.length ? [...grouped.values()].map(items => <div className="pub-source-group" key={items[0].id}>{row(items[0], true)}{items.length > 1 && <details className="pub-source-copies"><summary>相同内容的另外{items.length - 1}份来源记录</summary>{items.slice(1).map(item => row(item, false))}</details>}</div>) : <p className="pub-muted">暂未提供可展示的原文。</p>;
-
-  return collapsed ? <details className="pub-card pub-disclosure"><summary>原文依据（{evidence.length}条）</summary>{contents}</details> : <section className="pub-card"><h2>原文依据</h2>{contents}</section>;
+  const contents = rows.length ? [...grouped.values()].map(item => <div className="pub-source-row" key={item.id}><div><strong>{evidenceSourceName(item, sources)}</strong><span>{briefTime(item.publishedAt)} · 北京时间 · {evidenceKind(item)}</span><p className="pub-source-excerpt" dir="auto">{item.text}</p>{(!item.contextComplete || item.textOrigin === 'archive_excerpt') && <p className="pub-muted">这里只收录了部分原文，请打开来源查看完整内容。</p>}<ExternalLink url={item.url}>打开原文</ExternalLink></div></div>) : <p className="pub-muted">暂未提供可展示的原文。</p>;
+  return collapsed ? <details className="pub-card pub-disclosure"><summary>查看来源</summary>{contents}</details> : <section className="pub-card"><h2>来源</h2>{contents}</section>;
 }
 
-function EvidencePage({ data, id }: { data: PublicData; id: string }) {
+export function EvidencePage({ data, id }: { data: PublicData; id: string }) {
   const evidence = data.evidence.find(e => e.id === id);
   if (!evidence) return <Empty title="未找到这条来源" detail="只展示与公开发布内容关联的原文资料。" />;
   const parent = evidence.parentId ? data.evidence.find(e => e.id === evidence.parentId || e.messageId === evidence.parentId) : undefined;
   const articles = data.articles.filter(a => a.evidenceIds.includes(id));
-  return <><div className="pub-page-heading"><h1>原文与来源</h1><p>{displayTime(evidence.publishedAt)}</p></div><section className="pub-card"><div className="pub-card-top"><h2>来源说明</h2><Badge tone={evidence.provenance === 'official' ? 'cyan' : ''}>{evidence.provenance === 'official' ? '官方资料' : evidence.provenance === 'archive' ? '公开归档' : '人工补充'}</Badge></div><p>{evidence.provenance === 'archive' ? '内容由公开归档收录，属于辅助来源，不代表本站已直接获取官方原帖。' : evidence.provenance === 'manual' ? '由站长补充的来源资料，可通过原始链接核对。' : '从官方公开渠道采集的资料，具体资格和表述以原文为准。'}</p>{evidence.historical && <p className="pub-muted">此条为历史导入资料。</p>}<ExternalLink url={evidence.url}>打开原始链接</ExternalLink></section>{!evidence.contextComplete && <p className="pub-warning">上下文尚不完整，请结合相关事件的核验说明阅读。</p>}<section className="pub-card"><h2>{evidence.textOrigin === 'archive_excerpt' ? '归档收录正文' : evidence.textOrigin === 'structured' ? '来源结构化内容' : '原始内容'}</h2>{(evidence.metadata?.title || evidence.metadata?.summary) && <div className="pub-muted"><strong>{evidence.provenance === 'archive' ? '辅助归档描述' : '来源附加信息'}</strong>{evidence.metadata.title && <p>{evidence.metadata.title}</p>}{evidence.metadata.summary && <p>{evidence.metadata.summary}</p>}<p>标题与摘要不是原帖正文，不作为原文引用。</p></div>}<blockquote className="pub-original" dir="auto">{evidence.text}</blockquote><dl className="pub-facts"><div><dt>原文发布</dt><dd>{displayTime(evidence.publishedAt)}</dd></div><div><dt>本站采集</dt><dd>{displayTime(evidence.collectedAt)}</dd></div></dl></section>{parent && <section className="pub-card"><h2>上文</h2><p className="pub-prose">{parent.text}</p><TextLink href={`/sources/${encodeURIComponent(parent.id)}`}>查看上文来源</TextLink></section>}{articles.length > 0 && <section className="pub-card"><h2>对应中文内容</h2>{articles.map(article => <TextLink key={article.id} href={`/articles/${encodeURIComponent(article.id)}`}>{article.title}</TextLink>)}</section>}</>;
+  return <><div className="pub-page-heading"><h1>原文与来源</h1><p>{displayTime(evidence.publishedAt)} · 北京时间</p></div><section className="pub-card"><div className="pub-card-top"><h2>{evidenceSourceName(evidence, data.sources)}</h2><Badge tone={evidence.provenance === 'official' ? 'cyan' : ''}>{evidenceKind(evidence)}</Badge></div>{evidence.provenance === 'archive' && <p className="pub-muted">由第三方收录，可打开原文核对。</p>}<ExternalLink url={evidence.url}>打开原文</ExternalLink></section>{(!evidence.contextComplete || evidence.textOrigin === 'archive_excerpt') && <p className="pub-warning">这里只收录了部分原文，请打开来源查看完整内容。</p>}<section className="pub-card"><h2>{evidence.provenance === 'official' && evidence.textOrigin !== 'structured' && evidence.textOrigin !== 'archive_excerpt' ? '原文内容' : '收录内容'}</h2><blockquote className="pub-original" dir="auto">{evidence.text}</blockquote></section>{parent && <section className="pub-card"><h2>相关上文</h2><p className="pub-prose">{parent.text}</p><TextLink href={`/sources/${encodeURIComponent(parent.id)}`}>查看上文来源</TextLink></section>}{articles.length > 0 && <section className="pub-card"><h2>对应中文内容</h2>{articles.map(article => <TextLink key={article.id} href={`/articles/${encodeURIComponent(article.id)}`}>{article.title}</TextLink>)}</section>}</>;
 }
 function ActivityPage({ data, activity, id, query, onDay: setDay, pending, onPoster, onDayPoster }: { data: PublicData | null; activity?: Activity; id: string; query: URLSearchParams; onDay: (value: number | null) => void; pending?: React.ReactNode; onPoster: (p: Publication) => void; onDayPoster: (selection: ActivityDayShare) => void }) {
   const requestedDay = query.get('day');
@@ -348,7 +353,7 @@ function ActivityPage({ data, activity, id, query, onDay: setDay, pending, onPos
     catch (cause) { return <><Empty title="分享版本参数无效" detail={cause instanceof Error ? cause.message : '无法读取所选版本。'} /><TextLink href={`/activities/${encodeURIComponent(id)}`}>查看当前每日进展</TextLink></>; }
     const fixed = resolveActivityShare(data, selection);
     if (!fixed.available) return <><Empty title="这组分享版本暂不可用" detail={fixed.blockedReason} /><TextLink href={`/activities/${encodeURIComponent(id)}`}>查看当前每日进展</TextLink></>;
-    return <><div className="pub-page-heading"><p className="pub-eyebrow">指定发布版本 · 第{fixed.manifest.day}天</p><h1>{fixed.activity.title}</h1><p>{fixed.date} · {fixed.items.length}条进展</p></div><p className="pub-warning">{fixed.rulesNotice}下方保持分享时选择的条目；没有自动替换为最新版本。</p><div className="pub-share-row"><button className="pub-button" onClick={() => onDayPoster(fixed.manifest)}>生成整日海报<Icon name="share" /></button><Link scroll={false} className="pub-button" href={`/activities/${encodeURIComponent(id)}?day=${fixed.manifest.day}`}>查看当前进展<Icon name="arrow" /></Link></div>{fixed.items.map(({ publication, sourceTime }) => <article className="pub-card" key={publication.id} data-reading-id={publication.id}><div className="pub-card-top"><Badge tone="purple">固定发布版本</Badge><time>{briefTime(sourceTime)}</time></div><h2>{publication.article.title}</h2><p>{publicArticleSummary(publication.article)}</p><details><summary>查看完整内容</summary><p className="pub-prose">{publication.article.translation || publication.article.summary}</p></details><p className="pub-muted">此条资料截至 {displayTime(publication.cutoffAt)}</p><TextLink href={`/events/${encodeURIComponent(publication.eventId)}?version=${encodeURIComponent(publication.id)}`}>查看此版本与来源</TextLink></article>)}<p className="pub-muted">各条目保留独立资料截止时间。</p></>;
+    return <><div className="pub-page-heading"><p className="pub-eyebrow">指定发布版本 · 第{fixed.manifest.day}天</p><h1>{fixed.activity.title}</h1><p>{fixed.date} · {fixed.items.length}条进展</p></div><p className="pub-warning">{fixed.rulesNotice}下方保持分享时选择的条目；没有自动替换为最新版本。</p><div className="pub-share-row"><button className="pub-button" onClick={() => onDayPoster(fixed.manifest)}>生成整日海报<Icon name="share" /></button><Link scroll={false} className="pub-button" href={`/activities/${encodeURIComponent(id)}?day=${fixed.manifest.day}`}>查看当前进展<Icon name="arrow" /></Link></div>{fixed.items.map(({ publication, sourceTime }) => <article className="pub-card" key={publication.id} data-reading-id={publication.id}><div className="pub-card-top"><Badge tone="purple">固定发布版本</Badge><time>{briefTime(sourceTime)}</time></div><h2>{publication.article.title}</h2><ArticleContent article={publication.article} /><p className="pub-muted">此条资料截至 {displayTime(publication.cutoffAt)}</p><TextLink href={`/events/${encodeURIComponent(publication.eventId)}?version=${encodeURIComponent(publication.id)}`}>查看此版本与来源</TextLink></article>)}<p className="pub-muted">各条目保留独立资料截止时间。</p></>;
   }
   if (day !== null && (day < 1 || day > activity.days)) return <><Empty title="活动日期超出范围" detail="请选择这项活动内的日期。" /><button className="pub-button" onClick={() => setDay(null)}>查看当前日期</button></>;
   return <ActivityContent activity={activity} data={data} pending={pending} day={day} onDay={setDay} onPoster={onPoster} onDayPoster={onDayPoster} />;
@@ -374,7 +379,7 @@ function ActivityContent({ activity, data, pending, day, onDay, onPoster, onDayP
     {pending ?? <>{!entries.length && <div className="pub-empty pub-activity-empty"><Icon name="calendar" /><h2>{selected > actualDay ? '这一天尚未开始' : '暂无已收录进展'}</h2><p>{selected > actualDay ? '有公开进展后，会在对应日期更新。' : '尚未收录这一天的公开进展，不代表活动没有发生。'}</p>{latestDay && latestDay !== selected && <button className="pub-button" onClick={() => onDay(latestDay)}>查看最近有进展的第{latestDay}天<Icon name="arrow" /></button>}</div>}
     <button className="pub-button full pub-day-poster" disabled={!entries.length} onClick={() => { try { const selection = buildActivityShare(data!, activity.id, selected); activityPublicationUrl(location.origin, selection); setShareError(''); onDayPoster(selection); } catch (cause) { setShareError(cause instanceof Error ? cause.message : '这一天暂时不能生成整合海报。'); } }}>生成整日海报<Icon name="share" /></button>
     {shareError && <p className="pub-warning" role="alert">{shareError}</p>}
-    {entries.map(article => { const publication = data!.publications.find(p => p.id === article.publicationId); return <article className="pub-card" key={article.id} data-reading-id={article.id}><div className="pub-card-top"><Badge tone="purple">{article.historical ? '历史收录 · ' : ''}活动动态</Badge><time dateTime={articleSourceTime(article)} title={`${displayTime(articleSourceTime(article))} · 北京时间`}>{briefTime(articleSourceTime(article))}</time></div><h2>{article.title}</h2><p>{publicArticleSummary(article)}</p><details><summary>查看完整内容</summary><p className="pub-prose">{article.translation || article.summary}</p></details><div className="pub-card-top"><TextLink href={`/articles/${encodeURIComponent(article.id)}`}>查看详情与来源</TextLink>{publication && <button className="pub-text-button" disabled={article.status === 'withdrawn' || data!.events.find(event => event.id === article.eventId)?.status === 'withdrawn'} onClick={() => onPoster(publication)}>分享海报<Icon name="share" /></button>}</div></article>; })}
+    {entries.map(article => { const publication = data!.publications.find(p => p.id === article.publicationId); return <article className="pub-card" key={article.id} data-reading-id={article.id}><div className="pub-card-top"><Badge tone="purple">{article.historical ? '历史收录 · ' : ''}活动动态</Badge><time dateTime={articleSourceTime(article)} title={`${displayTime(articleSourceTime(article))} · 北京时间`}>{briefTime(articleSourceTime(article))}</time></div><h2>{article.title}</h2><ArticleContent article={article} /><div className="pub-card-top"><TextLink href={`/articles/${encodeURIComponent(article.id)}`}>查看详情与来源</TextLink>{publication && <button className="pub-text-button" disabled={article.status === 'withdrawn' || data!.events.find(event => event.id === article.eventId)?.status === 'withdrawn'} onClick={() => onPoster(publication)}>分享海报<Icon name="share" /></button>}</div></article>; })}
     </>}
   </div>;
 
@@ -387,7 +392,7 @@ export function Settings({notices,read,markRead,storageError,pending,data,codeAv
       {!notices.length&&<p className="pub-inbox-empty">暂无提醒，有新消息会显示在这里。</p>}</>}
     </section>
     {storageError&&<p className="pub-warning">{storageError}</p>}
-    <section className="pub-card pub-reminder-pending"><div className="pub-section-heading"><h2>微信提醒</h2><Badge tone="muted">小程序内开启</Badge></div><p>请在小程序的提醒页开启微信提醒，每次成功授权增加一次提醒机会。</p><p className="pub-muted">重置预告、完成声明和重要更正各使用一次，次数用完后可继续增加，也可以随时关闭。</p><WechatEntryGuide publicationId={data?.publications.find(p=>!publicationWithdrawn(data,p))?.id} codeAvailable={codeAvailable}/></section>
+    <section className="pub-card pub-reminder-pending"><div className="pub-section-heading"><h2>微信提醒</h2><Badge tone="muted">小程序内开启</Badge></div><p>请在小程序的提醒页开启微信提醒，每次成功授权增加一次提醒机会。</p><p className="pub-muted">可分别选择重置预告、完成声明和重要更正。每成功发送一条使用一次，未开启的类型不使用次数。</p><WechatEntryGuide publicationId={data?.publications.find(p=>!publicationWithdrawn(data,p))?.id} codeAvailable={codeAvailable}/></section>
     <section className="pub-card"><TextLink href="/more#privacy">隐私说明</TextLink></section>
   </>;
 }
@@ -395,15 +400,15 @@ function MorePage() {
   return <><section className="pub-card"><h2>内容与记录</h2><div className="pub-link-row"><TextLink href="/history">查看重置公告</TextLink></div><div className="pub-link-row"><TextLink href="/news">查看动态</TextLink></div><div className="pub-link-row"><TextLink href="/notices">查看全部提醒</TextLink></div><div className="pub-link-row"><TextLink href="/methodology">历史预测回放与观察记录</TextLink></div></section>
     <section className="pub-card" id="privacy"><h2>隐私说明</h2><p>查看公开消息无需提供手机号、通讯录或位置。已读状态保存在当前设备，清除浏览器数据后可能重置。</p><p>微信提醒使用微信提供的用户标识管理接收状态，可以在小程序提醒页关闭。保存海报由你主动操作，我们不读取或上传你的相册。</p><p>小程序内可查看平台提供的完整隐私指引。</p></section></>;
 }
-export function Methodology({data,snapshotId,cadenceId,onPoster,onShare}:{data:PublicData;snapshotId:string|null;cadenceId:string|null;onPoster:(s:ForecastSnapshot)=>void;onShare:(s:ForecastSnapshot)=>Promise<void>}) {
+export function Methodology({data,snapshotId,cadenceId,target='automatic_reset',onPoster,onShare}:{data:PublicData;snapshotId:string|null;cadenceId:string|null;target?:'automatic_reset'|'banked_reset';onPoster:(s:ForecastSnapshot)=>void;onShare:(s:ForecastSnapshot)=>Promise<void>}) {
   if(cadenceId)return <><div className="pub-page-heading"><h1>历史间隔实验记录</h1></div><ForecastPanel data={data.forecasts} snapshotId={null} cadenceId={cadenceId} onPoster={onPoster} onShare={onShare}/></>;
   if(snapshotId)return <><div className="pub-page-heading"><h1>固定预测记录</h1><p>初始预测与后续结局分别保留。</p></div><ForecastPanel data={data.forecasts} snapshotId={snapshotId} onPoster={onPoster} onShare={onShare}/></>;
-  return <><div className="pub-page-heading"><h1>观察记录</h1></div><HistoricalReplayPanel/><ForecastPanel data={data.forecasts} snapshotId={snapshotId} onPoster={onPoster} onShare={onShare}/></>;
+  return <><div className="pub-page-heading"><h1>观察记录</h1></div><HistoricalReplayPanel/><ForecastPanel data={data.forecasts} snapshotId={snapshotId} target={target} onPoster={onPoster} onShare={onShare}/></>;
 }
 function WechatReminderModal({onClose,data,codeAvailable}:{data:PublicData|null;dataError:string;onRetryData:()=>void;entry:WechatEntryState;codeAvailable:boolean;onRetryEntry:()=>void;onClose:()=>void}) {
   const dialog=useRef<HTMLDialogElement>(null);
   useEffect(()=>{dialog.current?.showModal();const previous=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.body.style.overflow=previous;};},[]);
-  return <dialog className="pub-dialog" ref={dialog} onClose={onClose} onCancel={onClose}><div className="pub-dialog-heading"><h2>微信提醒</h2><button className="pub-icon-button" aria-label="关闭窗口" onClick={onClose}><Icon name="close"/></button></div><div className="pub-dialog-body"><p>在小程序的提醒页开启，每次成功授权增加一次提醒机会。</p><p>重置预告、完成声明和重要更正各使用一次。可以继续增加次数，也可以关闭提醒。</p><WechatEntryGuide publicationId={data?.publications.find(p=>!publicationWithdrawn(data,p))?.id} codeAvailable={codeAvailable}/><TextLink href="/notices">查看全部站内提醒</TextLink><button className="pub-button full" onClick={onClose}>知道了</button></div></dialog>;
+  return <dialog className="pub-dialog" ref={dialog} onClose={onClose} onCancel={onClose}><div className="pub-dialog-heading"><h2>微信提醒</h2><button className="pub-icon-button" aria-label="关闭窗口" onClick={onClose}><Icon name="close"/></button></div><div className="pub-dialog-body"><p>在小程序的提醒页开启，每次成功授权增加一次提醒机会。</p><p>可分别选择重置预告、完成声明和重要更正。每成功发送一条使用一次，也可以随时关闭。</p><WechatEntryGuide publicationId={data?.publications.find(p=>!publicationWithdrawn(data,p))?.id} codeAvailable={codeAvailable}/><TextLink href="/notices">查看全部站内提醒</TextLink><button className="pub-button full" onClick={onClose}>知道了</button></div></dialog>;
 }
 function ShareLinkModal({ url, onClose }: { url: string; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null), input = useRef<HTMLInputElement>(null);

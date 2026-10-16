@@ -21,7 +21,7 @@ test('真实存储适配器的单 worker 空闲一小时 RPC 对照；不调用�
   const reset=(enabled:boolean)=>{
     tables=new Map();counts={};
     const seed=(table:string,payload:Row['payload'])=>{if(!tables.has(table))tables.set(table,new Map());tables.get(table)!.set(payload.id,{id:payload.id,payload,createdAt:new Date(base).toISOString()});};
-    seed('sources',{id:'not-due',enabled:true,validated:true,kind:'archive',intervalMinutes:5,nextRunAt:'2100-01-01T00:00:00Z'});
+    seed('sources',{id:'not-due',enabled:true,validated:true,status:'healthy',kind:'archive',intervalMinutes:5,nextRunAt:'2100-01-01T00:00:00Z'});
     seed('settings',{id:'site',autoPublish:false});seed('settings',{id:'ai',enabled:false});
     seed('settings',{id:'wechat',subscriptionsEnabled:enabled,appId:'wx0123456789abcdef',encryptedSecret:'fixture-not-real',templateId:'fixture-template',templateFields:{title:'thing1',status:'phrase2',time:'time3'},dailyApiLimit:100,dailySendLimit:100,version:1});
     t.mock.timers.setTime(base);
@@ -89,18 +89,23 @@ test('真实存储适配器的单 worker 空闲一小时 RPC 对照；不调用�
     reports.push({wechatConfigured:enabled,before,after,beforeTotal:total(before),afterTotal:total(after),reductionPercent:Math.round(reduction*10000)/100});
   }
   t.diagnostic('COST_FIXTURE_RESULT '+JSON.stringify({windowSeconds:3600,productionNetwork:false,billingMeasured:false,reports}));
-  // Even inside a throttled maintenance window, already queued work is claimed;
-  // its result must wake the follow-up scheduling path on the next turn.
+  // Queued work is claimed even inside maintenance windows. An unchanged
+  // healthy collection must not wake unrelated full scans or reminder work.
   reset(true);
   const cadence=createWorkerCadence(()=>Date.now());let scans=0;
-  for(const name of ['sources','wechat','forecast'] as const)await cadence.run(name,async()=>{scans++;});
+  for(const name of ['sources','generation','wechat','forecast'] as const)await cadence.run(name,async()=>{scans++;});
   const job={id:'fixture-collect',kind:'collect',sourceId:'not-due',status:'queued',attempts:0,availableAt:new Date().toISOString(),createdAt:new Date().toISOString(),payload:{}};
   tables.set('jobs',new Map([[job.id,{id:job.id,payload:job,createdAt:job.createdAt}]]));
   let collected=0;
   assert.equal(await runOne({cadence,collect:async()=>{collected++;return {seen:1,created:0};}}),true);
   assert.equal(collected,1);assert.equal(tables.get('jobs')?.get(job.id)?.payload.status,'succeeded');
-  for(const name of ['sources','wechat','forecast'] as const)await cadence.run(name,async()=>{scans++;});
-  assert.equal(scans,6,'collection wakes candidate, reminder and forecast scheduling');
+  for(const name of ['sources','generation','wechat','forecast'] as const)await cadence.run(name,async()=>{scans++;});
+  assert.equal(scans,4,'unchanged collection does not wake full generation/forecast scans or reminders');
+  const changed={...job,id:'fixture-new-evidence'};
+  tables.get('jobs')!.set(changed.id,{id:changed.id,payload:changed,createdAt:changed.createdAt});
+  assert.equal(await runOne({cadence,collect:async()=>({seen:1,created:1})}),true);
+  for(const name of ['sources','generation','wechat','forecast'] as const)await cadence.run(name,async()=>{scans++;});
+  assert.equal(scans,6,'new evidence immediately wakes generation and forecast only');
   const send={...job,id:'fixture-send',kind:'wechat_send',sourceId:undefined,status:'queued'};
   tables.get('jobs')!.set(send.id,{id:send.id,payload:send,createdAt:send.createdAt});
   let processed=0;

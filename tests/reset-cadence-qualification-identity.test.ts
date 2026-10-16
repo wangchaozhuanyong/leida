@@ -45,7 +45,7 @@ test('同轮支撑引用截止于最近唯一福利声明，产品祖先不合�
   assert.deepEqual(observations[0].evidenceIds, [usage.id, usageDone.id]);
   assert.deepEqual(observations[1].evidenceIds, [banked.id, bankedDone.id]);
   const forecast = buildResetCadenceForecast({ observations, generatedAt: cutoff, inputFingerprint: 'separate-rounds' });
-  assert.equal(forecast.observations.length, 2); assert.equal(forecast.historicalIntervals[0]?.hours, 72);
+  assert.equal(forecast.observations.length, 2); assert.equal(forecast.historicalIntervals.length, 0);
   assert.deepEqual(rows, before);
 });
 
@@ -58,7 +58,7 @@ test('同类独立轮次也不借共同产品祖先去重，多层同轮进展�
   const secondDone = item('20305', 'Confirmed landed across all accounts.', '2026-01-05T06:00:00Z', middle.messageId);
   const observations = extract([product, first, firstDone, second, middle, secondDone]);
   assert.deepEqual(observations.at(-1)?.evidenceIds, [second.id, middle.id, secondDone.id]);
-  const forecast = buildResetCadenceForecast({ observations, generatedAt: cutoff, inputFingerprint: 'same-kind-rounds' });
+  const forecast = buildResetCadenceForecast({ observations, generatedAt: cutoff, inputFingerprint: 'same-kind-rounds', target:'banked_reset' });
   assert.equal(forecast.observations.length, 2); assert.equal(forecast.historicalIntervals[0]?.hours, 72);
 });
 

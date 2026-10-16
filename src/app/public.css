@@ -257,7 +257,7 @@
 .pub-source-row { gap: 16px; }
 .pub-source-row > div { min-width: 0; flex: 1; }
 .pub-source-row strong { font-size: 14px; }
-.pub-source-row .pub-source-excerpt { font-size: 13px; line-height: 1.8; color: #c1cac7; margin: 8px 0 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pub-source-row .pub-source-excerpt { font-size: 13px; line-height: 1.8; color: #c1cac7; margin: 8px 0 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .pub-source-description { font-size: 12px; }
 .pub-source-group { border-bottom: 1px solid var(--pub-line); padding-bottom: 8px; }
 .pub-source-group:last-child { border-bottom: 0; }

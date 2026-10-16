@@ -115,7 +115,11 @@ else test('真实隔离库：历史原文与合成边界经worker自动发布回
       const machineBlocked=(await one<Candidate>('candidates',earlier.candidate!.id))!;
       const legacyDraft=buildAutomaticTemplate(gatherEvidenceContext(earlier.evidence,await list<Evidence>('evidence')))!;assert.ok(legacyDraft.actions.length);
       await put('candidates',{...machineBlocked,status:'pending',version:machineBlocked.version+1,content:{...legacyDraft,eventId:event.id,actions:legacyDraft.actions.map(action=>({...action,id:event.actions[0].id}))},reasons:['动作资格或状态变化缺少明确更正证据，存在事实冲突'],automation:{...machineBlocked.automation!,state:'conflict',inputFingerprint:machineBlocked.automation!.inputFingerprint!.replace(/^[^:]+:/,'benefit-rules-before:')}});
-      const beforeRecovery=await counts();await drain();const recovered=await state(machineBlocked.id);assert.equal(recovered.status,'published');assert.notEqual(recovered.automation,'conflict');assert.equal((await counts()).publications,beforeRecovery.publications);assert.equal((await counts()).notices,beforeRecovery.notices);
+      const beforeRecovery=await counts();
+      // This raw fixture simulates deploying new rules over old stored state.
+      // A restarted worker performs an initial scan; it is not a new-evidence write.
+      await scheduleDue({skipSources:true});
+      await drain();const recovered=await state(machineBlocked.id);assert.equal(recovered.status,'published');assert.notEqual(recovered.automation,'conflict');assert.equal((await counts()).publications,beforeRecovery.publications);assert.equal((await counts()).notices,beforeRecovery.notices);
       return {result:'pass',duplicateCreated:false,rootMessageId:rootPromise.evidence.messageId,collectionOrder:['root promise','later completion reply','earlier promise reply to same root'],latestStage:event.actions[0].stage,lateCandidate:late};
     }));
     await t.test('旧取消晚到先于人工保护判断归档，不覆盖新完成或制造更正提醒',async()=>record('older_cancellation_manual_protection','synthetic_boundary',async()=>{

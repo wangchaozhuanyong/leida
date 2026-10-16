@@ -13,9 +13,10 @@ const config={mode:'https',baseUrl:'https://public.example.org',cloudEnv:'',serv
 const now=Date.parse('2026-10-10T04:00:00Z'),scene='a'.repeat(32);
 const safe=(state='none')=>({configured:true,enabled:true,state,templateId:'fixture-template'});
 type Options=Record<string,any>;
-function mock(options:{state?:string;challengeState?:string;result?:string;privacy?:boolean;failConfirm?:boolean;failState?:boolean;failRevoke?:boolean;codeStatus?:number;sessionMs?:number;challengeMs?:number}={}){
+function mock(options:{state?:string;challengeState?:string;result?:string;privacy?:boolean;failConfirm?:boolean;failState?:boolean;failRevoke?:boolean;codeStatus?:number;sessionMs?:number;challengeMs?:number;legacyPreferences?:boolean;failPreferencesAfterSave?:boolean;invalidPreferences?:boolean}={}){
   let state=options.state||'none',login=0,subscribe=0,clock=now,count=['available','reserved'].includes(state)?1:0,challenges=0;
-  const confirmed=new Set<string>();const current=()=>({...safe(state),remainingCount:count,pendingCount:state==='reserved'?1:0});
+  let preferences={announcement:true,result:true,correction:true};
+  const confirmed=new Set<string>();const current=()=>({...safe(state),remainingCount:count,pendingCount:state==='reserved'?1:0,...(options.legacyPreferences?{}:{preferencesSupported:true,reminderPreferences:options.invalidPreferences?{...preferences,result:'yes'}:preferences})});
   const requests:Options[]=[];
   const wx={
     login(option:Options){login++;queueMicrotask(()=>option.success({code:'fixture-login-code'}));},
@@ -27,7 +28,8 @@ function mock(options:{state?:string;challengeState?:string;result?:string;priva
       else if(path==='/api/wechat/subscription'){
         if(options.failState){option.success({statusCode:401,data:{error:'当前读者会话已失效，请重新连接。'}});return;}
         if(option.method==='DELETE'){if(options.failRevoke){option.fail({});return;}state='revoked';count=0;}response=current();
-      }else if(path.endsWith('/challenge')){challenges++;const s=options.challengeState;response={state:s||current(),templateId:'fixture-template',...(s&&['available','reserved','unknown'].includes(s)?{}:{nonce:`fixture-nonce-${challenges}`,expiresAt:new Date(clock+(options.challengeMs||30000)).toISOString()})};}
+      }else if(path.endsWith('/preferences')){preferences={...option.data};if(options.failPreferencesAfterSave){option.fail({});return;}response=current();}
+      else if(path.endsWith('/challenge')){challenges++;const s=options.challengeState;response={state:s||current(),templateId:'fixture-template',...(s&&['available','reserved','unknown'].includes(s)?{}:{nonce:`fixture-nonce-${challenges}`,expiresAt:new Date(clock+(options.challengeMs||30000)).toISOString()})};}
       else if(path.endsWith('/confirm')){if(options.failConfirm){option.fail({errMsg:'internal-detail'});return;}if(!confirmed.has(option.data.nonce)){confirmed.add(option.data.nonce);if(option.data.result==='accept')count++;}state=count?'available':'rejected';response={...current(),acceptedAt:option.data.result==='accept'?new Date(clock).toISOString():undefined,extraPrivateField:'must-not-reach-ui'};}
       else if(path.startsWith('/api/v1/wechat/scene/'))response={publicationId:'fixture-publication'};
       else if(path.startsWith('/api/v1/wechat/code/')){if(options.codeStatus){option.success({statusCode:options.codeStatus,data:{error:options.codeStatus===503?'后台尚未配置微信小程序码。':'该版本已撤回。'}});return;}response={publicationId:'fixture-publication',scene,imageBase64:'iVBORw0KGgo=',contentType:'image/png'};}
@@ -175,6 +177,81 @@ function pageHarness(reader?:Options) {
   return{page,requests,calls,navigation,data,get subscriptions(){return listeners.size;}};
 }
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
+
+test('类型选择保存到读者接口，保持次数和已准备授权，不额外弹出微信授权',async()=>{
+  const h=mock({state:'available',sessionMs:600000,challengeMs:300000});await h.reader.loadForPage();
+  assert.deepEqual(h.reader.getState().reminderPreferences,{announcement:true,result:true,correction:true});
+  const before=h.requests.length,choice={announcement:false,result:true,correction:false};
+  await h.reader.savePreferences(choice,{userInitiated:true});
+  assert.equal(h.requests.length,before+1);assert.equal(h.subscribe,0);assert.equal(h.reader.getState().remainingCount,1);assert.equal(h.reader.getState().ready,true);
+  assert.deepEqual(h.reader.getState().reminderPreferences,choice);assert.equal(h.reader.getState().preferencesMessage,'已保存');
+  const save=h.requests.at(-1)!;assert.equal(save.url,config.baseUrl+'/api/wechat/subscription/preferences');assert.equal(save.method,'POST');assert.equal(save.header.Authorization,'Bearer fixture-reader-session');assert.deepEqual(save.data,choice);
+  const fresh=h.freshReader();await fresh.loadForPage();assert.deepEqual(fresh.getState().reminderPreferences,choice);
+  await fresh.authorize({userInitiated:true});assert.deepEqual(fresh.getState().reminderPreferences,choice);assert.equal(fresh.getState().remainingCount,2);
+});
+
+test('未主动操作和旧服务不写类型设置，错误格式的状态不能显示为可编辑',async()=>{
+  const h=mock();await h.reader.savePreferences({announcement:false,result:false,correction:false});assert.equal(h.login,0);assert.equal(h.requests.length,0);
+  const legacy=mock({legacyPreferences:true});await legacy.reader.loadForPage();assert.equal(legacy.reader.getState().canChooseTypes,false);
+  const before=legacy.requests.length;await legacy.reader.savePreferences({announcement:false,result:true,correction:false},{userInitiated:true});assert.equal(legacy.requests.length,before);assert.match(legacy.reader.getState().error,/暂不可设置/);
+  const invalid=mock({invalidPreferences:true});await invalid.reader.loadForPage();assert.equal(invalid.reader.getState().safe,null);assert.equal(invalid.reader.getState().canChooseTypes,false);
+});
+
+test('真实提醒页的三个开关分别保存，全部关闭保留次数，返回页面不额外写入',async()=>{
+  const h=mock({state:'available',sessionMs:600000,challengeMs:300000}),page=pageHarness(h.reader).page('settings');
+  try{
+    await flush();
+    for(const kind of ['announcement','result','correction'])await page.changeWechatPreference({currentTarget:{dataset:{kind}},detail:{value:false}});
+    assert.equal(page.data.wechat.allTypesOff,true);assert.equal(page.data.wechat.remainingCount,1);assert.equal(h.subscribe,0);assert.equal(h.requests.filter(r=>r.url.endsWith('/preferences')).length,3);
+    const before=h.requests.length;page.onHide();page.onShow();await flush();assert.equal(h.requests.length,before);
+    await page.changeWechatPreference({currentTarget:{dataset:{kind:'result'}},detail:{value:true}});assert.equal(page.data.wechat.allTypesOff,false);assert.deepEqual(page.data.wechat.reminderPreferences,{announcement:false,result:true,correction:false});
+    await page.changeWechatPreference({currentTarget:{dataset:{kind:'activity'}},detail:{value:true}});assert.equal(h.requests.filter(r=>r.url.endsWith('/preferences')).length,4);
+  }finally{page.onUnload();}
+});
+
+test('保存响应丢失不伪装成功，重新读取确认服务端选择且不重复授权',async()=>{
+  const options={state:'available',sessionMs:600000,challengeMs:300000,failPreferencesAfterSave:true},h=mock(options),page=pageHarness(h.reader).page('settings');
+  try{
+    await flush();await page.changeWechatPreference({currentTarget:{dataset:{kind:'correction'}},detail:{value:false}});
+    assert.match(page.data.wechat.error,/尚未确认/);assert.equal(page.data.wechat.preferencesMessage,'');assert.equal(page.data.wechat.preferencesUncertain,true);assert.equal(page.data.wechat.canChooseTypes,false);assert.equal(page.data.wechat.reminderPreferences.correction,true);
+    await page.addWechat();assert.equal(page.data.wechat.reminderPreferences.correction,false);assert.equal(page.data.wechat.preferencesUncertain,false);assert.equal(h.subscribe,0);assert.equal(page.data.wechat.remainingCount,1);
+  }finally{page.onUnload();}
+});
+
+test('类型保存遇到新的隐私确认时只恢复该保存，不误触发提醒授权',async()=>{
+  const options={sessionMs:600000,challengeMs:300000,privacy:false},h=mock(options),page=pageHarness(h.reader).page('settings');
+  try{
+    await flush();options.privacy=true;await page.changeWechatPreference({currentTarget:{dataset:{kind:'announcement'}},detail:{value:false}});assert.equal(page.data.wechat.privacyNeeded,true);assert.equal(h.subscribe,0);
+    options.privacy=false;await page.agreeWechatPrivacy();assert.equal(page.data.wechat.reminderPreferences.announcement,false);assert.equal(h.subscribe,0);assert.equal(h.requests.filter(r=>r.url.endsWith('/preferences')).length,1);
+  }finally{page.onUnload();}
+});
+
+test('类型保存读到发送状态未知时撤销之前准备，不能继续弹微信授权',async()=>{
+  const h=mock({state:'available',sessionMs:600000,challengeMs:300000});await h.reader.loadForPage();
+  assert.equal(h.reader.getState().ready,true);h.changeState('unknown');
+  await h.reader.savePreferences({announcement:true,result:true,correction:false},{userInitiated:true});
+  assert.equal(h.reader.getState().safe.state,'unknown');assert.equal(h.reader.getState().ready,false);
+  await h.reader.authorize({userInitiated:true});assert.equal(h.subscribe,0);assert.equal(h.reader.getState().remainingCount,1);
+});
+
+test('保存结果不确定后关闭提醒取得权威选择，开关恢复且次数不会凭空增加',async()=>{
+  const h=mock({state:'available',sessionMs:600000,challengeMs:300000,failPreferencesAfterSave:true}),page=pageHarness(h.reader).page('settings');
+  try{
+    await flush();await page.changeWechatPreference({currentTarget:{dataset:{kind:'correction'}},detail:{value:false}});
+    assert.equal(page.data.wechat.preferencesUncertain,true);
+    await page.revokeWechat();
+    assert.equal(page.data.wechat.preferencesUncertain,false);assert.equal(page.data.wechat.canChooseTypes,true);assert.equal(page.data.wechat.reminderPreferences.correction,false);
+    assert.equal(page.data.wechat.remainingCount,0);assert.equal(h.subscribe,0);
+  }finally{page.onUnload();}
+});
+
+test('类型接口只允许读者私有POST，不能通过公开传输发送',async()=>{
+  const h=mock(),privateRequest=createWechatTransport(h.wx,config),choice={announcement:true,result:false,correction:false};
+  await assert.rejects(createTransport(h.wx,config)('/api/wechat/subscription/preferences').promise,/路径/);
+  await assert.rejects(privateRequest('/api/wechat/subscription/preferences',{method:'GET',sessionToken:'fixture-reader-session'}).promise,/路径/);
+  await assert.rejects(privateRequest('/api/wechat/subscription/preferences',{method:'POST',data:choice}).promise,/重新建立/);
+  assert.equal(h.requests.length,0);
+});
 
 test('进入提醒页直接读取次数并准备，首次开启点击同步授权，不需要查看或确认按钮',async()=>{
   const h=mock({sessionMs:600000,challengeMs:300000}),ui=pageHarness(h.reader),page=ui.page('settings');

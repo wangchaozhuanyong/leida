@@ -21,6 +21,33 @@ const explicitEligibility = /\b(?:if|unless|except|excluding|eligible|created|re
 const unrestrictedClaim = (claim: ReturnType<typeof extractBenefitClaims>[number]) => claim.scope === 'public' &&
   !/（(?:资格原文|地区原文|限定范围)[:：]/u.test(claim.eligibility);
 
+function strictTime(value:string):number {
+  if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value))return NaN;
+  const year=Number(value.slice(0,4)),month=Number(value.slice(5,7)),day=Number(value.slice(8,10));
+  if(month<1||month>12||day<1||day>new Date(Date.UTC(year,month,0)).getUTCDate()||Number(value.slice(11,13))>23||Number(value.slice(14,16))>59||Number(value.slice(17,19))>59)return NaN;
+  return Date.parse(value);
+}
+function publishedTime(value:string):number {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value)?strictTime(`${value}T00:00:00Z`):strictTime(value);
+}
+
+/** Archive timestamps alone cannot establish precision, even when encoded as ISO. */
+function timePrecision(evidence:Evidence,source:Source):CadenceObservation['timePrecision'] {
+  const at=strictTime(evidence.publishedAt);
+  if(Number.isFinite(at)){
+    if(evidence.provenance==='official'&&['original','structured'].includes(evidence.textOrigin??''))return 'exact';
+    if(source.id==='tibo-public'&&source.kind==='timeline'&&source.url==='https://api.fxtwitter.com/2/profile/thsottiaux/statuses'&&evidence.textOrigin==='original'&&evidence.metadata?.sourceGroup==='fxembed:thsottiaux')return 'exact';
+    const post=canonicalUrl(evidence.url)?.match(/^https:\/\/x\.com\/thsottiaux\/status\/(\d{15,20})$/)?.[1];
+    if(post){
+      try{
+        const identity=BigInt(post),timestamp=Number((identity>>22n)+1288834974657n);
+        if(identity>0n&&identity<=0xffffffffffffffffn&&Number.isSafeInteger(timestamp)&&Math.abs(timestamp-at)<=1000)return 'exact';
+      }catch { /* An unverified archive time remains historical only. */ }
+    }
+  }
+  return /^\d{4}-\d{2}-\d{2}(?:T00:00:00(?:\.0+)?Z)?$/.test(evidence.publishedAt)?'date':'unknown';
+}
+
 function canonicalUrl(raw: string): string | undefined {
   try {
     const url = new URL(raw);
@@ -140,19 +167,25 @@ function contextStatement(primary: Evidence, latest: Map<string, Evidence[]>): {
 
 /** Latest known version first, then qualification: corrections cannot retain an old positive. */
 export function extractCadenceObservations(evidence: Evidence[], sources: Source[], cutoffAt: string): CadenceObservation[] {
-  const cutoff = Date.parse(cutoffAt);
+  const cutoff = strictTime(cutoffAt);
   if (!Number.isFinite(cutoff)) return [];
   const bySource = new Map(sources.map(source => [source.id, source]));
   const latest = new Map<string, Evidence[]>();
+  const accepted:Evidence[]=[];
   for (const item of evidence) {
     const source = bySource.get(item.sourceId);
-    const published = Date.parse(item.publishedAt), collected = Date.parse(item.collectedAt);
-    if (!source || !Number.isFinite(published) || !Number.isFinite(collected) || published > cutoff || collected > cutoff || !trustedEvidence(item, source)) continue;
+    const published = publishedTime(item.publishedAt), collected = strictTime(item.collectedAt);
+    if (!source || !Number.isFinite(published) || !Number.isFinite(collected) || published > cutoff || collected > cutoff || collected<published || !trustedEvidence(item, source)) continue;
+    accepted.push(item);
     const url = canonicalUrl(item.url)!;
     const versions = latest.get(url);
     if (!versions || collected > Date.parse(versions[0].collectedAt)) latest.set(url, [item]);
     else if (collected === Date.parse(versions[0].collectedAt)) versions.push(item);
   }
+  const sameVersion=(item:Evidence)=>`${canonicalUrl(item.url)}|${normalize(item.text)}|${item.parentId??''}|${item.publishedAt}|${item.textOrigin??''}`;
+  const firstKnown=new Map<string,number>();
+  for(const item of accepted){const signature=sameVersion(item),known=strictTime(item.collectedAt);firstKnown.set(signature,Math.min(firstKnown.get(signature)??Infinity,known));}
+  const byId=new Map(accepted.slice().sort((a,b)=>strictTime(a.collectedAt)-strictTime(b.collectedAt)).map(item=>[item.id,item]));
   const result: CadenceObservation[] = [];
   for (const [url, versions] of latest) {
     const statements = versions.map(version => {
@@ -163,7 +196,11 @@ export function extractCadenceObservations(evidence: Evidence[], sources: Source
     // Conflicting same-time source copies are not repaired by guessing.
     if (kinds.some(kind => kind === undefined) || new Set(kinds).size !== 1) continue;
     const item = versions[0];
-    result.push({ id: `cadence:${url}`, evidenceIds: [...new Set(statements.flatMap(statement => statement!.evidenceIds))].sort(), at: new Date(item.publishedAt).toISOString(), url, kind: kinds[0]! });
+    if(versions.some(version=>publishedTime(version.publishedAt)!==publishedTime(item.publishedAt)||timePrecision(version,bySource.get(version.sourceId)!)!==timePrecision(item,bySource.get(item.sourceId)!)))continue;
+    const evidenceIds=[...new Set(statements.flatMap(statement => statement!.evidenceIds))].sort();
+    const precision=timePrecision(item,bySource.get(item.sourceId)!);
+    const knownAt=Math.max(...evidenceIds.map(id=>{const support=byId.get(id)!;return firstKnown.get(sameVersion(support))!;}));
+    result.push({ id: `cadence:${url}`, evidenceIds, at: precision==='date'?item.publishedAt.slice(0,10):new Date(item.publishedAt).toISOString(), url, kind: kinds[0]!,timePrecision:precision,firstKnownAt:new Date(knownAt).toISOString() });
   }
   return result.sort((a, b) => Date.parse(a.at) - Date.parse(b.at) || a.id.localeCompare(b.id));
 }

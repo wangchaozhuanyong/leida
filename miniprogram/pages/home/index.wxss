@@ -60,3 +60,11 @@
 .timeline-head,.timeline-row,.timeline-note,.timeline-stages{position:relative;z-index:1}
 .timeline-symbol{opacity:0}
 .share-entry-poster{box-shadow:0 3px 8px #1b457326}
+
+/* Static observatory artwork blends into the same opaque page background. */
+.home-page{position:relative}
+.home-atmosphere{position:absolute;top:0;left:0;width:100%;height:66.6667vw;max-height:400px;z-index:0;pointer-events:none}
+.home-atmosphere-fade{position:absolute;top:0;left:0;width:100%;height:66.6667vw;max-height:400px;z-index:0;background:linear-gradient(180deg,#f2f5fb00 48%,#f2f5fb 100%);pointer-events:none}
+.home-page>.home-heading,.home-page>.freshness-detail,.home-page>status-panel,.home-page>.warning,.home-page>.status-timeline,.home-page>.timeline-time-note,.home-page>.instrument-actions,.home-page>.completion-records,.home-page>.share-entry,.home-page>.previous-records,.home-page>.activity-entry,.home-page>.section,.home-page>publication-card,.home-page>.card,.home-page>.foot{position:relative;z-index:1}
+.home-heading{flex-direction:column;align-items:flex-start;justify-content:center;gap:6px;min-height:124px;margin-bottom:12px}
+.home-heading .freshness-summary{justify-content:flex-start;min-height:28px;max-width:100%}

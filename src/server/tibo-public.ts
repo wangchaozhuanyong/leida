@@ -3,7 +3,7 @@ import {hasStandaloneContext} from './source-context';
 import {TiboTimelineError} from './tibo-timeline';
 import {randomUUID} from 'node:crypto';
 
-export const TIBO_PUBLIC_SOURCE:Source={id:'tibo-public',name:'Tibo 公开动态（免费）',kind:'timeline',url:'https://api.fxtwitter.com/2/profile/thsottiaux/statuses',enabled:false,validated:false,intervalMinutes:2,version:1,status:'unconnected'};
+export const TIBO_PUBLIC_SOURCE:Source={id:'tibo-public',name:'Tibo 公开动态（免费）',kind:'timeline',url:'https://api.fxtwitter.com/2/profile/thsottiaux/statuses',enabled:false,validated:false,intervalMinutes:10,collectionPolicy:'adaptive',version:1,status:'unconnected'};
 const USER_ID='1953337039510003712',LOOKBACK=24*3600_000,PARENT_RETRY_MS=15*60_000;
 type Incoming=Omit<Evidence,'id'|'hash'|'historical'>;
 type Obj=Record<string,unknown>;

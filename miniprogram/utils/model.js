@@ -210,6 +210,22 @@ function calendarModel(data, selected) {
 function noticeModel(data, preferences, read) {
   return data.notices.filter(notice => notice.status === 'active' && (notice.origin === 'admin' || notice.categories.some(category => ['announcement','result','correction'].includes(category)))).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).map(notice => ({ ...notice, time: displayTime(notice.createdAt), read: read.includes(notice.id), path: data.publications.some(item => item.id === notice.publicationId) ? `/pages/detail/index?publicationId=${encodeURIComponent(notice.publicationId)}` : '', missing: notice.origin !== 'admin' && !data.publications.some(item => item.id === notice.publicationId) }));
 }
+/** Public reading copy; ingestion metadata remains unchanged in the stored article. */
+function publicArticleSummary(article) {
+  if (article.contentOrigin !== 'template' || article.manualFields?.includes('summary')) return article.summary;
+  return article.summary
+    .replace('已保存发布说明；完整中文改动会在智能服务可用后自动补充。', '更新细节请查看官方发布说明。')
+    .replace(/^公开归档收录(?:产品动态|消息)：[“「]([\s\S]*?)[”」]。此条仅作(?:产品)?消息记录，完整细节请查看原文。$/, '$1')
+    .replace(/^根据(?:公开归档保存的原帖|公开原文)，/, '')
+    .replace(/\s*原文发布时间：[^。\n]*。这是中文事实摘要，/g, ' ')
+    .trim();
+}
+function publicArticleContent(article) {
+  const translation = article.translation?.trim() || '', summary = publicArticleSummary(article).trim() || translation;
+  const normalized = value => value.replace(/[\s\u200b\ufeff]+/g, '');
+  const hasAdditionalContent = !!translation && normalized(translation) !== normalized(summary) && normalized(translation) !== normalized(article.summary);
+  return { summary, body: translation || summary, hasAdditionalContent };
+}
 /** @param {PublicData} data @param {{publicationId?:string}} query */
 function resolveDetail(data, query) {
   const publication = data.publications.find(item => item.id === query.publicationId);
@@ -224,14 +240,20 @@ function resolveDetail(data, query) {
   const isOld = (newsOnly ? currentArticle.publicationId : currentEvent.publicationId) !== publication.id;
   const current = newsOnly ? data.publications.find(item => item.id === currentArticle.publicationId) : currentPublication(data, currentEvent);
   const ids = new Set([...(isNewsOnly(publication) ? publication.article.evidenceIds : publication.event.evidenceIds), ...(publication.article.contextEvidenceIds || [])]);
+  const seenSources = new Set();
+  const evidence = data.evidence.filter(item => ids.has(item.id)).sort((a,b) => Number(b.provenance === 'official') - Number(a.provenance === 'official')).filter(item => {
+    const key = `${item.publishedAt}:${item.text.replace(/\s+/g, ' ').trim()}`;
+    if (seenSources.has(key)) return false;
+    seenSources.add(key); return true;
+  });
   return {
-    missing: false, publicationId: publication.id, title: publication.article.title, summary: publication.article.summary, reviewStatus: publication.article.reviewStatus || '', reviewReasons: (publication.article.reviewReasons || []).join(''),
-    body: publication.article.translation || publication.article.summary, time: displayTime(articleSourceTime(publication.article)),
+    missing: false, publicationId: publication.id, title: publication.article.title, ...publicArticleContent(publication.article), reviewStatus: publication.article.reviewStatus || '', reviewReasons: (publication.article.reviewReasons || []).join(''),
+    time: displayTime(articleSourceTime(publication.article)),
     historical: isHistoricalArticle(publication.article, data.evidence), newsOnly, withdrawn, merged, isOld,
     version: newsOnly ? publication.article.version : publication.event.version, cutoff: displayTime(publication.cutoffAt), publishedAt: displayTime(publication.publishedAt), reason: publication.reason || '公开资料核验发布',
     canShare: !withdrawn && !merged, mergePath: targetPublication ? sharePath(targetPublication) : '', latestPath: !merged && isOld && current ? sharePath(current) : '',
     actions: newsOnly ? [] : publication.event.actions.map(action => ({ id: action.id, label: actionLabels[action.kind], stage: stageText(action, isOld || merged ? publication.cutoffAt : data.serverTime), eligibility: action.eligibility, scope: { public: '普发', targeted: '定向', private: '私人' }[action.scope], expectedAt: action.expectedAt ? displayTime(action.expectedAt) : action.timeNote || '尚未明确时间', quote: action.evidenceQuote || '' })),
-    evidence: data.evidence.filter(item => ids.has(item.id)).map(item => ({ id: item.id, label: { official: '官方资料', archive: '辅助归档', manual: '人工补充' }[item.provenance], text: item.text, origin: item.textOrigin === 'archive_excerpt' ? '归档保存的片段，不当作完整原帖' : item.textOrigin === 'structured' ? '结构化来源记录' : '原文记录', complete: item.contextComplete, time: displayTime(item.publishedAt), collectedAt: displayTime(item.collectedAt), url: safeUrl(item.url) || '', title: item.metadata && item.metadata.title || '', description: item.metadata && item.metadata.summary || '' }))
+    evidence: evidence.map(item => ({ id: item.id, label: { official: '官方原文', archive: '第三方收录', manual: '补充来源' }[item.provenance], text: item.text, origin: item.textOrigin === 'archive_excerpt' ? '仅收录原文片段' : item.textOrigin === 'structured' ? '来源摘要' : '', complete: item.contextComplete, time: displayTime(item.publishedAt), url: safeUrl(item.url) || '' }))
   };
 }
 /** Count calendar dates in the configured zone, without assuming every device has Intl. */
@@ -356,4 +378,4 @@ function forecastOutcomeModel(snapshot, data) {
   });
   return { available: true, entries, message: entries.length ? '按后续观测时间排列，最新记录在前。' : '尚无已关联的后续记录；不代表没有公告或不会发放。', note };
 }
-module.exports = { sourceStatus, actionLabels, preferenceDefaults, dateKey, displayTime, elapsed, completionTime, latestCompletedBenefits, completionElapsed, articleSourceTime, sortedArticles, isNewsOnly, currentPublication, statePublication, publicationSourceTime, sortedPublications, sortedStatePublications, publicActions, isHistoricalArticle, upcomingActions, announcementCountdown, resetOutlookModel, stageText, calendarDays, safeUrl, sharePath, publicationWithdrawn, publicationCard, calendarModel, noticeModel, resolveDetail, activityDayNumber, activityHomeVisible, activityModel, validateForecastSnapshot, validateForecastPublicData, probabilityText, forecastPath, forecastSnapshotModel, currentForecast, forecastReferenceModel, forecastOutcomeModel };
+module.exports = { publicArticleSummary, publicArticleContent, sourceStatus, actionLabels, preferenceDefaults, dateKey, displayTime, elapsed, completionTime, latestCompletedBenefits, completionElapsed, articleSourceTime, sortedArticles, isNewsOnly, currentPublication, statePublication, publicationSourceTime, sortedPublications, sortedStatePublications, publicActions, isHistoricalArticle, upcomingActions, announcementCountdown, resetOutlookModel, stageText, calendarDays, safeUrl, sharePath, publicationWithdrawn, publicationCard, calendarModel, noticeModel, resolveDetail, activityDayNumber, activityHomeVisible, activityModel, validateForecastSnapshot, validateForecastPublicData, probabilityText, forecastPath, forecastSnapshotModel, currentForecast, forecastReferenceModel, forecastOutcomeModel };

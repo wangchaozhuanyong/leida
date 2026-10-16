@@ -1,0 +1,11 @@
+<view class="navigation-space" style="height:{{totalHeight}}px" aria-hidden="true"></view>
+<view class="navigation-header" style="padding-top:{{statusBarHeight}}px">
+  <view class="navigation-inner {{back ? 'has-back' : ''}}" style="height:{{barHeight}}px;padding-right:{{rightInset}}px">
+    <button wx:if="{{back}}" class="navigation-back" bindtap="goBack" hover-class="navigation-pressed" aria-label="返回上一页，直接打开时返回首页"><view class="back-mark"></view></button>
+    <image wx:if="{{brand}}" class="navigation-logo" src="/assets/neural/radar-blue.png" mode="aspectFit" aria-hidden="true" />
+    <view class="navigation-copy">
+      <view class="navigation-title">{{title}}</view>
+      <view wx:if="{{brand}}" class="navigation-subtitle">MOYAO RESET RADAR</view>
+    </view>
+  </view>
+</view>

@@ -1,3 +1,4 @@
+<navigation-header title="分享海报" back="{{true}}" />
 <page-loader wx:if="{{navigationLoading}}" />
 <view wx:else class="page poster-page">
   <status-panel wx:if="{{!connected}}" loading="{{loading}}" error="{{error}}" unconfigured="{{unconfigured}}" bindretry="retry" />

@@ -3,7 +3,7 @@ import {createCipheriv,createDecipheriv,createHash,randomBytes} from 'node:crypt
 import {z} from 'zod';
 import {isCloudbaseClient,list,one,put,insert,transaction,type Client,type Table} from '../db';
 import type {Article,Evidence,Job,Notice,Publication,RadarEvent} from '../lib/types';
-import type {WechatSettings,WechatReader,WechatGrant,WechatCredit,WechatDelivery,WechatSubscriptionState} from '../lib/wechat';
+import type {WechatSettings,WechatReader,WechatGrant,WechatCredit,WechatDelivery,WechatSubscriptionState,WechatReminderPreferences} from '../lib/wechat';
 import {isHistoricalArticle} from '../lib/history';
 import {DomainError,id} from './domain';
 import {createWechatProvider,WechatServiceError} from './wechat-provider';
@@ -38,6 +38,19 @@ export function assertWechatPublication(publication:Publication,event?:RadarEven
 const fieldSchema=z.object({title:z.string().regex(/^thing\d{1,3}$/),status:z.string().regex(/^(?:thing|phrase)\d{1,3}$/),time:z.string().regex(/^(?:time|date)\d{1,3}$/)}).refine(fields=>new Set(Object.values(fields)).size===3,'模板字段不能重复');
 const publicQuotaActions=(publication:Publication)=>publication.event.actions.filter(action=>action.scope==='public'&&['automatic_reset','banked_reset'].includes(action.kind));
 const isQuotaPublication=(publication:Publication)=>publicQuotaActions(publication).length>0||publication.article.category==='reset'&&publication.event.actions.length===0;
+const reminderPreferencesSchema=z.object({announcement:z.boolean(),result:z.boolean(),correction:z.boolean()}).strict();
+const reminderTypes=['announcement','result','correction'] as const;
+const reminderPreferencesOf=(reader:WechatReader):WechatReminderPreferences=>({announcement:reader.reminderPreferences?.announcement??true,result:reader.reminderPreferences?.result??true,correction:reader.reminderPreferences?.correction??true});
+// A correction can also carry the original result/announcement categories. It
+// remains a correction so turning that type off cannot be bypassed by overlap.
+function reminderType(notice:Notice):keyof WechatReminderPreferences|undefined {
+  return notice.categories.includes('correction')?'correction':notice.categories.includes('result')?'result':notice.categories.includes('announcement')?'announcement':undefined;
+}
+function allowsReminder(reader:WechatReader,notice:Notice):boolean {
+  const type=reminderType(notice);if(!type||notice.origin==='admin')return false;
+  const enabledAt=reader.reminderEnabledAt?.[type];
+  return reminderPreferencesOf(reader)[type]&&(!enabledAt||Date.parse(notice.createdAt)>Date.parse(enabledAt));
+}
 export function wechatTemplateData(settings:WechatSettings,notice:Notice,publication?:Publication):Record<string,{value:string}> {
   let fields:WechatSettings['templateFields'];try {fields=fieldSchema.parse(settings.templateFields);}catch {throw new WechatServiceError('模板字段未配置或类型不兼容','configuration');}
   let status=notice.categories.includes('correction')?'重要更正':notice.categories.includes('result')?'公告称完成':notice.categories.includes('activity')?'活动更新':'发放预告';
@@ -172,6 +185,11 @@ export function createWechatService(dependencies:WechatDependencies={}) {
     const value=(await store.list<WechatReader>('wechat_readers',client)).find(item=>item.status==='active'&&item.appId===settings.appId&&item.sessions.some(session=>session.hash===sessionHash&&Date.parse(session.expiresAt)>clock()));
     if(!value)throw new DomainError('微信读者会话已过期，请重新授权',401);return value;
   }
+  async function lockedReader(sessionToken:string,client:Client):Promise<WechatReader> {
+    const value=await reader(sessionToken,client);await lock(client,value.id);
+    // Re-read after acquiring the same lock used by login/preferences writes.
+    return reader(sessionToken,client);
+  }
   async function wechatLogin(code:string):Promise<{sessionToken:string;expiresAt:string}> {
     const input=z.string().min(1).max(512).parse(code),settings=await usage('login');
     const openid=await provider.login(settings.appId,open(settings.encryptedSecret!),input);
@@ -180,21 +198,40 @@ export function createWechatService(dependencies:WechatDependencies={}) {
       await lock(client,readerId);const existing=await store.one<WechatReader>('wechat_readers',readerId,client);
       if(existing?.status==='disabled')throw new DomainError('微信提醒身份已停用',403);
       const sessions=[...(existing?.sessions??[]).filter(session=>Date.parse(session.expiresAt)>clock()).slice(-4),{hash:digest(sessionToken),createdAt:timestamp(),expiresAt}];
-      await store.put('wechat_readers',{id:readerId,appId:settings.appId,openidHash,encryptedOpenid:existing?.encryptedOpenid??seal(openid),status:'active',createdAt:existing?.createdAt??timestamp(),lastLoginAt:timestamp(),sessions} satisfies WechatReader,client);
+      await store.put('wechat_readers',{...existing,id:readerId,appId:settings.appId,openidHash,encryptedOpenid:existing?.encryptedOpenid??seal(openid),status:'active',createdAt:existing?.createdAt??timestamp(),lastLoginAt:timestamp(),sessions} satisfies WechatReader,client);
     });return {sessionToken,expiresAt};
   }
   async function subscriptionView(value:WechatReader,client?:Client):Promise<WechatSubscriptionState> {
-    const settings=await config(client);if(!ready(settings,'subscription'))return {configured:false,enabled:settings.subscriptionsEnabled,state:'unavailable'};
+    const preferences={reminderPreferences:reminderPreferencesOf(value),preferencesSupported:true};
+    const settings=await config(client);if(!ready(settings,'subscription'))return {configured:false,enabled:settings.subscriptionsEnabled,state:'unavailable',...preferences};
     const grant=await store.one<WechatGrant>('wechat_grants',`wxgrant_${digest(`${value.id}:${settings.templateId}`)}`,client);
     const deliveries=(await store.list<WechatDelivery>('wechat_deliveries',client)).filter(item=>item.readerId===value.id&&item.templateId===settings.templateId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
     const last=deliveries.find(item=>['sent','rejected','unknown','cancelled'].includes(item.status));
     const credits=creditsOf(grant);
-    return {configured:true,enabled:true,state:grant?.status==='challenged'&&Date.parse(grant.nonceExpiresAt)<clock()?'none':grant?.status??'none',templateId:settings.templateId,acceptedAt:grant?.acceptedAt,remainingCount:credits.filter(credit=>['available','reserved'].includes(credit.status)).length,pendingCount:credits.filter(credit=>credit.status==='reserved').length,lastResult:last?.status as WechatSubscriptionState['lastResult']};
+    return {configured:true,enabled:true,state:grant?.status==='challenged'&&Date.parse(grant.nonceExpiresAt)<clock()?'none':grant?.status??'none',templateId:settings.templateId,acceptedAt:grant?.acceptedAt,remainingCount:credits.filter(credit=>['available','reserved'].includes(credit.status)).length,pendingCount:credits.filter(credit=>credit.status==='reserved').length,lastResult:last?.status as WechatSubscriptionState['lastResult'],...preferences};
   }
   async function wechatSubscriptionState(sessionToken:string):Promise<WechatSubscriptionState> {return subscriptionView(await reader(sessionToken));}
+  async function saveWechatReminderPreferences(sessionToken:string,input:unknown):Promise<WechatSubscriptionState> {
+    const preferences=reminderPreferencesSchema.parse(input);
+    return store.transaction(async client=>{
+      // All scheduling/send claims take config before reader, then grant and
+      // delivery. A completed save therefore stops every not-yet-claimed send.
+      await lock(client,'wechat_config');const value=await lockedReader(sessionToken,client),previous=reminderPreferencesOf(value);
+      const enabledAt={...value.reminderEnabledAt};
+      for(const type of reminderTypes)if(!previous[type]&&preferences[type])enabledAt[type]=timestamp();
+      const next:WechatReader={...value,reminderPreferences:preferences,reminderEnabledAt:enabledAt};
+      await store.put('wechat_readers',next,client);
+      const notices=await store.list<Notice>('notices',client);
+      for(const delivery of await store.list<WechatDelivery>('wechat_deliveries',client))if(delivery.readerId===value.id&&delivery.status==='queued'){
+        const notice=notices.find(item=>item.id===delivery.noticeId);
+        if(!notice||!allowsReminder(next,notice))await finish(delivery,'cancelled','读者已关闭此类微信提醒',undefined,client);
+      }
+      return subscriptionView(next,client);
+    });
+  }
   async function wechatSubscriptionChallenge(sessionToken:string) {
     return store.transaction(async client=>{
-      const value=await reader(sessionToken,client),settings=await config(client);if(!ready(settings,'subscription'))throw new WechatServiceError('微信提醒尚未配置','configuration');
+      const value=await lockedReader(sessionToken,client),settings=await config(client);if(!ready(settings,'subscription'))throw new WechatServiceError('微信提醒尚未配置','configuration');
       const grantId=`wxgrant_${digest(`${value.id}:${settings.templateId}`)}`;await lock(client,grantId);const previous=await store.one<WechatGrant>('wechat_grants',grantId,client);
       const unresolved=(await store.list<WechatDelivery>('wechat_deliveries',client)).some(delivery=>delivery.readerId===value.id&&delivery.appId===settings.appId&&delivery.templateId===settings.templateId&&delivery.status==='unknown');
       if(unresolved)return {state:'unknown' as const,templateId:settings.templateId};
@@ -212,7 +249,7 @@ export function createWechatService(dependencies:WechatDependencies={}) {
   async function confirmWechatSubscription(sessionToken:string,input:unknown):Promise<WechatSubscriptionState> {
     const parsed=z.object({nonce:z.string().regex(/^[A-Za-z0-9_-]{43}$/),templateId:z.string().min(1).max(128),result:z.enum(['accept','reject','ban','filter'])}).parse(input);
     return store.transaction(async client=>{
-      const value=await reader(sessionToken,client),settings=await config(client);if(parsed.templateId!==settings.templateId||!ready(settings,'subscription'))throw new DomainError('订阅模板已变化，请重新操作',409);
+      const value=await lockedReader(sessionToken,client),settings=await config(client);if(parsed.templateId!==settings.templateId||!ready(settings,'subscription'))throw new DomainError('订阅模板已变化，请重新操作',409);
       const grantId=`wxgrant_${digest(`${value.id}:${settings.templateId}`)}`;await lock(client,grantId);const grant=await store.one<WechatGrant>('wechat_grants',grantId,client);
       if(!grant)throw new DomainError('订阅请求不存在或已失效',409);
       const receipt=digest(parsed.nonce),credits=creditsOf(grant);
@@ -228,7 +265,7 @@ export function createWechatService(dependencies:WechatDependencies={}) {
   }
   async function revokeWechatSubscription(sessionToken:string):Promise<WechatSubscriptionState> {
     return store.transaction(async client=>{
-      const value=await reader(sessionToken,client),settings=await config(client),grantId=`wxgrant_${digest(`${value.id}:${settings.templateId}`)}`;await lock(client,grantId);
+      const value=await lockedReader(sessionToken,client),settings=await config(client),grantId=`wxgrant_${digest(`${value.id}:${settings.templateId}`)}`;await lock(client,grantId);
       const grant=await store.one<WechatGrant>('wechat_grants',grantId,client);if(grant)await store.put('wechat_grants',withCredits({...grant,nonceExpiresAt:timestamp()},creditsOf(grant).map(credit=>['available','reserved','unknown'].includes(credit.status)?{...credit,status:'revoked' as const}:credit),'revoked'),client);
       for(const delivery of await store.list<WechatDelivery>('wechat_deliveries',client))if(delivery.readerId===value.id&&delivery.status==='queued')await store.put('wechat_deliveries',{...delivery,status:'cancelled',reason:'读者已取消提醒',finishedAt:timestamp()},client);
       return subscriptionView(value,client);
@@ -242,10 +279,12 @@ export function createWechatService(dependencies:WechatDependencies={}) {
       let scheduled=0;
       for(const previous of grants.filter(item=>item.appId===settings.appId&&item.templateId===settings.templateId&&item.status==='available'&&item.acceptedAt)) {
         if(scheduled>=WECHAT_DISPATCH_BATCH_SIZE)break;
-        await lock(client,previous.id);const grant=await store.one<WechatGrant>('wechat_grants',previous.id,client);if(!grant||grant.status!=='available'||grant.appId!==active.appId||grant.templateId!==active.templateId||!grant.acceptedAt)continue;
-        if(!readers.some(value=>value.id===grant.readerId&&value.status==='active'))continue;
+        await lock(client,previous.readerId);await lock(client,previous.id);const grant=await store.one<WechatGrant>('wechat_grants',previous.id,client);if(!grant||grant.status!=='available'||grant.appId!==active.appId||grant.templateId!==active.templateId||!grant.acceptedAt)continue;
+        // Preference writes share the configuration lock, so this batch read
+        // stays current without adding one database request per recipient.
+        const value=readers.find(item=>item.id===grant.readerId);if(!value||value.status!=='active'||value.appId!==active.appId)continue;
         const credits=creditsOf(grant);
-        const eligible=notices.filter(notice=>notice.origin!=='admin'&&notice.status==='active'&&notice.categories.some(category=>['announcement','result','correction'].includes(category))).sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
+        const eligible=notices.filter(notice=>notice.status==='active'&&allowsReminder(value,notice)).sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
         for(const notice of eligible) {
           const credit=credits.find(credit=>credit.status==='available'&&Date.parse(notice.createdAt)>Date.parse(credit.acceptedAt));if(!credit)continue;
           let pub:Publication;try{pub=await publication(notice.publicationId,client);}catch(error){if(error instanceof DomainError)continue;throw error;}
@@ -294,7 +333,7 @@ export function createWechatService(dependencies:WechatDependencies={}) {
     const settings=await config();
     if(!ready(settings,'subscription'))return {state:'deferred',resumeAt:new Date(clock()+15*60_000).toISOString(),reason:'微信提醒未配置或已关闭'};
     const [value,grant,notice]=await Promise.all([store.one<WechatReader>('wechat_readers',delivery.readerId),store.one<WechatGrant>('wechat_grants',delivery.grantId),store.one<Notice>('notices',delivery.noticeId)]);
-    let safe=value?.status==='active'&&value.appId===settings.appId&&delivery.appId===settings.appId&&delivery.templateId===settings.templateId&&grant?.status==='reserved'&&grant.deliveryId===delivery.id&&notice?.status==='active';
+    let safe=value?.status==='active'&&value.appId===settings.appId&&delivery.appId===settings.appId&&delivery.templateId===settings.templateId&&grant?.status==='reserved'&&grant.deliveryId===delivery.id&&notice?.status==='active'&&allowsReminder(value,notice);
     let verifiedPublication:Publication|undefined;
     if(safe)try{verifiedPublication=await publication(delivery.publicationId);if(!isQuotaPublication(verifiedPublication))safe=false;}catch(error){if(error instanceof DomainError)safe=false;else throw error;}
     if(!safe) {await store.transaction(client=>finish(delivery!,'cancelled','身份、授权、模板或对应内容已失效',undefined,client));return {state:'cancelled'};}
@@ -305,8 +344,9 @@ export function createWechatService(dependencies:WechatDependencies={}) {
     catch(error) {const budget=error instanceof WechatServiceError&&error.failureKind==='budget';return {state:'deferred',resumeAt:budget?tomorrow():new Date(clock()+15*60_000).toISOString(),reason:error instanceof WechatServiceError?error.message:'微信发送准备失败'};}
     let claimed=false,rateResumeAt:string|undefined;
     try {claimed=await store.transaction(async client=>{
-      await lock(client,'wechat_config');await lock(client,delivery!.grantId);await lock(client,deliveryId);const current=await store.one<WechatDelivery>('wechat_deliveries',deliveryId,client);const currentGrant=await store.one<WechatGrant>('wechat_grants',delivery!.grantId,client);const currentNotice=await store.one<Notice>('notices',delivery!.noticeId,client);const currentReader=await store.one<WechatReader>('wechat_readers',delivery!.readerId,client);
+      await lock(client,'wechat_config');await lock(client,delivery!.readerId);await lock(client,delivery!.grantId);await lock(client,deliveryId);const current=await store.one<WechatDelivery>('wechat_deliveries',deliveryId,client);const currentGrant=await store.one<WechatGrant>('wechat_grants',delivery!.grantId,client);const currentNotice=await store.one<Notice>('notices',delivery!.noticeId,client);const currentReader=await store.one<WechatReader>('wechat_readers',delivery!.readerId,client);
       if(current?.status!=='queued'||currentGrant?.status!=='reserved'||currentGrant.deliveryId!==deliveryId||currentNotice?.status!=='active'||currentReader?.status!=='active')return false;
+      if(!allowsReminder(currentReader,currentNotice)){await finish(current,'cancelled','读者已关闭此类微信提醒',undefined,client);return false;}
       await publication(current.publicationId,client);
       const currentSettings=await config(client);if(currentSettings.version!==settings.version)throw new WechatServiceError('微信配置已变化，暂缓发送','configuration');
       // The existing configuration lock serializes this check across workers/restarts.
@@ -319,9 +359,9 @@ export function createWechatService(dependencies:WechatDependencies={}) {
     try {await provider.send(token!,body!);await store.transaction(client=>finish(delivery!,'sent',undefined,0,client));return {state:'sent'};}
     catch(error) {const rejected=error instanceof WechatServiceError&&error.failureKind==='rejected',state=rejected?'rejected':'unknown';await store.transaction(client=>finish(delivery!,state,rejected?'微信未接受此次发送':'发送结果未知，停止自动重发',error instanceof WechatServiceError?error.errorCode:undefined,client));return {state};}
   }
-  return {adminWechat,publicWechatAvailability,saveWechatSettings,generateWechatCode,resolveWechatScene,wechatLogin,wechatSubscriptionState,wechatSubscriptionChallenge,confirmWechatSubscription,revokeWechatSubscription,scheduleWechatDeliveries,processWechatJob};
+  return {adminWechat,publicWechatAvailability,saveWechatSettings,generateWechatCode,resolveWechatScene,wechatLogin,wechatSubscriptionState,saveWechatReminderPreferences,wechatSubscriptionChallenge,confirmWechatSubscription,revokeWechatSubscription,scheduleWechatDeliveries,processWechatJob};
 }
 const service=createWechatService();
-export const {adminWechat,publicWechatAvailability,saveWechatSettings,generateWechatCode,resolveWechatScene,wechatLogin,wechatSubscriptionState,wechatSubscriptionChallenge,confirmWechatSubscription,revokeWechatSubscription,scheduleWechatDeliveries,processWechatJob}=service;
+export const {adminWechat,publicWechatAvailability,saveWechatSettings,generateWechatCode,resolveWechatScene,wechatLogin,wechatSubscriptionState,saveWechatReminderPreferences,wechatSubscriptionChallenge,confirmWechatSubscription,revokeWechatSubscription,scheduleWechatDeliveries,processWechatJob}=service;
 
 function recentWechatAttempts(deliveries:WechatDelivery[],clock:number){const attempts=deliveries.filter(d=>d.attemptedAt&&Date.parse(d.attemptedAt)>clock-1000);return {attempts:attempts.length,oldest:attempts.map(d=>d.attemptedAt!).sort()[0]};}

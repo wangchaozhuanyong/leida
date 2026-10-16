@@ -1,6 +1,7 @@
 /* Selected skin: silver-white neural network. Public routes only.
    Root selectors are evaluated on the server-rendered surface before hydration;
    management pages retain their existing dark canvas. */
+.pub-forecast-reference{margin-top:24px}.pub-forecast-types{display:flex;gap:24px;border-bottom:1px solid var(--pub-line);margin:12px 0 16px}.pub-forecast-types button{border:0;border-bottom:2px solid transparent;background:transparent;color:var(--pub-muted);padding:10px 0;min-height:44px;font-size:14px}.pub-forecast-types button[aria-pressed="true"]{border-bottom-color:var(--pub-cyan);color:var(--pub-cyan)}.pub-forecast-metrics{display:flex;gap:32px;margin-bottom:16px}.pub-forecast-metrics>div{flex:1;display:flex;flex-direction:column;gap:3px}.pub-forecast-metrics span{font-size:13px;color:var(--pub-muted)}.pub-forecast-metrics strong{font-size:34px;line-height:1.35;color:var(--pub-cyan);font-variant-numeric:tabular-nums}.pub-forecast-message{font-size:14px;line-height:1.8}.pub-forecast-meta{font-size:12px;color:var(--pub-muted);margin-top:9px!important}.pub-forecast-reference>.pub-text-link{display:flex;justify-content:space-between;min-height:44px;align-items:center;margin-top:12px}.pub-forecast-evaluation{padding-top:14px;margin-top:14px;border-top:1px solid var(--pub-line);font-size:13px;color:var(--pub-muted)}
 html:has(.public-surface) { background: #f2f5fb; color-scheme: light; }
 html:has(.public-surface) body { background: #f2f5fb; color: #14263e; }
 .public-surface {
@@ -292,4 +293,38 @@ html:has(.public-surface) body { background: #f2f5fb; color: #14263e; }
   .public-surface *, .public-surface *::before, .public-surface *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   /* Loading remains legible when its delayed reveal animation is disabled. */
   .public-surface .pub-page-loading > span { opacity: 1; }
+}
+
+/* Observatory masthead: a static, local image keeps the silver page canvas stable. */
+.public-surface .pub-shell { position: relative; isolation: isolate; }
+.public-surface .pub-topbar-identity { justify-content: flex-start; text-align: left; }
+.public-surface .pub-topbar-identity .pub-topbar-heading { align-items: flex-start; }
+.public-surface .pub-topbar .pub-brand { flex-direction: row; text-align: left; gap: 8px; }
+.public-surface .pub-topbar .pub-brand-mark { width: 28px; height: 30px; }
+.public-surface .pub-topbar .pub-brand strong { font-size: 13px; }
+.pub-home-atmosphere { position: absolute; inset: 0 0 auto 176px; height: 410px; z-index: -1; pointer-events: none; overflow: hidden; }
+.pub-home-atmosphere img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 58%; }
+.pub-home-atmosphere::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, #f2f5fb33 0%, #f2f5fb00 45%, #f2f5fb 100%); }
+.public-surface .route-home .pub-home-heading { min-height: 108px; align-items: flex-start; padding-top: 14px; }
+@media (min-width: 701px) and (max-width: 1180px) {
+  .pub-home-atmosphere { left: 148px; }
+  .public-surface .pub-topbar .pub-brand { gap: 6px; }
+  .public-surface .pub-topbar .pub-brand-mark { width: 24px; height: 27px; }
+  .public-surface .pub-topbar .pub-brand strong { font-size: 11.5px; }
+}
+@media (max-width: 700px) {
+  .public-surface .pub-topbar, .public-surface .pub-topbar-identity { min-height: 60px; height: 60px; }
+  .public-surface .pub-topbar-identity .pub-topbar-heading { align-items: center; }
+  .public-surface .pub-topbar .pub-brand { gap: 9px; }
+  .public-surface .pub-topbar .pub-brand-mark { width: 31px; height: 32px; }
+  .public-surface .pub-topbar .pub-brand strong { font-size: 16px; }
+  .pub-home-atmosphere { left: 0; top: 60px; height: min(66.6667vw, 400px); }
+  .pub-home-atmosphere img { object-fit: fill; }
+  .pub-home-atmosphere::after { background: linear-gradient(180deg, #f2f5fb00 48%, #f2f5fb 100%); }
+  .public-surface .route-home .pub-home-heading { flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px; min-height: 124px; margin-bottom: 12px; padding-top: 0; }
+  .public-surface .route-home .pub-freshness { margin-left: 0; }
+  .public-surface .route-home .pub-freshness > summary { justify-content: flex-start; min-height: 28px; }
+  .public-surface .route-home .pub-freshness > div { left: 0; right: auto; }
+  .public-surface .pub-topbar-heading { min-width: 0; }
+  .public-surface .pub-topbar-title { overflow: hidden; text-overflow: ellipsis; }
 }
