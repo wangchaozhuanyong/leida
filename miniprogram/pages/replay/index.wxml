@@ -1,3 +1,4 @@
+<navigation-header title="历史消息回放" back="{{true}}" />
 <page-loader wx:if="{{loading && !view}}" />
 <view wx:else class="page">
  <view class="card"><view class="heading">近一个月历史回放</view><view class="prose muted">真实消息 · 历史模拟。预测按每一步固定保存，与实时记录分别统计。</view></view>

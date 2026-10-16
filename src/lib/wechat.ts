@@ -9,16 +9,21 @@ export interface WechatSettings {
   deliveries?:{queued:number;sent:number;rejected:number;unknown:number;cancelled:number};
 }
 export type WechatGrantState='challenged'|'available'|'reserved'|'consumed'|'rejected'|'revoked'|'unknown';
+export interface WechatReminderPreferences {announcement:boolean;result:boolean;correction:boolean;}
 export interface WechatSubscriptionState {
   configured:boolean; enabled:boolean; state:'unavailable'|'none'|WechatGrantState;
   templateId?:string; acceptedAt?:string;
   remainingCount?:number; pendingCount?:number;
   lastResult?:'sent'|'rejected'|'unknown'|'cancelled';
+  reminderPreferences?:WechatReminderPreferences; preferencesSupported?:boolean;
 }
 export interface WechatReader {
   id:string; appId:string; openidHash:string; encryptedOpenid:string;
   status:'active'|'disabled'; createdAt:string; lastLoginAt:string;
   sessions:{hash:string;createdAt:string;expiresAt:string}[];
+  reminderPreferences?:WechatReminderPreferences;
+  /** Re-enabling a type does not replay messages published while it was off. */
+  reminderEnabledAt?:Partial<Record<keyof WechatReminderPreferences,string>>;
 }
 export interface WechatGrant {
   id:string; readerId:string; appId:string; templateId:string; status:WechatGrantState;

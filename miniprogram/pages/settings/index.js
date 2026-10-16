@@ -1,7 +1,7 @@
 const { createPage } = require('../../utils/page');
 const { noticeModel } = require('../../utils/model');
 // Bundled client version; keep this aligned with the development-tool upload.
-const buildVersion = '1.0.14';
+const buildVersion = '1.0.15';
 Page(createPage((data, query, page, app) => {
   const stored=app.preferences.snapshot(),notices=data?noticeModel(data,stored.preferences,stored.read):[];
   return { notices:notices.slice(0,3),unread:notices.filter(n=>!n.read).length,storageError:stored.error };
@@ -33,6 +33,18 @@ Page(createPage((data, query, page, app) => {
     return work.then(()=>{if(this._visible&&!reader.getState().error)return this.loadWechat();});
   },
   async revokeWechat(){this._wechatPrivacyAction='close';const reader=getApp().wechat;if(reader){await reader.revoke({userInitiated:true});if(this._visible&&!reader.getState().privacyNeeded&&!reader.getState().error)await this.loadWechat();}},
-  agreeWechatPrivacy(){if(this._wechatPrivacyAction==='close')return this.revokeWechat();return this.loadWechat();},
+  changeWechatPreference(event){
+    const key=event.currentTarget.dataset.kind,reader=getApp().wechat;
+    if(!reader||!['announcement','result','correction'].includes(key)||typeof event.detail?.value!=='boolean')return;
+    const state=reader.getState();if(!state.canChooseTypes)return;
+    return this.saveWechatPreferences({...state.reminderPreferences,[key]:event.detail.value});
+  },
+  async saveWechatPreferences(preferences){
+    this._wechatPrivacyAction='preferences';this._wechatPendingPreferences=preferences;
+    const reader=getApp().wechat;if(!reader)return;
+    await reader.savePreferences(preferences,{userInitiated:true});
+    if(!reader.getState().privacyNeeded)this._wechatPendingPreferences=null;
+  },
+  agreeWechatPrivacy(){if(this._wechatPrivacyAction==='close')return this.revokeWechat();if(this._wechatPrivacyAction==='preferences'&&this._wechatPendingPreferences)return this.saveWechatPreferences(this._wechatPendingPreferences);return this.loadWechat();},
   openPrivacyContract(){if(typeof wx.openPrivacyContract==='function')wx.openPrivacyContract({fail(){wx.showToast({title:'隐私指引暂不可用',icon:'none'});}});}
 } }));

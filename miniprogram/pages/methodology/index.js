@@ -1,5 +1,5 @@
 const m = require('../../utils/model');
-const { cadenceModel } = require('../../utils/cadence');
+const { cadenceModel, cadenceSnapshotId, validateCadenceSnapshot } = require('../../utils/cadence');
 const horizonRows = (data, id) => (data && data.cadenceHorizonOutcomes || []).filter(row => id ? row.snapshotId === id : Object.values(data.cadenceByKind || {}).some(snapshot=>snapshot.id===row.snapshotId)).map(row => ({ id:row.id, label:row.target==='banked_reset'?'重置卡发放':'用量重置', horizon:row.horizonHours, result:row.result==='occurred'?'已找到对应公开动态':row.result==='not_occurred'?'覆盖已核验，未发现对应动态':'暂不能判断', end:m.displayTime(row.windowEnd), actual:row.actualAt?m.displayTime(row.actualAt):'', note:row.scorable?'已加入可评分记录':'资料不完整或消息晚采，未计入预测成绩' }));
 const validId = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,179}$/.test(value);
 Page({
@@ -9,7 +9,7 @@ Page({
     this._snapshotId = this._cadenceId || params && params.snapshot || '';
     this._visible = true;
     this.setData({ fixed: !!this._snapshotId, isCadence:!!this._cadenceId, target:params && params.target==='banked_reset'?'banked_reset':'automatic_reset' });
-    if (this._snapshotId && !validId(this._snapshotId)) this.setData({ fixedError: '记录链接无效，请返回查看其他记录。' });
+    if (this._snapshotId && !(this._cadenceId ? cadenceSnapshotId(this._snapshotId) : validId(this._snapshotId))) this.setData({ fixedError: '记录链接无效，请返回查看其他记录。' });
     else if (this._snapshotId) void this.loadFixed();
   },
   onShow() {
@@ -55,7 +55,7 @@ Page({
     this.setData({ outcomes: snapshot ? m.forecastOutcomeModel(snapshot, data) : null });
   },
   async loadFixed() {
-    if (!validId(this._snapshotId) || this.data.fixedLoading) return;
+    if (!(this._cadenceId ? cadenceSnapshotId(this._snapshotId) : validId(this._snapshotId)) || this.data.fixedLoading) return;
     const epoch = this._fixedEpoch = (this._fixedEpoch || 0) + 1;
     this._fixedSnapshot = null;
     this.setData({ fixedLoading: true, fixedError: '', forecast: null, reference: null, outcomes: null });
@@ -65,7 +65,7 @@ Page({
       if (epoch !== this._fixedEpoch || !this._visible) return;
       if(this._cadenceId){
         const snapshot=result.data;
-        if(!snapshot || snapshot.id!==this._snapshotId || !Number.isFinite(Date.parse(snapshot.generatedAt)) || !Number.isFinite(Date.parse(snapshot.validUntil)) || !['ready','insufficient','paused','out_of_range'].includes(snapshot.status))throw new Error('预测记录格式不完整，请稍后重新读取。');
+        if(!validateCadenceSnapshot(snapshot) || snapshot.id!==this._snapshotId)throw new Error('预测记录格式不完整，请稍后重新读取。');
         const view=cadenceModel(null,snapshot.generatedAt,snapshot.target||'automatic_reset',snapshot);
         this.setData({ cadenceSnapshot:snapshot,cadenceNow:snapshot.generatedAt,cadenceNote:view.legacy?'此旧记录仅用于复盘，不作为当前预测。':'这份记录固定保留生成时的概率和窗口，后续资料不会重写。' });
         return;
@@ -82,7 +82,7 @@ Page({
     }
   },
   retryFixed() { void this.loadFixed(); },
-  openCadence(event) { const id=event.currentTarget.dataset.id;if(validId(id))wx.navigateTo({url:`/pages/methodology/index?cadence=${encodeURIComponent(id)}`}); },
+  openCadence(event) { const id=event.currentTarget.dataset.id;if(cadenceSnapshotId(id))wx.navigateTo({url:`/pages/methodology/index?cadence=${encodeURIComponent(id)}`}); },
   openReplay() { wx.navigateTo({url:'/pages/replay/index'}); },
   openForecast() { const forecast = this.data.forecast; if (forecast) wx.navigateTo({ url: forecast.path }); },
   copySignal() { const url = this.data.forecast && this.data.forecast.url; if (url) wx.setClipboardData({ data: url }); },

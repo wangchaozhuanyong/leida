@@ -10,7 +10,7 @@ function createPage(build, extra = {}) {
   function foreground(page, work) {
     const generation=(page._navigationGeneration||0)+1;page._navigationGeneration=generation;
     // Request state, rather than navigation, owns the content loader.
-    const finish=()=>{if(page._visible&&generation===page._navigationGeneration){page.setData({navigationLoading:false});if(extra.afterRender)extra.afterRender.call(page);}};
+    const finish=()=>{if(page._visible&&generation===page._navigationGeneration){if(page.data.navigationLoading)page.setData({navigationLoading:false});if(extra.afterRender)extra.afterRender.call(page);}};
     const pending=typeof work==='function'?work():work;
     if(pending&&typeof pending.then==='function')return Promise.resolve(pending).catch(()=>{}).finally(finish);
     finish();
@@ -21,6 +21,7 @@ function createPage(build, extra = {}) {
     const cutoff = data && data.publications.reduce((latest, item) => item.cutoffAt > latest ? item.cutoffAt : latest, '');
     const pagination=state.page||null;
     const patch={ navigationLoading: !data && !!state.loading, initialLoading: !data && !!state.loading, refreshing: !!data && !!state.loading && !state.loadingMore, loadingMore: !!state.loadingMore, moreError: state.moreError || '', updateAvailable: !!state.updateAvailable, loading: state.loading, connected: !!data, unconfigured: state.unconfigured, error: state.error, cutoff: displayTime(cutoff), pagination, ...(build(clockData, page._params || {}, {...page.data,pagination}, getApp()) || {}) };
+    if(extra.title)patch.navigationTitle=extra.title({...page.data,...patch}) || '';
     const generation=(page._renderGeneration||0)+1;page._renderGeneration=generation;
     const current=()=>page._visible&&generation===page._renderGeneration;
     const measure=callback=>{
@@ -46,7 +47,7 @@ function createPage(build, extra = {}) {
       };
       if(Object.keys(changed).length)page.setData(changed,afterCommit);else afterCommit();
       if(extra.title&&typeof wx.setNavigationBarTitle==='function'){
-        const title=extra.title(page.data);
+        const title=patch.navigationTitle;
         if(title&&title!==page._navigationTitle){page._navigationTitle=title;wx.setNavigationBarTitle({title});}
       }
       if (extra.afterRender) extra.afterRender.call(page);

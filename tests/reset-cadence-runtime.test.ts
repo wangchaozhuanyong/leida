@@ -64,7 +64,7 @@ test('按实际采集间隔判断新鲜度，不把降频后的健康来源误�
  assert.equal(cadenceSourcesAvailable([source],[source.id],later),false);
 });
 test('无变化只在六小时固定节点或到期结算点运行，新事实与更正立即失效',()=>{
- const runtime={id:'forecast_runtime',checkedAt:now,nextDueAt:cadenceNextFixedAt(now),cadenceModelVersion:RESET_CADENCE_MODEL_VERSION,inputsRevision:'a',cadenceSnapshotId:'auto',cadenceSnapshotIds:{automatic_reset:'auto',banked_reset:'bank'}};
+ const runtime={id:'forecast_runtime',checkedAt:now,nextDueAt:cadenceNextFixedAt(now),cadencePublicProjection:{version:'cadence-public-20261016-1' as const,digest:'fixture',snapshots:[],horizonOutcomes:[]},cadenceModelVersion:RESET_CADENCE_MODEL_VERSION,inputsRevision:'a',cadenceSnapshotId:'auto',cadenceSnapshotIds:{automatic_reset:'auto',banked_reset:'bank'}};
  assert.equal(forecastCycleDue(runtime,'a',new Date(time+60_000).toISOString()),false);
  assert.equal(forecastCycleDue(runtime,'b',new Date(time+60_000).toISOString()),true);
  assert.equal(forecastCycleDue(runtime,'a',new Date(time+60_000).toISOString(),true),true);

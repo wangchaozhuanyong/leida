@@ -2,6 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import type { PublicData } from '../src/lib/types';
+import { POST } from '../src/app/api/wechat/[...path]/route';
+
+test('微信提醒偏好HTTP接口拒绝未认证与非法格式，不访问数据库',async()=>{
+  const context={params:Promise.resolve({path:['subscription','preferences']})};
+  const unauthenticated=await POST(new Request('http://127.0.0.1/api/wechat/subscription/preferences',{method:'POST',body:JSON.stringify({announcement:true,result:true,correction:true})}),context);
+  assert.equal(unauthenticated.status,401);assert.equal(unauthenticated.headers.get('cache-control'),'no-store');
+  for(const value of [{announcement:true,result:true}, {announcement:true,result:'false',correction:true},{announcement:true,result:true,correction:true,readerId:'another-reader'}]){
+    const response=await POST(new Request('http://127.0.0.1/api/wechat/subscription/preferences',{method:'POST',headers:{authorization:`Bearer ${'a'.repeat(43)}`,'content-type':'application/json'},body:JSON.stringify(value)}),context);
+    assert.equal(response.status,400);assert.equal(response.headers.get('cache-control'),'no-store');
+  }
+});
 
 // HTTP verification runs only against the runner-created, isolated QA database.
 // No successful reader login, settings write or real WeChat call is performed.
@@ -40,6 +51,7 @@ test('微信公共与读者接口：未配置保护、固定场景、身份隔�
       ['/api/wechat/subscription', 'GET', undefined],
       ['/api/wechat/subscription/challenge', 'POST', undefined],
       ['/api/wechat/subscription/confirm', 'POST', { nonce: 'isolated-nonce', templateId: 'isolated-template', result: 'accept' }],
+      ['/api/wechat/subscription/preferences', 'POST', { announcement:true,result:true,correction:true }],
       ['/api/wechat/subscription', 'DELETE', undefined],
     ] as const) { const result = await request(path, method, body); assert.equal(result.response.status, 401, `${method} ${path}`); assert.match(result.value.error, /先|会话|连接/); }
   });

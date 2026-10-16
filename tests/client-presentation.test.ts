@@ -40,12 +40,15 @@ test('详情页属于原有导航分类',()=>{
   assert.equal(publicNavSection('articles'),'news');assert.equal(publicNavSection('activities'),'news');
   assert.equal(publicNavSection('notices'),'settings');
 });
-test('详情合并证据入口后，动作独有证据仍完整可达且不重复',()=>{
+test('详情只展示一份重复来源，动作独有的不同原文仍可达',()=>{
   const data=fixture();
+  data.evidence.push({...evidence('action-only'),text:'动作独有的补充原文。'});
+  data.publications[0].event.actions[0].evidenceIds.push('action-only');
   const html=renderToStaticMarkup(createElement(SearchParamsContext.Provider,{value:new URLSearchParams()},createElement(EventPage,{data,id:'event',onPoster(){},onShare:async()=>{}})));
-  assert.equal((html.match(/href="\/sources\/source-a"/g)||[]).length,1);
-  assert.equal((html.match(/href="\/sources\/source-b"/g)||[]).length,1);
-  assert.match(html,/原文依据（2条）/);assert.doesNotMatch(html,/发放依据（/);
+  assert.equal((html.match(/测试公开原文/g)||[]).length,1);
+  assert.match(html,/href="https:\/\/example.com\/source-a"/);
+  assert.match(html,/href="https:\/\/example.com\/action-only"/);
+  assert.match(html,/查看来源/);assert.doesNotMatch(html,/相同内容的另外|辅助归档/);
   assert.match(html,/个人账户是否到账尚未观测/);assert.match(html,/原帖未列明具体套餐/);
 });
 test('等待期间完成公告前置，明确预告才进入倒计时布局',()=>{

@@ -28,7 +28,7 @@ export function WechatEntryGuide({publicationId,codeAvailable=false}:{publicatio
   }
   return <div className="pub-wechat-entry">
     <p>在微信中打开：<strong>{appName}</strong></p>
-    <ol><li>打开微信，使用“搜一搜”查找上方名称，选择“小程序”。</li><li>点击底部“提醒”，即可查看已有次数。</li><li>按需要开启、增加次数或关闭提醒。</li></ol>
+    <ol><li>打开微信，使用“搜一搜”查找上方名称，选择“小程序”。</li><li>点击底部“提醒”，查看次数并选择要接收的类型。</li><li>按需要开启、增加次数或关闭提醒。</li></ol>
     {publicationId&&codeAvailable&&<>{image?<figure className="pub-mini-entry-code"><img src={image} width="208" height="208" alt="微信扫码进入模钥重置雷达小程序"/><figcaption>扫码进入后，点击底部“提醒”。<br/>同一部手机可按上方步骤从微信查找。</figcaption></figure>:<button className="pub-button full" disabled={busy} onClick={()=>void showCode()}>{busy?'正在获取小程序码…':'显示小程序码'}</button>}</>}
     {message&&<p role="status">{message}</p>}
   </div>;

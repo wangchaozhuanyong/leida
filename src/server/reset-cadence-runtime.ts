@@ -3,17 +3,18 @@ import {insert,list,one,put,pool,type Client} from '../db';
 import type {Evidence,Source} from '../lib/types';
 import {forecastSourceAvailable,type ForecastCadenceOutcome,type CadenceHorizonOutcome,type CadenceEvaluation} from '../lib/forecast';
 import {buildResetCadenceForecast,RESET_CADENCE_MODEL_VERSION,type ResetCadenceForecast,type CadenceTarget,type CadenceObservation} from '../lib/reset-cadence';
+import {CADENCE_PUBLIC_PROJECTION_VERSION,createCadencePublicProjection,type CadencePublicProjection} from './cadence-public-projection';
 import {extractCadenceObservations} from './reset-cadence-evidence';
 
 export interface StoredCadenceForecast extends ResetCadenceForecast {recordType:'reset_cadence';sourceIds:string[];inputFingerprint:string;evaluationSample?:boolean;}
 export type CadenceOutcome=ForecastCadenceOutcome;
-export interface CadenceRuntime {id:string;checkedAt:string;nextDueAt?:string;inputsRevision?:string;cadenceModelVersion?:string;cadenceSnapshotId?:string;cadenceSnapshotIds?:Partial<Record<CadenceTarget,string>>;cadenceEvaluationByKind?:Partial<Record<CadenceTarget,CadenceEvaluation>>;}
+export interface CadenceRuntime {id:string;checkedAt:string;nextDueAt?:string;inputsRevision?:string;cadenceModelVersion?:string;cadencePublicProjection?:CadencePublicProjection;cadenceSnapshotId?:string;cadenceSnapshotIds?:Partial<Record<CadenceTarget,string>>;cadenceEvaluationByKind?:Partial<Record<CadenceTarget,CadenceEvaluation>>;}
 export const CADENCE_TARGETS:CadenceTarget[]=['automatic_reset','banked_reset'];
 export const cadenceNextFixedAt=(timestamp:string)=>new Date((Math.floor(Date.parse(timestamp)/(6*3600_000))+1)*6*3600_000).toISOString();
 /** Publication/correction paths call this in their existing transaction. No schema or read-side writes. */
 export async function markForecastInputsChanged(client:Client=pool):Promise<void>{await put('settings',{id:'forecast_inputs',revision:createHash('sha256').update(`${Date.now()}:${Math.random()}`).digest('hex')},client);}
 export function forecastCycleDue(runtime:CadenceRuntime|undefined,inputsRevision:string|undefined,timestamp:string,changed=false):boolean {
- return changed||runtime?.cadenceModelVersion!==RESET_CADENCE_MODEL_VERSION||!runtime?.cadenceSnapshotIds?.automatic_reset||!runtime.cadenceSnapshotIds.banked_reset||runtime.inputsRevision!==inputsRevision||!Number.isFinite(Date.parse(runtime.nextDueAt??''))||Date.parse(timestamp)>=Date.parse(runtime.nextDueAt!);
+ return changed||runtime?.cadencePublicProjection?.version!==CADENCE_PUBLIC_PROJECTION_VERSION||runtime?.cadenceModelVersion!==RESET_CADENCE_MODEL_VERSION||!runtime?.cadenceSnapshotIds?.automatic_reset||!runtime.cadenceSnapshotIds.banked_reset||runtime.inputsRevision!==inputsRevision||!Number.isFinite(Date.parse(runtime.nextDueAt??''))||Date.parse(timestamp)>=Date.parse(runtime.nextDueAt!);
 }
 const digest=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export const isCadence=(value:unknown):value is StoredCadenceForecast=>!!value&&typeof value==='object'&&'recordType' in value&&value.recordType==='reset_cadence';
@@ -63,7 +64,7 @@ export function evaluateCadence(snapshots:StoredCadenceForecast[],outcomes:Caden
 }
 
 /** This forecasts public messages. It never publishes a reset or sends reader notifications. */
-export async function executeResetCadence(client:Client,evidence:Evidence[],sources:Source[],timestamp:string):Promise<{snapshotId:string;snapshotIds:Partial<Record<CadenceTarget,string>>;snapshots:number;outcomes:number;evaluationByKind:Partial<Record<CadenceTarget,CadenceEvaluation>>;nextDueAt:string}> {
+export async function executeResetCadence(client:Client,evidence:Evidence[],sources:Source[],timestamp:string):Promise<{snapshotId:string;snapshotIds:Partial<Record<CadenceTarget,string>>;snapshots:number;outcomes:number;evaluationByKind:Partial<Record<CadenceTarget,CadenceEvaluation>>;nextDueAt:string;publicProjection:CadencePublicProjection}> {
  const observations=extractCadenceObservations(evidence,sources,timestamp);
  // Disabling polling pauses future predictions, but does not retract an unchanged public fact.
  const resolutionObservations=extractCadenceObservations(evidence,sources.map(source=>({...source,enabled:true})),timestamp);
@@ -103,7 +104,9 @@ export async function executeResetCadence(client:Client,evidence:Evidence[],sour
   }
  }
  for(const target of CADENCE_TARGETS)evaluationByKind[target]=evaluateCadence(stored,existingOutcomes,target,timestamp);
- return {snapshotId:snapshotIds.automatic_reset!,snapshotIds,snapshots,outcomes,evaluationByKind,nextDueAt};
+ const visibleIds=new Set([...Object.values(snapshotIds),...stored.slice().sort((a,b)=>Date.parse(b.generatedAt)-Date.parse(a.generatedAt)||a.id.localeCompare(b.id)).slice(0,12).map(s=>s.id)]);
+ const visible=stored.filter(s=>visibleIds.has(s.id)),publicProjection=createCadencePublicProjection(visible,publicCadenceHorizonOutcomes(existingOutcomes,visible,timestamp));
+ return {snapshotId:snapshotIds.automatic_reset!,snapshotIds,snapshots,outcomes,evaluationByKind,nextDueAt,publicProjection};
 }
 
 export async function getCadenceSnapshot(id:string,client:Client):Promise<StoredCadenceForecast|undefined> {

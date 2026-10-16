@@ -21,7 +21,8 @@
     "backgroundColorTop": "#f2f5fb",
     "backgroundColorBottom": "#f2f5fb",
     "backgroundTextStyle": "dark",
-    "enablePullDownRefresh": true
+    "enablePullDownRefresh": true,
+    "navigationStyle": "custom"
   },
   "tabBar": {
     "color": "#4d607b",
@@ -59,7 +60,8 @@
     "status-panel": "/components/status-panel/index",
     "publication-card": "/components/publication-card/index",
     "instrument-dial": "/components/instrument-dial/index",
-    "page-loader": "/components/page-loader/index"
+    "page-loader": "/components/page-loader/index",
+    "navigation-header": "/components/navigation-header/index"
   },
   "sitemapLocation": "sitemap.json"
 }

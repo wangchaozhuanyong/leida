@@ -1,5 +1,8 @@
 <page-meta root-background-color="#f2f5fb" page-style="background-color:#f2f5fb" />
+<navigation-header title="模钥重置雷达" brand="{{true}}" />
 <view class="page home-page">
+  <image class="home-atmosphere" src="/assets/neural/observatory-header.jpg" mode="aspectFill" aria-hidden="true" />
+  <view class="home-atmosphere-fade" aria-hidden="true" />
   <view class="home-heading"><view class="home-heading-copy"><view class="home-heading-title">Codex重置</view><view class="home-heading-subtitle">不要错过每一次重置。</view></view><view class="freshness-summary" bindtap="toggleFreshness" role="button" aria-label="公开资料状态" aria-expanded="{{freshnessOpen}}"><view class="health-dot {{sourceDelayed || error ? 'delayed' : ''}}"></view><text>{{error ? connected ? '更新暂时中断' : '暂时无法连接' : connected ? sourceStatusLabel : loading ? '加载中' : '等待连接公开资料'}}</text><text class="info-symbol">ⓘ</text></view></view>
   <view wx:if="{{freshnessOpen && connected}}" class="freshness-detail"><view>最近采集成功：{{collectedAt}} · 北京时间</view><view>最新消息发布于：{{latestSourceTime}} · 北京时间</view><view class="muted">成功时间来自最近成功的来源，不代表所有来源同时更新。</view></view>
   <status-panel wx:if="{{!connected}}" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />

@@ -1,5 +1,5 @@
 import { apiError, body, json } from '@/server/http';
-import { confirmWechatSubscription, revokeWechatSubscription, wechatLogin, wechatSubscriptionChallenge, wechatSubscriptionState } from '@/server/wechat';
+import { confirmWechatSubscription, revokeWechatSubscription, saveWechatReminderPreferences, wechatLogin, wechatSubscriptionChallenge, wechatSubscriptionState } from '@/server/wechat';
 
 export const dynamic = 'force-dynamic';
 function readerToken(request: Request): string {
@@ -25,6 +25,7 @@ export async function POST(request: Request, context: { params: Promise<{ path: 
       }
       case 'subscription/challenge': return json(await wechatSubscriptionChallenge(readerToken(request)));
       case 'subscription/confirm': return json(await confirmWechatSubscription(readerToken(request), await body(request)));
+      case 'subscription/preferences': return json(await saveWechatReminderPreferences(readerToken(request), await body(request)));
       default: return missing();
     }
   } catch (error) { return apiError(error); }

@@ -1,3 +1,4 @@
+<navigation-header title="观察记录" back="{{true}}" />
 <page-loader wx:if="{{navigationLoading || fixedLoading}}" />
 <view wx:else>
 <view class="page">

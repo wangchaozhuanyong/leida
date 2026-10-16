@@ -72,6 +72,16 @@ export function publicArticleSummary(article: Article): string {
     .replace(/\s*原文发布时间：[^。\n]*。这是中文事实摘要，/g, ' ')
     .trim();
 }
+/** Compare displayed content without treating layout-only whitespace as another article. */
+export function publicArticleContent(article: Article): { summary: string; body: string; hasAdditionalContent: boolean } {
+  const translation = article.translation?.trim() ?? '';
+  const summary = publicArticleSummary(article).trim() || translation;
+  const body = translation || summary;
+  const comparable = (value: string) => value.replace(/[\s\u200b\ufeff]+/g, '');
+  const hasAdditionalContent = !!translation && comparable(translation) !== comparable(summary)
+    && comparable(translation) !== comparable(article.summary);
+  return { summary, body, hasAdditionalContent };
+}
 export const safeUrl = (url: string) => { try { const parsed = new URL(url); return ['https:', 'http:'].includes(parsed.protocol) ? parsed.href : undefined; } catch { return undefined; } };
 export function elapsed(value: string, now: string) {
   const minutes = Math.max(0, Math.floor((Date.parse(now) - Date.parse(value)) / 60000));

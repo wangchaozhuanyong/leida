@@ -54,21 +54,39 @@ export class CloudbaseRpc {
     this.#token = apiKey;
     this.#fetch = transport;
   }
-  async call<T>(operation: CloudbaseOperation, params: Record<string, unknown> = {}): Promise<T> {
+  async call<T>(operation: CloudbaseOperation, params: Record<string, unknown> = {}, options: {signal?: AbortSignal} = {}): Promise<T> {
     if (!(operations as readonly string[]).includes(operation)) throw new CloudbaseRpcError('configuration');
     let body: string;
     try { body = JSON.stringify(params); } catch { throw new CloudbaseRpcError('configuration'); }
     if (Buffer.byteLength(body) > 2 * 1024 * 1024) throw new CloudbaseRpcError('configuration');
+    if (options.signal?.aborted) throw new CloudbaseRpcError('unknown', undefined, 'REQUEST_TIMEOUT');
     const controller = new AbortController();
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    const assertActive = () => { if (controller.signal.aborted) throw new CloudbaseRpcError('unknown', undefined, 'REQUEST_TIMEOUT'); };
+    let rejectAborted!: (error: CloudbaseRpcError) => void;
+    const aborted = new Promise<never>((_, reject) => { rejectAborted = reject; });
+    const onAbort = () => {
+      // A custom transport/body reader may ignore signal; the race still releases its caller.
+      void reader?.cancel().catch(() => {});
+      rejectAborted(new CloudbaseRpcError('unknown', undefined, 'REQUEST_TIMEOUT'));
+    };
+    const onExternalAbort = () => controller.abort();
+    controller.signal.addEventListener('abort', onAbort, {once: true});
+    options.signal?.addEventListener('abort', onExternalAbort, {once: true});
+    if (options.signal?.aborted) controller.abort();
     const timeout = setTimeout(() => controller.abort(), 8000);
     try {
+      return await Promise.race([aborted, (async () => {
+      assertActive();
       const response = await this.#fetch(this.#endpoint + operation, { method: 'POST', headers: { Authorization: `Bearer ${this.#token}`, 'Content-Type': 'application/json' }, body, redirect: 'error', cache: 'no-store', signal: controller.signal });
-      const reader = response.body?.getReader();
+      if (controller.signal.aborted) { void response.body?.cancel().catch(() => {}); assertActive(); }
+      reader = response.body?.getReader();
       const chunks: Uint8Array[] = [];
       let bytes = 0;
       if (reader) try {
         for (;;) {
           const result = await reader.read();
+          assertActive();
           if (result.done) break;
           bytes += result.value.byteLength;
           if (bytes > 2 * 1024 * 1024) { await reader.cancel(); throw new CloudbaseRpcError('response', response.status, 'RESPONSE_TOO_LARGE'); }
@@ -83,11 +101,17 @@ export class CloudbaseRpc {
         // Preserve the existing conflict semantics and only an allowlisted code.
         throw new CloudbaseRpcError(code === '40001' || code === 'DATABASE_40001' ? 'conflict' : 'rejected', response.status, code);
       }
+      assertActive();
       return result as T;
+      })()]);
     } catch (error) {
       if (error instanceof CloudbaseRpcError) throw error;
       // A request can commit before a connection drops. Never retry it silently.
       throw new CloudbaseRpcError('unknown', undefined, controller.signal.aborted ? 'REQUEST_TIMEOUT' : transportDiagnostic(error));
-    } finally { clearTimeout(timeout); }
+    } finally {
+      clearTimeout(timeout);
+      options.signal?.removeEventListener('abort', onExternalAbort);
+      controller.signal.removeEventListener('abort', onAbort);
+    }
   }
 }

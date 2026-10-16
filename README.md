@@ -10,7 +10,7 @@
 
 历史查漏工具 `pnpm exec tsx scripts/prepare-reset-history.ts --help` 只生成项目 `outputs/` 内的待核对候选和公开原文补证，不连接数据库、不自动发布或发送提醒。第三方清单的类型和时间不是已核验事实；核对原帖、资格及完整上下文后，才可交给现有候选流程处理。
 
-本轮为本地候选，不能据此认定已上线。CloudBase现有库发布前需备份两个已有只读函数，再审核并执行 `scripts/migrations/cloudbase-cadence-public-projection-upgrade.sql`；该文件仅替换公开版本及资料投影，不改表、数据或权限。不要在已有库重新执行空库安装脚本。升级SQL、Git推送、服务部署、小程序上传及真机验收各自单独记录；回退时恢复备份的函数定义和上一版应用，不删除新模型的历史快照。
+1.0.15 已包含旧 CloudBase 读取函数的应用兼容：沿用已授权的固定业务只读接口，补齐两类预测、评估和有界结局，不需要先修改线上 SQL。旧函数环境每次10秒缓存未命中最多增加3次只读RPC，新函数环境没有这些补读；此成本不属于空闲worker节省幅度。专用 `scripts/migrations/cloudbase-cadence-public-projection-upgrade.sql` 仅保留为后续可选维护，实施前仍须备份两个现有函数，不能重跑空库安装脚本。Git推送、服务部署、小程序上传及真机验收各自记录，不删除新旧历史快照。运行版本可通过不读取数据库的 `/api/v1/release` 核对。
 
 ## 历史消息逐条回放
 

@@ -128,7 +128,7 @@ export async function runForecastCycle(timestamp=iso(),options:{force?:boolean;i
   }
   const cadence=await executeResetCadence(c,all,sources,timestamp);
   result.cadenceSnapshots=cadence.snapshots;result.cadenceOutcomes=cadence.outcomes;
-  await put('settings',{id:'forecast_runtime',checkedAt:timestamp,status:'ready',ruleVersion:FORECAST_RULE_VERSION,modelVersion:FORECAST_MODEL_VERSION,cadenceSnapshotId:cadence.snapshotId,cadenceSnapshotIds:cadence.snapshotIds,cadenceEvaluationByKind:cadence.evaluationByKind,inputsRevision:inputs?.revision,cadenceModelVersion:cadence.evaluationByKind.automatic_reset?.modelVersion,nextDueAt:cadence.nextDueAt},c);
+  await put('settings',{id:'forecast_runtime',checkedAt:timestamp,status:'ready',ruleVersion:FORECAST_RULE_VERSION,modelVersion:FORECAST_MODEL_VERSION,cadencePublicProjection:cadence.publicProjection,cadenceSnapshotId:cadence.snapshotId,cadenceSnapshotIds:cadence.snapshotIds,cadenceEvaluationByKind:cadence.evaluationByKind,inputsRevision:inputs?.revision,cadenceModelVersion:cadence.evaluationByKind.automatic_reset?.modelVersion,nextDueAt:cadence.nextDueAt},c);
   return result;
  });}catch{
   try{await put('settings',{id:'forecast_runtime',checkedAt:timestamp,status:'error',error:'预测观察处理失败，新闻与发放状态流程继续运行'});}catch{/* A storage failure cannot be repaired by this observation task. */}

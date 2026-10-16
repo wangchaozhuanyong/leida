@@ -1,4 +1,5 @@
 <page-meta root-background-color="#f2f5fb" page-style="background-color:#f2f5fb" />
+<navigation-header title="提醒" />
 <view class="page">
   <view wx:if="{{storageError}}" class="warning">{{storageError}}</view>
   <view class="card inbox-card"><view class="row"><view class="heading">站内信 <text wx:if="{{unread}}" class="inbox-unread">{{unread}} 未读</text></view><button class="text-button" data-path="/pages/notices/index" bindtap="navigate">查看全部提醒 →</button></view>
@@ -7,9 +8,18 @@
     <button wx:for="{{notices}}" wx:key="id" class="inbox-preview" data-id="{{item.id}}" bindtap="openNotice"><view class="grow"><view class="row top"><text>{{item.title}}</text><view wx:if="{{!item.read}}" class="dot"></view></view><view class="inbox-summary">{{item.summary}}</view><view class="small muted">{{item.time}}</view></view></button>
     <view wx:if="{{connected && !notices.length}}" class="inbox-empty">暂无提醒，有新消息会显示在这里。</view>
   </view>
-  <view class="card reminder-card"><view class="row"><view class="heading">微信提醒</view><text class="badge muted">{{!wechat.safe ? (wechat.busy ? '加载中' : '未连接') : !wechat.safe.configured || !wechat.safe.enabled ? '暂不可用' : wechat.safe.state === 'revoked' ? '已关闭' : wechat.safe.state === 'unknown' ? '已暂停' : wechat.remainingCount > 0 ? '已开启' : '按次提醒'}}</text></view>
+  <view class="card reminder-card"><view class="row"><view class="heading">微信提醒</view><text class="badge muted">{{!wechat.safe ? (wechat.busy ? '加载中' : '未连接') : !wechat.safe.configured || !wechat.safe.enabled ? '暂不可用' : wechat.safe.state === 'revoked' ? '已关闭' : wechat.safe.state === 'unknown' || wechat.allTypesOff ? '已暂停' : wechat.remainingCount > 0 ? '已开启' : '按次提醒'}}</text></view>
     <view class="reminder-count"><text class="muted">剩余提醒</text><text class="reminder-number">{{wechat.safe ? wechat.remainingCount : '—'}}</text><text class="muted">次</text></view>
-    <view class="muted lead">重置预告、完成声明和重要更正，每条新提醒使用一次。可以随时增加次数。</view>
+    <view class="muted lead">只接收你开启的类型，每成功发送一条使用一次。</view>
+    <view class="reminder-types">
+      <view class="row reminder-types-heading"><text>提醒内容</text><text class="small muted" aria-live="polite">{{wechat.busy ? '处理中' : wechat.preferencesMessage}}</text></view>
+      <view class="reminder-type-row"><view class="grow"><view>重置预告</view><view class="small muted">有新的重置计划或发放进展时提醒</view></view><switch aria-label="接收重置预告" color="#2458ce" checked="{{wechat.reminderPreferences.announcement}}" disabled="{{!wechat.canChooseTypes}}" data-kind="announcement" bindchange="changeWechatPreference" /></view>
+      <view class="reminder-type-row"><view class="grow"><view>完成声明</view><view class="small muted">公开公告确认完成时提醒</view></view><switch aria-label="接收完成声明" color="#2458ce" checked="{{wechat.reminderPreferences.result}}" disabled="{{!wechat.canChooseTypes}}" data-kind="result" bindchange="changeWechatPreference" /></view>
+      <view class="reminder-type-row"><view class="grow"><view>重要更正</view><view class="small muted">已发布的重置信息被更正时提醒</view></view><switch aria-label="接收重要更正" color="#2458ce" checked="{{wechat.reminderPreferences.correction}}" disabled="{{!wechat.canChooseTypes}}" data-kind="correction" bindchange="changeWechatPreference" /></view>
+    </view>
+    <view wx:if="{{wechat.allTypesOff}}" class="reminder-paused">已暂停所有类型，剩余次数保留。开启任一类型即可继续接收新消息。</view>
+    <view wx:elif="{{wechat.safe && !wechat.safe.preferencesSupported}}" class="small muted lead">提醒类型暂不可设置，请稍后重新加载。</view>
+    <view class="small muted lead">设置自动保存。重新开启只提醒新消息，不补发关闭期间的内容。完成声明不代表已检测到你的个人账户到账。</view>
     <view wx:if="{{wechat.error}}" class="warning lead">{{wechat.error}}</view>
     <view wx:if="{{wechat.privacyNeeded}}" class="stack lead"><button class="secondary full" bindtap="openPrivacyContract">查看隐私指引</button><button class="primary full" open-type="agreePrivacyAuthorization" bindagreeprivacyauthorization="agreeWechatPrivacy">同意隐私指引并继续</button></view>
     <block wx:else><button class="primary full reminder-add" loading="{{wechat.busy}}" disabled="{{wechat.busy || (!wechat.ready && !wechat.confirmNeeded && !wechat.error)}}" bindtap="addWechat">{{wechat.busy ? '加载中' : wechat.confirmNeeded ? '重试' : wechat.error && !wechat.ready ? '重新加载' : wechat.safe && (!wechat.safe.configured || !wechat.safe.enabled || wechat.safe.state === 'unknown') ? '暂不可开启' : wechat.remainingCount > 0 ? '增加一次提醒' : '开启微信提醒'}}</button>
