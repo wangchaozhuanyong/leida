@@ -70,6 +70,7 @@ test('无变化只在六小时固定节点或到期结算点运行，新事实�
  assert.equal(forecastCycleDue(runtime,'a',new Date(time+60_000).toISOString(),true),true);
  assert.equal(forecastCycleDue(runtime,'a',new Date(time+6*3600_000).toISOString()),true);
  assert.equal(forecastCycleDue({...runtime,cadenceSnapshotIds:undefined},'a',now),true,'旧单一模型必须升级');
+ assert.equal(forecastCycleDue({...runtime,cadenceModelVersion:'conditional-beta-reset-cadence-20261016-1'},'a',now),true,'上下文提取修复上线立即重算，不等待下一个固定窗口');
 });
 test('24/48小时结局按同类型精确时间独立结算，无连续覆盖证明的缺事件一律未知',()=>{
  const fixed={...snapshot(),evaluationSample:true},before=structuredClone(fixed),at=(hours:number)=>new Date(time+hours*3600_000).toISOString();

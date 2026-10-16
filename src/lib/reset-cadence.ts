@@ -101,7 +101,7 @@ export interface ResetCadenceInput {
 }
 
 export type CadenceLookback=8|12|20|30;
-export const RESET_CADENCE_MODEL_VERSION='conditional-beta-reset-cadence-20261016-1';
+export const RESET_CADENCE_MODEL_VERSION='conditional-beta-reset-cadence-20261016-2';
 export const RESET_CADENCE_MIN_INTERVALS=8;
 export const RESET_CADENCE_MAX_INTERVALS=30;
 // Fixed recent window balances several months of cadence and historical support.
@@ -263,6 +263,6 @@ export function buildResetCadenceForecast(input:ResetCadenceInput):ResetCadenceF
  const series=observations.filter(record=>record.kind===target),historical=allIntervals(series),training=historical.slice(-lookback),latest=series.at(-1),anchor=latest&&preciseObservation(latest)?latest.at:null;
  const result=estimate(training,anchor?sourceTime(anchor):generated,generated);
  const status=input.paused?'paused':!anchor?'insufficient':result.status;
- const explanation=input.paused?(input.pauseReason?.trim()||'采集来源暂不可用，停止输出新的预测。'):!anchor?'没有同类、精确时间且首次可知时间已核验的公开历史，不输出纯先验预测。':training.length<RESET_CADENCE_MIN_INTERVALS?`只有${training.length}个同类精确间隔，至少需要${RESET_CADENCE_MIN_INTERVALS}个。`:status==='out_of_range'?'本次等待已超过近期全部历史间隔，历史分布没有剩余支持，不延长旧预测。':status==='insufficient'?`超过当前等待时长的同类历史间隔仅${result.eligibleCount}个，至少需要${RESET_CADENCE_MIN_ELIGIBLE}个，不输出样本不足的概率。`:'按当前等待时长筛选同类精确历史间隔，以Beta(2,2)先验平滑未来24/48小时概率；20%–80%为经验时间范围。不是官方预告或个人到账时间，尚未校准。';
+ const explanation=input.paused?(input.pauseReason?.trim()||'采集来源暂不可用，停止输出新的预测。'):!anchor?'最近一次同类公开声明尚缺可靠的精确时间，无法确定等待起点，暂不输出概率。':training.length<RESET_CADENCE_MIN_INTERVALS?`只有${training.length}个同类精确间隔，至少需要${RESET_CADENCE_MIN_INTERVALS}个。`:status==='out_of_range'?'本次等待已超过近期全部历史间隔，历史分布没有剩余支持，不延长旧预测。':status==='insufficient'?`超过当前等待时长的同类历史间隔仅${result.eligibleCount}个，至少需要${RESET_CADENCE_MIN_ELIGIBLE}个，不输出样本不足的概率。`:'按当前等待时长筛选同类精确历史间隔，以Beta(2,2)先验平滑未来24/48小时概率；20%–80%为经验时间范围。不是官方预告或个人到账时间，尚未校准。';
  return {status,target,id:`forecast_cadence_${input.inputFingerprint.trim()}`,modelVersion:RESET_CADENCE_MODEL_VERSION,inputFingerprint:input.inputFingerprint.trim(),generatedAt:iso(generated),cutoffAt:iso(generated),validUntil:iso(generated+RESET_CADENCE_VALID_HOURS*HOUR),anchorAt:anchor,sampleCount:training.length,lookbackIntervals:lookback,eligibleCount:anchor?result.eligibleCount:0,p24:status==='ready'?result.p24:null,p48:status==='ready'?result.p48:null,rawP24:status==='ready'?result.rawP24:null,rawP48:status==='ready'?result.rawP48:null,predictedAt:status==='ready'?result.predictedAt:null,windowStart:status==='ready'?result.windowStart:null,windowEnd:status==='ready'?result.windowEnd:null,trainingObservationIds:trainingIds(training),trainingIntervals:training,historicalIntervals:historical,...normalized,method:method(lookback,target),backtest:backtest(series,lookback),explanation,calibrated:false};
 }

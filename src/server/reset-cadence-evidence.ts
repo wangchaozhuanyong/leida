@@ -1,7 +1,7 @@
 import type { CadenceObservation } from '../lib/reset-cadence';
 import type { Evidence, Source } from '../lib/types';
 import { benefitClauses, benefitStage, extractBenefitClaims, isTruncatedBenefitText } from './benefit-rules';
-import { evidenceBenefitClaims, isExplicitParent } from './source-context';
+import { directEvidenceBenefitClaims, evidenceBenefitClaims, gatherEvidenceContext, isExplicitParent } from './source-context';
 
 /** Auxiliary training series: public reset statements, never a reader's actual balance. */
 const archiveOrigin = 'https://codex-resets.com';
@@ -72,6 +72,15 @@ function trustedEvidence(evidence: Evidence, source: Source): boolean {
   return evidence.provenance === 'archive' && source.id === 'reset-archive' && source.kind === 'archive' && source.url === `${archiveOrigin}/zh-CN`;
 }
 
+/** The existing activity adapter supplies a calendar only, never a reset assertion. */
+function trustedCampaignCalendar(evidence:Evidence,source:Source):boolean {
+  const url=canonicalUrl(evidence.url);
+  return source.enabled&&source.validated&&source.id==='activity-archive'&&source.kind==='activity'&&source.url===`${archiveOrigin}/tibo-28`&&evidence.provenance==='archive'&&evidence.textOrigin==='archive_excerpt'&&evidence.metadata?.sourceGroup==='codex-resets'&&!!evidence.metadata.activity&&!!url?.startsWith('https://x.com/thsottiaux/status/')&&(evidence.messageId===url.split('/').at(-1)||evidence.messageId.startsWith('observed-'));
+}
+
+interface CadenceStatement {kind:CadenceObservation['kind'];evidenceIds:string[];proofEvidenceIds?:string[];}
+const versionMeaning=(item:Evidence)=>`${normalize(item.text)}|${item.parentId??''}|${item.textOrigin??''}|${item.publishedAt}|${JSON.stringify(item.metadata?.activity??null)}`;
+
 function statementKind(evidence: Evidence): CadenceObservation['kind'] | undefined {
   // The legacy completeness flag often reflects unsupported claim grammar.
   // Complete explicit text is inspected directly for auxiliary training only.
@@ -127,7 +136,7 @@ function statementKind(evidence: Evidence): CadenceObservation['kind'] | undefin
   return kinds.size === 1 ? [...kinds][0] : kinds.size > 1 ? 'unspecified' : undefined;
 }
 
-function contextStatement(primary: Evidence, latest: Map<string, Evidence[]>): { kind: CadenceObservation['kind']; evidenceIds: string[] } | undefined {
+function contextStatement(primary: Evidence, latest: Map<string, Evidence[]>,calendars:Map<string,Evidence[]>,latestEvidence:Evidence[]): CadenceStatement | undefined {
   if (!primary.parentId) return;
   if (privateAction.test(normalize(primary.text)) || limitedAudience.test(primary.text) || explicitEligibility.test(primary.text) || negatedAction.test(primary.text) || /^(?:if|unless|suppose|hypothetically)\b|如果|假如|假设/iu.test(primary.text.trim())) return;
   const chain = [primary];
@@ -139,7 +148,7 @@ function contextStatement(primary: Evidence, latest: Map<string, Evidence[]>): {
     const versions = matches[0];
     // Latest equally-timed copies must agree on the actual original and parent.
     // Otherwise the shared resolver's tie-break would silently pick a claim.
-    const signatures = new Set(versions.map(parent => `${normalize(parent.text)}|${parent.parentId ?? ''}|${parent.textOrigin ?? ''}|${new Date(parent.publishedAt).toISOString()}`));
+    const signatures = new Set(versions.map(versionMeaning));
     if (signatures.size !== 1 || versions.some(parent => !isExplicitParent(current, parent))) return;
     const parent = versions[0], url = canonicalUrl(parent.url)!;
     if (seen.has(url) || Date.parse(parent.publishedAt) > Date.parse(current.publishedAt)) return;
@@ -147,22 +156,35 @@ function contextStatement(primary: Evidence, latest: Map<string, Evidence[]>): {
     seen.add(url); chain.push(...versions); current = parent;
   }
   if (current.parentId) return;
+  // Campaign shorthand needs its original rule, original Day 1 and verified
+  // calendar as well as the explicit reply chain. Only cutoff-filtered latest
+  // evidence can supply that shared context; conflicting proof copies fail closed.
+  const context=gatherEvidenceContext(primary,latestEvidence);
+  for(const item of context){
+    const url=canonicalUrl(item.url)!,statements=latest.get(url),calendarVersions=calendars.get(url),isCalendar=calendarVersions?.some(version=>version.id===item.id);
+    const versions=isCalendar?calendarVersions:statements;
+    if(!versions||new Set(versions.map(versionMeaning)).size!==1||item.metadata?.activity&&!isCalendar)return;
+  }
   // A trailing conversational question must not erase the preceding explicit
   // completion clause. The shared resolver still supplies and checks its referent.
-  const claims = benefitClauses(primary.text).flatMap(text => evidenceBenefitClaims({ ...primary, text }, chain)).filter(claim => unrestrictedClaim(claim) && (claim.stage === 'claimed_complete' || claim.stage === 'in_progress'));
+  const claims = benefitClauses(primary.text).flatMap(text => evidenceBenefitClaims({ ...primary, text }, context)).filter(claim => unrestrictedClaim(claim) && (claim.stage === 'claimed_complete' || claim.stage === 'in_progress'));
   if (!claims.length || new Set(claims.map(claim => claim.kind)).size !== 1) return;
   // Keep the entire verified chain for resolution above. Only the reply path
   // through its nearest unique benefit statement supports this particular
   // fact; an older product ancestor must not become a permanent round identity.
-  const supportingParent = chain.findIndex(item => extractBenefitClaims(item.text, item.publishedAt).length > 0);
+  const supportingParent = chain.findIndex(item => directEvidenceBenefitClaims(item,context).length > 0);
   if (supportingParent < 0) return;
-  const support = extractBenefitClaims(chain[supportingParent].text, chain[supportingParent].publishedAt);
+  const support = directEvidenceBenefitClaims(chain[supportingParent],context);
   if (support.length !== 1 || !unrestrictedClaim(support[0]) || support[0].kind !== claims[0].kind) return;
   const lastSupportingUrl = canonicalUrl(chain[supportingParent].url);
   const supporting = chain.slice(0, supportingParent + 1);
   // Equally-timed identical source copies of that statement share its identity.
   for (let i = supportingParent + 1; i < chain.length && canonicalUrl(chain[i].url) === lastSupportingUrl; i++) supporting.push(chain[i]);
-  return { kind: claims[0].kind, evidenceIds: [...new Set(supporting.map(item => item.id))] };
+  const evidenceIds=[...new Set(supporting.map(item=>item.id))],chainIds=new Set(chain.map(item=>item.id));
+  // Shared campaign proof determines first-known time, but is not a round
+  // identity: otherwise every reset using the same calendar would merge.
+  const proofEvidenceIds=[...new Set([...evidenceIds,...context.filter(item=>!chainIds.has(item.id)).map(item=>item.id)])];
+  return { kind: claims[0].kind,evidenceIds,proofEvidenceIds };
 }
 
 /** Latest known version first, then qualification: corrections cannot retain an old positive. */
@@ -171,26 +193,30 @@ export function extractCadenceObservations(evidence: Evidence[], sources: Source
   if (!Number.isFinite(cutoff)) return [];
   const bySource = new Map(sources.map(source => [source.id, source]));
   const latest = new Map<string, Evidence[]>();
+  const calendars=new Map<string,Evidence[]>();
   const accepted:Evidence[]=[];
   for (const item of evidence) {
     const source = bySource.get(item.sourceId);
     const published = publishedTime(item.publishedAt), collected = strictTime(item.collectedAt);
-    if (!source || !Number.isFinite(published) || !Number.isFinite(collected) || published > cutoff || collected > cutoff || collected<published || !trustedEvidence(item, source)) continue;
+    if (!source || !Number.isFinite(published) || !Number.isFinite(collected) || published > cutoff || collected > cutoff || collected<published || !trustedEvidence(item, source)&&!trustedCampaignCalendar(item,source)) continue;
     accepted.push(item);
     const url = canonicalUrl(item.url)!;
-    const versions = latest.get(url);
-    if (!versions || collected > Date.parse(versions[0].collectedAt)) latest.set(url, [item]);
+    // A later calendar excerpt for this URL cannot replace its original body.
+    const versionsByPurpose=trustedEvidence(item,source)?latest:calendars,versions=versionsByPurpose.get(url);
+    if (!versions || collected > Date.parse(versions[0].collectedAt)) versionsByPurpose.set(url, [item]);
     else if (collected === Date.parse(versions[0].collectedAt)) versions.push(item);
   }
-  const sameVersion=(item:Evidence)=>`${canonicalUrl(item.url)}|${normalize(item.text)}|${item.parentId??''}|${item.publishedAt}|${item.textOrigin??''}`;
+  const sameVersion=(item:Evidence)=>`${canonicalUrl(item.url)}|${versionMeaning(item)}`;
   const firstKnown=new Map<string,number>();
   for(const item of accepted){const signature=sameVersion(item),known=strictTime(item.collectedAt);firstKnown.set(signature,Math.min(firstKnown.get(signature)??Infinity,known));}
   const byId=new Map(accepted.slice().sort((a,b)=>strictTime(a.collectedAt)-strictTime(b.collectedAt)).map(item=>[item.id,item]));
+  const latestEvidence=[...latest.values(),...calendars.values()].flat();
   const result: CadenceObservation[] = [];
   for (const [url, versions] of latest) {
-    const statements = versions.map(version => {
+    if(versions.some(version=>!trustedEvidence(version,bySource.get(version.sourceId)!)))continue;
+    const statements = versions.map((version):CadenceStatement|undefined => {
       const directKind = statementKind(version);
-      return directKind ? { kind: directKind, evidenceIds: [version.id] } : contextStatement(version, latest);
+      return directKind ? { kind: directKind, evidenceIds: [version.id] } : contextStatement(version, latest,calendars,latestEvidence);
     });
     const kinds = statements.map(statement => statement?.kind);
     // Conflicting same-time source copies are not repaired by guessing.
@@ -198,8 +224,9 @@ export function extractCadenceObservations(evidence: Evidence[], sources: Source
     const item = versions[0];
     if(versions.some(version=>publishedTime(version.publishedAt)!==publishedTime(item.publishedAt)||timePrecision(version,bySource.get(version.sourceId)!)!==timePrecision(item,bySource.get(item.sourceId)!)))continue;
     const evidenceIds=[...new Set(statements.flatMap(statement => statement!.evidenceIds))].sort();
+    const proofEvidenceIds=[...new Set(statements.flatMap(statement=>statement!.proofEvidenceIds??statement!.evidenceIds))];
     const precision=timePrecision(item,bySource.get(item.sourceId)!);
-    const knownAt=Math.max(...evidenceIds.map(id=>{const support=byId.get(id)!;return firstKnown.get(sameVersion(support))!;}));
+    const knownAt=Math.max(...proofEvidenceIds.map(id=>{const support=byId.get(id)!;return firstKnown.get(sameVersion(support))!;}));
     result.push({ id: `cadence:${url}`, evidenceIds, at: precision==='date'?item.publishedAt.slice(0,10):new Date(item.publishedAt).toISOString(), url, kind: kinds[0]!,timePrecision:precision,firstKnownAt:new Date(knownAt).toISOString() });
   }
   return result.sort((a, b) => Date.parse(a.at) - Date.parse(b.at) || a.id.localeCompare(b.id));
