@@ -1,5 +1,7 @@
 # 模钥重置雷达
 
+当前发布分支、版本、工作树用途及已验证范围见 [RELEASE.md](RELEASE.md)。下文保留各功能最初实施时的边界记录；实际发布状态以最新发布回执为准。
+
 ## 历史消息逐条回放
 
 `scripts/capture-replay-input.ts` 冻结近一个月公开消息与起点前初始化资料；`scripts/run-month-replay.ts` 只在本机专属 `radar_replay_数字` 新库执行。通过 `REPLAY_OUTPUT` 指定本工作区 `outputs/` 内的新批次目录，旧输入、数据库、预测和结果保留。`--stop-after=25` 可验证中断续跑；输入或后端代码指纹变化时拒绝续接旧批次。
