@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type {ResetCadenceForecast} from '@/lib/reset-cadence';
 import {displayTime,safeUrl} from './model';
+import {RESET_CADENCE_MODEL_VERSION} from '@/lib/reset-cadence';
 
 const probability=(value:number|null)=>value!==null&&Number.isFinite(value)?`${Math.round(value*100)}%`:'暂无估计';
 const validProbability=(value:number|null|undefined)=>typeof value==='number'&&Number.isFinite(value)&&value>=0&&value<=1;
@@ -8,29 +9,30 @@ const validTime=(value:string|null|undefined)=>value?Date.parse(value):Number.Na
 const windowTime=(value:string)=>new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value));
 
 /** Display only a current model window; announcements and personal delivery are separate facts. */
-export function ResetPrediction({forecast,now,details=false}:{forecast?:ResetCadenceForecast;now:string;details?:boolean}) {
+export function ResetPrediction({forecast,now,details=false,frozen=false}:{forecast?:ResetCadenceForecast;now:string;details?:boolean;frozen?:boolean}) {
  const current=validTime(now),start=validTime(forecast?.windowStart),end=validTime(forecast?.windowEnd),expires=validTime(forecast?.validUntil);
- const expired=!!forecast&&(!Number.isFinite(current)||!Number.isFinite(expires)||expires<=current);
+ const expired=!!forecast&&(!Number.isFinite(current)||!Number.isFinite(expires)||expires<=current||validTime(forecast.generatedAt)>current);
+ const legacy=!!forecast&&(!forecast.target||forecast.modelVersion!==RESET_CADENCE_MODEL_VERSION);
  const ended=forecast?.status==='ready'&&Number.isFinite(end)&&end<=current;
- const ready=forecast?.status==='ready'&&!expired&&!ended&&Number.isFinite(start)&&Number.isFinite(end)&&end>=start&&validProbability(forecast.p24)&&validProbability(forecast.p48);
+ const ready=forecast?.status==='ready'&&(!legacy||frozen)&&!expired&&!ended&&Number.isFinite(start)&&Number.isFinite(end)&&end>=start&&validProbability(forecast.p24)&&validProbability(forecast.p48)&&forecast.p24!<=forecast.p48!;
  const remaining=ready&&start<current;
  const futureStart=remaining?now:forecast?.windowStart;
  const recentError=forecast?.backtest.recent.medianAbsoluteErrorHours;
  const coarse=typeof recentError==='number'&&recentError>24;
- const state=!forecast?'尚无记录':expired||ended?'待重新计算':forecast.status==='ready'?(ready?(coarse?'粗略估计':'历史间隔'):'资料待核验'):forecast.status==='paused'?'暂停估计':forecast.status==='out_of_range'?'超出样本范围':'样本不足';
+ const state=legacy?'冻结历史模型':!forecast?'尚无记录':expired||ended?'待重新计算':forecast.status==='ready'?(ready?(coarse?'粗略估计':'历史估算'):'资料待核验'):forecast.status==='paused'?'暂停估计':forecast.status==='out_of_range'?'超出样本范围':'样本不足';
  const unavailable=!forecast?'正在读取最新预测。':expired||ended?'上一次估计已过有效时间，等待重新计算。':forecast.status==='paused'?'采集资料暂时不足以支持当前估计，预测已暂停。':forecast.status==='out_of_range'?'当前等待时间已超过历史样本支持范围，暂不提供下一次时间估计。':forecast.status==='insufficient'?'可比较的历史间隔还不足，暂不提供下一次时间估计。':'预测资料尚未完整核验，暂不提供时间估计。';
  const observations=forecast?.observations.filter(item=>forecast.trainingObservationIds.includes(item.id)).slice().sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)).slice(0,6)??[];
  return <section className={`pub-card pub-reset-prediction${ready?' is-ready':''}`} aria-label="历史间隔实验">
-  <div className="pub-card-top"><h2>历史间隔实验</h2><span className={`pub-badge${ready?' purple':''}`}>{state}</span></div>
-  <p className="pub-muted">此实验混合了不同公开动态，尚不支持当前活动的小时级预测，不作为下次重置时间。原始计算和失准记录保留供复盘。</p>
+  <div className="pub-card-top"><h2>{!legacy&&forecast?.target?(forecast.target==='banked_reset'?'重置卡发放参考':'用量重置参考'):'历史间隔实验'}</h2><span className={`pub-badge${ready?' purple':''}`}>{state}</span></div>
+  <p className="pub-muted">{!legacy&&forecast?.target?'按同类型、时间可核验的历史间隔估算，样本较少时作平滑处理。明确公告优先，估算不是发放承诺。':'此旧实验混合了不同公开动态，不作为当前下次重置时间；原始计算和失准记录保留供复盘。'}</p>
   {ready&&forecast&&futureStart&&forecast.windowEnd?<>
    <p className="pub-prediction-label">{remaining?'剩余估计区间':'估计时间区间'} · 北京时间</p>
    <div className="pub-prediction-window"><time dateTime={futureStart}>{windowTime(futureStart)}</time>{start===end?<span>附近</span>:<><span aria-hidden="true">—</span><time dateTime={forecast.windowEnd}>{windowTime(forecast.windowEnd)}</time></>}</div>
    <div className="pub-prediction-probabilities"><div><span>24小时内</span><strong>{probability(forecast.p24)}</strong></div><div><span>48小时内</span><strong>{probability(forecast.p48)}</strong></div></div>
-   <p className="pub-muted">从本次计算时间起算的历史经验比例。0%只表示可比样本里暂无对应记录，不代表重置不会发生。</p>
+   <p className="pub-muted">从本次计算时间起算。{!legacy?'概率为（窗口内次数＋2）÷（可比间隔＋4），不是已验证准确率。':'旧模型采用历史经验比例，0%不代表重置不会发生。'}</p>
    {coarse&&<p className="pub-muted">历史起点回测的近期中位误差约 {recentError.toFixed(0)} 小时，只能参考天级范围。</p>}
   </>:<p className="pub-prediction-unavailable" role="status">{unavailable}</p>}
-  <p className="pub-prediction-target">估计公开重置动态（用量重置／重置卡），个人额度是否到账仍需自行确认。</p>
+  <p className="pub-prediction-target">估计{forecast?.target==='banked_reset'?'公开重置卡发放动态':forecast?.target==='automatic_reset'?'公开用量重置动态':'公开重置动态（旧混合模型）'}，个人额度是否到账仍需自行确认。</p>
   {forecast&&<div className="pub-prediction-meta"><span>采用 {forecast.sampleCount} 个历史间隔</span><span>更新于 <time dateTime={forecast.generatedAt}>{displayTime(forecast.generatedAt)}</time>（北京时间）</span></div>}
   {details&&forecast&&<details className="pub-prediction-details"><summary>查看计算与回测依据</summary>
    <p className="pub-muted">{forecast.explanation}</p>

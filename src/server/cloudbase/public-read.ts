@@ -1,7 +1,7 @@
 import type { PublicData, Source } from '../../lib/types';
 import type { PublicReadOptions, PublicReadEnvelope, PublicPage } from '../../lib/public-read';
 import type { ForecastCase, ForecastOutcome, ForecastSnapshot } from '../../lib/forecast';
-import type { StoredCadenceForecast } from '../reset-cadence-runtime';
+import type { StoredCadenceForecast, CadenceRuntime } from '../reset-cadence-runtime';
 import { projectPublicHistory } from '../../lib/history';
 import { publicResetOutlook } from '../../lib/reset-outlook';
 import { publicActions } from '../../lib/public-facts';
@@ -20,7 +20,7 @@ interface VersionData {
 interface Bundle extends Pick<PublicData,'events'|'articles'|'publications'|'evidence'|'activities'|'notices'> {
   versionData:VersionData;site:PublicData['site']|null;
   page:{total:number;rows:{id:string;at:string;published:string}[]}|null;
-  forecastRecords:{cases:ForecastCase[];snapshots:ForecastSnapshot[];outcomes:ForecastOutcome[];runtime?:{status?:string;cadenceSnapshotId?:string}|null};
+  forecastRecords:{cases:ForecastCase[];snapshots:ForecastSnapshot[];outcomes:ForecastOutcome[];runtime?:(Partial<CadenceRuntime>&{status?:string})|null};
 }
 function validVersion(value:unknown):asserts value is VersionData {
   if(!value||typeof value!=='object')throw new CloudbaseRpcError('response');
@@ -30,7 +30,7 @@ function validVersion(value:unknown):asserts value is VersionData {
 export function cloudbasePublicVersion(value:unknown,timestamp:string) {
   validVersion(value);
   const expired=(time:string)=>Date.parse(time)<=Date.parse(timestamp);
-  const settings=value.settings.map(p=>p.id==='site'?p:{id:p.id??undefined,status:p.status??undefined,cadenceSnapshotId:p.cadenceSnapshotId??undefined});
+  const settings=value.settings.map(p=>p.id==='site'?p:{id:p.id??undefined,status:p.status??undefined,cadenceSnapshotId:p.cadenceSnapshotId??undefined,cadenceSnapshotIds:p.cadenceSnapshotIds??undefined,cadenceEvaluationByKind:p.cadenceEvaluationByKind??undefined});
   const parts:unknown[]=[...value.digests,settings,value.deadlines.map(row=>[row.id,row.action,expired(row.deadline)]),value.cases.map(row=>[row.id,row.digest,expired(row.w24),expired(row.w48)]),value.snapshots.map(row=>[row.id,expired(row.until),Date.parse(row.generated)>Date.parse(timestamp)]),value.outcomeDigest];
   return finishPublicVersion(parts,value.sources,timestamp);
 }

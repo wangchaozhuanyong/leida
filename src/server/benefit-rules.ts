@@ -1,7 +1,7 @@
 import type { ActionKind, ActionStage, BenefitAction } from '../lib/types';
 
 /** Change only when fact interpretation changes, so unchanged inputs are evaluated once. */
-export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261016-12';
+export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261016-13';
 export interface BenefitClaim {
   kind: ActionKind; stage: ActionStage; eligibility: string; scope: BenefitAction['scope'];
   quote: string; expectedAt?: string; timeNote?: string;
@@ -13,6 +13,7 @@ const usage = /(?:usage(?:\s+limits?)?|rate\s+limits?|用量|使用(?:额度|限
 const globalReset = /\bglobal\s+(?:(?:usage|rate\s+limits?)\s+)?reset\b|全局(?:用量)?重置/i;
 // A short completion can inherit a benefit only through extractReplyClaims' explicit parent.
 const deicticCompletion = /^(?:done\s+and\s+dusted|(?:it|that|this)(?:'s|\s+is)\s+(?:(?:now|already)\s+)?done)[.!]?$/i;
+const allPaidResetGreeting=/^enjoy\s+reset\s+usage\s+limits\s+for\s+all\s+paid\s+users\s+(?:of|for)\s+(?:Codex\s+and\s+ChatGPT\s+Work|ChatGPT\s+Work\s+and\s+Codex)[.!]?$/i;
 const dayEndDeadline = /\b(?:by|before)\s+(?:the\s+)?(?:end\s+of\s+(?:the\s+)?(?:day|today|tomorrow)|EOD)\b|(?:今日|今天|当日|当天|明天)结束(?:之)?前|日终(?:之)?前/i;
 const excluded = /\b(?:purchase[ds]?|buy|bought|referral|invitation|invite[ds]?|redeem(?:ed|ing)?|carry(?:ing)? over|carried over|my resets?|my account|just you|your account only|inventory|store|stock|option)\b|购买|邀请|推荐奖励|个人结转|私人|仅你|仅该账户|自行使用|主动用卡|商店|库存|已有的重置卡/i;
 const targeted = /\b(?:some|certain|selected|subset|specific|affected)\s+(?:\w+\s+){0,3}(?:users?|accounts?)|\b\d[\d,]*(?:\.\d+)?[km]?\s+(?:\w+\s+){0,2}(?:users?|accounts?)\b|部分|特定|选定|受(?:故障)?影响|定向补偿/i;
@@ -35,6 +36,19 @@ export function hasDayEndDeadline(text: string): boolean {
   return dayEndDeadline.test(normalize(text));
 }
 
+/** A completed reset and the future duration of its investigation are separate facts. */
+function separateResetInvestigation(sentence:string):string[] {
+  const predicate=sentence.match(/\b(?:we|i)\s+have\s+(?:now\s+|already\s+|just\s+)*reset\s+(?:usage(?:\s+limits?)?|rate\s+limits?)\s+for\b/i);
+  if(predicate?.index===undefined)return [sentence];
+  const prefix=sentence.slice(0,predicate.index),rest=sentence.slice(predicate.index);
+  const investigation=rest.match(/\s+while\s+(?:we|i)\s+(?:work(?:ing)?\s+towards?\s+wrapping\s+up\s+(?:our\s+)?investigation|continue\s+(?:our\s+)?investigation|investigate)\b/i);
+  if(investigation?.index===undefined||benefitKinds(rest.slice(investigation.index)).length)return [sentence];
+  // Preserve conditional, negative and other benefit predicates instead of
+  // extracting a positive fragment from a different hypothetical statement.
+  if(prefix.trim()&&(!/\b(?:and|but)\s*$/i.test(prefix)||!/\b(?:evidence|reports?|issues?|investigation)\b/i.test(prefix)||benefitKinds(prefix).length||/\b(?:if|unless|maybe|perhaps|would|could|might|never|haven't|hasn't)\b/i.test(normalize(prefix))))return [sentence];
+  return [prefix.trim(),rest.slice(0,investigation.index).trim(),rest.slice(investigation.index).trim()].filter(Boolean);
+}
+
 /** Preserve source slices; qualification and tense never come from another sentence. */
 export function benefitClauses(text: string): string[] {
   const result: string[] = [];
@@ -47,7 +61,7 @@ export function benefitClauses(text: string): string[] {
   }
   const ending = text.slice(start).trim();
   if (ending) result.push(ending);
-  return result.flatMap(sentence => {
+  return result.flatMap(separateResetInvestigation).flatMap(sentence => {
     if (benefitKinds(sentence).length < 2) return [sentence];
     const separators = [...sentence.matchAll(/，|,(?=\s)|\band\b|并且|同时|并(?=向|为)|而(?=重置卡|用量)/gi)];
     for (const separator of separators) {
@@ -79,6 +93,9 @@ export function benefitStage(text: string): ActionStage | undefined {
   if (/\blanding\b.{0,60}(?:\btomorrow\b|\btoday\b|\bsoon\b|\bin\b|\bwithin\b|\bby\b|\d{1,2}(?::\d{2})?\s*[ap]m\b)/i.test(s)) return 'promised';
   if (/\b(?:are|is|we're)\s+(?:now\s+)?(?:giving|loading|crediting|granting|reset{1,2}ing)|\b(?:loading|rolling out|propagating|in progress)\b|正在|发放中|传播中|加载中/i.test(s)) return 'in_progress';
   if (deicticCompletion.test(s)) return 'claimed_complete';
+  // This exact all-paid announcement describes already reset limits. A bare
+  // "Enjoy a reset" or any future landing sentence still has no completion.
+  if(allPaidResetGreeting.test(s))return 'claimed_complete';
   if (/\b(?:have|has)\s+(?:now\s+|already\s+|just\s+|been\s+|fully\s+)*(?:reset|added|credited|granted|given|loaded|deposited|landed|propagated|completed|processed)\b|^(?:added|credited|granted|loaded)\b|\b(?:confirmed|fully|all)\s+(?:landed|propagated|credited|loaded|completed)\b|\b(?:reset|resets)\s+(?:have\s+)?(?:all\s+)?(?:landed|propagated|completed)\b|已(?:经|全部)?(?:为.{0,80})?(?:确认|重置|发放|到账|落地|传播|加载|存入|添加)|全部.{0,20}(?:落地|传播)/i.test(s)) return 'claimed_complete';
   if (/^all\s+reset\s+for\s+everyone[.!]?$/i.test(s)) return 'claimed_complete';
   // The original's short announcement omits "will", but a global action with
@@ -260,7 +277,8 @@ export function extractBenefitClaims(text: string, publishedAt: string): Benefit
       !/\b(?:banked|not|never|unconfirmed|rumou?rs?|maybe|only|except|excluding|selected|specific|affected|if|unless|created|registered|upgraded|region|country)\b|\b(?:my|your|our)\s+accounts?\b/i.test(text);
     const kinds = productUsageAnnouncement ? ['automatic_reset' as const] : benefitKinds(clause);
     if (kinds.length !== 1 || /^(?:as (?:mentioned|promised)|previously|yesterday|see (?:above|parent))\b|之前提到|接上|参见父帖/i.test(clause)) continue;
-    const stage = benefitStage(clause);
+    const greetingLanding=allPaidResetGreeting.test(normalize(clause))&&next&&/^(?:it\s+)?(?:lands?|landing|will\s+(?:land|be\s+there))\b/i.test(normalize(next))&&/\b(?:tomorrow|today|soon|in|within|by|next)\b/i.test(next);
+    const stage = greetingLanding?'promised':benefitStage(clause);
     // A possessive "everyone's account" may refer to one explicitly introduced
     // product-user audience in this same original post. It never lends plan/region/tense.
     const antecedents=clauses.slice(0,index).filter(item=>/(?:active\s+)?users\s+(?:who\s+are\s+(?:now\s+)?using|across|of)\b/i.test(item)&&/\bCodex\b|ChatGPT\s*Work/i.test(item));

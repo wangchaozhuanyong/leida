@@ -17,6 +17,7 @@ import {ForecastPanel} from './ForecastPanel';
 import {InstrumentDial} from './InstrumentDial';
 import {StatusTimeline} from './StatusTimeline';
 import {ResetOutlookPanel} from './ResetOutlookPanel';
+import {ResetForecastCard} from './ResetForecastCard';
 import {publicResetOutlook} from '@/lib/reset-outlook';
 import { actionLabels } from '@/lib/labels';
 import { activityDayNumber, activityHomeVisible } from '@/lib/activity-display';
@@ -166,7 +167,7 @@ export default function PublicApp() {
   else if (route === 'articles' && path[1]) content = <ArticlePage data={data} id={path[1]} onPoster={setPoster} />;
   else if (route === 'sources' && path[1]) content = <EvidencePage data={data} id={path[1]} />;
   else if (route === 'notices') content = <Notices publications={data.publications} notices={visibleNotices} read={read} markRead={markRead} storageError={storageError} selectedId={query.get('message')} />;
-  else if (route === 'methodology') content = <Methodology data={data} snapshotId={query.get('snapshot')} cadenceId={query.get('cadence')} onPoster={setForecastPoster} onShare={s=>shareUrl(`${location.origin}/methodology?snapshot=${encodeURIComponent(s.id)}`,'重置实验预测快照')} />;
+  else if (route === 'methodology') content = <Methodology data={data} snapshotId={query.get('snapshot')} cadenceId={query.get('cadence')} target={query.get('target')==='banked_reset'?'banked_reset':'automatic_reset'} onPoster={setForecastPoster} onShare={s=>shareUrl(`${location.origin}/methodology?snapshot=${encodeURIComponent(s.id)}`,'重置实验预测快照')} />;
   else content = <><Empty title="暂时没有这条记录" detail="链接可能已变化，请返回首页查看公开动态。" /><TextLink href="/">返回首页</TextLink></>;
   return <div className={`pub-shell route-${route} ${subpage ? 'is-detail' : ''}`} onClickCapture={onNavigateCapture}>
     <Suspense fallback={null}><PublicRouteReader onChange={onLocation} /></Suspense>
@@ -233,6 +234,7 @@ export function Home({ data, onWechatReminders, onPoster, onShare, historical, w
         {activity && <Link scroll={false} className="pub-instrument-activity" href={`/activities/${encodeURIComponent(activity.id)}`}><Icon name="calendar"/><div><h2>{activity.title}</h2><p>{activityPhase} · 已收录{activity.items.length}项进展</p></div><span>查看进展 <Icon name="arrow"/></span></Link>}
       </aside>
     </div>
+    <ResetForecastCard data={data.forecasts} now={data.serverTime}/>
     <section className="pub-recent"><div className="pub-section-heading"><div><h2>最近动态</h2></div><TextLink href="/news">全部动态</TextLink></div><div className="pub-recent-grid">{recent.length ? recent.map(p => <Announcement key={p.id} publication={p} withdrawn={publicationWithdrawn(data,p)} />) : <Empty title="暂无公开公告" detail="采集并核验后的重置记录会显示在这里。" />}</div></section>
   </>;
 }
@@ -395,10 +397,10 @@ function MorePage() {
   return <><section className="pub-card"><h2>内容与记录</h2><div className="pub-link-row"><TextLink href="/history">查看重置公告</TextLink></div><div className="pub-link-row"><TextLink href="/news">查看动态</TextLink></div><div className="pub-link-row"><TextLink href="/notices">查看全部提醒</TextLink></div><div className="pub-link-row"><TextLink href="/methodology">历史预测回放与观察记录</TextLink></div></section>
     <section className="pub-card" id="privacy"><h2>隐私说明</h2><p>查看公开消息无需提供手机号、通讯录或位置。已读状态保存在当前设备，清除浏览器数据后可能重置。</p><p>微信提醒使用微信提供的用户标识管理接收状态，可以在小程序提醒页关闭。保存海报由你主动操作，我们不读取或上传你的相册。</p><p>小程序内可查看平台提供的完整隐私指引。</p></section></>;
 }
-export function Methodology({data,snapshotId,cadenceId,onPoster,onShare}:{data:PublicData;snapshotId:string|null;cadenceId:string|null;onPoster:(s:ForecastSnapshot)=>void;onShare:(s:ForecastSnapshot)=>Promise<void>}) {
+export function Methodology({data,snapshotId,cadenceId,target='automatic_reset',onPoster,onShare}:{data:PublicData;snapshotId:string|null;cadenceId:string|null;target?:'automatic_reset'|'banked_reset';onPoster:(s:ForecastSnapshot)=>void;onShare:(s:ForecastSnapshot)=>Promise<void>}) {
   if(cadenceId)return <><div className="pub-page-heading"><h1>历史间隔实验记录</h1></div><ForecastPanel data={data.forecasts} snapshotId={null} cadenceId={cadenceId} onPoster={onPoster} onShare={onShare}/></>;
   if(snapshotId)return <><div className="pub-page-heading"><h1>固定预测记录</h1><p>初始预测与后续结局分别保留。</p></div><ForecastPanel data={data.forecasts} snapshotId={snapshotId} onPoster={onPoster} onShare={onShare}/></>;
-  return <><div className="pub-page-heading"><h1>观察记录</h1></div><HistoricalReplayPanel/><ForecastPanel data={data.forecasts} snapshotId={snapshotId} onPoster={onPoster} onShare={onShare}/></>;
+  return <><div className="pub-page-heading"><h1>观察记录</h1></div><HistoricalReplayPanel/><ForecastPanel data={data.forecasts} snapshotId={snapshotId} target={target} onPoster={onPoster} onShare={onShare}/></>;
 }
 function WechatReminderModal({onClose,data,codeAvailable}:{data:PublicData|null;dataError:string;onRetryData:()=>void;entry:WechatEntryState;codeAvailable:boolean;onRetryEntry:()=>void;onClose:()=>void}) {
   const dialog=useRef<HTMLDialogElement>(null);

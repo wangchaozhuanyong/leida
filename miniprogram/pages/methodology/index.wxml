@@ -1,6 +1,11 @@
 <page-loader wx:if="{{navigationLoading || fixedLoading}}" />
 <view wx:else>
 <view class="page">
+  <reset-forecast wx:if="{{!fixed}}" forecasts="{{cadenceData}}" now="{{cadenceNow}}" initial-target="{{target}}" />
+  <block wx:if="{{isCadence && cadenceSnapshot}}"><reset-forecast snapshot="{{cadenceSnapshot}}" now="{{cadenceNow}}" /><view class="prose muted">{{cadenceNote}}时间均为北京时间。</view></block>
+  <view wx:if="{{!fixed && evaluations.length}}" class="card"><view class="heading">上线后的预测验证</view><view wx:for="{{evaluations}}" wx:key="target" class="prose">{{item.label}}：可评分 {{item.samples}} 次，其中发生 {{item.positive}} 次；未知或晚采 {{item.unknown}} 次。</view><view class="small muted lead">固定且互不重叠的48小时窗口，未知不当作未发生；尚未校准。</view></view>
+  <view wx:if="{{horizonRecords.length}}" class="card"><view class="heading">固定窗口后续结果</view><view wx:for="{{horizonRecords}}" wx:key="id" class="prose"><view>{{item.label}} · {{item.horizon}}小时 · {{item.result}}</view><view class="small muted">窗口截至 {{item.end}} · 北京时间</view><view wx:if="{{item.actual}}" class="small muted">公开动态时间 {{item.actual}}</view><view class="small muted">{{item.note}}</view></view></view>
+  <view wx:if="{{!fixed && cadenceHistory.length}}" class="card"><view class="heading">固定预测记录</view><button wx:for="{{cadenceHistory}}" wx:key="id" class="text-button" data-id="{{item.id}}" bindtap="openCadence">{{item.label}} · {{item.time}} →</button></view>
   <view wx:if="{{!fixed}}" class="card"><view class="heading">近一个月历史回放</view><view class="prose muted">真实消息驱动的历史模拟，逐条保留预测与验证结果，与实时预测分别统计。</view><button class="secondary full" style="margin-top:12px" bindtap="openReplay">查看逐条回放与结果</button></view>
   <view wx:if="{{fixedError}}" class="warning"><view>{{fixedError}}</view><button class="secondary full" style="margin-top:12px" bindtap="retryFixed">重新加载</button></view>
   <view wx:if="{{forecast}}" class="card hero">

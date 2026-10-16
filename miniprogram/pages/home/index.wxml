@@ -23,6 +23,7 @@
     </button>
     <view wx:if="{{pending && completions.length}}" class="previous-records"><view class="small muted">最近公开完成声明</view><view wx:for="{{completions}}" wx:key="kind" class="previous-record"><view class="row"><view class="grow">{{item.title}}</view><button class="text-button" data-path="{{item.path}}" bindtap="navigate">查看依据 →</button></view><view class="completion-time muted">{{item.time}} · 北京时间</view></view></view>
     <view wx:if="{{activity}}" class="activity-entry" data-path="{{activity.path}}" bindtap="navigate" role="button"><image src="/assets/neural/calendar-blue.png" class="action-icon" aria-hidden="true"/><view class="grow"><view class="activity-title">{{activity.title}}</view><view class="small muted">{{activity.phase}} · 已收录{{activity.entries}}项进展</view></view><text class="activity-link">查看进展 →</text></view>
+    <reset-forecast forecasts="{{cadenceForecasts}}" now="{{forecastNow}}" />
     <view class="row section"><view class="heading">最近动态</view><button class="text-button" data-path="/pages/news/index" bindtap="navigate">全部动态 →</button></view>
     <publication-card wx:for="{{recent}}" wx:key="id" item="{{item}}" />
     <view wx:if="{{!recent.length}}" class="card empty">暂无公开公告。</view>

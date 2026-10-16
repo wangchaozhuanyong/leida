@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {isCloudbaseClient,pool,list,one,insert,put,transaction,type Client} from '../db';
 import type {Evidence,Source,Publication,RadarEvent,Article} from '../lib/types';
 import {FORECAST_RULE_VERSION,FORECAST_MODEL_VERSION,referenceForecast,forecastWindows,forecastSourceAvailable,qualifyForecastSignal,matchForecastCase,buildForecastSnapshot,publicForecastCaseProjection,effectiveForecastOutcome,type ForecastPublicData,type ForecastCase,type ForecastSnapshot,type ForecastOutcome} from '../lib/forecast';
-import {executeResetCadence,getCadenceSnapshot,isCadence,projectCadenceForecast,cadenceOutcomes,type CadenceRuntime,type StoredCadenceForecast} from './reset-cadence-runtime';
+import {executeResetCadence,getCadenceSnapshot,isCadence,projectCadenceForecast,cadenceOutcomes,publicCadenceHorizonOutcomes,forecastCycleDue,type CadenceRuntime,type StoredCadenceForecast} from './reset-cadence-runtime';
 import {configuredPublicRpc} from './cloudbase/public-config';
 import {publicResetOutlook} from '../lib/reset-outlook';
 import type {PublicFactsData} from '../lib/public-facts';
@@ -32,18 +32,24 @@ export async function getPublicForecast(client:Client=pool,timestamp=iso(),publi
  const facts=publicData??await (async()=>{const [events,articles,publications,evidence]=await Promise.all([list<RadarEvent>('events',client),list<Article>('articles',client),list<Publication>('publications',client),list<Evidence>('evidence',client)]);const publicEvidence=new Set(publications.flatMap(p=>p.article.evidenceIds));return {events,articles,publications,evidence:evidence.filter(e=>publicEvidence.has(e.id)),serverTime:timestamp};})();
  const cases:ForecastCase[]=compact==='home'?(await client.query("SELECT payload FROM radar_forecast_cases WHERE (payload->'windows'->>'48')::timestamptz>$1::timestamptz",[timestamp])).rows.map(row=>row.payload):await list<ForecastCase>('forecast_cases',client);
  const outcomes:ForecastOutcome[]=compact==='home'?(await client.query("SELECT payload FROM radar_forecast_outcomes WHERE payload->>'caseId'=ANY($1::text[])",[cases.map(c=>c.id)])).rows.map(row=>row.payload):await list<ForecastOutcome>('forecast_outcomes',client),sources=await list<Source>('sources',client);
- const snapshots:ForecastSnapshot[]=compact?(await client.query(`SELECT (payload - 'observations' - 'trainingObservationIds' - 'trainingIntervals' - 'historicalIntervals' - 'capacityPadding') || CASE WHEN payload->>'recordType'='reset_cadence' THEN jsonb_build_object('summaryOnly',true,'observations','[]'::jsonb,'trainingObservationIds','[]'::jsonb,'trainingIntervals','[]'::jsonb,'historicalIntervals','[]'::jsonb,'backtest',((payload->'backtest') - 'entries') || jsonb_build_object('entries','[]'::jsonb)) ELSE '{}'::jsonb END AS payload FROM radar_forecast_snapshots WHERE id=ANY($1::text[]) OR id=(SELECT payload->>'cadenceSnapshotId' FROM radar_settings WHERE id='forecast_runtime') ${compact==='home'?'':"OR id IN (SELECT id FROM radar_forecast_snapshots WHERE payload->>'recordType'='reset_cadence' ORDER BY (payload->>'generatedAt')::timestamptz DESC,id LIMIT 12)"}`,[cases.map(c=>c.snapshotId)])).rows.map(row=>row.payload):await list<ForecastSnapshot>('forecast_snapshots',client);
+ const snapshots:ForecastSnapshot[]=compact?(await client.query(`SELECT (payload - 'observations' - 'trainingObservationIds' - 'trainingIntervals' - 'historicalIntervals' - 'capacityPadding') || CASE WHEN payload->>'recordType'='reset_cadence' THEN jsonb_build_object('summaryOnly',true,'observations','[]'::jsonb,'trainingObservationIds','[]'::jsonb,'trainingIntervals','[]'::jsonb,'historicalIntervals','[]'::jsonb,'backtest',((payload->'backtest') - 'entries') || jsonb_build_object('entries','[]'::jsonb)) ELSE '{}'::jsonb END AS payload FROM radar_forecast_snapshots WHERE id=ANY($1::text[]) OR id IN (SELECT jsonb_each_text.value FROM radar_settings CROSS JOIN LATERAL jsonb_each_text(coalesce(payload->'cadenceSnapshotIds','{}'::jsonb)) WHERE id='forecast_runtime') OR id=(SELECT payload->>'cadenceSnapshotId' FROM radar_settings WHERE id='forecast_runtime') ${compact==='home'?'':"OR id IN (SELECT id FROM radar_forecast_snapshots WHERE payload->>'recordType'='reset_cadence' ORDER BY (payload->>'generatedAt')::timestamptz DESC,id LIMIT 12)"}`,[cases.map(c=>c.snapshotId)])).rows.map(row=>row.payload):await list<ForecastSnapshot>('forecast_snapshots',client);
  const runtime=await one<CadenceRuntime&{status?:string}>('settings','forecast_runtime',client);
  const cadenceSnapshot=runtime?.cadenceSnapshotId?(compact?snapshots.find(s=>s.id===runtime.cadenceSnapshotId) as unknown as StoredCadenceForecast:await getCadenceSnapshot(runtime.cadenceSnapshotId,client)):undefined;
  return projectPublicForecastRecords({cases,outcomes,sources,snapshots,runtime,cadenceSnapshot},timestamp,facts,compact);
 }
 /** Same factual projection for native and single-snapshot CloudBase reads. */
-export function projectPublicForecastRecords(input:{cases:ForecastCase[];outcomes:ForecastOutcome[];sources:Source[];snapshots:ForecastSnapshot[];runtime?:{status?:string};cadenceSnapshot?:StoredCadenceForecast},timestamp:string,facts:PublicFactsData,compact:boolean|'home'=false):ForecastPublicData {
+export function projectPublicForecastRecords(input:{cases:ForecastCase[];outcomes:ForecastOutcome[];sources:Source[];snapshots:ForecastSnapshot[];runtime?:(Partial<CadenceRuntime>&{status?:string});cadenceSnapshot?:StoredCadenceForecast},timestamp:string,facts:PublicFactsData,compact:boolean|'home'=false):ForecastPublicData {
  const {cases,outcomes,sources,snapshots,runtime,cadenceSnapshot}=input;
  const base={ruleVersion:FORECAST_RULE_VERSION,modelVersion:FORECAST_MODEL_VERSION,generatedAt:timestamp,reference:referenceForecast(),outlook:publicResetOutlook(facts)};
  const cadenceHistory=compact==='home'?[]:(snapshots as unknown as StoredCadenceForecast[]).filter(s=>s.recordType==='reset_cadence').sort((a,b)=>Date.parse(b.generatedAt)-Date.parse(a.generatedAt)).slice(0,12);
  const computationFailed=runtime?.status==='error';
- return {...base,status:computationFailed?'unavailable':'ready',...(computationFailed?{reason:'预测观察处理失败，暂不提供当前实验估计；公开公告与固定历史记录继续保留。'}:{}),cadence:computationFailed?undefined:projectCadenceForecast(cadenceSnapshot,sources,timestamp),cadenceHistory,cadenceOutcomes:cadenceOutcomes(outcomes).slice(0,12),cases:cases.slice().sort((a,b)=>Date.parse(b.signalAt)-Date.parse(a.signalAt)).map(c=>{
+ const cadenceByKind:NonNullable<ForecastPublicData['cadenceByKind']>={};
+ for(const target of ['automatic_reset','banked_reset'] as const){const id=runtime?.cadenceSnapshotIds?.[target],stored=id?(snapshots as unknown as StoredCadenceForecast[]).find(s=>s.id===id):target==='automatic_reset'?cadenceSnapshot:undefined;const projected=projectCadenceForecast(stored,sources,timestamp);if(projected)cadenceByKind[target]=projected;}
+ const cadence=cadenceByKind.automatic_reset??projectCadenceForecast(cadenceSnapshot,sources,timestamp);
+ const visibleCadenceIds=new Set([...cadenceHistory.map(s=>s.id),...Object.values(runtime?.cadenceSnapshotIds??{}),...(cadenceSnapshot?[cadenceSnapshot.id]:[])]);
+ const visibleCadence=(snapshots as unknown as StoredCadenceForecast[]).filter(s=>visibleCadenceIds.has(s.id));
+ const cadenceHorizonOutcomes=compact==='home'?undefined:publicCadenceHorizonOutcomes(outcomes,visibleCadence,timestamp);
+ return {...base,status:computationFailed?'unavailable':'ready',...(computationFailed?{reason:'预测观察处理失败，暂不提供当前实验估计；公开公告与固定历史记录继续保留。'}:{}),cadence:computationFailed?undefined:cadence,cadenceByKind:computationFailed?undefined:cadenceByKind,cadenceEvaluationByKind:runtime?.cadenceEvaluationByKind,cadenceHistory,cadenceOutcomes:cadenceOutcomes(outcomes).slice(0,12),...(cadenceHorizonOutcomes?{cadenceHorizonOutcomes}:{}),cases:cases.slice().sort((a,b)=>Date.parse(b.signalAt)-Date.parse(a.signalAt)).map(c=>{
   const available=forecastSourceAvailable(sources.find(s=>s.id===c.sourceId),timestamp);
   const projectedCase={...c,coverage:!available?{status:'gap' as const,sourceIds:c.coverage.sourceIds,reason:'信号来源暂停、失效或结构异常，不能据未找到消息标阴性'}:c.coverage},snapshot=snapshots.find(s=>s.id===c.snapshotId);
   const {status}=publicForecastCaseProjection(projectedCase,snapshot,timestamp);
@@ -52,13 +58,15 @@ export function projectPublicForecastRecords(input:{cases:ForecastCase[];outcome
 }
 export interface ForecastCycleResult {status:'ready'|'unavailable'|'error';discovered:number;snapshots:number;outcomes:number;cadenceSnapshots?:number;cadenceOutcomes?:number;}
 /** Independent observation transaction: never writes events, articles, publications or reader notices. */
-export async function runForecastCycle(timestamp=iso(),options:{force?:boolean}={}):Promise<ForecastCycleResult> {
+export async function runForecastCycle(timestamp=iso(),options:{force?:boolean;inputsChanged?:boolean}={}):Promise<ForecastCycleResult> {
  try{return await transaction(async c=>{
   const result:ForecastCycleResult={status:'ready',discovered:0,snapshots:0,outcomes:0};
-  if(!await forecastTablesAvailable(c))return {...result,status:'unavailable'};
   await lockTransaction(c,'radar_forecast_cycle');
   const runtime=await one<CadenceRuntime>('settings','forecast_runtime',c);
-  if(!options.force&&runtime?.cadenceSnapshotId&&runtime.checkedAt&&Date.parse(timestamp)-Date.parse(runtime.checkedAt)<60_000)return result;
+  const inputs=await one<{id:string;revision?:string}>('settings','forecast_inputs',c);
+  // A no-change worker tick reads only these two tiny settings rows. No history scan.
+  if(!options.force&&!forecastCycleDue(runtime,inputs?.revision,timestamp,options.inputsChanged))return result;
+  if(!await forecastTablesAvailable(c))return {...result,status:'unavailable'};
   const sources=await list<Source>('sources',c),all=await list<Evidence>('evidence',c),cases=await list<ForecastCase>('forecast_cases',c),outcomes=await list<ForecastOutcome>('forecast_outcomes',c),publications=await list<Publication>('publications',c),events=await list<RadarEvent>('events',c),articles=await list<Article>('articles',c);
   // Existing evidence versions retain their own public/collection times; older updates cannot reset a case window.
   const signals=all.filter(e=>Date.parse(e.collectedAt)<=Date.parse(timestamp)&&Date.parse(e.publishedAt)<=Date.parse(timestamp)).sort((a,b)=>Date.parse(a.publishedAt)-Date.parse(b.publishedAt));
@@ -120,7 +128,7 @@ export async function runForecastCycle(timestamp=iso(),options:{force?:boolean}=
   }
   const cadence=await executeResetCadence(c,all,sources,timestamp);
   result.cadenceSnapshots=cadence.snapshots;result.cadenceOutcomes=cadence.outcomes;
-  await put('settings',{id:'forecast_runtime',checkedAt:timestamp,status:'ready',ruleVersion:FORECAST_RULE_VERSION,modelVersion:FORECAST_MODEL_VERSION,cadenceSnapshotId:cadence.snapshotId},c);
+  await put('settings',{id:'forecast_runtime',checkedAt:timestamp,status:'ready',ruleVersion:FORECAST_RULE_VERSION,modelVersion:FORECAST_MODEL_VERSION,cadenceSnapshotId:cadence.snapshotId,cadenceSnapshotIds:cadence.snapshotIds,cadenceEvaluationByKind:cadence.evaluationByKind,inputsRevision:inputs?.revision,cadenceModelVersion:cadence.evaluationByKind.automatic_reset?.modelVersion,nextDueAt:cadence.nextDueAt},c);
   return result;
  });}catch{
   try{await put('settings',{id:'forecast_runtime',checkedAt:timestamp,status:'error',error:'预测观察处理失败，新闻与发放状态流程继续运行'});}catch{/* A storage failure cannot be repaired by this observation task. */}

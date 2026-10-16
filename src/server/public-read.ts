@@ -36,14 +36,14 @@ export function publicSources(rows: Source[], timestamp: string): PublicData['so
     let status = source.status;
     if (!source.enabled || source.kind === 'manual') status = 'paused';
     else if (status === 'paused') status = source.lastSuccessAt ? 'healthy' : 'unconnected';
-    if (source.enabled && source.kind !== 'manual' && source.lastSuccessAt && Date.parse(timestamp) - Date.parse(source.lastSuccessAt) > source.intervalMinutes * 3 * 60000) status = 'delayed';
+    if (source.enabled && source.kind !== 'manual' && source.lastSuccessAt && Date.parse(timestamp) - Date.parse(source.lastSuccessAt) > (source.effectiveIntervalMinutes ?? source.intervalMinutes) * 3 * 60000) status = 'delayed';
     return { id: source.id, name: source.name, status, lastSuccessAt: source.lastSuccessAt };
   });
 }
 /** Shared opaque version calculation; inputs come from one database snapshot. */
 export function finishPublicVersion(parts: unknown[], rows: Source[], timestamp: string) {
   const sources = publicSources(rows, timestamp);
-  const complete = [...parts, rows.map(p => [p.id, p.enabled, p.validated, p.publicationPaused, p.kind, p.url, p.status, p.intervalMinutes, forecastSourceAvailable(p,timestamp), sources.find(s => s.id === p.id)?.status])];
+  const complete = [...parts, rows.map(p => [p.id, p.enabled, p.validated, p.publicationPaused, p.kind, p.url, p.status, p.effectiveIntervalMinutes ?? p.intervalMinutes, forecastSourceAvailable(p,timestamp), sources.find(s => s.id === p.id)?.status])];
   const contentVersion = hash(JSON.stringify(complete)).slice(0, 24);
   return { version: hash(JSON.stringify([contentVersion, sources])).slice(0, 24), contentVersion, sources, serverTime: timestamp };
 }
@@ -57,13 +57,13 @@ export async function readPublicVersion(client: Client, timestamp = new Date().t
     parts.push(result.rows[0].digest);
   }
   const settings = await client.query("SELECT payload FROM radar_settings WHERE id IN ('site','forecast_runtime') ORDER BY id");
-  parts.push(settings.rows.map(row => { const p = row.payload; return p.id === 'site' ? p : { id: p.id, status: p.status, cadenceSnapshotId: p.cadenceSnapshotId }; }));
+  parts.push(settings.rows.map(row => { const p = row.payload; return p.id === 'site' ? p : { id: p.id, status: p.status, cadenceSnapshotId: p.cadenceSnapshotId, cadenceSnapshotIds:p.cadenceSnapshotIds,cadenceEvaluationByKind:p.cadenceEvaluationByKind }; }));
   // Deadlines and source health can change without a new publication row.
   const deadlines = await client.query("SELECT payload->>'id' AS id, a->>'id' AS action, a->>'expectedAt' AS deadline FROM radar_events CROSS JOIN LATERAL jsonb_array_elements(payload->'actions') a WHERE a->>'expectedAt' IS NOT NULL ORDER BY id, action");
   parts.push(deadlines.rows.map(row => [row.id, row.action, Date.parse(row.deadline) <= Date.parse(timestamp)]));
   if (await forecastTablesAvailable(client)) {
     const cases = await client.query("SELECT id, md5(payload::text) AS digest, payload->'windows'->>'24' AS w24, payload->'windows'->>'48' AS w48 FROM radar_forecast_cases ORDER BY id");
-    const snapshots = await client.query("SELECT id, payload->>'validUntil' AS until, payload->>'generatedAt' AS generated FROM radar_forecast_snapshots WHERE id=(SELECT payload->>'cadenceSnapshotId' FROM radar_settings WHERE id='forecast_runtime') OR id IN (SELECT payload->>'snapshotId' FROM radar_forecast_cases) ORDER BY id");
+    const snapshots = await client.query("SELECT id, payload->>'validUntil' AS until, payload->>'generatedAt' AS generated FROM radar_forecast_snapshots WHERE id IN (SELECT jsonb_each_text.value FROM radar_settings CROSS JOIN LATERAL jsonb_each_text(coalesce(payload->'cadenceSnapshotIds','{}'::jsonb)) WHERE id='forecast_runtime') OR id=(SELECT payload->>'cadenceSnapshotId' FROM radar_settings WHERE id='forecast_runtime') OR id IN (SELECT payload->>'snapshotId' FROM radar_forecast_cases) ORDER BY id");
     const outcomes = await client.query("SELECT md5(coalesce(string_agg(id || md5(payload::text), ',' ORDER BY id), '')) AS digest FROM radar_forecast_outcomes");
     parts.push(cases.rows.map(row => [row.id, row.digest, Date.parse(row.w24) <= Date.parse(timestamp), Date.parse(row.w48) <= Date.parse(timestamp)]), snapshots.rows.map(row => [row.id, Date.parse(row.until) <= Date.parse(timestamp), Date.parse(row.generated) > Date.parse(timestamp)]), outcomes.rows[0].digest);
   }

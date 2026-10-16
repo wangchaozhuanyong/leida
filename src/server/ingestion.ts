@@ -1,6 +1,6 @@
 import { load } from 'cheerio';
 import { list, one, put, transaction } from '../db';
-import type { Activity, ActivityDefinition, Evidence, Source } from '../lib/types';
+import type { Activity, ActivityDefinition, Evidence, Source, SourceHttpCheckpoint } from '../lib/types';
 import { DomainError, hash, now } from './domain';
 import { audit, createEvidence } from './service';
 import { gatherEvidenceContext, hasStandaloneContext } from './source-context';
@@ -8,6 +8,8 @@ import { evidenceFingerprint } from './automatic-content';
 import {TiboTimelineError} from './tibo-timeline';
 import {TIBO_PUBLIC_SOURCE,fetchTiboPublicTimeline,safeSourceTransportCode,type TiboPublicBatch} from './tibo-public';
 import {randomUUID} from 'node:crypto';
+import {markForecastInputsChanged} from './reset-cadence-runtime';
+import {sourceCollectionSchedule,sourceNextCollectionAt,sourceForecastConfiguration} from './source-collection-policy';
 
 export class SourceStructureError extends DomainError {}
 export class SourceRateLimitError extends DomainError {
@@ -16,25 +18,41 @@ export class SourceRateLimitError extends DomainError {
 export class SourceConfigurationError extends DomainError {}
 export class SourceTransientError extends DomainError {}
 class SourceDiagnosticError extends DomainError {}
+class SourceUnchanged extends Error {}
 export interface SourceRequestEvent {
  requestId:string;phase:'source'|'releases'|'clock';attempt:number;outcome:'failed'|'recovered';elapsedMs:number;
  reason?:'http'|'network'|'body'|'format';status?:number;transportCode?:string;retryInMs?:number;
 }
-export interface SourceReadDependencies {fetcher?:typeof fetch;sleep?:(milliseconds:number)=>Promise<void>;onRequestEvent?:(event:SourceRequestEvent)=>Promise<void>;}
-interface SourceReadContext extends SourceReadDependencies {retriesRemaining:number;}
-const readContext=(dependencies:SourceReadDependencies={}):SourceReadContext=>({...dependencies,retriesRemaining:2});
+export interface SourceReadDependencies {fetcher?:typeof fetch;sleep?:(milliseconds:number)=>Promise<void>;onRequestEvent?:(event:SourceRequestEvent)=>Promise<void>;forceFullRead?:boolean;}
+interface SourceReadContext extends SourceReadDependencies {retriesRemaining:number;source?:Source;checkpoints:Record<string,SourceHttpCheckpoint>;allowUnchanged:boolean;}
+const readContext=(dependencies:SourceReadDependencies={},source?:Source):SourceReadContext=>({...dependencies,retriesRemaining:2,source,checkpoints:{...source?.httpCheckpoints},allowUnchanged:!!source&&!dependencies.forceFullRead&&source.validated&&!source.publicationPaused&&!(source.kind==='releases'&&(source.releaseScan?.nextPage??1)>1)});
 export const sourceDefinitions:Source[]=[
- {id:'official-status',name:'官方服务状态',kind:'status',url:'https://status.openai.com/api/v2/incidents.json',enabled:false,validated:false,intervalMinutes:5,version:1,status:'unconnected'},
- {id:'reset-archive',name:'重置公开归档（辅助来源）',kind:'archive',url:'https://codex-resets.com/zh-CN',enabled:false,validated:false,intervalMinutes:5,version:1,status:'unconnected'},
- {id:'activity-archive',name:'活动公开归档（辅助来源）',kind:'activity',url:'https://codex-resets.com/tibo-28',enabled:false,validated:false,intervalMinutes:5,version:1,status:'unconnected'},
+ {id:'official-status',name:'官方服务状态',kind:'status',url:'https://status.openai.com/api/v2/incidents.json',enabled:false,validated:false,intervalMinutes:30,collectionPolicy:'adaptive',version:1,status:'unconnected'},
+ {id:'reset-archive',name:'重置公开归档（辅助来源）',kind:'archive',url:'https://codex-resets.com/zh-CN',enabled:false,validated:false,intervalMinutes:30,collectionPolicy:'adaptive',version:1,status:'unconnected'},
+ {id:'activity-archive',name:'活动公开归档（辅助来源）',kind:'activity',url:'https://codex-resets.com/tibo-28',enabled:false,validated:false,intervalMinutes:30,collectionPolicy:'adaptive',version:1,status:'unconnected'},
  {id:'manual',name:'人工补充原文',kind:'manual',url:'https://codex-resets.com/zh-CN',enabled:false,validated:true,intervalMinutes:15,version:1,status:'paused'},
- {id:'official-releases',name:'Codex 官方稳定版本',kind:'releases',url:'https://api.github.com/repos/openai/codex/releases',enabled:false,validated:false,intervalMinutes:5,version:1,status:'unconnected'},
+ {id:'official-releases',name:'Codex 官方稳定版本',kind:'releases',url:'https://api.github.com/repos/openai/codex/releases',enabled:false,validated:false,intervalMinutes:360,collectionPolicy:'adaptive',version:1,status:'unconnected'},
  TIBO_PUBLIC_SOURCE
 ];
 export type Incoming=Omit<Evidence,'id'|'hash'|'historical'> & {activityDay?:number};
 const responseCache = new Map<string,{etag?:string;lastModified?:string;body:string}>();
 const releaseCheckpoints = new Map<string,Source['releaseScan']>();
 const timelineCheckpoints = new WeakMap<Source,TiboPublicBatch>();
+const sourceReadCheckpoints=new WeakMap<Source,{httpCheckpoints:Record<string,SourceHttpCheckpoint>;unchanged:boolean}>();
+const safeValidator=(value:string|null)=>value&&value.length<=1024&&!/[\r\n]/.test(value)?value:undefined;
+export function sourceReadCheckpoint(source:Source){return sourceReadCheckpoints.get(source);}
+export function incomingFingerprint(records:Incoming[]):string {
+ return hash(JSON.stringify(records.map(({collectedAt:_,...record})=>record).sort((a,b)=>a.messageId.localeCompare(b.messageId)||a.sourceId.localeCompare(b.sourceId))));
+}
+export function hasOpenCodexIncident(records:Incoming[]):boolean {
+ const latest=new Map<string,Incoming>();
+ for(const record of records){
+  if(record.provenance!=='official'||!/\bcodex\b/i.test(record.metadata?.title??'')||!record.metadata?.status)continue;
+  const key=record.parentId??record.messageId,previous=latest.get(key);
+  if(!previous||Date.parse(record.publishedAt)>Date.parse(previous.publishedAt))latest.set(key,record);
+ }
+ return [...latest.values()].some(record=>!['resolved','postmortem','completed'].includes(record.metadata!.status!));
+}
 function timelineError(error:TiboTimelineError):DomainError {
  if(error.failureKind==='structure')return new SourceStructureError(error.message);
  if(error.failureKind==='rate_limit'&&error.retryAt)return new SourceRateLimitError(error.retryAt,error.message);
@@ -70,9 +88,11 @@ function allowedSource(source:Source):boolean {
 }
 async function fetchAllowedURL(url:string,accept='text/html,application/json',context:SourceReadContext=readContext(),phase:SourceRequestEvent['phase']='source'):Promise<string> {
  const cached=responseCache.get(url);
+ const saved=context.checkpoints[url],primary=phase!=='clock';
  const headers:Record<string,string>={'User-Agent':'MoyaoResetRadar/1.0 (+local research collector)','Accept':accept};
- if(cached?.etag)headers['If-None-Match']=cached.etag;
- else if(cached?.lastModified)headers['If-Modified-Since']=cached.lastModified;
+ const validator=primary&&context.allowUnchanged?saved:cached;
+ if(validator?.etag)headers['If-None-Match']=validator.etag;
+ else if(validator?.lastModified)headers['If-Modified-Since']=validator.lastModified;
  const requestId=randomUUID(),sleep=context.sleep??(milliseconds=>new Promise(resolve=>setTimeout(resolve,milliseconds)));
  for(let attempt=1;;attempt++){
   const started=performance.now();let detail:Pick<SourceRequestEvent,'reason'|'status'|'transportCode'>={reason:'network'},body:string;
@@ -81,6 +101,10 @@ async function fetchAllowedURL(url:string,accept='text/html,application/json',co
    try{response=await (context.fetcher??fetch)(url,{signal:AbortSignal.timeout(20_000),redirect:'error',headers});}
    catch(error){detail={reason:'network',transportCode:safeSourceTransportCode(error)};throw new SourceTransientError('来源暂时连接失败，等待自动重试');}
    detail={reason:'http',status:response.status};
+   if(response.status===304&&primary&&context.allowUnchanged&&saved){
+    if(attempt>1)await context.onRequestEvent?.({requestId,phase,attempt,outcome:'recovered',elapsedMs:Math.round(performance.now()-started)});
+    throw new SourceUnchanged();
+   }
    if(response.status===304&&cached)body=cached.body;
    else{
     const retryHeader=response.headers.get('retry-after'),seconds=Number(retryHeader),retryMs=retryHeader?(Number.isFinite(seconds)?Date.now()+seconds*1000:Date.parse(retryHeader)):0;
@@ -94,10 +118,17 @@ async function fetchAllowedURL(url:string,accept='text/html,application/json',co
     catch(error){if(error instanceof SourceStructureError)throw error;detail={reason:'body',transportCode:safeSourceTransportCode(error)};throw new SourceTransientError('来源响应读取中断，等待自动重试');}
     finally{reader.releaseLock();}
     body=Buffer.concat(chunks).toString('utf8');
+    const checkpoint:SourceHttpCheckpoint={bodyHash:hash(body),etag:safeValidator(response.headers.get('etag')),lastModified:safeValidator(response.headers.get('last-modified'))};
+    if(primary){context.checkpoints[url]=checkpoint;while(Object.keys(context.checkpoints).length>16)delete context.checkpoints[Object.keys(context.checkpoints)[0]];}
     if(!responseCache.has(url)&&responseCache.size>=16)responseCache.delete(responseCache.keys().next().value!);
     responseCache.set(url,{body,etag:response.headers.get('etag')??undefined,lastModified:response.headers.get('last-modified')??undefined});
+    if(primary&&context.allowUnchanged&&saved?.bodyHash===checkpoint.bodyHash){
+     if(attempt>1)await context.onRequestEvent?.({requestId,phase,attempt,outcome:'recovered',elapsedMs:Math.round(performance.now()-started)});
+     throw new SourceUnchanged();
+    }
    }
   }catch(error){
+   if(error instanceof SourceUnchanged)throw error;
    const retry=error instanceof SourceTransientError&&context.retriesRemaining>0,retryInMs=retry?(context.retriesRemaining===2?1000:2500):undefined;
    await context.onRequestEvent?.({requestId,phase,attempt,outcome:'failed',elapsedMs:Math.round(performance.now()-started),...(error instanceof SourceStructureError?{reason:'format' as const}:detail),...(retryInMs?{retryInMs}:{})});
    if(!retry)throw error;context.retriesRemaining--;await sleep(retryInMs!);continue;
@@ -202,27 +233,32 @@ export function isHistoricalRecord(publishedAt:string,historical=false,currentTi
  return historical||currentTime-Date.parse(publishedAt)>24*3600_000;
 }
 /** First page is always revisited; a persisted page checkpoint bounds each catch-up batch. */
-export async function fetchReleasePages(source:Source,fetcher:typeof fetch=fetch,dependencies:SourceReadDependencies={}):Promise<{records:Incoming[];scan:NonNullable<Source['releaseScan']>}> {
- const context=readContext({...dependencies,fetcher});
+export async function fetchReleasePages(source:Source,fetcher:typeof fetch=fetch,dependencies:SourceReadDependencies={}):Promise<{records:Incoming[];scan:NonNullable<Source['releaseScan']>;httpCheckpoints?:Record<string,SourceHttpCheckpoint>;unchanged?:boolean}> {
+ const context=readContext({...dependencies,fetcher},source);
  const checkpoint=source.releaseScan,baseline=checkpoint?.baseline??source.cursor;
  const stopBefore=baseline&&Number.isFinite(Date.parse(baseline))?Date.parse(baseline)-RELEASE_LOOKBACK_MS:Date.now()-RELEASE_LOOKBACK_MS;
  const pages=[1];if(checkpoint?.nextPage&&checkpoint.nextPage>1)for(let p=Math.max(2,checkpoint.nextPage-1);pages.length<MAX_RELEASE_PAGES;p++)pages.push(p);
  else for(let p=2;pages.length<MAX_RELEASE_PAGES;p++)pages.push(p);
  const records:Incoming[]=[],seen=new Set<string>();let newestAt=checkpoint?.newestAt??source.cursor,nextPage=1,complete=false;
  for(const page of pages){
-  const raw=await fetchAllowedURL(`https://api.github.com/repos/openai/codex/releases?per_page=${RELEASE_PAGE_SIZE}&page=${page}`,'application/vnd.github+json',context,'releases');
+  let raw:string;
+  try{raw=await fetchAllowedURL(`https://api.github.com/repos/openai/codex/releases?per_page=${RELEASE_PAGE_SIZE}&page=${page}`,'application/vnd.github+json',context,'releases');}
+  catch(error){if(!(error instanceof SourceUnchanged)||page!==1)throw error;return {records:[],scan:source.releaseScan??{nextPage:1},httpCheckpoints:context.checkpoints,unchanged:true};}
   let items:unknown;try{items=JSON.parse(raw);}catch{throw new SourceStructureError('官方版本列表未返回有效结构');}
   if(!Array.isArray(items))throw new SourceStructureError('官方版本接口没有返回分页列表');
   for(const row of parseReleases(raw,source)){if(!seen.has(row.messageId)){seen.add(row.messageId);records.push(row);}if(!newestAt||Date.parse(row.publishedAt)>Date.parse(newestAt))newestAt=row.publishedAt;}
+  // An unchanged head can end a completed scan; tail pages must still be read.
+  context.allowUnchanged=false;
   // Drafts can have no published_at, so use only valid timestamps for cursor termination.
   const times=items.map(item=>item&&typeof item==='object'&&'published_at'in item?Date.parse(String(item.published_at)):NaN).filter(Number.isFinite);
   const reachedBoundary=times.length>0&&Math.max(...times)<stopBefore;
   if(items.length<RELEASE_PAGE_SIZE||reachedBoundary){complete=true;nextPage=1;break;}
   nextPage=page+1;
  }
- return {records,scan:{nextPage,newestAt,baseline:complete?undefined:baseline,completedAt:complete?now():checkpoint?.completedAt}};
+ return {records,scan:{nextPage,newestAt,baseline:complete?undefined:baseline,completedAt:complete?now():checkpoint?.completedAt},httpCheckpoints:context.checkpoints};
 }
 export async function fetchRecords(source:Source,validationOnly=false,dependencies:SourceReadDependencies={}):Promise<Incoming[]> {
+ sourceReadCheckpoints.delete(source);
  if(source.id==='tibo-timeline')throw new SourceConfigurationError('收费采集已停用，请使用 Tibo 免费公开动态');
  if(!allowedSource(source))throw new DomainError('来源不在固定适配器允许名单');
  if(source.kind==='timeline'){
@@ -236,10 +272,13 @@ export async function fetchRecords(source:Source,validationOnly=false,dependenci
   try{if(dependencies.onRequestEvent)await dependencies.onRequestEvent(event);else await transaction(c=>audit('worker',`source.request.${event.outcome}`,source.id,event.outcome==='recovered'?'来源请求在本次采集内恢复':'来源请求异常，保留安全诊断与重试记录',undefined,event,c));}
   catch{throw new SourceDiagnosticError('采集诊断记录暂不可用，停止本轮采集');}
  };
- const context=readContext({...dependencies,onRequestEvent});
- if(source.kind==='releases'){const result=await fetchReleasePages(source,dependencies.fetcher??fetch,{...dependencies,onRequestEvent});releaseCheckpoints.set(source.id,result.scan);return result.records;}
+ const context=readContext({...dependencies,onRequestEvent,forceFullRead:validationOnly||dependencies.forceFullRead},source);
+ if(source.kind==='releases'){const result=await fetchReleasePages(source,dependencies.fetcher??fetch,{...dependencies,onRequestEvent,forceFullRead:validationOnly||dependencies.forceFullRead});releaseCheckpoints.set(source.id,result.scan);sourceReadCheckpoints.set(source,{httpCheckpoints:result.httpCheckpoints??{},unchanged:result.unchanged===true});return result.records;}
  const url=source.kind==='activity'?`${ARCHIVE_ORIGIN}/zh-CN/${challengePath(source.url)}`:source.url;
- let raw:string;try{raw=await fetchAllowedURL(url,undefined,context);}catch(error){if(source.kind!=='activity'||!(error instanceof DomainError)||error.message!=='来源请求失败（状态 404）')throw error;raw=await fetchAllowedURL(`${ARCHIVE_ORIGIN}/${challengePath(source.url)}`,undefined,context);}
+ let raw:string;
+ try{try{raw=await fetchAllowedURL(url,undefined,context);}catch(error){if(source.kind!=='activity'||!(error instanceof DomainError)||error.message!=='来源请求失败（状态 404）')throw error;raw=await fetchAllowedURL(`${ARCHIVE_ORIGIN}/${challengePath(source.url)}`,undefined,context);}}
+ catch(error){if(!(error instanceof SourceUnchanged))throw error;sourceReadCheckpoints.set(source,{httpCheckpoints:context.checkpoints,unchanged:true});return [];}
+ sourceReadCheckpoints.set(source,{httpCheckpoints:context.checkpoints,unchanged:false});
  if(source.kind==='status')return parseStatus(raw,source);
  if(source.kind==='activity'){
   const $=load(raw);let clockScript='';
@@ -268,7 +307,7 @@ async function discoverSources(source:Source):Promise<void> {
  const existing=await list<Source>('sources');
  for(const url of discoverActivityLinks(html)){
   const slug=challengePath(url)!;if(existing.some(s=>s.kind==='activity'&&challengePath(s.url)===slug))continue;
-  const proposed:Source={id:`activity-${hash(slug).slice(0,16)}`,name:'活动公开归档（辅助来源）',kind:'activity',url,enabled:true,validated:false,intervalMinutes:5,version:1,status:'unconnected',discoveredFrom:source.id};
+  const proposed:Source={id:`activity-${hash(slug).slice(0,16)}`,name:'活动公开归档（辅助来源）',kind:'activity',url,enabled:true,validated:false,intervalMinutes:30,collectionPolicy:'adaptive',version:1,status:'unconnected',discoveredFrom:source.id};
   try{
    const records=await fetchRecords(proposed),definition=records.find(r=>r.metadata?.activity)?.metadata?.activity;
    if(definition)await establishActivity(definition);
@@ -287,14 +326,16 @@ export async function validateSource(sourceId:string,actor:string) {
  const before=await one<Source>('sources',sourceId);if(!before)throw new DomainError('来源不存在');if(before.kind==='manual')return {validated:true,count:0};
  try{const records=await fetchRecords(before,true);const timeline=timelineCheckpoints.get(before);if(timeline?.interrupted){await transaction(async c=>{const source=await one<Source>('sources',sourceId,c,true);if(source)await put('sources',{...source,timelineScan:timeline.scan},c);});throw timelineError(timeline.interrupted);}await transaction(async c=>{const source=await one<Source>('sources',sourceId,c,true);if(!source)throw new DomainError('来源不存在');if(source.kind==='timeline'&&!timeline)throw new DomainError('免费动态验证断点缺失');
   // Samples are not saved as evidence, so validation cannot advance the cursor.
-  await put('sources',{...source,...(timeline?{timelineScan:timeline.scan}:{}),validated:true,publicationPaused:false,pauseReason:undefined,consecutiveFailures:0,error:undefined,version:source.version+1,status:source.enabled?'healthy':'paused'},c);await audit(actor,'source.validate',sourceId,`适配器通过结构校验，取得 ${records.length} 条样本；持续可用性仍待运行`,undefined,{count:records.length},c);});return {validated:true,count:records.length};}
+  const updated:Source={...source,...(timeline?{timelineScan:timeline.scan}:{}),validated:true,publicationPaused:false,pauseReason:undefined,consecutiveFailures:0,error:undefined,version:source.version+1,status:source.enabled?'healthy':'paused'};await put('sources',updated,c);if(sourceForecastConfiguration(source)!==sourceForecastConfiguration(updated))await markForecastInputsChanged(c);await audit(actor,'source.validate',sourceId,`适配器通过结构校验，取得 ${records.length} 条样本；持续可用性仍待运行`,undefined,{count:records.length},c);});return {validated:true,count:records.length};}
  catch(e){await transaction(async c=>{const s=await one<Source>('sources',sourceId,c,true);if(s){const waiting=e instanceof SourceRateLimitError||e instanceof TiboTimelineError&&e.failureKind==='transient';await put('sources',{...s,validated:waiting?s.validated:false,publicationPaused:waiting?s.publicationPaused:e instanceof SourceStructureError,pauseReason:waiting?s.pauseReason:e instanceof SourceStructureError?'structure':undefined,...(waiting?{nextRunAt:e instanceof SourceRateLimitError?e.retryAt:new Date(Date.now()+60_000).toISOString()}:{}),status:'failed',error:e instanceof DomainError?e.message:'来源连接失败',version:s.version+1},c);}});throw e;}
 }
-export async function collectSource(sourceId:string,historical=false):Promise<{seen:number;created:number}> {
+export async function collectSource(sourceId:string,historical=false):Promise<{seen:number;created:number;healthChanged?:boolean}> {
  const source=await one<Source>('sources',sourceId);if(!source||(!source.validated&&!(source.enabled&&source.publicationPaused&&source.pauseReason==='structure')))throw new DomainError('来源未验证');
  if(!source.enabled)throw new DomainError('来源已由管理员暂停');
- const records=await fetchRecords(source),timeline=source.kind==='timeline'?timelineCheckpoints.get(source):undefined;let created=0;
- for(const raw of records){
+ const records=await fetchRecords(source,false,{forceFullRead:historical}),timeline=source.kind==='timeline'?timelineCheckpoints.get(source):undefined;
+ const read=sourceReadCheckpoints.get(source),fingerprint=incomingFingerprint(records),unchanged=!historical&&(read?.unchanged===true||source.collectionFingerprint===fingerprint);
+ let created=0,healthChanged=false;
+ for(const raw of unchanged?[]:records){
   const {activityDay,...incoming}=raw;const definition=incoming.metadata?.activity;
   const activityAllowed=definition?await establishActivity(definition):true;
   const result=await createEvidence({...incoming,historical:isHistoricalRecord(incoming.publishedAt,historical)});
@@ -308,17 +349,21 @@ export async function collectSource(sourceId:string,historical=false):Promise<{s
    });
   }
  }
- await discoverSources(source);
+ if(!unchanged)await discoverSources(source);
  const time=now(),scan=releaseCheckpoints.get(source.id);
  await transaction(async c=>{
   const current=await one<Source>('sources',sourceId,c,true);
   if(current){const latest=records.length?records.reduce((a,b)=>Date.parse(a.publishedAt)>Date.parse(b.publishedAt)?a:b).publishedAt:current.cursor;
    const cursor=scan?(scan.nextPage===1?scan.newestAt:current.cursor):(!current.cursor||latest&&Date.parse(latest)>Date.parse(current.cursor)?latest:current.cursor);
    const waiting=timeline&&!timeline.headRead;
-   await put('sources',{...current,validated:waiting?current.validated:true,publicationPaused:waiting?current.publicationPaused:false,pauseReason:waiting?current.pauseReason:undefined,consecutiveFailures:waiting?current.consecutiveFailures:0,status:current.enabled?'healthy':'paused',error:waiting?current.error:undefined,lastSuccessAt:waiting?current.lastSuccessAt:time,nextRunAt:new Date(Date.now()+current.intervalMinutes*60_000).toISOString(),cursor,releaseScan:scan??current.releaseScan,timelineScan:timeline?.scan??current.timelineScan,version:current.version+1},c);
+   const hasActiveIncident=current.kind==='status'&&!read?.unchanged?hasOpenCodexIncident(records):current.hasActiveIncident;
+   const schedule=sourceCollectionSchedule({...current,hasActiveIncident});
+   healthChanged=!waiting&&(current.status!==(current.enabled?'healthy':'paused')||!current.validated||current.publicationPaused===true);
+   const updated:Source={...current,...schedule,hasActiveIncident,validated:waiting?current.validated:true,publicationPaused:waiting?current.publicationPaused:false,pauseReason:waiting?current.pauseReason:undefined,consecutiveFailures:waiting?current.consecutiveFailures:0,status:current.enabled?'healthy':'paused',error:waiting?current.error:undefined,lastSuccessAt:waiting?current.lastSuccessAt:time,cursor,releaseScan:scan??current.releaseScan,timelineScan:timeline?.scan??current.timelineScan,httpCheckpoints:read?.httpCheckpoints??current.httpCheckpoints,collectionFingerprint:read?.unchanged?current.collectionFingerprint:fingerprint,version:current.version+1};
+   await put('sources',{...updated,nextRunAt:sourceNextCollectionAt(updated)},c);
   }
-  await audit('worker','source.collect',sourceId,`读取 ${records.length} 条，新增 ${created} 条；${timeline?.interrupted?'已保留成功读取的部分，后续读取等待恢复':'保留旧条目回看以发现编辑'}`,undefined,{seen:records.length,created,historical,releaseScan:scan,partial:!!timeline?.interrupted},c);
+  if(!unchanged||healthChanged)await audit('worker','source.collect',sourceId,`读取 ${records.length} 条，新增 ${created} 条；${timeline?.interrupted?'已保留成功读取的部分，后续读取等待恢复':'保留旧条目回看以发现编辑'}`,undefined,{seen:records.length,created,historical,releaseScan:scan,partial:!!timeline?.interrupted},c);
  });
  if(timeline?.interrupted)throw timelineError(timeline.interrupted);
- return {seen:records.length,created};
+ return {seen:records.length,created,healthChanged};
 }

@@ -1,0 +1,9 @@
+<view class="forecast-card">
+  <view class="forecast-heading"><text>{{snapshot ? '固定预测记录' : '下一次重置参考'}}</text><text class="forecast-state">{{view.state}}</text></view>
+  <view wx:if="{{!snapshot}}" class="forecast-types"><button class="{{target === 'automatic_reset' ? 'selected' : ''}}" data-target="automatic_reset" bindtap="selectTarget" aria-pressed="{{target === 'automatic_reset'}}">用量重置</button><button class="{{target === 'banked_reset' ? 'selected' : ''}}" data-target="banked_reset" bindtap="selectTarget" aria-pressed="{{target === 'banked_reset'}}">重置卡</button></view>
+  <view wx:if="{{view.ready}}" class="forecast-metrics"><view><text>24小时内</text><view>{{view.p24}}</view></view><view><text>48小时内</text><view>{{view.p48}}</view></view></view>
+  <view class="forecast-message">{{view.message}}</view>
+  <view wx:if="{{view.hasSnapshot && !view.announced}}" class="forecast-meta">{{view.sampleCount}}个历史间隔 · {{view.eligibleCount}}个当前可比间隔<view>估算于 {{view.generatedAt}} · 北京时间</view></view>
+  <view wx:if="{{view.ready}}" class="forecast-meta">窗口从本次估算时间起算；24小时截至 {{view.window24}}。个人账户到账需自行确认。</view>
+  <button wx:if="{{!snapshot}}" class="forecast-link" bindtap="openDetails">查看预测依据 <text>→</text></button>
+</view>

@@ -1,6 +1,6 @@
 export const WORKER_IDLE_MS = 15_000;
 export const WORKER_HEARTBEAT_MS = 60_000;
-const intervals = { sources: 60_000, wechat: 30_000, forecast: 60_000 };
+const intervals = { sources: 60_000, generation: 5*60_000, wechat: 30_000, forecast: 60_000 };
 type Maintenance = keyof typeof intervals;
 
 /** Local cadence only; database leases and read-set validation remain authoritative. */
@@ -8,9 +8,15 @@ export function createWorkerCadence(clock = Date.now) {
   const due = new Map<Maintenance, number>();
   const pending = new Map<Maintenance, Promise<void>>();
   const revisions = new Map<Maintenance, number>();
+  const inputs = new Map<Maintenance, string | undefined>();
+  const nudge=(...names:Maintenance[])=>{for(const name of names){due.delete(name);revisions.set(name,(revisions.get(name)??0)+1);}};
   return {
     nudge(...names: Maintenance[]) {
-      for (const name of names) { due.delete(name); revisions.set(name, (revisions.get(name) ?? 0) + 1); }
+      nudge(...names);
+    },
+    /** Persistent input revisions also wake service/admin/backfill writes from another process. */
+    observe(name:Maintenance,revision:string|undefined) {
+      if(!inputs.has(name)||inputs.get(name)!==revision){inputs.set(name,revision);nudge(name);}
     },
     run(name: Maintenance, work: () => Promise<void>): Promise<void> {
       const old = pending.get(name);

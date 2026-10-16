@@ -16,6 +16,7 @@ import { isHistoricalContent } from '../lib/history';
 import {processWechatJob,scheduleWechatDeliveries} from './wechat';
 import {runForecastCycle} from './forecast';
 import {createWorkerCadence} from './worker-timing';
+import {sourceCollectionSchedule,sourceNextCollectionAt,verifiedCollectionWindow} from './source-collection-policy';
 
 const MAX_ACTIVE_GENERATION = 10;
 const MAX_ACTIVE_HISTORICAL = 2;
@@ -66,23 +67,35 @@ export function fingerprintChange(saved:string|undefined,current:string):'new'|'
  const previous=evidenceHash(saved),next=evidenceHash(current);
  return previous&&next&&previous===next?'rules':'evidence';
 }
-export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichment?:boolean}={}):Promise<void> {
+export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichment?:boolean;skipGeneration?:boolean;skipSources?:boolean}={}):Promise<void> {
   const allowTemplates=options.allowTemplates!==false;
   await transaction(async c=>{
     await lockTransaction(c,'radar_scheduler');
     const sources=await list<Source>('sources',c);
-    for(const source of sources) if(sourceCollectionDue(source)) {
+    for(const source of options.skipSources?[]:sources) if(sourceCollectionDue(source)) {
       await queueJob('collect',{sourceId:source.id,structureProbe:source.pauseReason==='structure'},c);
-      await put('sources',{...source,nextRunAt:new Date(Date.now()+(source.pauseReason==='structure'?15:source.intervalMinutes)*60_000).toISOString()},c);
+      const schedule=sourceCollectionSchedule(source);
+      await put('sources',{...source,...schedule,nextRunAt:sourceNextCollectionAt(source)},c);
     }
+    if(options.skipGeneration)return;
     const ai=await one<AIRecord>('settings','ai',c);
     const ready=aiReady(ai);
     const site=await one<SiteSettings>('settings','site',c)??defaultSite;
-    if(!ready&&!site.autoPublish)return;
     const candidates=await list<Candidate>('candidates',c);
     const evidence=await list<Evidence>('evidence',c);
     const articles=await list<Article>('articles',c);
     const events=await list<RadarEvent>('events',c);
+    const collectionWindow=verifiedCollectionWindow(events,evidence);
+    for(const source of sources){
+      const schedule=sourceCollectionSchedule({...source,collectionWindow});
+      if(schedule.collectionPolicy!=='adaptive')continue;
+      if(JSON.stringify(source.collectionWindow)!==JSON.stringify(collectionWindow)||source.effectiveIntervalMinutes!==schedule.effectiveIntervalMinutes||source.collectionPolicy!==schedule.collectionPolicy||source.intervalMinutes!==schedule.intervalMinutes){
+        const updated={...source,...schedule,collectionWindow};
+        const due=sourceNextCollectionAt(updated,Date.parse(source.lastSuccessAt??now()));
+        await put('sources',{...updated,nextRunAt:source.status==='failed'?source.nextRunAt:source.nextRunAt&&Date.parse(source.nextRunAt)<Date.parse(due)?source.nextRunAt:due},c);
+      }
+    }
+    if(!ready&&!site.autoPublish)return;
     const jobs=await list<Job>('jobs',c);
     const generating=jobs.filter(job=>job.kind==='generate');
     let active=generating.filter(activeJob).length;
@@ -378,6 +391,7 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
 }
 export interface WorkerDependencies { generate?:Generator; collect?:typeof collectSource; enrich?:typeof enrichKnownEvidence; enrichQuoted?:typeof enrichQuotedResetContext; schedule?:boolean; allowTemplates?:boolean; wechat?:typeof processWechatJob; cadence?:ReturnType<typeof createWorkerCadence>; }
 const workerCadence=createWorkerCadence();
+let forecastInputsChanged=false;
 export async function writeWorkerHeartbeat(error?:string,processed:boolean|string=false):Promise<void> {
   const previous=await one<{id:string;heartbeatAt:string;lastJobAt?:string;error?:string}>('settings','worker_runtime');
   await put('settings',{id:'worker_runtime',heartbeatAt:now(),lastJobAt:typeof processed==='string'?processed:processed?now():previous?.lastJobAt,error});
@@ -386,10 +400,17 @@ export async function runOne(dependencies:WorkerDependencies={}):Promise<boolean
   const allowTemplates=dependencies.allowTemplates??!dependencies.generate;
   const cadence=dependencies.cadence??workerCadence;
   if(dependencies.schedule!==false) {
-    await cadence.run('sources',()=>scheduleDue({allowTemplates,allowEnrichment:!dependencies.generate||!!dependencies.enrich}));
+    await cadence.run('sources',()=>scheduleDue({allowTemplates,skipGeneration:true}));
+    // One small persisted marker replaces full scans when the inputs are stable.
+    // createEvidence/publication transactions update it, including admin/backfill
+    // writes performed outside this worker process.
+    const inputs=await one<{revision?:string}>('settings','forecast_inputs');
+    cadence.observe('generation',inputs?.revision);
+    await cadence.run('generation',()=>scheduleDue({allowTemplates,allowEnrichment:!dependencies.generate||!!dependencies.enrich,skipSources:true}));
     try {await cadence.run('wechat',scheduleWechatDeliveries);} catch {console.error('微信提醒调度暂不可用，其他任务继续运行');}
     try {await cadence.run('forecast',async()=>{
-      if((await runForecastCycle()).status==='error')throw new Error('预测观察暂不可用');
+      if((await runForecastCycle(now(),{inputsChanged:forecastInputsChanged})).status==='error')throw new Error('预测观察暂不可用');
+      forecastInputsChanged=false;
     });} catch {console.error('预测观察暂不可用，新闻任务继续运行');}
   }
   const job=await claimJob();
@@ -411,10 +432,11 @@ export async function runOne(dependencies:WorkerDependencies={}):Promise<boolean
     const enrichQuoted=dependencies.enrichQuoted??(dependencies.generate?async()=>[]:enrichQuotedResetContext);
     const generated=job.kind==='generate'?await generateCandidate(job,dependencies.generate??generateContent,allowTemplates,enrich,enrichQuoted):false;
     if(job.kind!=='generate') {
-      await (dependencies.collect??collectSource)(job.sourceId!,job.kind==='backfill'||job.payload.historical===true);
+      const collected=await (dependencies.collect??collectSource)(job.sourceId!,job.kind==='backfill'||job.payload.historical===true);
+      if(collected.created>0||collected.healthChanged){forecastInputsChanged=true;cadence.nudge('generation','forecast');}
       await transaction(async c=>{
         const source=await one<Source>('sources',job.sourceId!,c,true);
-        if(source)await put('sources',{...source,validated:true,publicationPaused:false,pauseReason:undefined,consecutiveFailures:0,status:source.enabled?'healthy':'paused',error:undefined,nextRunAt:new Date(Date.now()+source.intervalMinutes*60_000).toISOString()},c);
+        if(source&&(source.status!==(source.enabled?'healthy':'paused')||!source.validated||source.publicationPaused||source.error)){forecastInputsChanged=true;await put('sources',{...source,validated:true,publicationPaused:false,pauseReason:undefined,consecutiveFailures:0,status:source.enabled?'healthy':'paused',error:undefined,...sourceCollectionSchedule(source),nextRunAt:sourceNextCollectionAt(source)},c);}
       });
     }
     await transaction(async c=>{
@@ -440,6 +462,7 @@ export async function runOne(dependencies:WorkerDependencies={}):Promise<boolean
       if(job.sourceId&&job.kind!=='generate') {
         const source=await one<Source>('sources',job.sourceId,c,true);
         if(source) {
+          if(source.status!=='failed'||source.publicationPaused!== (error instanceof SourceStructureError?true:source.publicationPaused))forecastInputsChanged=true;
           const configuration=error instanceof SourceConfigurationError;
           const next:Source={...source,status:'failed',error:message,validated:error instanceof SourceStructureError||configuration?false:source.validated,publicationPaused:configuration?false:error instanceof SourceStructureError?true:source.publicationPaused,pauseReason:configuration?undefined:error instanceof SourceStructureError?'structure':source.pauseReason,consecutiveFailures:(source.consecutiveFailures??0)+1,version:source.version+1};
           next.nextRunAt=sourceRetryAt(source,error instanceof SourceRateLimitError?error.retryAt:undefined);
@@ -459,6 +482,7 @@ export async function runOne(dependencies:WorkerDependencies={}):Promise<boolean
   }
   // Fresh evidence feeds generation on the next turn; publication feeds reminders.
   // Manual changes in the separate web process are picked up by the bounded cadence.
-  cadence.nudge('sources','wechat','forecast');
+  if(job.kind==='generate'){forecastInputsChanged=true;cadence.nudge('generation','forecast','wechat');}
+  else if(forecastInputsChanged)cadence.nudge('forecast');
   return true;
 }
