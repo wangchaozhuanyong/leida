@@ -43,6 +43,7 @@ test('补录清单拒绝作者替换、未来消息、重复身份与非法范�
     (v:HistoryBundle)=>{v.messages[0].publishedAt='2100-01-01T00:00:00Z';},
     (v:HistoryBundle)=>{v.evidence.push(v.evidence[0]);},
     (v:HistoryBundle)=>{v.messages.push(v.messages[0]);},
-    (v:HistoryBundle)=>{v.evidence[0].textOrigin='archive_excerpt';}
+    (v:HistoryBundle)=>{v.evidence[0].textOrigin='archive_excerpt';},
+    (v:HistoryBundle)=>{v.reposts![0].replacementId=v.reposts![0].messageId;}
   ]){const value=structuredClone(data);mutate(value);assert.throws(()=>validateHistoryBundle(value,digest(value)));}
 });

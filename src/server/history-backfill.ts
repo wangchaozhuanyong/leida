@@ -10,9 +10,9 @@ import {DomainError,hash,now,validateDraft} from './domain';
 import {TIBO_PUBLIC_SOURCE} from './tibo-public';
 
 interface HistoryMessage {messageId:string;publishedAt:string;referenceOnly:boolean;expectedActions:{kind:string;stage:string}[];}
-export interface HistoryBundle {id:string;schemaVersion:number;rulesVersion:string;startsAt:string;endsAt:string;reviewedAt:string;evidence:Evidence[];messages:HistoryMessage[];}
+export interface HistoryBundle {id:string;schemaVersion:number;rulesVersion:string;startsAt:string;endsAt:string;reviewedAt:string;evidence:Evidence[];messages:HistoryMessage[];reposts?:{messageId:string;replacementId:string}[];}
 interface HistoryReceipt {id:string;digest:string;phase:'publishing'|'complete';nextIndex:number;insertedEvidence:number;published:number;references:number;existing:number;updatedAt:string;}
-const BUNDLE_DIGEST='9f5b8188ba8e0a245622513114f6cc1705247f64a0e4ec37a6c949e82784cba1';
+const BUNDLE_DIGEST='482a3fc5b5df25429467131b592690a4670307398c1be8e1d6cba9d492f3c8c8';
 const bundle=bundleFile as unknown as HistoryBundle;
 const receiptId='maintenance:'+bundle.id;
 const key=(e:Evidence)=>`${namespace(e)}:${e.messageId}`;
@@ -28,6 +28,7 @@ export function validateHistoryBundle(value:HistoryBundle,digest=BUNDLE_DIGEST):
   if(!Number.isFinite(Date.parse(value.startsAt))||!Number.isFinite(Date.parse(value.endsAt))||Date.parse(value.endsAt)>Date.now()+300000)throw new DomainError('历史补录时间范围无效');
   for(const row of value.evidence)if(row.sourceId!=='tibo-public'||row.textOrigin!=='original'||!row.historical||!/^https:\/\/x\.com\/thsottiaux\/status\/\d+$/.test(row.url)||!row.url.endsWith('/'+row.messageId)||!row.text||row.text.length>12000||!Number.isFinite(Date.parse(row.publishedAt))||Date.parse(row.publishedAt)>Date.parse(value.endsAt))throw new DomainError('历史补录来源或原文无效');
   for(const row of value.messages)if(!ids.has(row.messageId)||row.publishedAt<value.startsAt||row.publishedAt>value.endsAt)throw new DomainError('历史补录消息超出范围');
+  for(const pair of value.reposts??[]){const first=value.evidence.find(e=>e.messageId===pair.messageId),second=value.evidence.find(e=>e.messageId===pair.replacementId);if(!first||!second||!first.parentId||first.parentId!==second.parentId||Date.parse(second.publishedAt)<=Date.parse(first.publishedAt)||Date.parse(second.publishedAt)-Date.parse(first.publishedAt)>600000)throw new DomainError('历史重发关联未通过核对');}
 }
 
 export function historicalDraft(primary:Evidence,all:Evidence[],message:HistoryMessage):DraftContent {
@@ -115,6 +116,16 @@ export async function applyBundledHistory():Promise<HistoryReceipt> {
         next.published++;next.nextIndex++;
       }
       next.phase=next.nextIndex===bundle.messages.length?'complete':'publishing';next.updatedAt=now();
+      if(next.phase==='complete')for(const pair of bundle.reposts??[]){
+        const sourceArticle=articles.find(a=>identity.get(a.evidenceIds[0])===key(bundle.evidence.find(e=>e.messageId===pair.messageId)!)),targetArticle=articles.find(a=>identity.get(a.evidenceIds[0])===key(bundle.evidence.find(e=>e.messageId===pair.replacementId)!));
+        const source=events.find(e=>e.id===sourceArticle?.eventId),target=events.find(e=>e.id===targetArticle?.eventId);
+        if(!source||!target||source.id===target.id||source.status!=='published'||target.status!=='published')continue;
+        if([source,target].some(e=>e.manualFields?.length)||[sourceArticle!,targetArticle!].some(a=>a.status!=='published'||a.manualFields?.length||a.contentOrigin!=='template')||candidates.some(candidate=>candidate.humanEdited&&candidate.status==='published'&&([sourceArticle!.id,targetArticle!.id].includes(candidate.automation?.articleId??'')||[pair.messageId,pair.replacementId].some(messageId=>identity.get(candidate.evidenceId)===key(bundle.evidence.find(e=>e.messageId===messageId)!)))))continue;
+        const [first,second]=[source.actions,target.actions];
+        if(first.length!==1||second.length!==1||first[0].stage!=='claimed_complete'||second[0].stage!=='claimed_complete'||JSON.stringify([first[0].kind,first[0].scope,first[0].eligibility,first[0].evidenceQuote])!==JSON.stringify([second[0].kind,second[0].scope,second[0].eligibility,second[0].evidenceQuote]))throw new DomainError('重发原帖动作不一致，保留人工核对');
+        const merged={...source,status:'merged' as const,mergedInto:target.id,version:source.version+1,updatedAt:now()};await put('events',merged,c);
+        await audit('authorized-history-backfill','history.repost_merge',source.id,'已核对为同一完成声明的文字修正重发；两条原文和旧快照保留，重置只计一次',source,merged,c);
+      }
       await put('settings',next,c);
       if(next.phase==='complete')await audit('authorized-history-backfill','history.backfill',bundle.id,'按用户要求补齐近半年可查公开历史；未生成实时提醒',undefined,next,c);
       return next;

@@ -110,7 +110,7 @@ export function selectOriginal(versions: Evidence[]): Evidence | undefined {
 }
 export function originalConflict(item:Evidence,all:Evidence[]):boolean {
   if(item.textOrigin!=='original')return false;
-  const clean=(s:string)=>s.replace(/\s*https?:\/\/t\.co\/\S+/g,'').replace(/[’‘]/g,"'").replace(/\s+/g,' ').trim();
+  const clean=(s:string)=>s.replace(/\s*https?:\/\/t\.co\/\S+/g,'').replace(/(?:https?:\/\/)?\bpic\.twitter\.com\/[A-Za-z0-9]+\b/gi,'').replace(/[’‘]/g,"'").replace(/\s+/g,' ').trim();
   return all.some(other=>other.id!==item.id&&namespace(other)===namespace(item)&&other.messageId===item.messageId&&other.textOrigin==='original'&&!isTruncatedText(other.text)&&!isTruncatedText(item.text)&&
     (clean(other.text)!==clean(item.text)||!!other.parentId&&!!item.parentId&&other.parentId!==item.parentId));
 }
