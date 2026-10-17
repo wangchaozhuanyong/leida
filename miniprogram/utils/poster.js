@@ -29,7 +29,7 @@ function posterInput(data, publicationId) {
   if (m.publicationWithdrawn(data,publication)) throw new PosterError('withdrawn', '此内容已撤回，不能生成分享海报。');
   if (data.events.some(item => item.id === publication.eventId && item.status === 'merged')) throw new PosterError('merged', '事件已合并，请查看合并后的公开记录。');
   const newsOnly = m.isNewsOnly(publication);
-  return { publicationId, name:data.site.name || '模钥重置雷达', title:publication.article.title, summary:publication.article.summary,
+  return { publicationId, name:data.site.name || '模钥重置雷达', title:publication.article.title, summary:m.publicArticleSummary(publication.article),
     version:newsOnly ? publication.article.version : publication.event.version, historical:m.isHistoricalArticle(publication.article,data.evidence), newsOnly,
     sourceTime:publication.article.sourcePublishedAt ? m.displayTime(publication.article.sourcePublishedAt) : '', cutoff:m.displayTime(publication.cutoffAt),
     actions:newsOnly ? [] : publication.event.actions.map(action => ({ title:`${m.actionLabels[action.kind]} · ${m.stageText(action,publication.cutoffAt)}`, eligibility:action.eligibility,

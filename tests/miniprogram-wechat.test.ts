@@ -70,10 +70,10 @@ test('拒绝、封禁、过滤按微信返回原样报告，不能伪造accept�
   for(const result of ['reject','ban','filter']){const h=mock({result});await h.reader.prepare({userInitiated:true});await h.reader.authorize({userInitiated:true});assert.equal(h.requests.find(item=>item.url.endsWith('/confirm'))!.data.result,result);assert.equal(h.reader.getState().safe.state,'rejected');assert.equal(h.reader.getState().ready,false);}
 });
 
-test('已有次数和处理中允许追加；未知结果或旧服务器无nonce时绝不弹窗',async()=>{
+test('已有次数和未知结果允许新授权；旧服务器无nonce时绝不弹窗',async()=>{
   for(const state of ['available','reserved','unknown']){
-    const h=mock({state});await h.reader.prepare({userInitiated:true});await h.reader.authorize({userInitiated:true});assert.equal(h.subscribe,state==='unknown'?0:1);assert.equal(h.requests.some(item=>item.url.endsWith('/challenge')),state!=='unknown');
-    const race=mock({challengeState:state});await race.reader.prepare({userInitiated:true});await race.reader.authorize({userInitiated:true});assert.equal(race.subscribe,0);assert.equal(race.reader.getState().safe.state,state);
+    const h=mock({state});await h.reader.prepare({userInitiated:true});await h.reader.authorize({userInitiated:true});assert.equal(h.subscribe,1);assert.equal(h.requests.some(item=>item.url.endsWith('/challenge')),true);
+    const race=mock({challengeState:state});await race.reader.prepare({userInitiated:true});if(state==='unknown')assert.match(race.reader.getState().error,/稍后重试/);await race.reader.authorize({userInitiated:true});assert.equal(race.subscribe,0);assert.equal(race.reader.getState().safe.state,state);
   }
 });
 
@@ -357,8 +357,8 @@ test('关闭失败保留错误和已有次数，不被紧接的自动刷新伪�
   } finally {page.onUnload();}
 });
 
-test('提醒页结果未知时禁止预备，过期会话在重入页时恢复但不授权',async()=>{
-  const blocked=mock({state:'unknown'});await blocked.reader.loadForPage();assert.equal(blocked.reader.getState().ready,false);assert.equal(blocked.requests.some(r=>r.url.endsWith('/challenge')),false);assert.equal(blocked.subscribe,0);
+test('提醒页结果未知时可准备新授权，过期会话重入恢复但不自动授权',async()=>{
+  const blocked=mock({state:'unknown'});await blocked.reader.loadForPage();assert.equal(blocked.reader.getState().ready,true);assert.equal(blocked.requests.some(r=>r.url.endsWith('/challenge')),true);assert.equal(blocked.subscribe,0);await blocked.reader.authorize({userInitiated:true});assert.equal(blocked.subscribe,1);assert.equal(blocked.reader.getState().remainingCount,1);
   const h=mock({sessionMs:60000,challengeMs:300000});await h.reader.loadForPage();h.advance(60001);assert.equal(h.reader.getState().ready,false);
   await h.reader.loadForPage();assert.equal(h.login,2);assert.equal(h.reader.getState().ready,true);assert.equal(h.subscribe,0);
 });

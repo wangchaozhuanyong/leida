@@ -191,7 +191,7 @@ function publicationCard(data, publication) {
   const withdrawn = publicationWithdrawn(data, publication);
   const kinds = [...new Set(actions.map(action => actionLabels[action.kind]))].join('＋');
   return {
-    id: publication.id, path: sharePath(publication), title: publication.article.title, summary: publication.article.summary, reviewStatus: publication.article.reviewStatus || '', reviewReasons: (publication.article.reviewReasons || []).join(''),
+    id: publication.id, path: sharePath(publication), title: publication.article.title, summary: publicArticleSummary(publication.article), reviewStatus: publication.article.reviewStatus || '', reviewReasons: (publication.article.reviewReasons || []).join(''),
     time: displayTime(publicationSourceTime(publication)), historical: isHistoricalArticle(publication.article, data.evidence),
     label: withdrawn ? '已撤回' : isNewsOnly(publication) ? '来源消息' : kinds || (publication.article.category === 'activity' ? '活动动态' : '产品更新'),
     note: withdrawn ? '已撤回，不能作为当前发放依据' : isNewsOnly(publication) ? '仅新闻收录，不改变发放状态' : '公开公告',

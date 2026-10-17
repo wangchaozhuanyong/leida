@@ -1,3 +1,7 @@
+import {readFileSync} from 'node:fs';
+import {buildAutomaticTemplate} from '../src/server/automatic-content';
+import {gatherEvidenceContext} from '../src/server/source-context';
+import type {Evidence,Article,Publication,RadarEvent,Activity} from '../src/lib/types';
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
@@ -11,8 +15,8 @@ import type { Audit, Candidate, Job, Source } from '../src/lib/types';
 // The normal suite uses controlled SQL and HTTP IO only, without loading local secrets.
 process.env.DOTENV_CONFIG_PATH=fileURLToPath(new URL('./.admin-audit-no-env',import.meta.url));
 process.env.ENCRYPTION_KEY=randomBytes(32).toString('base64');
-const { pool, list, one, put }=await import('../src/db');
-const { executeCommand }=await import('../src/server/service');
+const { pool, list, one, put, insert }=await import('../src/db');
+const { executeCommand,publishCandidate }=await import('../src/server/service');
 const { DomainError }=await import('../src/server/domain');
 const { defaultAI, encryptKey, AIServiceError }=await import('../src/server/ai');
 const originalQuery=pool.query,originalConnect=pool.connect;
@@ -171,4 +175,42 @@ test('站内信独立发布、校验和撤回均有审计，不制造公告、�
   await executeCommand('notice.withdraw',{id:notice.id},actor);await executeCommand('notice.withdraw',{id:notice.id},actor);
   assert.equal(table('notices')[0].status,'withdrawn');assert.equal((await audits()).filter(a=>a.action==='notice.withdraw').length,1);
   await assert.rejects(executeCommand('notice.withdraw',{id:'missing'},actor),/未找到/);
+});
+
+
+test('站内信可选择历史显示日期，实际审计时间保留；未来日期和同请求改日期被拒绝',async()=>{
+  reset();
+  const selected='2026-09-16T10:18:00+08:00',input={title:'上线公告',body:'站内信内容',createdAt:selected,requestId:'00000000-0000-4000-8000-000000000002'};
+  const notice=await executeCommand('notice.publish',input,actor) as {id:string;createdAt:string};
+  assert.equal(notice.createdAt,'2026-09-16T02:18:00.000Z');
+  assert.equal((await executeCommand('notice.publish',input,actor) as {id:string}).id,notice.id);
+  const actual=(await audits()).find(a=>a.action==='notice.publish')!;assert.ok(Date.parse(actual.createdAt)>Date.parse(notice.createdAt));
+  await assert.rejects(executeCommand('notice.publish',{...input,createdAt:'2026-09-17T10:18:00+08:00'},actor),/已变化/);
+  for(const createdAt of ['invalid',new Date(Date.now()+86400000).toISOString()])await assert.rejects(executeCommand('notice.publish',{title:'测试日期',body:'测试正文',createdAt},actor));
+  assert.equal(table('notices').length,1);assert.equal((await audits()).filter(a=>a.action==='notice.publish').length,1);
+});
+
+
+test('已有实时公告补齐活动关联不重新通知，保留原快照且重复处理幂等',async()=>{
+  reset();
+  const evidence=(JSON.parse(readFileSync(new URL('./fixtures/reset-omission-month.json',import.meta.url),'utf8')) as Evidence[]).map((e,i)=>({...e,id:`activity-fixture-${i}`,hash:`hash-${i}`,historical:false,collectedAt:new Date(Date.parse(e.publishedAt)+1000).toISOString()}));
+  const primary=evidence.find(e=>e.messageId==='2110618732666257557'&&e.sourceId==='tibo-public')!,context=gatherEvidenceContext(primary,evidence),content=buildAutomaticTemplate(context)!;
+  assert.equal(content.activityId,'challenge-28');assert.equal(content.activityDay,10);
+  for(const e of evidence)await insert('evidence',e);
+  await put('sources',{...source('tibo-public'),status:'healthy'});
+  const definition=evidence.find(e=>e.metadata?.activity)!.metadata!.activity!;
+  await put('activities',{...definition,version:1,items:[]} satisfies Activity);
+  const publishedAt=new Date(Date.parse(primary.publishedAt)+60000).toISOString();
+  const event:RadarEvent={id:'existing-activity-event',title:content.title,version:1,status:'published',actions:content.actions,evidenceIds:content.evidenceIds,publicationId:'existing-activity-pub',updatedAt:publishedAt};
+  const article:Article={id:'existing-activity-article',eventId:event.id,title:content.title,summary:content.summary,translation:'',category:'reset',version:1,status:'published',publicationId:event.publicationId,evidenceIds:content.evidenceIds,publishedAt,updatedAt:publishedAt,publicationMode:'state_change',contentOrigin:'template',historical:false};
+  const prior:Publication={id:event.publicationId,eventId:event.id,articleId:article.id,event,article,cutoffAt:publishedAt,publishedAt,reason:'existing live publication',mode:'state_change',contentOrigin:'template'};
+  await put('events',event);await put('articles',article);await insert('publications',prior);
+  const candidate:Candidate={id:'activity-repair-candidate',evidenceId:primary.id,status:'published',humanEdited:false,version:1,createdAt:publishedAt,updatedAt:publishedAt,reasons:[],content:{...content,eventId:event.id},automation:{state:'ready',reasonCodes:[],dependencyIds:[],inputFingerprint:'old-rule',evaluatedAt:publishedAt,articleId:article.id,templatePublished:true}};
+  await put('candidates',candidate);const frozen=await one('publications',prior.id);
+  const result=await publishCandidate(candidate.id,1,'worker','补齐原帖活动归属',true);
+  assert.equal(result.article.historical,false);assert.equal(result.article.category,'activity');
+  const activity=(await one<Activity>('activities',definition.id))!;assert.deepEqual(activity.items,[{day:10,articleId:article.id,eventId:event.id}]);
+  assert.equal(table('notices').length,0);assert.deepEqual(await one('publications',prior.id),frozen);
+  const current=(await one<Candidate>('candidates',candidate.id))!;
+  const repeated=await publishCandidate(candidate.id,current.version,'worker','重复核对',true);assert.equal(repeated.id,result.id);assert.equal(table('notices').length,0);
 });

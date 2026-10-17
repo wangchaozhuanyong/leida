@@ -372,7 +372,7 @@ test('多次机会遇到明确拒绝或未知发送均暂停，不把剩余次�
     await f.notice();await f.service.scheduleWechatDeliveries();await f.service.processWechatJob(job);
     assert.equal((await f.store.list<WechatDelivery>('wechat_deliveries')).length,1);
     assert.equal(f.calls.filter(call=>call.url.includes('subscribe/send')).length,1);
-    if(send==='timeout'){const challenge=await f.service.wechatSubscriptionChallenge(session.sessionToken);assert.equal(challenge.nonce,undefined);}
+    if(send==='timeout'){const challenge=await f.service.wechatSubscriptionChallenge(session.sessionToken);assert.ok(challenge.nonce);assert.equal(challenge.state.state,'unknown');assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,2);}
   }
 });
 
@@ -556,8 +556,33 @@ test('旧发送迟到回包不覆盖读者后来取消/新授权，重复执行�
   const duplicate=await f.service.processWechatJob(job);assert.equal(duplicate.state,'deferred');await f.service.revokeWechatSubscription(session.sessionToken);f.advance(31_000);await f.accept(session.sessionToken);release();assert.equal((await sending).state,'sent');assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).state,'available');assert.equal(f.calls.filter(call=>call.url.includes('subscribe/send')).length,1);
 });
 
-test('unknown结果不能通过取消再报告accept绕过',async()=>{
-  const f=await fixture({send:'timeout'}),session=await f.login();await f.accept(session.sessionToken);await f.notice();await f.service.processWechatJob((await f.queued())[0]);await f.service.revokeWechatSubscription(session.sessionToken);f.advance(31_000);const challenge=await f.service.wechatSubscriptionChallenge(session.sessionToken);assert.equal(challenge.state,'unknown');assert.equal(challenge.nonce,undefined);assert.equal((await f.store.list<WechatDelivery>('wechat_deliveries')).length,1);
+test('unknown只允许新授权恢复；关闭再报告旧accept不能恢复次数或重发旧消息',async()=>{
+  const f=await fixture({send:'timeout'}),session=await f.login(),old=await f.accept(session.sessionToken);await f.notice();const job=(await f.queued())[0];await f.service.processWechatJob(job);
+  await f.service.revokeWechatSubscription(session.sessionToken);f.advance(31_000);
+  await f.service.confirmWechatSubscription(session.sessionToken,{...old.challenge,result:'accept'});
+  assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,0);
+  const fresh=await f.accept(session.sessionToken);assert.equal(fresh.state.remainingCount,1);assert.equal(fresh.state.state,'available');
+  assert.equal((await f.service.processWechatJob(job)).state,'unknown');assert.equal((await f.store.list<WechatDelivery>('wechat_deliveries')).length,1);
+  assert.equal(f.calls.filter(call=>call.url.includes('subscribe/send')).length,1);
+});
+
+test('新授权恢复保留未知回执及原可用次数，不补发暂停消息，只发送之后的新消息',async()=>{
+  const options={send:'timeout' as 'timeout'|'ok'},f=await fixture(options),session=await f.login();
+  for(let n=0;n<3;n++)await f.accept(session.sessionToken);
+  await f.notice();const oldJob=(await f.queued())[0];await f.service.processWechatJob(oldJob);
+  const oldDelivery=(await f.store.list<WechatDelivery>('wechat_deliveries'))[0];await f.notice();
+  const prepared=await f.service.wechatSubscriptionChallenge(session.sessionToken);assert.ok(prepared.nonce);
+  assert.equal(prepared.state.state,'unknown');assert.equal(prepared.state.remainingCount,2);
+  await f.service.scheduleWechatDeliveries();assert.equal((await f.store.list<WechatDelivery>('wechat_deliveries')).length,1);
+  f.advance(1000);const confirmed=await f.service.confirmWechatSubscription(session.sessionToken,{...prepared,result:'accept'});
+  assert.equal(confirmed.state,'available');assert.equal(confirmed.remainingCount,3);
+  await f.service.confirmWechatSubscription(session.sessionToken,{...prepared,result:'accept'});assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,3);
+  await f.service.scheduleWechatDeliveries();assert.equal((await f.store.list<WechatDelivery>('wechat_deliveries')).length,1);
+  options.send='ok';const upcoming=await f.notice(),jobs=await f.queued(),job=jobs.find(item=>item.id!==oldJob.id)!;
+  assert.ok(job);assert.equal((await f.service.processWechatJob(job)).state,'sent');
+  const sent=(await f.store.list<WechatDelivery>('wechat_deliveries')).find(item=>item.id!==oldDelivery.id)!;assert.equal(sent.noticeId,upcoming.id);
+  assert.deepEqual(await f.store.one('wechat_deliveries',oldDelivery.id),oldDelivery);assert.equal((await f.service.processWechatJob(oldJob)).state,'unknown');
+  assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,2);assert.equal(f.calls.filter(call=>call.url.includes('subscribe/send')).length,2);
 });
 
 test('二维码外部响应期间切换配置，不返回其他账号/版本的码',async()=>{

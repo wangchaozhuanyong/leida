@@ -142,7 +142,7 @@ function campaignProof(item:Evidence,all:Evidence[]):Evidence[]|undefined {
       const date=localDay(item.publishedAt,a.timezone);
       if(!anchors.some(e=>localDay(e.publishedAt,a.timezone)===a.startsOn)||!date)continue;
       const day=(Date.parse(date+'T00:00:00Z')-Date.parse(a.startsOn+'T00:00:00Z'))/86400000+1;
-      if(day===days)valid.set(JSON.stringify([a.startsOn,a.timezone,total]),calendar);
+      if(day===days)valid.set(JSON.stringify([a.id,a.startsOn,a.timezone,total]),calendar);
     }
     if(valid.size===1)matches.push([rule,anchors[0],[...valid.values()][0]]);
     else if(valid.size>1)return;
@@ -174,6 +174,19 @@ export function gatherEvidenceContext(primary:Evidence,all:Evidence[]):Evidence[
 
 export function isVerifiedCampaignCalendar(item:Evidence,all:Evidence[]):boolean {
   return !!item.metadata?.activity&&all.some(day=>campaignProof(day,all)?.some(proof=>proof.id===item.id));
+}
+
+/** Follow explicit reply lineage to its verified campaign day. Publication
+ * dates alone never establish membership, including a reply on the next day. */
+export function campaignMembership(item:Evidence,all:Evidence[]):{activityId:string;activityDay:number}|undefined {
+  if(item.provenance==='manual')return;
+  const day=gatherExplicitEvidenceContext(item,all).find(e=>/(?:^|\n)\s*(?:Roundup of )?Day\s+\d+\s*\//i.test(e.text));
+  if(!day)return;
+  const proof=campaignProof(day,all),activity=proof?.find(e=>e.metadata?.activity)?.metadata?.activity;
+  if(!activity)return;
+  const ids=new Set(all.filter(e=>namespace(e)===namespace(day)&&e.metadata?.activity?.startsOn===activity.startsOn&&e.metadata.activity.timezone===activity.timezone&&e.metadata.activity.days===activity.days).map(e=>e.metadata!.activity!.id));
+  if(ids.size!==1)return;
+  return {activityId:activity.id,activityDay:Number(day.text.match(/(?:^|\n)\s*(?:Roundup of )?Day\s+(\d+)\s*\//i)![1])};
 }
 
 export function processingObstacles(context:Evidence[]):{codes:string[];missing:boolean;conflict:boolean} {

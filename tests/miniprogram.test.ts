@@ -551,7 +551,7 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   // Last uploaded client artifact. Backend-only releases must not relabel the installed client.
-  const buildVersion='1.0.20';
+  const buildVersion='1.0.21';
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);assert.equal(news.data.navigationTitle,'动态 · 共42篇');news.onUnload();
   const records=h.page('announcements');assert.equal(records.data.navigationTitle,'重置公告 · 42个事件');records.onUnload();
