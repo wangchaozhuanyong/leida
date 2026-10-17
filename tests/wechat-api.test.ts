@@ -2,7 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import type { PublicData } from '../src/lib/types';
-import { POST } from '../src/app/api/wechat/[...path]/route';
+import { GET, POST } from '../src/app/api/wechat/[...path]/route';
+
+test('次数摘要仍要求读者身份，响应不可缓存',async()=>{
+  for(const [handler,path] of [[GET,['subscription']],[POST,['subscription','challenge']]] as const){
+    const response=await handler(new Request(`http://127.0.0.1/api/wechat/${path.join('/')}`,{method:handler===GET?'GET':'POST',headers:{'X-Radar-Subscription-View':'summary'}}),{params:Promise.resolve({path:[...path]})});
+    assert.equal(response.status,401);assert.equal(response.headers.get('cache-control'),'no-store');
+  }
+});
 
 test('微信提醒偏好HTTP接口拒绝未认证与非法格式，不访问数据库',async()=>{
   const context={params:Promise.resolve({path:['subscription','preferences']})};

@@ -75,6 +75,9 @@ function createTransport(wxApi, config, {privateRequests=false}={}) {
       const header = typeof etag==='string' && etag ? { 'If-None-Match': `"${etag}"` } : {};
       if(!privateRequests)header['X-Radar-Watch-Contract']='2';
       if(privateRequests){header['content-type']='application/json';if(options.sessionToken)header.Authorization=`Bearer ${options.sessionToken}`;}
+      // Counts still come from the reader's live grant. The screen does not use
+      // delivery-history details; older servers may safely ignore this hint.
+      if(privateRequests&&(path==='/api/wechat/subscription'&&method==='GET'||path==='/api/wechat/subscription/challenge'&&method==='POST'))header['X-Radar-Subscription-View']='summary';
       const receive = response => {
         if (cancelled) return;
         if (response.statusCode === 304) { if (versionPath && etag) resolve({ unchanged: true }); else reject(new Error('接口未返回公开资料，请重新加载。')); return; }

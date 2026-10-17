@@ -41,6 +41,14 @@
       {
         "value": "package.json",
         "type": "file"
+      },
+      {
+        "value": "assets/neural/observatory-header.jpg",
+        "type": "file"
+      },
+      {
+        "value": "assets/neural/orb.png",
+        "type": "file"
       }
     ],
     "include": []

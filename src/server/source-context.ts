@@ -118,7 +118,7 @@ function isCampaignRule(item:Evidence):boolean {
   return item.textOrigin==='original'&&item.provenance!=='manual'&&!isTruncatedText(item.text)&&/over the next (\d+) days, each day we[’']ll either ship one thing.{0,160}codex\/work users or ship a full reset\./i.test(item.text);
 }
 export function isCampaignResetShorthand(item:Evidence):boolean {
-  return item.textOrigin==='original'&&!isTruncatedText(item.text)&&/(?:^|\n)\s*Day\s+\d+\s*\/\s*Reset[.!]?\s*$/i.test(item.text)&&
+  return item.textOrigin==='original'&&!isTruncatedText(item.text)&&/(?:^|\n)\s*Day\s+\d+\s*\/\s*(?:Le\s+limit\s+)?Reset[.!]?\s*(?:https:\/\/t\.co\/[A-Za-z0-9]+\s*)?$/i.test(item.text)&&
     !/\b(?:banked|not|never|cancel|cancelled|only|except|if|maybe|hypothetical)\b/i.test(item.text);
 }
 function localDay(at:string,zone:string):string|undefined {

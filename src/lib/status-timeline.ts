@@ -8,6 +8,14 @@ const beijing=(value:string)=>new Date(Date.parse(value)+8*3600_000).toISOString
 
 export type Completion = Pick<BenefitAction, 'kind' | 'stage' | 'statementAt'> | null | undefined;
 
+/** Display whole minutes without suggesting second-level precision. */
+export function countdownParts(expectedAt:string, now:string): {value:number;unit:string}[] {
+  const minutes = Math.max(0, Math.floor((Date.parse(expectedAt) - Date.parse(now)) / 60000));
+  if (minutes < 1) return [];
+  const days = Math.floor(minutes / 1440), hours = Math.floor(minutes % 1440 / 60);
+  return [...(days ? [{value: days, unit: '天'}] : []), ...(days || hours ? [{value: hours, unit: '小时'}] : []), {value: minutes % 60, unit: '分钟'}];
+}
+
 /** Only the current evidenced stage is marked; the line is not a history of inferred steps. */
 export function statusTimelineModel(outlook: ResetOutlook, now: string, completion: Completion = outlook.latestCompletion, forecasts?: ForecastPublicData) {
   const resolvedAt=outlook.lastResolved?.resolvedAt??outlook.lastResolved?.statementAt??completion?.statementAt;
@@ -19,15 +27,15 @@ export function statusTimelineModel(outlook: ResetOutlook, now: string, completi
   const scheduled = countdown?.status === 'upcoming';
   const overdue = countdown?.status === 'expired';
   const banked = (active ?? completion)?.kind === 'banked_reset';
-  const minutes = scheduled ? Math.ceil((Date.parse(active!.expectedAt!) - Date.parse(now)) / 60000) : 0;
+  const duration = scheduled ? countdownParts(active!.expectedAt!, now) : [];
   const signal=!active?activeResetWatch(forecasts?.watch,now,resolvedAt):undefined;
   const base = {
-    watching:false,estimating:false,detail:remote?(remote.sourceType==='observed'?'来源观察记录 · 尚待执行确认':'公开预告 · 尚待执行确认'):'',sourceUrl:remote?.sourceUrl??'',sourceType:remote?.sourceType??'x_post',sourceCredit:!!remote,sourceId:remote?.id??'',forecastWindow:'',chanceLabel:'',observedLabel:'',expiresAt:'',
+    watching:false,estimating:false,detail:overdue?'预计时间已到，等待公开完成确认。':scheduled?'预计时间仅供参考，以实际发放为主。':'',sourceUrl:remote?.sourceUrl??'',sourceType:remote?.sourceType??'x_post',sourceCredit:!!remote,sourceId:remote?.id??'',forecastWindow:'',chanceLabel:'',observedLabel:'',expiresAt:'',
     publicationId:active?.publicationId??'',statementAt:active?.statementAt??(completed?completion?.statementAt??'':''),expectedAt:active?.expectedAt??'',kind:(active??completion)?.kind??'automatic_reset',
-    scheduled, completed: !!completed,
-    lead: scheduled ? remote?'距离预计安排时间':/^原文近似时间/.test(active?.timeNote ?? '') ? '预计约' : /^原文预计时刻/.test(active?.timeNote ?? '') ? '预计剩余' : '距离预计最晚时间' : completed ? '公开完成声明' : outlook.status === 'cancelled' ? '上轮安排已取消' : '公开动态追踪',
-    title: scheduled ? `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}` : overdue ? '等待确认' : active ? active.stage === 'in_progress' ? banked ? '发卡进行中' : '重置进行中' : '时间待明确' : completed ? banked ? '已确认发放重置卡' : '已确认重置' : '等待下一次 Reset',
-    note: scheduled ? `预计 ${new Date(Date.parse(active!.expectedAt!) + 8 * 3600_000).toISOString().slice(0, 16).replace('T', ' ')}` : overdue ? '已过预计时间，待公开确认' : active ? '有明确安排后，自动更新' : completed ? `${completed.label} · 以公开完成公告为准` : forecasts?.watch?.status==='unavailable'?'信号来源暂不可用，恢复后自动检查':'有新的重置信号后更新',
+    scheduled, overdue, countdownParts: duration, completed: !!completed,
+    lead: scheduled ? '距离预计安排时间' : completed ? '公开完成声明' : outlook.status === 'cancelled' ? '上轮安排已取消' : '公开动态追踪',
+    title: scheduled ? duration.length ? duration.map(part => `${part.value}${part.unit}`).join('') : '不足1分钟' : overdue ? '等待确认' : active ? active.stage === 'in_progress' ? banked ? '发卡进行中' : '重置进行中' : '时间待明确' : completed ? banked ? '已确认发放重置卡' : '已确认重置' : '等待下一次 Reset',
+    note: scheduled || overdue ? `${overdue ? '原预计' : '预计'} ${beijing(active!.expectedAt!)}` : active ? '有明确安排后，自动更新' : completed ? `${completed.label} · 以公开完成公告为准` : forecasts?.watch?.status==='unavailable'?'信号来源暂不可用，恢复后自动检查':'有新的重置信号后更新',
     currentStage: overdue ? -1 : active ? active.stage === 'in_progress' ? 1 : 0 : completed ? 2 : -1,
     stages: ['公开预告', banked ? '发卡进行' : '重置进行', '完成确认'],
   };
@@ -52,7 +60,7 @@ export function statusPosterSnapshot(data:PublicData,now=data.serverTime) {
   const publicationId=model.publicationId||(model.completed?latest?.publication.id??'':'');
   const minutes=model.completed?Math.max(0,Math.floor((Date.parse(now)-Date.parse(model.statementAt))/60000)):0;
   const value=model.completed?(minutes<1?'刚刚':String(minutes<60?minutes:minutes<1440?Math.floor(minutes/60):Math.floor(minutes/1440))):model.watching?'观察中':model.title;
-  const unit=model.scheduled?'小时 : 分钟':model.completed&&minutes>=1?(minutes<60?'分钟':minutes<1440?'小时':'天'):'';
+  const unit=model.completed&&minutes>=1?(minutes<60?'分钟':minutes<1440?'小时':'天'):'';
   return {round:statusTimelineRevision(model),publicationId,generatedAt:now,
     title:model.scheduled?(model.kind==='banked_reset'?'重置卡发放预告':'用量重置预告'):model.completed?(model.kind==='banked_reset'?'公告称已发放重置卡':'公告称已重置用量'):model.title,
     label:model.completed?'距该公告':model.scheduled?model.lead:'当前公开状态',value,unit,statementAt:model.statementAt,statementLabel:model.watching?'信号时间':'公告时间',

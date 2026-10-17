@@ -75,6 +75,50 @@ async function recipients(f:Awaited<ReturnType<typeof fixture>>,count:number){
   }
 }
 
+test('次数摘要不等待发送历史，保留完整状态、次数和偏好；旧调用仍返回发送结果',async()=>{
+  const f=await fixture(),session=await f.login();
+  await f.accept(session.sessionToken);await f.accept(session.sessionToken);
+  await f.notice();const job=(await f.queued())[0];await f.service.processWechatJob(job);
+  const full=await f.service.wechatSubscriptionState(session.sessionToken);
+  assert.equal(full.remainingCount,1);assert.equal(full.lastResult,'sent');
+  const originalList=f.store.list.bind(f.store);let historyReads=0;
+  let release!:()=>void;const slowHistory=new Promise<void>(resolve=>{release=resolve;});
+  f.store.list=async <T>(table:Table,client?:Client):Promise<T[]>=>{
+    if(table==='wechat_deliveries'){historyReads++;await slowHistory;}
+    return originalList<T>(table,client);
+  };
+  let result:Awaited<ReturnType<typeof f.service.wechatSubscriptionState>>|undefined;
+  const pending=f.service.wechatSubscriptionState(session.sessionToken,{includeLastResult:false}).then(value=>{result=value;});
+  try{
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.ok(result,'显示次数不能等待慢速发送历史查询');
+    const {lastResult:_,...expected}=full;assert.deepEqual(result,expected);
+    assert.equal(historyReads,0);
+  }finally{release();await pending;}
+  assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).lastResult,'sent');
+  assert.equal(historyReads,1,'旧调用保留完整响应');
+});
+
+test('摘要预备不读取历史、不消耗次数，且读者隔离和失效检查保持有效',async()=>{
+  const f=await fixture(),a=await f.login(),b=await f.login('another-code');
+  await f.accept(a.sessionToken);await f.accept(a.sessionToken);
+  const originalList=f.store.list.bind(f.store);let historyReads=0;
+  f.store.list=async <T>(table:Table,client?:Client):Promise<T[]>=>{
+    if(table==='wechat_deliveries')historyReads++;
+    return originalList<T>(table,client);
+  };
+  const summary={includeLastResult:false};
+  const prepared=await f.service.wechatSubscriptionChallenge(a.sessionToken,summary);
+  assert.ok(prepared.nonce);assert.equal(prepared.state.remainingCount,2);
+  assert.equal((await f.service.wechatSubscriptionState(b.sessionToken,summary)).remainingCount,0);
+  assert.equal(historyReads,0);
+  const reader=(await f.store.list<WechatReader>('wechat_readers')).find(row=>row.sessions.some(session=>session.hash===createHash('sha256').update(a.sessionToken).digest('hex')))!;
+  await f.store.put('wechat_readers',{...reader,status:'disabled'});
+  await assert.rejects(f.service.wechatSubscriptionState(a.sessionToken,summary),/会话已过期/);
+  f.advance(8*24*3600_000);
+  await assert.rejects(f.service.wechatSubscriptionState(b.sessionToken,summary),/会话已过期/);
+});
+
 test('提醒偏好旧读者默认全开，保存不要求授权且不增加次数，重新登录保留选择',async()=>{
   const f=await fixture(),session=await f.login();
   assert.deepEqual((await f.service.wechatSubscriptionState(session.sessionToken)).reminderPreferences,{announcement:true,result:true,correction:true});

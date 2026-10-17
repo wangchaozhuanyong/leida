@@ -24,6 +24,7 @@ export interface WechatStore {
   transaction<T>(fn:(client:Client)=>Promise<T>):Promise<T>;
 }
 export interface WechatDependencies {store?:WechatStore;fetcher?:typeof fetch;clock?:()=>number;encryptionKey?:()=>Buffer;preparePublicPage?:(publicationId:string)=>Promise<void>;}
+interface SubscriptionViewOptions {includeLastResult?:boolean;}
 const digest=(value:string)=>createHash('sha256').update(value).digest('hex');
 export const publicationScene=(publicationId:string)=>digest(publicationId).slice(0,32);
 export function publicationForScene(scene:string,publications:Publication[]):Publication {
@@ -204,16 +205,22 @@ export function createWechatService(dependencies:WechatDependencies={}) {
       await store.put('wechat_readers',{...existing,id:readerId,appId:settings.appId,openidHash,encryptedOpenid:existing?.encryptedOpenid??seal(openid),status:'active',createdAt:existing?.createdAt??timestamp(),lastLoginAt:timestamp(),sessions} satisfies WechatReader,client);
     });return {sessionToken,expiresAt};
   }
-  async function subscriptionView(value:WechatReader,client?:Client):Promise<WechatSubscriptionState> {
+  async function subscriptionView(value:WechatReader,client?:Client,options:SubscriptionViewOptions={}):Promise<WechatSubscriptionState> {
     const preferences={reminderPreferences:reminderPreferencesOf(value),preferencesSupported:true};
     const settings=await config(client);if(!ready(settings,'subscription'))return {configured:false,enabled:settings.subscriptionsEnabled,state:'unavailable',...preferences};
     const grant=await store.one<WechatGrant>('wechat_grants',`wxgrant_${digest(`${value.id}:${settings.templateId}`)}`,client);
-    const deliveries=(await store.list<WechatDelivery>('wechat_deliveries',client)).filter(item=>item.readerId===value.id&&item.templateId===settings.templateId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
-    const last=deliveries.find(item=>['sent','rejected','unknown','cancelled'].includes(item.status));
+    // The reminder screen only needs the authoritative grant and preferences.
+    // Do not make its balance wait for a paginated scan of everyone's deliveries.
+    // Legacy callers retain the optional last-result field and its original semantics.
+    let lastResult:WechatSubscriptionState['lastResult'];
+    if(options.includeLastResult!==false){
+      const deliveries=(await store.list<WechatDelivery>('wechat_deliveries',client)).filter(item=>item.readerId===value.id&&item.templateId===settings.templateId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+      lastResult=deliveries.find(item=>['sent','rejected','unknown','cancelled'].includes(item.status))?.status as WechatSubscriptionState['lastResult'];
+    }
     const credits=creditsOf(grant);
-    return {configured:true,enabled:true,state:grant?.status==='challenged'&&Date.parse(grant.nonceExpiresAt)<clock()?'none':grant?.status??'none',templateId:settings.templateId,acceptedAt:grant?.acceptedAt,remainingCount:credits.filter(credit=>['available','reserved'].includes(credit.status)).length,pendingCount:credits.filter(credit=>credit.status==='reserved').length,lastResult:last?.status as WechatSubscriptionState['lastResult'],...preferences};
+    return {configured:true,enabled:true,state:grant?.status==='challenged'&&Date.parse(grant.nonceExpiresAt)<clock()?'none':grant?.status??'none',templateId:settings.templateId,acceptedAt:grant?.acceptedAt,remainingCount:credits.filter(credit=>['available','reserved'].includes(credit.status)).length,pendingCount:credits.filter(credit=>credit.status==='reserved').length,...(options.includeLastResult!==false?{lastResult}:{}),...preferences};
   }
-  async function wechatSubscriptionState(sessionToken:string):Promise<WechatSubscriptionState> {return subscriptionView(await reader(sessionToken));}
+  async function wechatSubscriptionState(sessionToken:string,options:SubscriptionViewOptions={}):Promise<WechatSubscriptionState> {return subscriptionView(await reader(sessionToken),undefined,options);}
   async function saveWechatReminderPreferences(sessionToken:string,input:unknown):Promise<WechatSubscriptionState> {
     const preferences=reminderPreferencesSchema.parse(input);
     return store.transaction(async client=>{
@@ -232,7 +239,7 @@ export function createWechatService(dependencies:WechatDependencies={}) {
       return subscriptionView(next,client);
     });
   }
-  async function wechatSubscriptionChallenge(sessionToken:string) {
+  async function wechatSubscriptionChallenge(sessionToken:string,options:SubscriptionViewOptions={}) {
     return store.transaction(async client=>{
       const value=await lockedReader(sessionToken,client),settings=await config(client);if(!ready(settings,'subscription'))throw new WechatServiceError('微信提醒尚未配置','configuration');
       const grantId=`wxgrant_${digest(`${value.id}:${settings.templateId}`)}`;await lock(client,grantId);const previous=await store.one<WechatGrant>('wechat_grants',grantId,client);
@@ -243,7 +250,7 @@ export function createWechatService(dependencies:WechatDependencies={}) {
       const status=previous?.status==='revoked'||previous?.status==='unknown'?previous.status:'challenged';
       const next=withCredits({...previous,id:grantId,readerId:value.id,appId:settings.appId,templateId:settings.templateId,status,nonceHash:digest(nonce),nonceExpiresAt:expiresAt,requestedAt:timestamp(),updatedAt:timestamp(),challengeTimes:[...challengeTimes,clock()]},creditsOf(previous),status);
       await store.put('wechat_grants',next,client);
-      return {state:await subscriptionView(value,client),templateId:settings.templateId,nonce,expiresAt};
+      return {state:await subscriptionView(value,client,options),templateId:settings.templateId,nonce,expiresAt};
     });
   }
   async function confirmWechatSubscription(sessionToken:string,input:unknown):Promise<WechatSubscriptionState> {

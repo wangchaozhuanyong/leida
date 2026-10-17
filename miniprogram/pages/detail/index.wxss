@@ -1,6 +1,8 @@
 /* 原文使用纯文本，避免执行来源内容。 */
 .detail-share{margin-top:28px;padding:24px 0 8px;border-top:1px solid #ccd9ed}
-.share-heading{font-size:19px;font-weight:600;line-height:1.5;color:#14263e}
+.share-header{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.share-heading{flex:none;font-size:19px;font-weight:600;line-height:1.5;color:#14263e}
+.share-subtitle{margin-left:auto;font-size:12px;line-height:1.5;color:#4d607b;text-align:right;white-space:nowrap}
 .share-description{margin-top:6px;font-size:12px;line-height:1.8;color:#4d607b}
 .announcement-themes{display:flex;gap:10px;margin:18px 0 16px}
 .detail-share .announcement-theme{flex:1;min-width:0;min-height:78px;gap:10px;padding:13px 12px;justify-content:flex-start;text-align:left;background:#ffffff;border:1px solid #ccd9ed;border-radius:12px;color:#14263e;font-weight:400}

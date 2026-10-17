@@ -38,7 +38,7 @@ test('公开安排优先于模糊信号，支持未知时间；过点只等待�
    const view=statusTimelineModel({status:'monitoring'},at,null,forecasts);
    assert.deepEqual(native.statusTimelineModel({status:'monitoring'},at,null,forecasts),view);
    assert.equal(view.completed,false);assert.equal(view.watching,false);assert.equal(view.chanceLabel,'');assert.equal(view.sourceUrl,input.data.active_watch.source.url);
-   assert.equal(view.title,at===now?'01:00':'等待确认');
+   assert.equal(view.title,at===now?'1小时0分钟':'等待确认');
  }
  (input.data.scheduled_reset as any).scheduled_for=null;
  const unknown=statusTimelineModel({status:'monitoring'},now,null,{...forecasts,watch:parseResetWatchResponse(input,now)});

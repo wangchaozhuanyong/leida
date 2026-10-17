@@ -1,1 +1,1 @@
-<view class="loading-page" role="status"><view class="loading-ring"></view><text class="loading-label">加载中</text></view>
+<view class="loading-page" role="status"><text class="loading-label">加载中</text><view class="loading-bar"><view class="loading-light"/></view></view>

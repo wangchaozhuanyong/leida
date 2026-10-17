@@ -2,7 +2,7 @@ import {createHash} from 'node:crypto';
 import bundleFile from './data/history-backfill-20261017.json';
 import {list,one,insert,put,transaction,lockTransaction} from '../db';
 import type {Candidate,DraftContent,Evidence,RadarEvent,Article,Source} from '../lib/types';
-import {buildAutomaticTemplate,evidenceFingerprint,isClearlyUnrelated,AUTOMATIC_RULES_VERSION} from './automatic-content';
+import {buildAutomaticTemplate,evidenceFingerprint,isClearlyUnrelated} from './automatic-content';
 import {gatherEvidenceContext,namespace,selectOriginal,originalConflict} from './source-context';
 import {actionIdentityEvidence,contextFor,resolveLinkedEvents} from './worker';
 import {publishHistoricalDraft,partitionAutomaticActions,automaticNewsContextUpgrade,audit} from './service';
@@ -20,9 +20,11 @@ export function canUpgradeHistoryArticle(article:Article,event:RadarEvent|undefi
   return !humanEdited&&article.status==='published'&&article.publicationMode==='news_only'&&article.contentOrigin==='template'&&!article.manualFields?.length&&event?.status==='published'&&!event.manualFields?.length;
 }
 
-/** The input is a reviewed, versioned repository asset, never a request body or URL. */
+/** The input is a reviewed, versioned repository asset, never a request body or URL.
+ * Its pinned rule version and digest stay immutable after completion. New live
+ * rules must pass every bundled expected-action regression before release. */
 export function validateHistoryBundle(value:HistoryBundle,digest=BUNDLE_DIGEST):void {
-  if(createHash('sha256').update(JSON.stringify(value)).digest('hex')!==digest||value.schemaVersion!==1||value.rulesVersion!==AUTOMATIC_RULES_VERSION||!value.id||value.messages.length>120||value.evidence.length>240)throw new DomainError('历史补录清单校验失败');
+  if(createHash('sha256').update(JSON.stringify(value)).digest('hex')!==digest||value.schemaVersion!==1||value.rulesVersion!==bundle.rulesVersion||!value.id||value.messages.length>120||value.evidence.length>240)throw new DomainError('历史补录清单校验失败');
   const ids=new Set(value.evidence.map(e=>e.messageId));
   if(ids.size!==value.evidence.length||new Set(value.messages.map(m=>m.messageId)).size!==value.messages.length)throw new DomainError('历史补录清单包含重复原帖');
   if(!Number.isFinite(Date.parse(value.startsAt))||!Number.isFinite(Date.parse(value.endsAt))||Date.parse(value.endsAt)>Date.now()+300000)throw new DomainError('历史补录时间范围无效');

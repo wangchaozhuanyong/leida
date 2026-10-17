@@ -32,7 +32,7 @@ test('网页与小程序时间轴在等待、预告、进行、逾期、完成�
 
 test('计时到点只转等待确认，不高亮完成，也不把阶段线当历史证明', () => {
   const upcoming = statusTimelineModel({status: 'scheduled', active}, now);
-  assert.equal(upcoming.title, '03:20'); assert.equal(upcoming.currentStage, 0);
+  assert.equal(upcoming.title, '3小时20分钟'); assert.equal(upcoming.currentStage, 0);
   assert.match(upcoming.note, /15:20/);
   for (const stage of ['promised', 'in_progress'] as const) {
     const outlook: ResetOutlook = {status: 'scheduled', active: {...active, stage}};
@@ -73,7 +73,7 @@ test('信号优先于旧完成，不能标为公开预告；两端显示同一�
 });
 test('明确预告、后来的完成声明、撤回、到期与无效来源压过旧信号',()=>{
   const data=forecasts();
-  assert.equal(statusTimelineModel({status:'scheduled',active},now,null,data).title,'03:20');
+  assert.equal(statusTimelineModel({status:'scheduled',active},now,null,data).title,'3小时20分钟');
   const newer={...completed,statementAt:'2026-10-15T03:30:00Z'};
   assert.equal(statusTimelineModel({status:'completed',latestCompletion:newer},now,newer,data).watching,false);
   for(const watch of [{status:'none',checkedAt:now},{status:'unavailable',checkedAt:now},{...data.watch,signal:{...data.watch!.signal,sourceUrl:'https://evil.test/'}},{...data.watch,signal:{...data.watch!.signal,expiresAt:now}}]){
@@ -111,4 +111,14 @@ test('新信号到期即回等待，历史区间不会重新接管；新的公�
   assert.deepEqual(native.statusTimelineModel(outlook,expiry,null,data),waiting);
   assert.equal(statusTimelineModel({status:'scheduled',active},now,null,data).note,'预计 2026-10-15 15:20');
   assert.deepEqual(data,before,'切换显示状态不能重写信号或延长预测期限');
+});
+
+
+test('倒计时以天小时分钟显示，整点和不足一分钟不产生歧义，过点仍等待确认',()=>{
+ for(const [minutes,title] of [[713,'11小时53分钟'],[2205,'1天12小时45分钟'],[60,'1小时0分钟'],[1440,'1天0小时0分钟'],[53,'53分钟'],[0.5,'不足1分钟']] as const){
+  const a={...active,expectedAt:new Date(Date.parse(now)+minutes*60000).toISOString()};
+  const web=statusTimelineModel({status:'scheduled',active:a},now);
+  assert.equal(web.title,title);assert.equal(web.detail,'预计时间仅供参考，以实际发放为主。');
+  assert.deepEqual(native.statusTimelineModel({status:'scheduled',active:a},now),web);
+ }
 });

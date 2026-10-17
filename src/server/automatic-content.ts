@@ -136,7 +136,7 @@ export function resetReview(primary:Evidence,context:Evidence[]):Pick<DraftConte
   const incident=/\bPro\s+500\b/i.test(text)&&(/didn't get the reset|investigating/i.test(text)||/^All fixed\./i.test(text)&&context.some(e=>e.id!==primary.id&&primary.parentId===e.messageId&&/Pro 500.*(?:didn[’']t get the reset)/i.test(e.text)));
   const explicit=/(?:resets? (?:all propagated|has been processed|coming next week)|promised a reset|reset (?:will|by|in)|(?:^|\n)\s*Day \d+\/\s*Reset|(?:重置|发卡|存卡).{0,50}(?:预告|安排|传播|发放|已)|(?:will|promis|ship|give|load).{0,50}\b(?:reset|banked)\b)/i.test(text);
   const reply=/^(?:done and dusted|it['’]s done|all fixed)[.!]?$/i.test(text.trim())&&context.some(e=>e.id!==primary.id&&/reset|重置/i.test(e.text));
-  if(!incident&&!campaign&&!explicit&&!reply)return;
+  if(!incident&&!campaign&&!explicit&&!reply&&!isCampaignResetShorthand(primary))return;
   if(!campaign&&!incident&&(/[?？]/.test(text)||/\b(?:can['’]t|won['’]t|didn['’]t)|the day we reach perfection/i.test(text)||/\b(?:if|unless|would|could|maybe|hypothetical|not|never|cannot|cancelled)\b|假设|希望|传闻/i.test(text)))return;
   if(incident)return {title:'Pro 500 重置异常跟踪',summary:/^All fixed\./i.test(text)?'作者回复称 Pro 500 相关异常已修复。此记录只跟踪受影响用户，不新增全体重置次数，个人账户到账尚未观测。':'作者报告部分 Pro 500 用户未如期收到重置，正在调查并表示将补偿。此记录不代表全体用户新增一次重置。',reviewStatus:'targeted_update',reviewReasons:['仅涉及原文所述 Pro 500 异常及后续处理，不作为公共发放完成声明。']};
   const reasons:string[]=[];

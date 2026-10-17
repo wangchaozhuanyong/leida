@@ -153,8 +153,7 @@ html:has(.public-surface) body { background: #f2f5fb; color: #14263e; }
 .public-surface .pub-inbox-link,
 .public-surface .pub-notice.is-read { background: var(--skin-surface); border-color: var(--skin-border); color: var(--skin-text); box-shadow: 0 2px 10px var(--skin-shadow); }
 .public-surface .pub-card:hover { border-color: var(--skin-border-strong); }
-.public-surface .pub-recent .pub-card,
-.public-surface .route-news .pub-card.pub-news-item { background: transparent; border-color: var(--skin-border); box-shadow: none; }
+.public-surface .pub-recent .pub-card { background: transparent; border-color: var(--skin-border); box-shadow: none; }
 .public-surface .pub-announcement p,
 .public-surface .pub-source-row .pub-source-excerpt,
 .public-surface .pub-notice p,
@@ -324,47 +323,29 @@ html:has(.public-surface) body { background: #f2f5fb; color: #14263e; }
 .public-surface .pub-topbar .pub-brand { flex-direction: row; text-align: left; gap: 8px; }
 .public-surface .pub-topbar .pub-brand-mark { width: 28px; height: 30px; }
 .public-surface .pub-topbar .pub-brand strong { font-size: 13px; }
-.public-surface .route-home .pub-home-heading { position: relative; isolation: isolate; flex-direction: column; justify-content: center; align-items: flex-start; gap: 0; min-height: 224px; margin-bottom: 16px; padding: 22px 28px; text-align: left; background: var(--skin-page); z-index: 2; }
-.pub-home-atmosphere { position: absolute; inset: 0 0 0 auto; width: 65%; max-width: 560px; z-index: 0; pointer-events: none; overflow: hidden; }
-.pub-home-atmosphere img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: right center; }
-.pub-home-atmosphere::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, #f2f5fb 0%, #f2f5fb6b 32%, #f2f5fb00 60%), linear-gradient(270deg, #f2f5fb 0%, #f2f5fb 3.5%, #f2f5fb00 10%), linear-gradient(180deg, #f2f5fb 0%, #f2f5fb00 14%, #f2f5fb00 82%, #f2f5fb 100%); }
-.public-surface .pub-home-heading-copy { position: relative; z-index: 1; width: 58%; min-width: 0; }
-.public-surface .pub-home-heading-copy h1 { margin: 0; font-family: "Songti SC", "STSong", "SimSun", serif; font-size: 39px; font-weight: 600; line-height: 1.18; letter-spacing: 1px; color: #233c5b; white-space: normal; }
-.public-surface .pub-home-heading-topic { display: block; white-space: nowrap; }
-.public-surface .pub-home-heading-product { font-family: Georgia, "Times New Roman", serif; letter-spacing: -.8px; margin-right: 6px; }
-.public-surface .pub-home-heading-accent { display: block; margin-top: 3px; color: var(--skin-accent); letter-spacing: 4px; }
-.public-surface .pub-home-heading-copy p { font-size: 12px; line-height: 20px; letter-spacing: .8px; margin: 9px 0 0; color: #516985; white-space: normal; }
-.public-surface .route-home .pub-freshness { position: relative; z-index: 2; margin: 2px 0 0; max-width: 58%; padding: 0; }
-.public-surface .route-home .pub-freshness > summary { justify-content: flex-start; min-height: 44px; white-space: normal; }
-.public-surface .route-home .pub-freshness > div { left: 0; right: auto; transform: none; text-align: left; }
-@media (min-width: 701px) and (max-width: 1180px) {
-  .public-surface .pub-topbar .pub-brand { gap: 6px; }
-  .public-surface .pub-topbar .pub-brand-mark { width: 24px; height: 27px; }
-  .public-surface .pub-topbar .pub-brand strong { font-size: 11.5px; }
+.public-surface .route-home .pub-home-heading{position:relative;isolation:isolate;flex-direction:column;justify-content:flex-start;align-items:center;gap:0;height:400px;min-height:0;margin:0 0 20px;padding:18px 24px 0;text-align:center;z-index:2;background:var(--skin-page)}
+.pub-home-atmosphere{position:absolute;inset:0;width:100%;max-width:none;z-index:0;pointer-events:none;overflow:hidden}
+.pub-home-atmosphere img{display:block;width:100%;height:100%;object-fit:cover;object-position:center 57%}
+.pub-home-atmosphere::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,#f2f5fb66,transparent 18%,transparent 82%,#f2f5fb)}
+.public-surface .pub-home-heading-copy{position:relative;z-index:1;width:100%;min-width:0}
+.public-surface .pub-home-heading-copy h1{margin:0;font-family:"Songti SC","STSong","SimSun",serif;font-size:44px;font-weight:600;line-height:1.15;letter-spacing:2px;color:#153356;white-space:normal}
+.public-surface .pub-home-heading-topic{display:block;white-space:nowrap}
+.public-surface .pub-home-heading-product{font-family:Georgia,"Times New Roman",serif;font-style:italic;font-weight:500;letter-spacing:-1.5px;margin-right:10px}
+.public-surface .pub-home-heading-accent{display:flex;align-items:center;justify-content:center;gap:18px;margin-top:5px;color:var(--skin-accent);font-size:32px;letter-spacing:7px}
+.pub-home-heading-accent::before,.pub-home-heading-accent::after{content:'';width:26px;height:1px;background:#9eb8ee}
+.public-surface .pub-home-heading-copy p{font-size:12px;line-height:20px;letter-spacing:2px;margin:8px 0 0;color:#516985}
+.public-surface .route-home .pub-freshness{position:absolute;bottom:0;z-index:2;margin:0;max-width:100%;padding:0}
+.public-surface .route-home .pub-freshness>summary{justify-content:center;min-height:44px;white-space:normal}
+.public-surface .route-home .pub-freshness>div{left:50%;right:auto;transform:translateX(-50%);text-align:left;width:min(300px,85vw)}
+@media(max-width:700px){
+ .public-surface .pub-topbar,.public-surface .pub-topbar-identity{min-height:60px;height:60px}
+ .public-surface .pub-topbar .pub-brand{gap:9px}.public-surface .pub-topbar .pub-brand-mark{width:31px;height:32px}.public-surface .pub-topbar .pub-brand strong{font-size:16px}
+ .public-surface .route-home .pub-home-heading{width:calc(100% + 44px);height:300px;margin:0 -22px 12px;padding:12px 20px 0}
+ .public-surface .pub-home-heading-copy h1{font-size:34px}.public-surface .pub-home-heading-accent{font-size:26px;letter-spacing:5px;margin-top:4px}
+ .public-surface .pub-home-heading-copy p{font-size:11px;margin-top:7px;letter-spacing:1px}
+ .public-surface .route-home .pub-freshness>summary{font-size:10px}.public-surface .pub-topbar-heading{min-width:0}.public-surface .pub-topbar-title{overflow:hidden;text-overflow:ellipsis}
 }
-@media (max-width: 700px) {
-  .public-surface .pub-topbar, .public-surface .pub-topbar-identity { min-height: 60px; height: 60px; }
-  .public-surface .pub-topbar-identity .pub-topbar-heading { align-items: center; }
-  .public-surface .pub-topbar .pub-brand { gap: 9px; }
-  .public-surface .pub-topbar .pub-brand-mark { width: 31px; height: 32px; }
-  .public-surface .pub-topbar .pub-brand strong { font-size: 16px; }
-  .public-surface .route-home .pub-home-heading { width: calc(100% + 44px); min-height: 176px; margin: 0 -22px 12px; padding: 15px 22px 5px; }
-  .pub-home-atmosphere { width: 100%; max-width: none; }
-  .public-surface .pub-home-heading-copy h1 { font-size: 30px; letter-spacing: .7px; }
-  .public-surface .pub-home-heading-accent { letter-spacing: 3px; }
-  .public-surface .pub-home-heading-copy p { font-size: 11px; line-height: 18px; margin-top: 7px; letter-spacing: .4px; }
-  .public-surface .route-home .pub-freshness > summary { font-size: 10px; }
-  .public-surface .pub-topbar-heading { min-width: 0; }
-  .public-surface .pub-topbar-title { overflow: hidden; text-overflow: ellipsis; }
-}
-
-@media (max-width: 360px) {
-  .public-surface .route-home .pub-home-heading { width: calc(100% + 34px); margin-left: -17px; margin-right: -17px; padding-left: 17px; padding-right: 17px; }
-}
-@media (max-width: 350px) {
-  .public-surface .pub-home-heading-copy h1 { font-size: 26px; letter-spacing: .3px; }
-  .public-surface .pub-home-heading-copy p { font-size: 10px; letter-spacing: .8px; }
-}
+@media(max-width:360px){.public-surface .route-home .pub-home-heading{width:calc(100% + 34px);height:278px;margin-left:-17px;margin-right:-17px}.public-surface .pub-home-heading-copy h1{font-size:30px}.public-surface .pub-home-heading-accent{font-size:24px}}
 
 /* A quiet status group, one primary reminder action, and a signal on the page canvas. */
 .public-surface .pub-home-completions-heading { color: var(--skin-muted); }
@@ -445,3 +426,32 @@ html:has(.public-surface) body { background: #f2f5fb; color: #14263e; }
 .public-surface .pub-record-notes summary:after{content:none}
 .public-surface .pub-record-notes[open]>summary:after{content:none}
 .public-surface .pub-records button:disabled{opacity:1}
+
+/* Feature cards share one hierarchy: title, context, action; the recent completion list stays intact. */
+.public-surface .pub-instrument-summary>.pub-share-entry,.public-surface .pub-instrument-summary>.pub-instrument-activity{position:relative;display:flex;align-items:center;width:100%;min-height:154px;margin:14px 0 0;padding:20px;border:1px solid #e0e8f4;border-radius:20px;background:#ffffffeb;box-shadow:0 6px 24px #2d54800a;gap:16px;text-align:left}
+.public-surface .pub-share-entry::before,.public-surface .pub-share-entry::after{display:none}
+.public-surface .pub-share-entry-copy{order:0;flex:1}.public-surface .pub-share-entry-posters{order:1;width:86px;height:100px;margin-right:4px}
+.public-surface .pub-share-entry-poster{width:58px;height:88px;box-shadow:0 6px 13px #27426122}.public-surface .pub-share-entry-poster.editorial{left:30px}.public-surface .pub-share-entry-poster.precision{top:9px}
+.public-surface .pub-share-entry-arrow{display:none}.public-surface .pub-share-entry-title,.public-surface .pub-instrument-summary>.pub-instrument-activity h2{font-size:17px;line-height:1.5;font-weight:650;color:#20344f}
+.public-surface .pub-share-entry-description,.public-surface .pub-instrument-summary>.pub-instrument-activity p{font-size:11px;line-height:1.7;margin-top:6px;color:#73839a}
+.public-surface .pub-feature-action{display:block;font-size:12px;line-height:24px;color:#2458ce;margin-top:14px;font-weight:500}
+.public-surface .pub-instrument-activity>.pub-icon{width:65px;height:65px;padding:12px;border-radius:18px;background:#edf4ff;color:#4b7ad9;flex:none;transform:rotate(6deg)}
+.public-surface .pub-share-entry:hover,.public-surface .pub-instrument-activity:hover{background:#fff;border-color:#bdd0ef}
+.public-surface .pub-timeline-overview{position:relative}.public-surface .is-scheduled .pub-timeline-copy{width:100%}.public-surface .is-scheduled .pub-timeline-overview>.pub-neural-art{position:absolute;right:0;top:-10px;width:44px;height:44px}
+.public-surface .pub-timeline-row h1{display:flex;align-items:baseline;flex-wrap:wrap;gap:5px}
+.public-surface .is-scheduled .pub-timeline-row h1{font-size:36px;line-height:1.25;margin-top:16px;color:#2458ce;letter-spacing:-1px}
+.public-surface .pub-duration-part{white-space:nowrap}.public-surface .pub-timeline-row h1 .pub-duration-part small{display:inline;font-family:inherit;font-size:15px;line-height:1.3;font-weight:500;letter-spacing:0;margin-left:3px;margin-right:3px;color:#536d91}
+.public-surface .pub-timeline-date{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:12px}.public-surface .pub-timeline-date .pub-timeline-note{margin:0;font-size:12px;line-height:1.7}.public-surface .pub-timeline-date .pub-timeline-timezone{font-size:10px;margin:0;white-space:nowrap;color:#8493a9}
+.public-surface .pub-timeline-detail{font-size:11px;line-height:1.7;margin-top:8px;color:#73839a}
+.public-surface .route-news .pub-card.pub-news-item{padding:20px;border:1px solid #e0e8f4;border-radius:18px;background:#ffffffeb;margin:12px 0;box-shadow:0 4px 16px #294a7710}.public-surface .pub-news-item h3{font-size:18px;line-height:1.5;margin:14px 0 10px}.public-surface .pub-news-item>p{font-size:14px;line-height:1.8;margin:0;color:#63748c}
+.public-surface .pub-news-context{margin-top:16px;padding:12px 14px;border-radius:10px;background:#f1f5fc;font-size:12px;line-height:1.8;color:#63748c}.pub-news-context strong{display:block;font-weight:600;color:#8a6b34;margin-bottom:4px}.public-surface .pub-news-item>.pub-text-link{min-height:44px;margin-top:12px;display:flex;align-items:center;justify-content:flex-end}
+.public-surface .pub-loading-bar{order:1;display:block;width:160px;height:4px;border:0;border-radius:4px;background:#dce6f6;overflow:hidden;position:relative}
+.pub-loading-bar::after,.pub-refresh-track>span{content:'';display:block;width:40%;height:100%;border-radius:4px;background:linear-gradient(90deg,#93c5ff,#3164db);animation:pub-bar-glide 1.8s ease-in-out infinite}
+.pub-refresh-track{height:3px;position:sticky;top:0;z-index:5;overflow:hidden;visibility:hidden;margin-bottom:-3px;pointer-events:none}.pub-refresh-track.is-active{visibility:visible}.pub-refresh-track:not(.is-active)>span{animation:none}
+@keyframes pub-bar-glide{from{transform:translateX(-110%)}to{transform:translateX(360%)}}
+@media(prefers-reduced-motion:reduce){.pub-loading-bar::after,.pub-refresh-track>span{animation:none;transform:translateX(75%)}}
+@media(max-width:350px){.public-surface .is-scheduled .pub-timeline-row h1{font-size:32px}.public-surface .pub-timeline-row h1 .pub-duration-part small{font-size:14px}.public-surface .pub-instrument-summary>.pub-share-entry,.public-surface .pub-instrument-summary>.pub-instrument-activity{padding:16px;gap:12px}.public-surface .pub-share-entry-posters{width:68px;transform:scale(.85);transform-origin:right center}.public-surface .pub-share-entry-title,.public-surface .pub-instrument-summary>.pub-instrument-activity h2{font-size:16px}}
+
+.public-surface .pub-share-entry .pub-feature-action{display:flex;align-items:center;gap:4px}.public-surface .pub-feature-action .pub-share-entry-arrow{display:inline-block;width:23px;height:23px}.public-surface .pub-feature-action .pub-share-orbit,.public-surface .pub-feature-action .pub-share-rail{display:none}
+
+.public-surface .pub-dial-readout strong.pub-dial-countdown{font-size:clamp(20px,2.2vw,32px);letter-spacing:-.6px;white-space:nowrap}@media(min-width:701px){.public-surface .pub-home-atmosphere img{object-fit:contain;object-position:center}.public-surface .pub-home-atmosphere{background:radial-gradient(ellipse,#e7f0f9 40%,#f2f5fb 78%)}}
