@@ -443,3 +443,13 @@ test('会话缓存限制20项，主导航与活跃页保留，详情按最近访
   const count=calls.length;await session.ensure(home);assert.equal(calls.length,count,'主导航不被详情挤掉');
   await session.ensure('/api/v1/bootstrap?view=detail&id=0');assert.equal(calls.length,count+1);
 });
+
+test('空闲预取日历不激活或覆盖首页，首次进记录复用同一在途响应，日期不制造新缓存键', async()=>{
+  const calendar='/api/v1/bootstrap?view=calendar', delayed=deferred<Response>(),calls:string[]=[];
+  const session=new PublicSession({fetch:(async url=>{calls.push(String(url));return url===calendar?delayed.promise:json(envelope(['home']));}) as typeof fetch});
+  const leaveHome=session.activate(home);await session.ensure(home);const before=session.snapshot(home);
+  const preload=session.ensure(calendar);const leaveCalendar=session.activate(calendar);await settle();
+  assert.deepEqual(calls,[home,calendar]);assert.equal(session.snapshot(home),before);
+  delayed.resolve(json(envelope(['records'])));await preload;await session.ensure(calendar);
+  assert.deepEqual(session.snapshot(calendar).page?.ids,['records']);assert.deepEqual(calls,[home,calendar]);leaveHome();leaveCalendar();
+});

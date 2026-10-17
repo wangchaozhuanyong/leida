@@ -1,17 +1,3 @@
-<navigation-header title="重置日程" back="{{true}}" />
-<page-loader wx:if="{{navigationLoading}}" />
-<view wx:else>
-<view class="page">
-  <status-panel wx:if="{{!connected}}" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />
-  <block wx:else><view wx:if="{{error}}" class="warning">{{error}}<button class="secondary" bindtap="retry">重新加载</button></view>
-    <view class="card"><view class="heading">近26周</view><view class="muted">{{completedCount}}项公告称已完成</view><view class="row day-legend lead"><text>金色：用量重置</text><text>灰绿：重置卡</text></view>
-      <scroll-view class="calendar-scroll" scroll-x="{{true}}" scroll-into-view="week-25" enhanced="{{true}}"><view class="weeks"><view wx:for="{{weeks}}" wx:key="id" wx:for-item="week" id="{{week.id}}" class="week"><view class="week-label">{{week.month}}</view><button wx:for="{{week.days}}" wx:for-item="day" wx:key="date" class="day {{day.tone}} {{day.selected ? 'selected' : ''}}" disabled="{{day.future}}" data-date="{{day.date}}" bindtap="selectDay" aria-label="{{day.date}}，{{day.count}}项完成声明，{{day.ongoing}}项进行中">{{day.day}}</button></view></view></scroll-view>
-      <view class="small muted lead">可横向滑动。实心为完成声明，空心为进行中；同一福利动作只计一次。</view>
-    </view>
-    <view class="heading section">{{selected}}</view>
-    <view wx:for="{{selectedItems}}" wx:key="id" class="card"><view class="row"><text class="badge {{item.tone}}">{{item.label}}</text><text>{{item.stage}}</text></view><button class="secondary full" style="margin-top:14px" data-path="{{item.path}}" bindtap="navigate">查看发放依据</button></view>
-    <view wx:if="{{!selectedItems.length}}" class="card empty">这一天暂无已收录记录。</view><view class="foot">资料截至 {{cutoff}} · 北京时间</view>
-  </block>
-</view>
-
-</view>
+<page-meta root-background-color="#f2f5fb" page-style="background-color:#f2f5fb" />
+<navigation-header title="重置记录" back="{{true}}" />
+<include src="../announcements/calendar.wxml" />

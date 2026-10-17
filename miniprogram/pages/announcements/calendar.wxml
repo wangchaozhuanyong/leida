@@ -1,0 +1,18 @@
+<view class="page records-page">
+  <status-panel wx:if="{{!connected}}" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />
+  <block wx:else>
+    <view wx:if="{{error}}" class="warning">{{error}}<button class="text-button" bindtap="retry">重新加载</button></view>
+    <view class="record-summary"><text>本月已收录</text><text>额度重置 <text class="record-number">{{automaticCount}}</text> 次</text><text>重置卡 <text class="record-number banked">{{bankedCount}}</text> 次</text></view>
+    <view class="record-kinds"><button wx:for="{{kinds}}" wx:key="value" class="{{kind===item.value?'active':''}}" data-value="{{item.value}}" bindtap="selectKind"><view wx:if="{{item.value!=='all'}}" class="record-dot {{item.value}}" />{{item.label}}</button></view>
+    <view class="record-period">可查看近半年 · {{periodLabel}}</view>
+    <view class="month-calendar">
+      <view class="month-heading"><button aria-label="上个月" disabled="{{monthIndex===months.length-1}}" bindtap="previousMonth">‹</button><picker mode="selector" range="{{months}}" range-key="label" value="{{monthIndex}}" bindchange="selectMonth"><view class="month-select">{{months[monthIndex].label}} ⌄</view></picker><button aria-label="下个月" disabled="{{monthIndex===0}}" bindtap="nextMonth">›</button></view>
+      <view class="month-week"><text>一</text><text>二</text><text>三</text><text>四</text><text>五</text><text>六</text><text>日</text></view>
+      <view class="month-days"><block wx:for="{{days}}" wx:key="date"><view wx:if="{{item.blank}}" class="blank-day" /><button wx:else class="{{item.selected?'selected':''}} {{item.today?'today':''}}" disabled="{{item.disabled}}" aria-label="{{item.date}}，{{item.count}}条已收录完成记录" aria-pressed="{{item.selected}}" data-date="{{item.date}}" bindtap="selectDay"><text>{{item.day}}</text><view class="day-markers"><view wx:if="{{item.automatic}}" class="record-dot automatic_reset"/><view wx:if="{{item.banked}}" class="record-dot banked_reset"/></view></button></block></view>
+    </view>
+    <view class="record-heading"><text>{{selectedLabel}}</text><text class="small muted">{{selectedItems.length ? selectedItems.length+' 条完成记录':'已收录记录'}}</text></view>
+    <view wx:for="{{selectedItems}}" wx:key="id" class="date-record"><view class="row"><text class="record-label {{item.kind}}">{{item.label}}</text><text class="record-time">{{item.time}} · 北京时间</text></view><view class="record-title">{{item.title}}</view><button class="text-button" data-path="{{item.path}}" bindtap="navigate">查看公告 →</button></view>
+    <view wx:if="{{!selectedItems.length}}" class="date-empty"><view>这一天暂无已收录的重置记录</view><view class="small muted">可以选择有标记的日期查看。</view><button wx:if="{{recentDate && recentDate!==selected}}" class="text-button" bindtap="recentRecord">查看最近有记录的一天 →</button></view>
+    <view class="record-foot">按公开完成声明的北京时间归档。未收录记录不代表当日没有发生重置。</view>
+  </block>
+</view>

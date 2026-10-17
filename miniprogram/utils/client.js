@@ -4,7 +4,7 @@ const query = options => Object.entries(options).sort(([a],[b])=>a.localeCompare
 const sameContent = (a, b) => a.contentVersion && b.contentVersion ? a.contentVersion === b.contentVersion : a.version === b.version;
 const append = (a, b) => ({ ...b, data:{...b.data,...Object.fromEntries(['events','articles','publications','evidence','notices'].map(key=>[key,merge(a.data[key],b.data[key])]))},page:{...b.page,ids:[...new Set([...(a.page?.ids||[]),...(b.page?.ids||[])])]} });
 const isAddition = (before, after) => after.publications.length > before.publications.length && ['publications','articles','events','evidence','notices'].every(key => before[key].every(item => after[key].some(next => next.id === item.id && JSON.stringify(next) === JSON.stringify(item))));
-const pinned = view => ['home','notices'].includes(view.view) || ['news','history'].includes(view.view) && (!view.filter || view.filter === 'all');
+const pinned = view => ['home','notices','calendar'].includes(view.view) || ['news','history'].includes(view.view) && (!view.filter || view.filter === 'all');
 /** Foreground public reads; independent views and response epochs protect page changes. */
 function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, now = () => Date.now(), random = Math.random }) {
   const request = createTransport(wxApi, config), listeners = new Set(), views = new Map();
@@ -12,8 +12,9 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
   let state = empty();
   let active = false, timer, pending, epoch = 0, task, failures = 0, view = {view:'home'};
   const pollMs = Math.max(5000, Number(config.pollMs)||300000);
-  let latestVersion = '', lastCheckAt = -Infinity;
+  let latestVersion = '', latestContentVersion = '', lastCheckAt = -Infinity;
   const pinnedKeys = new Set();
+  let calendarPrefetch, prefetchEpoch = 0;
   const emit = patch => {
     state = { ...state, ...patch };
     if (state.data) {
@@ -69,10 +70,10 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
         const stateOnly = !!result.contentVersion && result.contentVersion === (state.candidate?.contentVersion||state.contentVersion);
         result = await read(stateOnly ? '/api/v1/bootstrap?view=state' : path);
         if(stateOnly && state.candidate && result.contentVersion===state.candidate.contentVersion){
-          failures=0;latestVersion=result.version;emit({candidate:{...state.candidate,version:result.version,data:{...state.candidate.data,sources:result.data.sources,serverTime:result.data.serverTime}},validatedAt:now(),error:''});return;
+          failures=0;latestVersion=result.version;latestContentVersion=result.contentVersion||latestContentVersion;emit({candidate:{...state.candidate,version:result.version,data:{...state.candidate.data,sources:result.data.sources,serverTime:result.data.serverTime}},validatedAt:now(),error:''});return;
         }
         if (stateOnly && result.contentVersion === state.contentVersion) {
-          failures=0; latestVersion=result.version; emit({data:{...state.data,sources:result.data.sources,serverTime:result.data.serverTime},version:result.version,receivedAt:now(),validatedAt:now(),error:''}); return;
+          failures=0; latestVersion=result.version;latestContentVersion=result.contentVersion||latestContentVersion; emit({data:{...state.data,sources:result.data.sources,serverTime:result.data.serverTime},version:result.version,receivedAt:now(),validatedAt:now(),error:''}); return;
         }
         if (stateOnly) result=await read(path);
       }
@@ -84,7 +85,7 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
         const count=Math.max(1,previous.pagesLoaded||1)+(cursor?1:0);
         result=await rebuild(count,cursor?undefined:result);pagesLoaded=result.pagesLoaded;
       }
-      failures=0; latestVersion=result.version;
+      failures=0; latestVersion=result.version;latestContentVersion=result.contentVersion||latestContentVersion;
       const next={ data:result.data, page:result.page||null, pagesLoaded, version:result.version, contentVersion:result.contentVersion||'', receivedAt:now(), validatedAt:now(), error:'', moreError:'' };
       if(checkOnly && previous.data && ['news','history'].includes(view.view) && isAddition(previous.data,result.data))emit({candidate:next,updateAvailable:true,validatedAt:now(),error:''});
       else emit({...next,candidate:null,updateAvailable:false});
@@ -102,19 +103,35 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
   return {
     subscribe(fn) { listeners.add(fn); fn(state); return () => listeners.delete(fn); },
     getState() { return state; }, refresh,
+    prefetchCalendar() {
+      const calendar={view:'calendar'}, key=query(calendar), cached=views.get(key);
+      if (state.unconfigured || view.view==='calendar' || cached?.data && now()-cached.validatedAt<pollMs && cached.version===latestVersion) return Promise.resolve();
+      if(calendarPrefetch)return calendarPrefetch.promise;
+      const generation=prefetchEpoch, beforeContent=latestContentVersion;
+      const task=request(`/api/v1/bootstrap?${key}`);
+      const promise=task.promise.then(result=>{
+        if(generation!==prefetchEpoch)return;
+        if(beforeContent!==latestContentVersion && result.contentVersion!==latestContentVersion)return;
+        views.set(key,{...empty(),data:result.data,version:result.version,contentVersion:result.contentVersion||'',page:result.page||null,pagesLoaded:1,receivedAt:now(),validatedAt:now(),error:''});pinnedKeys.add(key);
+      }).catch(()=>{}).finally(()=>{if(calendarPrefetch?.promise===promise)calendarPrefetch=undefined;});
+      calendarPrefetch={task,promise};return promise;
+    },
     setView(next) {
       if (query(next)===query(view)) return current() ? pending||Promise.resolve() : refresh(true);
       cancel(); view={...next};
       // Each page/filter restores only its own validated snapshot. Known version
       // changes and expiry revalidate it; a cold page never shows another view.
-      const cached=views.get(query(view));
-      state={...empty(),...cached}; emit({});
-      return current() ? Promise.resolve() : refresh(!!cached?.data);
+      const restore=()=>{const cached=views.get(query(view));state={...empty(),...cached};emit({});return current()?Promise.resolve():refresh(!!cached?.data);};
+      if(next.view==='calendar' && calendarPrefetch){
+        const generation=epoch;state=empty();emit({loading:true});
+        return calendarPrefetch.promise.then(()=>{if(generation===epoch)return restore();});
+      }
+      return restore();
     },
     applyUpdates() { if(state.candidate)emit({...state.candidate,candidate:null,updateAvailable:false}); },
     more() { if(state.moreError&&!state.page?.nextCursor)return refresh(false);if(state.candidate)emit({...state.candidate,candidate:null,updateAvailable:false}); return state.page?.nextCursor ? refresh(false,state.page.nextCursor) : Promise.resolve(); },
     start() { if(active)return pending||Promise.resolve(); active=true;const first=state.data&&now()-lastCheckAt<60000?Promise.resolve():refresh(!!state.data);first.finally(schedule);return first; },
-    stop() { active=false;cancel();if(timer!==undefined)timers.clearTimeout(timer);timer=undefined;emit({loading:false,loadingMore:false}); }
+    stop() { active=false;prefetchEpoch++;if(calendarPrefetch)calendarPrefetch.task.abort();calendarPrefetch=undefined;cancel();if(timer!==undefined)timers.clearTimeout(timer);timer=undefined;emit({loading:false,loadingMore:false}); }
   };
 }
 module.exports = { createClient };

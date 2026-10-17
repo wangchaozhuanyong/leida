@@ -11,11 +11,22 @@ import { publicResetOutlook } from '../src/lib/reset-outlook';
 // This suite exercises the real GET route against a read-only memory store.
 // It never loads local credentials, opens a database connection or calls WeChat.
 process.env.DOTENV_CONFIG_PATH = fileURLToPath(new URL('./.public-flow-no-env', import.meta.url));
+// Install the source stub before importing a reader that captures fetch at creation.
+// Otherwise the test can accidentally start a real upstream read and reach Next after()
+// without a request scope under a slow network or concurrent test load.
+const originalFetch = globalThis.fetch;
+let externalRequests = 0;
+globalThis.fetch = async input => {
+  if (String(input) === 'https://codex-resets.com/api/v1/status') return Response.json({
+    meta:{api_version:'v1',generated_at:new Date().toISOString()},
+    data:{latest_reset:null,scheduled_reset:null,active_watch:null}
+  });
+  externalRequests++;throw new Error('External network calls are forbidden in this suite');
+};
 const { pool } = await import('../src/db');
 const { GET } = await import('../src/app/api/v1/[...path]/route');
-const originalQuery = pool.query, originalConnect = pool.connect, originalFetch = globalThis.fetch;
+const originalQuery = pool.query, originalConnect = pool.connect;
 let tables: Record<string, unknown[]> = {};
-let externalRequests = 0;
 const clone = <T>(value: T): T => structuredClone(value);
 const query = async (sql: string, values: unknown[] = []) => {
   if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql) || sql.startsWith('SET TRANSACTION')) return { rows: [], rowCount: 0 };
@@ -28,7 +39,6 @@ const query = async (sql: string, values: unknown[] = []) => {
 };
 pool.query = query as typeof pool.query;
 pool.connect = (async () => ({ query, release() {} })) as typeof pool.connect;
-globalThis.fetch = async () => { externalRequests++; throw new Error('External network calls are forbidden in this suite'); };
 after(async () => { pool.query = originalQuery; pool.connect = originalConnect; globalThis.fetch = originalFetch; await pool.end(); assert.equal(externalRequests, 0, 'Public regression fixtures must not attempt external requests'); });
 
 const now = new Date().toISOString();

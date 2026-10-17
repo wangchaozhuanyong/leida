@@ -10,7 +10,7 @@ test('网站筛选直接从 URL 解析且只把正文所需参数传给读取接
   assert.equal(news.newsCategory, 'product');
   assert.equal(news.readPath, '/api/v1/bootstrap?view=news&filter=product');
   assert.equal(parsePublicRoute('/news', new URLSearchParams('category=unknown')).newsCategory, 'all');
-  assert.equal(parsePublicRoute('/history', new URLSearchParams('target=banked')).readPath, '/api/v1/bootstrap?view=history&filter=banked_reset');
+  assert.equal(parsePublicRoute('/history', new URLSearchParams('target=banked')).readPath, '/api/v1/bootstrap?view=calendar');
   assert.equal(parsePublicRoute('/history', new URLSearchParams('target=automatic')).historyFilter, 'automatic_reset');
   assert.equal(parsePublicRoute('/settings', new URLSearchParams()).readPath, '/api/v1/bootstrap?view=notices');
   assert.equal(parsePublicRoute('/more', new URLSearchParams()).readPath, null);

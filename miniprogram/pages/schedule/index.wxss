@@ -1,1 +1,1 @@
-/* 日历每个日期按钮至少 44×44px。 */
+@import "../announcements/index.wxss";

@@ -551,10 +551,10 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   // Bundled client source version. Backend-only releases must not relabel an installed client.
-  const buildVersion='1.0.24';
+  const buildVersion='1.0.25';
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);assert.equal(news.data.navigationTitle,'动态 · 共42篇');news.onUnload();
-  const records=h.page('announcements');assert.equal(records.data.navigationTitle,'重置公告 · 42个事件');records.onUnload();
+  const records=h.page('announcements');assert.equal(records.data.navigationTitle,'重置记录');records.onUnload();
   const settings=h.page('settings');assert.equal(settings.data.clientVersion,`${buildVersion} · 体验版`);settings.onUnload();
   const older=nativeHarness(),fallback=older.page('settings');assert.equal(fallback.data.clientVersion,buildVersion);fallback.onUnload();
   for(const [envVersion,label] of [['release','正式版'],['develop','开发版']]){
@@ -616,7 +616,7 @@ test('实际详情页面分享固定版本，收到撤回后隐藏菜单并保�
 
 test('实际日程、活动及提醒页面可选日期、查看固定版本和本机已读，不发写接口', async () => {
   const harness = nativeHarness(), schedule = harness.page('schedule',{ date:'2026-10-10' });
-  assert.equal(schedule.data.selectedItems.length, 4);
+  assert.equal(schedule.data.selectedItems.length, 3);
   schedule.selectDay({ currentTarget: { dataset: { date:'2026-10-09' } } });
   assert.equal(schedule.data.selected, '2026-10-09'); assert.equal(schedule.data.selectedItems.length, 0);
   const activity = harness.page('activity',{ id:'fixture-activity' });

@@ -120,7 +120,7 @@ export class PublicSession {
   private prune(): void {
     const pinned = (endpoint: string) => {
       const query = new URL(endpoint, 'https://local.invalid').searchParams;
-      return ['home','notices'].includes(query.get('view') || '') || ['news','history'].includes(query.get('view') || '') && (!query.get('filter') || query.get('filter') === 'all');
+      return ['home','notices','calendar'].includes(query.get('view') || '') || ['news','history'].includes(query.get('view') || '') && (!query.get('filter') || query.get('filter') === 'all');
     };
     for (const [key, entry] of [...this.entries].sort((a,b) => a[1].touched-b[1].touched)) {
       if (this.entries.size <= 20) break;
