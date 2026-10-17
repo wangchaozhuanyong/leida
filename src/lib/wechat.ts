@@ -28,6 +28,8 @@ export interface WechatReader {
 export interface WechatGrant {
   id:string; readerId:string; appId:string; templateId:string; status:WechatGrantState;
   nonceHash:string; nonceExpiresAt:string; requestedAt:string; acceptedAt?:string;
+  /** First fresh consent after the latest uncertain-send pause; later top-ups preserve it. */
+  resumedAt?:string;
   confirmedNonceHash?:string; deliveryId?:string; updatedAt:string;
   credits?:WechatCredit[]; challengeTimes?:number[];
 }

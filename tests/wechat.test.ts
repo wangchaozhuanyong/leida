@@ -585,6 +585,22 @@ test('新授权恢复保留未知回执及原可用次数，不补发暂停消�
   assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,2);assert.equal(f.calls.filter(call=>call.url.includes('subscribe/send')).length,2);
 });
 
+test('恢复后再次增加次数，不应跳过恢复后尚未派发的新消息',async()=>{
+ for(const legacy of [false,true]){
+  const options={send:'timeout' as 'timeout'|'ok'},f=await fixture(options),session=await f.login();
+  await f.accept(session.sessionToken);await f.notice();const oldJob=(await f.queued())[0];
+  await f.service.processWechatJob(oldJob);const paused=await f.notice();
+  f.advance(1000);await f.accept(session.sessionToken);const recoveryAt=new Date(f.now()).toISOString();
+  if(legacy){const grant=(await f.store.list<WechatGrant>('wechat_grants'))[0];const {resumedAt:_,...old}=grant;await f.store.put('wechat_grants',old);}
+  const upcoming=await f.notice();f.advance(1000);await f.accept(session.sessionToken);
+  options.send='ok';await f.service.scheduleWechatDeliveries();
+  const deliveries=await f.store.list<WechatDelivery>('wechat_deliveries');
+  assert.equal(deliveries.filter(item=>item.noticeId===paused.id).length,0);
+  assert.equal(deliveries.filter(item=>item.noticeId===upcoming.id).length,1,'增加次数不能向后移动恢复边界而跳过有效新消息');
+  assert.equal((await f.store.list<WechatGrant>('wechat_grants'))[0].resumedAt,recoveryAt);
+ }
+});
+
 test('二维码外部响应期间切换配置，不返回其他账号/版本的码',async()=>{
   let change!:()=>Promise<void>;const f=await fixture({beforeCode:async()=>change()});change=async()=>{await f.configure({envVersion:'develop'});};await assert.rejects(f.service.generateWechatCode(f.publication.id),/已变化/);assert.equal((await f.service.adminWechat()).codesToday,1);
 });
