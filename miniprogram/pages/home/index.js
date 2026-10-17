@@ -42,7 +42,12 @@ Page(createPage((data, query, page, app) => {
     shareLabel: '分享这条公告给朋友',
     historical: data.articles.length > 0 && data.articles.every(article => m.isHistoricalArticle(article, data.evidence))
   };
-}, { view:()=>({view:'home'}), data: { name: '模钥重置雷达', freshnessOpen: false }, afterRender() { this.syncCountdown(); this.syncForecastExpiry(); }, hide() { this.stopCountdown(); this.stopForecastExpiry(); }, unload() { this.stopCountdown(); this.stopForecastExpiry(); }, methods: {
+}, { view:()=>({view:'home'}), data: { name: '模钥重置雷达', freshnessOpen: false }, afterRender() { this.queueCalendarPrefetch(); this.syncCountdown(); this.syncForecastExpiry(); }, hide() { this.cancelCalendarPrefetch(); this.stopCountdown(); this.stopForecastExpiry(); }, unload() { this.cancelCalendarPrefetch(); this.stopCountdown(); this.stopForecastExpiry(); }, methods: {
+  queueCalendarPrefetch() {
+    if(!this.data.connected || this._calendarPrefetched || this._calendarPrefetchTimer || !getApp().client.prefetchCalendar)return;
+    this._calendarPrefetchTimer=setTimeout(()=>{this._calendarPrefetchTimer=null;if(this._visible){this._calendarPrefetched=true;void getApp().client.prefetchCalendar();}},800);
+  },
+  cancelCalendarPrefetch() { if(this._calendarPrefetchTimer)clearTimeout(this._calendarPrefetchTimer);this._calendarPrefetchTimer=null; },
   toggleFreshness() { this.setData({ freshnessOpen: !this.data.freshnessOpen }); },
   openPoster() { if (this.data.connected) wx.navigateTo({ url:'/pages/poster/index' }); },
   syncCountdown() {

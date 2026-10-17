@@ -1,1 +1,1 @@
-/* 页面使用统一卡片。 */
+@import "../announcements/index.wxss";

@@ -1,6 +1,6 @@
 export type NewsCategory = 'all' | 'reset' | 'activity' | 'product';
 export type HistoryFilter = 'all' | 'automatic_reset' | 'banked_reset';
-export type PublicFilterKey = 'category' | 'target' | 'day';
+export type PublicFilterKey = 'category' | 'target' | 'day' | 'date';
 
 export function parsePublicRoute(pathname: string, query: URLSearchParams) {
   const path = pathname.split('/').filter(Boolean).map(part => {
@@ -11,7 +11,7 @@ export function parsePublicRoute(pathname: string, query: URLSearchParams) {
   const newsCategory: NewsCategory = category === 'reset' || category === 'activity' || category === 'product' ? category : 'all';
   const target = query.get('target');
   const historyFilter: HistoryFilter = target === 'automatic' ? 'automatic_reset' : target === 'banked' ? 'banked_reset' : 'all';
-  const view = route==='settings' ? 'notices' : ['history', 'news', 'methodology', 'notices'].includes(route) ? route
+  const view = route==='settings' ? 'notices' : route === 'history' ? 'calendar' : route === 'news' && newsCategory === 'reset' ? 'history' : ['news', 'methodology', 'notices'].includes(route) ? route
     : route === 'activities' ? 'activity'
     : ['events', 'articles', 'sources'].includes(route) ? 'detail'
     : route === 'home' ? 'home' : null;
@@ -25,8 +25,7 @@ export function parsePublicRoute(pathname: string, query: URLSearchParams) {
     if (view === 'activity') {
       for (const key of ['day', 'publication']) for (const value of query.getAll(key)) params.append(key, value);
     }
-    if (route === 'history') params.set('filter', historyFilter);
-    if (route === 'news') params.set('filter', newsCategory);
+    if (route === 'news') params.set('filter', newsCategory === 'reset' ? historyFilter : newsCategory);
   }
   return { path, route, newsCategory, historyFilter, readPath: params ? `/api/v1/bootstrap?${params}` : null };
 }

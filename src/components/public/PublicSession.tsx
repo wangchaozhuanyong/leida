@@ -30,6 +30,11 @@ export function usePublicQuery(endpoint: string | null, navigationKey = endpoint
   const snapshot = useCallback(() => endpoint ? session.snapshot(endpoint) : idlePublicQuery, [endpoint, session]);
   const value = useSyncExternalStore(subscribe, snapshot, snapshot);
   useEffect(() => endpoint ? session.activate(endpoint) : undefined, [endpoint, navigationKey, session]);
+  useEffect(() => {
+    if (!value.data || endpoint !== '/api/v1/bootstrap?view=home') return;
+    const timer = window.setTimeout(() => { if (document.visibilityState === 'visible') void session.ensure('/api/v1/bootstrap?view=calendar'); }, 800);
+    return () => window.clearTimeout(timer);
+  }, [endpoint, !!value.data, session]);
   const refresh = useCallback(() => endpoint ? session.refresh(endpoint) : Promise.resolve(), [endpoint, session]);
   const applyUpdates = useCallback(() => { if (endpoint) session.applyUpdates(endpoint); }, [endpoint, session]);
   const more = useCallback(() => endpoint ? session.more(endpoint) : Promise.resolve(), [endpoint, session]);
