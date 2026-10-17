@@ -187,10 +187,20 @@ async function withdrawalNotice(publication:Publication, kind:'event'|'article',
   await insert('notices',{id:`notice_${semanticKey}`,semanticKey,eventId:publication.eventId,publicationId:publication.id,title,summary:`撤回原因：${reason}`,categories:['correction'],status:'active',createdAt:now()} satisfies Notice,c);
 }
 /** Internal maintenance only. Uses normal fact validation and never emits historical alerts. */
-export async function publishHistoricalDraft(content:DraftContent,c:Client,reason:string):Promise<Publication> {
+export async function publishHistoricalDraft(content:DraftContent,c:Client,reason:string,existingArticle?:Article):Promise<Publication> {
   const evidence=await list<Evidence>('evidence',c),cited=evidence.filter(row=>content.evidenceIds.includes(row.id));
   if(cited.length!==new Set(content.evidenceIds).size||!isHistoricalContent(cited,now())||!cited.every(row=>Number.isFinite(Date.parse(row.publishedAt))&&Date.parse(row.publishedAt)<=Date.now()))throw new DomainError('历史补录证据范围不符');
-  return publish(content,c,{actor:'authorized-history-backfill',reason,suppressNotice:true});
+  if(existingArticle&&(existingArticle.status!=='published'||existingArticle.publicationMode!=='news_only'||existingArticle.contentOrigin!=='template'||existingArticle.manualFields?.length))throw new DomainError('历史文章不符合自动补证范围');
+  const previous=existingArticle&&content.eventId!==existingArticle.eventId?await one<RadarEvent>('events',existingArticle.eventId,c):undefined;
+  if(existingArticle&&content.eventId!==existingArticle.eventId&&!previous)throw new DomainError('历史文章的原事件不存在');
+  if(previous){const primary=evidence.find(e=>e.id===content.evidenceIds[0]),target=await one<RadarEvent>('events',content.eventId!,c);if(!primary||!target||automaticNewsContextUpgrade(primary,content,previous,target,evidence,await list<Article>('articles',c))?.id!==existingArticle!.id)throw new DomainError('历史文章父帖关联未通过核对');}
+  const result=await publish(content,c,{actor:'authorized-history-backfill',reason,suppressNotice:true,existingArticle});
+  if(previous){
+    const merged={...previous,status:'merged' as const,mergedInto:result.eventId,version:previous.version+1,updatedAt:now()};await put('events',merged,c);
+    for(const activity of await list<Activity>('activities',c))if(activity.items.some(item=>item.articleId===result.articleId&&item.eventId===previous.id))await put('activities',{...activity,version:activity.version+1,items:activity.items.map(item=>item.articleId===result.articleId&&item.eventId===previous.id?{...item,eventId:result.eventId}:item)},c);
+    await audit('authorized-history-backfill','event.news_context_link',previous.id,'历史原帖补证，复用已有父帖事件并保留旧快照',previous,{event:merged,articleId:result.articleId},c);
+  }
+  return result;
 }
 
 export async function createEvidence(input: Omit<Evidence,'id'|'hash'>,actor?:string):Promise<{evidence:Evidence;created:boolean;candidate?:Candidate}> {

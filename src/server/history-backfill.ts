@@ -5,17 +5,20 @@ import type {Candidate,DraftContent,Evidence,RadarEvent,Article,Source} from '..
 import {buildAutomaticTemplate,evidenceFingerprint,isClearlyUnrelated,AUTOMATIC_RULES_VERSION} from './automatic-content';
 import {gatherEvidenceContext,namespace,selectOriginal,originalConflict} from './source-context';
 import {actionIdentityEvidence,contextFor,resolveLinkedEvents} from './worker';
-import {publishHistoricalDraft,partitionAutomaticActions,audit} from './service';
+import {publishHistoricalDraft,partitionAutomaticActions,automaticNewsContextUpgrade,audit} from './service';
 import {DomainError,hash,now,validateDraft} from './domain';
 import {TIBO_PUBLIC_SOURCE} from './tibo-public';
 
 interface HistoryMessage {messageId:string;publishedAt:string;referenceOnly:boolean;expectedActions:{kind:string;stage:string}[];}
 export interface HistoryBundle {id:string;schemaVersion:number;rulesVersion:string;startsAt:string;endsAt:string;reviewedAt:string;evidence:Evidence[];messages:HistoryMessage[];}
 interface HistoryReceipt {id:string;digest:string;phase:'publishing'|'complete';nextIndex:number;insertedEvidence:number;published:number;references:number;existing:number;updatedAt:string;}
-const BUNDLE_DIGEST='f6400bd0cd6a91adf3df834b1bca28bd74c1a94d99a5b16546dc832b367a8f06';
+const BUNDLE_DIGEST='9f5b8188ba8e0a245622513114f6cc1705247f64a0e4ec37a6c949e82784cba1';
 const bundle=bundleFile as unknown as HistoryBundle;
 const receiptId='maintenance:'+bundle.id;
 const key=(e:Evidence)=>`${namespace(e)}:${e.messageId}`;
+export function canUpgradeHistoryArticle(article:Article,event:RadarEvent|undefined,humanEdited=false):boolean {
+  return !humanEdited&&article.status==='published'&&article.publicationMode==='news_only'&&article.contentOrigin==='template'&&!article.manualFields?.length&&event?.status==='published'&&!event.manualFields?.length;
+}
 
 /** The input is a reviewed, versioned repository asset, never a request body or URL. */
 export function validateHistoryBundle(value:HistoryBundle,digest=BUNDLE_DIGEST):void {
@@ -63,7 +66,7 @@ export async function applyBundledHistory():Promise<HistoryReceipt> {
       const current=await one<HistoryReceipt>('settings',receiptId,c);
       if(!current||current.digest!==BUNDLE_DIGEST)throw new DomainError('历史补录批次不匹配');
       if(current.phase==='complete')return current;
-      const all=await list<Evidence>('evidence',c),articles=await list<Article>('articles',c),events=await list<RadarEvent>('events',c);
+      const all=await list<Evidence>('evidence',c),articles=await list<Article>('articles',c),events=await list<RadarEvent>('events',c),candidates=await list<Candidate>('candidates',c);
       const identity=new Map(all.map(e=>[e.id,key(e)]));
       const next={...current};
       for(const message of bundle.messages.slice(current.nextIndex,current.nextIndex+10)){
@@ -71,12 +74,18 @@ export async function applyBundledHistory():Promise<HistoryReceipt> {
         const primary=selectOriginal(all.filter(e=>key(e)===key(prototype)));
         if(!primary||isClearlyUnrelated(primary))throw new DomainError('历史补录主帖未核对');
         const existing=articles.find(a=>identity.get(a.evidenceIds[0])===key(primary));
-        if(existing){next.existing++;next.nextIndex++;continue;}
+        const humanEdited=!!existing&&candidates.some(candidate=>candidate.humanEdited&&candidate.status==='published'&&(candidate.automation?.articleId===existing.id||identity.get(candidate.evidenceId)===key(primary)));
+        if(existing&&!canUpgradeHistoryArticle(existing,events.find(e=>e.id===existing.eventId),humanEdited)){next.existing++;next.nextIndex++;continue;}
         const context=gatherEvidenceContext(primary,all);let draft=historicalDraft(primary,all,message);
         let linked=resolveLinkedEvents(primary,context,events,all).filter(e=>e.status==='published');
         if(draft.publicationMode==='news_only')linked=[];
-        if(linked.length>1)draft=historicalDraft(primary,all,{...message,referenceOnly:true});
-        let target=linked.length===1?linked[0]:undefined;
+        if(!existing&&linked.length>1)draft=historicalDraft(primary,all,{...message,referenceOnly:true});
+        let target=existing?events.find(e=>e.id===existing.eventId):linked.length===1?linked[0]:undefined;
+        if(existing&&target){
+          const upgrades=linked.filter(event=>event.id!==target!.id&&automaticNewsContextUpgrade(primary,draft,target!,event,all,articles)?.id===existing.id);
+          if(upgrades.length===1)target=upgrades[0];
+          else if(linked.some(event=>event.id!==target!.id&&event.actions.length))draft=historicalDraft(primary,all,{...message,referenceOnly:true});
+        }
         if(target&&draft.actions.some(action=>target!.actions.filter(a=>a.kind===action.kind&&a.scope===action.scope).length>1)){
           draft=historicalDraft(primary,all,{...message,referenceOnly:true});target=undefined;
         }
@@ -89,16 +98,19 @@ export async function applyBundledHistory():Promise<HistoryReceipt> {
         const partition=partitionAutomaticActions(draft,target);
         if(partition.stale.length)draft={...draft,actions:partition.current,...(!partition.current.length?{publicationMode:'news_only' as const,title:'较早公告记录',summary:`公开来源的较早声明：${draft.summary}`}:{})};
         const errors=validateDraft(draft,all);if(errors.length)throw new DomainError('历史补录事实校验未通过');
+        const previousCandidate=candidates.find(candidate=>candidate.id.startsWith('candidate_history_')&&!candidate.humanEdited&&identity.get(candidate.evidenceId)===key(primary));
         if(draft.publicationMode==='news_only'){
           // Unresolved references stay in the existing review queue, not customer news.
-          await insert('candidates',{id:`candidate_history_${hash(bundle.id+':'+message.messageId)}`,evidenceId:primary.id,version:1,status:'draft',content:draft,reasons:draft.reviewReasons??['历史原帖待核对'],createdAt:now(),updatedAt:now(),humanEdited:false} satisfies Candidate,c);
+          if(!previousCandidate&&!existing)await insert('candidates',{id:`candidate_history_${hash(bundle.id+':'+message.messageId)}`,evidenceId:primary.id,version:1,status:'draft',content:draft,reasons:draft.reviewReasons??['历史原帖待核对'],createdAt:now(),updatedAt:now(),humanEdited:false} satisfies Candidate,c);
           next.references++;next.nextIndex++;continue;
         }
-        const publication=await publishHistoricalDraft(draft,c,`补齐近半年公开历史，原帖 ${message.messageId}；历史补录不发送实时提醒`);
-        const candidate:Candidate={id:`candidate_history_${hash(bundle.id+':'+message.messageId)}`,evidenceId:primary.id,version:1,status:'published',content:{...draft,eventId:publication.eventId},reasons:[],createdAt:now(),updatedAt:now(),humanEdited:false};
+        const publication=await publishHistoricalDraft(draft,c,`补齐近半年公开历史，原帖 ${message.messageId}；历史补录不发送实时提醒`,existing);
+        const candidate:Candidate={id:previousCandidate?.id??`candidate_history_${hash(bundle.id+':'+message.messageId)}`,evidenceId:primary.id,version:(previousCandidate?.version??0)+1,status:'published',content:{...draft,eventId:publication.eventId},reasons:[],createdAt:previousCandidate?.createdAt??now(),updatedAt:now(),humanEdited:false};
         // This frozen, reviewed import is final; do not enqueue paid prose enrichment.
         candidate.automation={state:'ready',reasonCodes:[],dependencyIds:[],inputFingerprint:evidenceFingerprint(contextFor(candidate,primary,all)),evaluatedAt:now(),articleId:publication.articleId,templatePublished:false};
-        await insert('candidates',candidate,c);articles.push(publication.article);
+        if(previousCandidate)await put('candidates',candidate,c);else await insert('candidates',candidate,c);
+        const articleIndex=articles.findIndex(a=>a.id===publication.articleId);if(articleIndex<0)articles.push(publication.article);else articles[articleIndex]=publication.article;
+        if(existing&&existing.eventId!==publication.eventId){const old=events.find(e=>e.id===existing.eventId);if(old){old.status='merged';old.mergedInto=publication.eventId;}}
         const oldIndex=events.findIndex(e=>e.id===publication.eventId);if(oldIndex<0)events.push(publication.event);else events[oldIndex]=publication.event;
         next.published++;next.nextIndex++;
       }

@@ -83,13 +83,16 @@ export class CloudbaseRpc {
       reader = response.body?.getReader();
       const chunks: Uint8Array[] = [];
       let bytes = 0;
+      // The legacy snapshot contains full source bodies and frozen forecasts.
+      // Keep its compatibility ceiling bounded without widening writes or scoped reads.
+      const responseLimit=operation==='radar_cb_public_bundle'&&typeof params.p_options==='object'&&params.p_options!==null&&(params.p_options as {view?:unknown}).view==='legacy'?8*1024*1024:2*1024*1024;
       if (reader) try {
         for (;;) {
           const result = await reader.read();
           assertActive();
           if (result.done) break;
           bytes += result.value.byteLength;
-          if (bytes > 2 * 1024 * 1024) { await reader.cancel(); throw new CloudbaseRpcError('response', response.status, 'RESPONSE_TOO_LARGE'); }
+          if (bytes > responseLimit) { await reader.cancel(); throw new CloudbaseRpcError('response', response.status, 'RESPONSE_TOO_LARGE'); }
           chunks.push(result.value);
         }
       } finally { reader.releaseLock(); }
