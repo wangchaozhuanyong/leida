@@ -1,12 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {activeResetWatch,validResetWatch,resetWatchRevision,type ResetWatch} from '../src/lib/reset-watch';
-import {createResetWatchReader,parseResetWatchResponse,resetWatchVersion,withResetWatchEnvelope,withResetWatchData,RESET_WATCH_ENDPOINT} from '../src/server/reset-watch';
+import {createResetWatchReader,parseResetWatchResponse,resetWatchVersion,withResetWatchEnvelope,withResetWatchData,publicWatchForClient,RESET_WATCH_ENDPOINT} from '../src/server/reset-watch';
 import type {PublicData} from '../src/lib/types';
 import {referenceForecast} from '../src/lib/forecast';
 import {createRequire} from 'node:module';
 import {statusTimelineModel} from '../src/components/public/StatusTimeline';
+import {buildResetCadenceForecast} from '../src/lib/reset-cadence';
 const native=createRequire(import.meta.url)('../miniprogram/utils/status-timeline.js');
+const nativeModel=createRequire(import.meta.url)('../miniprogram/utils/model.js');
+const nativeCadence=createRequire(import.meta.url)('../miniprogram/utils/cadence.js');
 
 const now = '2026-10-17T04:00:00.000Z';
 function response() {
@@ -127,6 +130,44 @@ test('公开读取投影不修改公告或提醒；所有视图版本包含同�
  assert.equal(result.data.notices,data.notices);assert.equal(result.data.events,data.events);
  const state=withResetWatchEnvelope({data:facts,version:'base',contentVersion:'base'},watch(),now);
  assert.equal(state.contentVersion,result.contentVersion);assert.equal(state.data.forecasts,undefined);
+});
+
+function wideHistoricalForecast(currentWatch:ResetWatch):PublicData {
+ const generated=Date.parse(now),observations=Array.from({length:10},(_,i)=>{const at=new Date(generated-(9-i)*48*3600000).toISOString();return {id:`e${i}`,url:`https://x.com/thsottiaux/status/${100+i}`,evidenceIds:[`e${i}`],kind:'automatic_reset' as const,at,firstKnownAt:at,timePrecision:'exact' as const};});
+ const estimated=buildResetCadenceForecast({observations,generatedAt:now,target:'automatic_reset',inputFingerprint:'isolated-wide-interval'});
+ const cadence={...estimated,windowStart:'2026-10-18T14:21:41.000Z',predictedAt:'2026-10-24T06:42:25.000Z',windowEnd:'2026-11-05T06:42:25.000Z'};
+ assert.equal(cadence.status,'ready');
+ return {events:[],articles:[],publications:[],evidence:[],notices:[],activities:[],sources:[],site:{name:'test',description:'',version:1,autoPublish:false},serverTime:now,forecasts:{status:'ready',ruleVersion:'test',modelVersion:'test',generatedAt:now,cases:[],reference:referenceForecast(),outlook:{status:'monitoring'},watch:currentWatch,cadence,cadenceByKind:{automatic_reset:cadence},cadenceHistory:[cadence],cadenceOutcomes:[]}};
+}
+
+test('普通公开响应不再向新旧客户端提供历史区间，旧首页也不能继续估算10月18日至11月5日',()=>{
+ for(const currentWatch of [{status:'none',checkedAt:now},{status:'unavailable',checkedAt:now},watch()] as ResetWatch[]){
+  const data=wideHistoricalForecast(currentWatch),before=structuredClone(data);
+  assert.equal(nativeCadence.cadenceModel(data.forecasts,now).ready,true,'必须先证明旧消费者会采用输入区间');
+  for(const acceptsObserved of [true,false]){
+   const projected=publicWatchForClient(data,acceptsObserved);
+   for(const key of ['cadence','cadenceByKind','cadenceHistory','cadenceEvaluationByKind','cadenceOutcomes','cadenceHorizonOutcomes'])assert.equal(projected.forecasts?.[key as keyof NonNullable<PublicData['forecasts']>],undefined,key);
+   assert.equal(nativeModel.validateForecastPublicData(projected.forecasts),true,'保留旧客户端所需响应合同');
+   assert.equal(nativeCadence.cadenceModel(projected.forecasts,now).ready,false);
+   assert.equal(nativeCadence.cadenceModel(projected.forecasts,now).rangeLabel,'');
+   assert.deepEqual(projected.forecasts?.outlook,data.forecasts?.outlook);
+   assert.deepEqual(projected.forecasts?.watch,currentWatch);
+   assert.equal(projected.publications,data.publications);assert.equal(projected.notices,data.notices);
+  }
+  assert.deepEqual(data,before,'不改写数据库或固定实验快照');
+ }
+});
+
+test('明确打开历史实验视图时仍可读原始快照，观察来源兼容降级不丢失历史记录',()=>{
+ const data=wideHistoricalForecast(watch()),before=structuredClone(data);
+ const history=publicWatchForClient(data,true,true);
+ assert.equal(history.forecasts?.cadence,data.forecasts?.cadence);
+ assert.equal(history.forecasts?.cadenceHistory,data.forecasts?.cadenceHistory);
+ const observed:PublicData={...data,forecasts:{...data.forecasts!,watch:{status:'active',checkedAt:now,signal:{...watch().signal!,sourceType:'observed',sourceUrl:undefined}}}};
+ const legacyHistory=publicWatchForClient(observed,false,true);
+ assert.equal(legacyHistory.forecasts?.watch?.status,'unavailable');
+ assert.equal(legacyHistory.forecasts?.cadence,observed.forecasts?.cadence);
+ assert.deepEqual(data,before);
 });
 
 

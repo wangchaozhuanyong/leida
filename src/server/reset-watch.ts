@@ -9,7 +9,7 @@ export const RESET_WATCH_TIMEOUT_MS = 8_000;
 export const RESET_WATCH_RESPONSE_BUDGET_MS = 1_500;
 export const RESET_WATCH_FAILURE_BACKOFF_MS = 60_000;
 // Changing the public selection/interpretation must invalidate an unchanged facts cache once.
-const PUBLIC_RESET_PRESENTATION_VERSION='source-driven-public-reset-20261017-2';
+const PUBLIC_RESET_PRESENTATION_VERSION='source-driven-public-reset-20261017-3';
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_RESPONSE_AGE_MS = 15 * 60_000;
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -135,11 +135,21 @@ export function resetWatchVersion(base: string, watch: ResetWatch | undefined, n
 export function withResetWatchData(data: PublicData, watch: ResetWatch): PublicData {
   return data.forecasts ? {...data, forecasts: {...data.forecasts, watch}} : data;
 }
-/** Older native validators require a Tibo URL; never break their entire bootstrap. */
-export function publicWatchForClient(data:PublicData, acceptsObserved:boolean):PublicData {
-  const watch=data.forecasts?.watch;
-  if(acceptsObserved||!watch||!(watch.signal?.sourceType==='observed'||watch.scheduledReset?.sourceType==='observed'))return data;
-  return withResetWatchData(data,{status:'unavailable',checkedAt:watch.checkedAt});
+/** Ordinary readers, including already uploaded clients, must not turn historical
+ * interval experiments into a current prediction. Fixed history stays readable
+ * only through the existing methodology/forecast-record entry points. */
+export function publicWatchForClient(data:PublicData, acceptsObserved:boolean, includeHistoricalForecasts=false):PublicData {
+  let projected=data;
+  const historicalFields=['cadence','cadenceByKind','cadenceEvaluationByKind','cadenceHistory','cadenceOutcomes','cadenceHorizonOutcomes'] as const;
+  if(!includeHistoricalForecasts&&data.forecasts&&historicalFields.some(key=>key in data.forecasts!)){
+    const forecasts={...data.forecasts};
+    for(const key of historicalFields)delete forecasts[key];
+    projected={...data,forecasts};
+  }
+  // Older native validators require a Tibo URL; keep their bootstrap readable.
+  const watch=projected.forecasts?.watch;
+  if(acceptsObserved||!watch||!(watch.signal?.sourceType==='observed'||watch.scheduledReset?.sourceType==='observed'))return projected;
+  return withResetWatchData(projected,{status:'unavailable',checkedAt:watch.checkedAt});
 }
 export function withResetWatchEnvelope(result: PublicReadEnvelope, watch: ResetWatch, now: string): PublicReadEnvelope {
   return {...result, data: withResetWatchData({...result.data, serverTime: now}, watch),
