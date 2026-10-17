@@ -248,6 +248,25 @@ test('真实隔离库：微信身份、一次性授权、任务派发和安全�
       await service.scheduleWechatDeliveries();
       assert.equal((await service.processWechatJob(job)).state, 'unknown');
       assert.equal(sendCount(), before + 1);
+      clock = Math.max(Date.now(),clock+1);
+      await accept(reader.session.sessionToken);
+      const resumedAt = at();
+      clock = Math.max(Date.now(),clock+1);
+      const fixture = await publishedFixture();
+      const pending: Notice = { ...queued.notice, id:`synthetic-pending-${tag}-${++sequence}`, eventId:fixture.event.id, publicationId:fixture.publication.id, semanticKey:`synthetic-pending-fact-${tag}-${sequence}`, createdAt:at() };
+      await insert('notices',pending);
+      clock = Math.max(Date.now(),clock+1);
+      await accept(reader.session.sessionToken);
+      const grant = (await list<WechatGrant>('wechat_grants')).find(item=>item.readerId===reader.reader.id)!;
+      assert.equal(grant.resumedAt,resumedAt,'数据库恢复边界不能随增加次数前移');
+      await service.scheduleWechatDeliveries();
+      const delivery = (await list<WechatDelivery>('wechat_deliveries')).find(item=>item.noticeId===pending.id&&item.readerId===reader.reader.id)!;
+      assert.ok(delivery,'恢复后产生、尚未派发的公告仍应入队');
+      const nextJob = (await one<Job>('jobs',`job_${delivery.id}`))!;ownedJobs.add(nextJob.id);
+      assert.equal((await dispatch(nextJob)).status,'succeeded');
+      assert.equal((await one<WechatDelivery>('wechat_deliveries',delivery.id))?.status,'sent');
+      assert.equal((await one<WechatDelivery>('wechat_deliveries',queued.delivery.id))?.status,'unknown');
+      assert.equal(sendCount(),before+2);
     });
     await t.test('公开和管理员资料只包含公开内容或聚合结果，不包含私有对象', async () => {
       const publicData = await getPublicData(), adminData = await getAdminData();

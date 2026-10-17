@@ -259,8 +259,16 @@ export function createWechatService(dependencies:WechatDependencies={}) {
       // may be accepted to reopen a closed reminder after an explicit choice.
       if(Date.parse(grant.nonceExpiresAt)<=clock())throw new DomainError('订阅请求已失效，请重新操作',409);
       // One fresh accepted callback creates one opportunity, never a requested count.
-      if(parsed.result==='accept')credits.push({id:receipt,acceptedAt:timestamp(),status:'available'});
-      await store.put('wechat_grants',withCredits({...grant,status:parsed.result==='accept'?'available':grant.status,confirmedNonceHash:receipt,acceptedAt:parsed.result==='accept'?timestamp():grant.acceptedAt},credits,parsed.result==='accept'?'available':'rejected'),client);return subscriptionView(value,client);
+      let resumedAt=grant.resumedAt;
+      if(parsed.result==='accept'){
+        const uncertain=credits.some(credit=>credit.status==='unknown');
+        if(grant.status==='unknown'||grant.status==='revoked'&&uncertain)resumedAt=timestamp();
+        // Freeze the existing conservative boundary for pre-upgrade records
+        // before acceptedAt advances with another authorized opportunity.
+        else if(!resumedAt&&uncertain)resumedAt=grant.acceptedAt;
+        credits.push({id:receipt,acceptedAt:timestamp(),status:'available'});
+      }
+      await store.put('wechat_grants',withCredits({...grant,resumedAt,status:parsed.result==='accept'?'available':grant.status,confirmedNonceHash:receipt,acceptedAt:parsed.result==='accept'?timestamp():grant.acceptedAt},credits,parsed.result==='accept'?'available':'rejected'),client);return subscriptionView(value,client);
     });
   }
   async function revokeWechatSubscription(sessionToken:string):Promise<WechatSubscriptionState> {
@@ -286,7 +294,7 @@ export function createWechatService(dependencies:WechatDependencies={}) {
         const credits=creditsOf(grant);
         // Recovery never backfills messages from the pause. Existing uncertain
         // deliveries retain their terminal state and their idempotency keys.
-        const resumedAt=deliveries.some(item=>item.readerId===grant.readerId&&item.appId===grant.appId&&item.templateId===grant.templateId&&item.status==='unknown')?Date.parse(grant.acceptedAt):0;
+        const resumedAt=deliveries.some(item=>item.readerId===grant.readerId&&item.appId===grant.appId&&item.templateId===grant.templateId&&item.status==='unknown')?Date.parse(grant.resumedAt??grant.acceptedAt):0;
         const eligible=notices.filter(notice=>notice.status==='active'&&allowsReminder(value,notice)).sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
         for(const notice of eligible) {
           const credit=credits.find(credit=>credit.status==='available'&&Date.parse(notice.createdAt)>Math.max(Date.parse(credit.acceptedAt),resumedAt));if(!credit)continue;
