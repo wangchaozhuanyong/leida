@@ -4,7 +4,7 @@ import type { ForecastCase, ForecastOutcome, ForecastSnapshot } from '../../lib/
 import type { StoredCadenceForecast, CadenceRuntime } from '../reset-cadence-runtime';
 import { projectPublicHistory } from '../../lib/history';
 import { publicResetOutlook } from '../../lib/reset-outlook';
-import { publicActions } from '../../lib/public-facts';
+import { publicActions, recentCompletedBenefits } from '../../lib/public-facts';
 import { parsePublicRead, decodeCursor, encodePublicCursor, finishPublicVersion } from '../public-read';
 import { projectPublicForecastRecords } from '../forecast';
 import { createPublicCache } from '../public-cache';
@@ -63,6 +63,7 @@ function response(bundle:Bundle,options:PublicReadOptions|{view:'legacy'},timest
     const outlook=publicResetOutlook(facts);
     for(const id of [outlook.active?.publicationId,outlook.latestCompletion?.publicationId,outlook.lastResolved?.publicationId])if(id)selected.add(id);
     const actions=publicActions(facts).sort((a,b)=>Date.parse(b.action.statementAt)-Date.parse(a.action.statementAt));
+    recentCompletedBenefits(facts).forEach(item=>selected.add(item.publication.id));
     for(const kind of ['automatic_reset','banked_reset'] as const){const item=actions.find(item=>item.action.kind===kind&&item.action.stage==='claimed_complete'&&Date.parse(item.action.statementAt)<=Date.parse(timestamp)&&Date.parse(item.publication.publishedAt)<=Date.parse(timestamp));if(item)selected.add(item.publication.id);}
     facts.articles.slice().sort((a,b)=>Date.parse(b.sourcePublishedAt||b.publishedAt)-Date.parse(a.sourcePublishedAt||a.publishedAt)).slice(0,3).forEach(a=>selected.add(a.publicationId));
   }else if(options.view==='calendar')publicActions(facts).forEach(item=>selected.add(item.publication.id));

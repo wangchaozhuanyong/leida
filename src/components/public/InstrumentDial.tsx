@@ -13,8 +13,8 @@ const timeLabel = (at: string) => new Intl.DateTimeFormat('zh-CN', {timeZone: 'A
 /** A Beijing clock face showing an active announcement or a recent public completion. */
 export function InstrumentDial({outlook, serverTime, completion = outlook.latestCompletion, forecasts}: {outlook: ResetOutlook; serverTime: string; completion?: Pick<BenefitAction, 'kind' | 'stage' | 'statementAt'> | null; forecasts?:ForecastPublicData}) {
   const now = usePublicClock(serverTime);
-  const timeline=statusTimelineModel(outlook,now,completion,forecasts),reference=timeline.watching||timeline.estimating;
-  const active = outlook.active, countdown = active ? announcementCountdown(active, now) : undefined;
+  const timeline=statusTimelineModel(outlook,now,completion,forecasts),reference=timeline.sourceCredit||timeline.watching||timeline.estimating;
+  const active = timeline.sourceCredit&&!timeline.watching?{expectedAt:timeline.expectedAt||undefined,kind:timeline.kind,stage:'promised' as const,timeNote:''}:outlook.active, countdown = active ? announcementCountdown(active, now) : undefined;
   const completed = active||reference ? undefined : completionElapsed(completion, now);
   const bankedCompletion = !!completed && completion?.kind === 'banked_reset';
   const longElapsed = (completed?.parts.reduce((length, part) => length + String(part.value).length, 0) ?? 0) > 3;
@@ -29,6 +29,7 @@ export function InstrumentDial({outlook, serverTime, completion = outlook.latest
   const lead = reference?timeline.lead:scheduled ? /^原文近似时间/.test(active?.timeNote ?? '') ? '预计约' : /^原文预计时刻/.test(active?.timeNote ?? '') ? '预计剩余' : '距离预计最晚时间' : completed ? completed.lead : outlook.status === 'cancelled' ? '上轮安排已取消' : '公开动态追踪';
   return <section className={`pub-instrument-dial ${scheduled ? 'is-scheduled' : completed ? 'is-completed' : 'is-waiting'}`} aria-label={scheduled ? `公开预告：${countdown.label}，北京时间${timeLabel(active!.expectedAt!)}` : completed ? `${completed.lead}：${completed.label}` : `重置雷达：${state}`}>
     <h1 className="pub-visually-hidden">重置雷达</h1>
+    <div className="pub-dial-viewport">
     <svg className="pub-dial-face" viewBox="0 0 600 600" aria-hidden="true">
       <defs><radialGradient id="dial-light"><stop stopColor="#242820"/><stop offset="1" stopColor="#0c1214"/></radialGradient><linearGradient id="dial-gold"><stop stopColor="#ffe197"/><stop offset="1" stopColor="#e6ac3c"/></linearGradient></defs>
       <circle cx="300" cy="300" r="283" className="pub-dial-orbit"/><circle cx="300" cy="300" r="271" className="pub-dial-orbit"/>
@@ -49,6 +50,7 @@ export function InstrumentDial({outlook, serverTime, completion = outlook.latest
       <span>{reference?timeline.note:scheduled ? '小时 : 分钟' : completed ? '以公开完成公告为准' : countdown?.status==='expired'?'已过预计时间，待公开确认':active?'有明确安排后，自动更新':forecasts?timeline.note:'暂无下一次明确时间'}</span>
       {reference&&<span className="pub-dial-reference-note">{timeline.detail}</span>}
     </div>
-    <div className="pub-dial-caption"><small>24 小时表盘 · 北京时间</small>{timeline.watching&&<div className="pub-watch-source"><a href={timeline.sourceUrl} target="_blank" rel="noopener noreferrer">查看信号原帖 ↗</a><a href="https://codex-resets.com/" target="_blank" rel="noopener noreferrer">数据来自 Codex Resets ↗</a></div>}</div>
+    </div>
+    <div className="pub-dial-caption"><small>24 小时表盘 · 北京时间</small>{timeline.forecastWindow&&<small>信号发布时预计：{timeline.forecastWindow}</small>}{timeline.observedLabel&&<small>{timeline.observedLabel}</small>}{timeline.chanceLabel&&<small>{timeline.chanceLabel}</small>}{timeline.sourceCredit&&<div className="pub-watch-source">{timeline.sourceUrl&&<a href={timeline.sourceUrl} target="_blank" rel="noopener noreferrer">{timeline.sourceType==='observed'?'查看观察来源 ↗':'查看来源原帖 ↗'}</a>}<a href="https://codex-resets.com/" target="_blank" rel="noopener noreferrer">数据来自 Codex Resets ↗</a></div>}</div>
   </section>;
 }

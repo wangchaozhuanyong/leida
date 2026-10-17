@@ -4,6 +4,9 @@ import {activeResetWatch,validResetWatch,resetWatchRevision,type ResetWatch} fro
 import {createResetWatchReader,parseResetWatchResponse,resetWatchVersion,withResetWatchEnvelope,withResetWatchData,RESET_WATCH_ENDPOINT} from '../src/server/reset-watch';
 import type {PublicData} from '../src/lib/types';
 import {referenceForecast} from '../src/lib/forecast';
+import {createRequire} from 'node:module';
+import {statusTimelineModel} from '../src/components/public/StatusTimeline';
+const native=createRequire(import.meta.url)('../miniprogram/utils/status-timeline.js');
 
 const now = '2026-10-17T04:00:00.000Z';
 function response() {
@@ -12,11 +15,40 @@ function response() {
 const watch=()=>parseResetWatchResponse(response(),now);
 const stub=(fn:(url:RequestInfo|URL,init?:RequestInit)=>Promise<Response>)=>fn as typeof fetch;
 
+test('上游信号概率和预测窗口原样归属上游，不从历史间隔另造日期或概率',()=>{
+ const read=watch(),forecasts={status:'ready' as const,generatedAt:now,ruleVersion:'test',modelVersion:'test',cases:[],reference:referenceForecast(),watch:read};
+ const view=statusTimelineModel({status:'monitoring'},now,null,forecasts);
+ assert.equal(view.forecastWindow,'10小时内');assert.equal(view.chanceLabel,'上游信号概率 73%');assert.equal(view.scheduled,false);
+ assert.deepEqual(native.statusTimelineModel({status:'monitoring'},now,null,forecasts),view);
+ const input=response();input.data.active_watch.reset_chance_percent=null as any;
+ assert.equal(statusTimelineModel({status:'monitoring'},now,null,{...forecasts,watch:parseResetWatchResponse(input,now)}).chanceLabel,'');
+});
+
+test('公开安排优先于模糊信号，支持未知时间；过点只等待确认，不计作完成',()=>{
+ const input=response();
+ input.data.scheduled_reset={id:'scheduled-1',status:'scheduled',reset_type:'banked',announced_at:'2026-10-17T03:00:00Z',scheduled_for:'2026-10-17T05:00:00Z',text:'Banked reset coming within two hours.',source:input.data.active_watch.source} as any;
+ const parsed=parseResetWatchResponse(input,now);
+ assert.equal(parsed.status,'none');assert.equal(parsed.signal,undefined);assert.equal(parsed.scheduledReset?.kind,'banked_reset');
+ const forecasts={status:'ready' as const,generatedAt:now,ruleVersion:'test',modelVersion:'test',cases:[],reference:referenceForecast(),watch:parsed};
+ assert.notEqual(resetWatchVersion('base',parsed,now),resetWatchVersion('base',parsed,'2026-10-17T05:00:00Z'),'预告过点改变公开版本，已有缓存也会重新读取');
+ for(const at of [now,'2026-10-17T05:00:00Z']){
+   const view=statusTimelineModel({status:'monitoring'},at,null,forecasts);
+   assert.deepEqual(native.statusTimelineModel({status:'monitoring'},at,null,forecasts),view);
+   assert.equal(view.completed,false);assert.equal(view.watching,false);assert.equal(view.chanceLabel,'');assert.equal(view.sourceUrl,input.data.active_watch.source.url);
+   assert.equal(view.title,at===now?'01:00':'等待确认');
+ }
+ (input.data.scheduled_reset as any).scheduled_for=null;
+ const unknown=statusTimelineModel({status:'monitoring'},now,null,{...forecasts,watch:parseResetWatchResponse(input,now)});
+ assert.equal(unknown.title,'时间待明确');assert.equal(unknown.scheduled,false);
+ const stale=structuredClone(input);stale.data.latest_reset.announced_at='2026-10-17T03:30:00Z';
+ assert.ok(parseResetWatchResponse(stale,now).scheduledReset,'来源仍标记待执行的预告，不能靠另一条完成消息的时间推断结束');
+});
+
 test('只读信号保留来源与观察期限，第三方概率不成为本站概率',()=>{
  const result=watch();assert.equal(result.status,'active');assert.ok(validResetWatch(result));
  assert.equal(result.signal?.sourceUrl,response().data.active_watch.source.url);
  assert.equal(result.signal?.forecastWindow,'within 10 hours');
- assert.ok(!JSON.stringify(result).includes('73'));assert.ok(!('predictedAt' in result.signal!));
+ assert.equal(result.signal?.chancePercent,73);assert.ok(!('predictedAt' in result.signal!));
  assert.equal(activeResetWatch(result,now)?.text,"Let's break the cycle.");
  const input=response();input.data.active_watch=null as any;
  assert.deepEqual(parseResetWatchResponse(input,now),{status:'none',checkedAt:now});
@@ -28,7 +60,7 @@ test('信号到期、未来检查时间、后续完成或安排都会停止展�
  assert.ok(activeResetWatch(value,now,'2026-10-15T00:00:00.000Z'));
  const expired=response();expired.data.active_watch.expires_at='2026-10-17T04:00:00.000Z';assert.equal(parseResetWatchResponse(expired,now).status,'none');
  const completed=response();completed.data.latest_reset.announced_at='2026-10-17T03:00:00.000Z';assert.equal(parseResetWatchResponse(completed,now).status,'none');
- const scheduled=response();scheduled.data.scheduled_reset={status:'scheduled'} as any;assert.equal(parseResetWatchResponse(scheduled,now).status,'none');
+ const scheduled=response();scheduled.data.scheduled_reset={status:'scheduled'} as any;assert.throws(()=>parseResetWatchResponse(scheduled,now),/scheduled reset/);
 });
 test('接口结构、时效、作者、来源和文本长度不可信时拒绝，不伪装无信号',()=>{
  const variants=[

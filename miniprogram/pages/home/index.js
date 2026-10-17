@@ -26,9 +26,8 @@ Page(createPage((data, query, page, app) => {
   const posterDescription = '选择黑金或水墨，分享当前公开状态';
   return {
     name: data.site.name || '模钥重置雷达',
-    cadenceForecasts: data.forecasts || null, forecastNow: data.serverTime,
     latest: latest ? { title: latest.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', elapsed: m.elapsed(latest.statementAt, data.serverTime), time: m.completionTime(latest.statementAt), eligibility: latestAction.eligibility, path: pathFor(latest) } : null,
-    completions: completed.map(item => ({ kind: item.action.kind, title: item.action.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', label: item.action.kind === 'banked_reset' ? '重置卡发放' : '用量重置', time: m.completionTime(item.action.statementAt), shortTime: completionDate(item.action.statementAt, data.serverTime), path: pathFor({ publicationId: item.publication.id }) })),
+    completions: m.recentCompletedBenefits(data).map(item => ({ id:item.action.id, kind: item.action.kind, title: item.action.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', label: item.action.kind === 'banked_reset' ? '重置卡发放' : '用量重置', time: m.completionTime(item.action.statementAt), shortTime: completionDate(item.action.statementAt, data.serverTime), path: pathFor({ publicationId: item.publication.id }) })),
     evidencePath: pathFor(pending || latest) || '/pages/announcements/index',
     evidenceLabel: pending ? '查看本次公告' : latest ? '查看最近公告' : '浏览历史记录',
     pending: pending ? { label: m.actionLabels[pending.kind], stage: m.stageText(pending, data.serverTime), countdown: countdown.label, timed: countdown.status !== 'unknown', counting: countdown.status === 'upcoming', time: pending.expectedAt ? m.displayTime(pending.expectedAt) : '', timeNote: pending.timeNote || '', path: pathFor(pending) } : null,
@@ -47,7 +46,7 @@ Page(createPage((data, query, page, app) => {
   toggleFreshness() { this.setData({ freshnessOpen: !this.data.freshnessOpen }); },
   openPoster() { if (this.data.connected) wx.navigateTo({ url:'/pages/poster/index' }); },
   syncCountdown() {
-    if (!(this.data.pending && this.data.pending.counting) && !(this.data.timeline && this.data.timeline.completed)) { this.stopCountdown(); return; }
+    if (!(this.data.pending && this.data.pending.counting) && !(this.data.timeline && (this.data.timeline.completed || this.data.timeline.scheduled))) { this.stopCountdown(); return; }
     if (!this._countdownTimer) this._countdownTimer = setInterval(() => this.tickCountdown(), 1000);
   },
   tickCountdown() {
@@ -72,9 +71,6 @@ Page(createPage((data, query, page, app) => {
     const now=Date.parse(state.data.serverTime)+Math.max(0,Date.now()-state.receivedAt);
     const dates=[];
     if (forecasts.watch && forecasts.watch.status==='active' && forecasts.watch.signal) dates.push(forecasts.watch.signal.expiresAt);
-    const snapshots=Object.values(forecasts.cadenceByKind || {});
-    if(forecasts.cadence)snapshots.push(forecasts.cadence);
-    for(const snapshot of snapshots)if(snapshot && snapshot.status==='ready')dates.push(snapshot.validUntil,snapshot.windowEnd);
     const next=dates.map(Date.parse).filter(at=>Number.isFinite(at)&&at>now).sort((a,b)=>a-b)[0];
     if (!next) { this.stopForecastExpiry(); return; }
     if (this._forecastExpiryAt===next && this._forecastExpiryTimer) return;
@@ -88,14 +84,15 @@ Page(createPage((data, query, page, app) => {
     const now=new Date(Date.parse(state.data.serverTime)+Math.max(0,Date.now()-state.receivedAt)).toISOString();
     const outlook=m.resetOutlookModel(state.data),completed=m.latestCompletedBenefits(state.data)[0];
     const timeline=statusTimelineModel(outlook,now,completed?.action||null,state.data.forecasts);
-    const patch={forecastNow:now};
+    const patch={};
     if(JSON.stringify(timeline)!==JSON.stringify(this.data.timeline))patch.timeline=timeline;
-    this.setData(patch);this.syncCountdown();this.syncForecastExpiry();
+    if(Object.keys(patch).length)this.setData(patch);
+    this.syncCountdown();this.syncForecastExpiry();
   },
   stopForecastExpiry() { if(this._forecastExpiryTimer)clearTimeout(this._forecastExpiryTimer);this._forecastExpiryTimer=null;this._forecastExpiryAt=null; },
   copyWatchSource() {
     const url=this.data.timeline && this.data.timeline.sourceUrl;
-    if(typeof url==='string' && /^https:\/\/x\.com\/thsottiaux\/status\/\d{15,20}$/.test(url))wx.setClipboardData({data:url,fail(){wx.showToast({title:'复制失败，请稍后重试',icon:'none'});}});
+    if(typeof url==='string' && url.startsWith('https://') && !!m.safeUrl(url))wx.setClipboardData({data:url,fail(){wx.showToast({title:'复制失败，请稍后重试',icon:'none'});}});
   },
   copyWatchProvider() { wx.setClipboardData({data:'https://codex-resets.com/',fail(){wx.showToast({title:'复制失败，请稍后重试',icon:'none'});}}); },
   openWechatSettings() { wx.switchTab({ url: '/pages/settings/index' }); },

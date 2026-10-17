@@ -3,7 +3,7 @@ const { cadenceModel, cadenceSnapshotId, validateCadenceSnapshot } = require('..
 const horizonRows = (data, id) => (data && data.cadenceHorizonOutcomes || []).filter(row => id ? row.snapshotId === id : Object.values(data.cadenceByKind || {}).some(snapshot=>snapshot.id===row.snapshotId)).map(row => ({ id:row.id, label:row.target==='banked_reset'?'重置卡发放':'用量重置', horizon:row.horizonHours, result:row.result==='occurred'?'已找到对应公开动态':row.result==='not_occurred'?'覆盖已核验，未发现对应动态':'暂不能判断', end:m.displayTime(row.windowEnd), actual:row.actualAt?m.displayTime(row.actualAt):'', note:row.scorable?'已加入可评分记录':'资料不完整或消息晚采，未计入预测成绩' }));
 const validId = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,179}$/.test(value);
 Page({
-  data: { navigationLoading: true, fixed: false, forecast: null, reference: null, outcomes: null, fixedLoading: false, fixedError: '', currentUnavailable: '暂无观察记录。' },
+  data: { navigationLoading: true, fixed: false, forecast: null, reference: null, outcomes: null, fixedLoading: false, fixedError: '', currentUnavailable: '暂无观察记录。', showCadenceStats:false },
   onLoad(params) {
     this._cadenceId = params && params.cadence || '';
     this._snapshotId = this._cadenceId || params && params.snapshot || '';
@@ -82,6 +82,7 @@ Page({
     }
   },
   retryFixed() { void this.loadFixed(); },
+  toggleCadenceStats() { this.setData({showCadenceStats:!this.data.showCadenceStats}); },
   openCadence(event) { const id=event.currentTarget.dataset.id;if(cadenceSnapshotId(id))wx.navigateTo({url:`/pages/methodology/index?cadence=${encodeURIComponent(id)}`}); },
   openReplay() { wx.navigateTo({url:'/pages/replay/index'}); },
   openForecast() { const forecast = this.data.forecast; if (forecast) wx.navigateTo({ url: forecast.path }); },

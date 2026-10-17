@@ -111,6 +111,9 @@ html:has(.public-surface) body { background: #f2f5fb; color: #14263e; }
 .pub-status-timeline .pub-timeline-detail{margin:5px 0 0;font-size:10px;line-height:1.6;color:var(--skin-muted)}
 .pub-dial-readout .pub-dial-reference-note{font-size:12px!important;margin-top:6px;color:var(--skin-muted)}
 .pub-dial-caption .pub-watch-source{justify-content:center;margin-top:3px}
+.public-surface .pub-instrument-dial{aspect-ratio:auto}
+.public-surface .pub-dial-viewport{position:relative;aspect-ratio:1;width:100%}
+.public-surface .pub-dial-caption{position:static;margin-top:8px}
 .public-surface .pub-status-timeline { background: var(--skin-timeline); border-color: var(--skin-border-strong); }
 .public-surface .pub-timeline-head,
 .public-surface .pub-status-timeline .pub-timeline-note { color: var(--skin-timeline-text); }
@@ -285,6 +288,7 @@ html:has(.public-surface) body { background: #f2f5fb; color: #14263e; }
 .public-surface .pub-timeline-head { display: block; }
 .public-surface .pub-timeline-row { margin-top: 5px; }
 .public-surface .pub-timeline-row h1 { font-size: 25px; }
+.public-surface .pub-timeline-row h1.pub-timeline-waiting { font-size: 22px; line-height: 1.4; letter-spacing: -.4px; }
 .public-surface .pub-timeline-row h1 small { display: block; margin: 2px 0 0; line-height: 15px; }
 .public-surface .pub-status-timeline .pub-timeline-timezone { margin: 4px 0 0; color: var(--skin-muted); font-size: 9px; line-height: 14px; letter-spacing: .4px; }
 .public-surface .pub-neural-art { position: relative; flex: 0 0 96px; width: 96px; height: 96px; pointer-events: none; }
@@ -313,28 +317,27 @@ html:has(.public-surface) body { background: #f2f5fb; color: #14263e; }
   .public-surface .pub-page-loading > span { opacity: 1; }
 }
 
-/* Observatory masthead: a static, local image keeps the silver page canvas stable. */
+/* The complete observatory belongs to its own masthead, above the status card. */
 .public-surface .pub-shell { position: relative; isolation: isolate; }
 .public-surface .pub-topbar-identity { justify-content: flex-start; text-align: left; }
 .public-surface .pub-topbar-identity .pub-topbar-heading { align-items: flex-start; }
 .public-surface .pub-topbar .pub-brand { flex-direction: row; text-align: left; gap: 8px; }
 .public-surface .pub-topbar .pub-brand-mark { width: 28px; height: 30px; }
 .public-surface .pub-topbar .pub-brand strong { font-size: 13px; }
-.pub-home-atmosphere { position: absolute; inset: 0 0 auto 176px; height: 410px; z-index: -1; pointer-events: none; overflow: hidden; }
-.pub-home-atmosphere img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 58%; }
-.pub-home-atmosphere::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, #f2f5fb33 0%, #f2f5fb00 45%, #f2f5fb 100%); }
-.public-surface .route-home .pub-home-heading { flex-direction: column; justify-content: center; align-items: center; gap: 0; min-height: 108px; padding: 0; text-align: center; }
-.public-surface .pub-home-heading-copy { width: 100%; }
-.public-surface .pub-home-heading-copy h1 { font-family: "Songti SC", "STSong", "SimSun", serif; font-size: 34px; font-weight: 600; line-height: 1.4; letter-spacing: 1.2px; color: #233c5b; }
-.public-surface .pub-home-heading-copy h1 span { color: var(--skin-accent); }
-.public-surface .pub-home-heading-copy p { display: flex; align-items: center; justify-content: center; gap: 9px; font-size: 12px; line-height: 20px; letter-spacing: 1.2px; margin: 5px 0 0; color: #516985; }
-.pub-home-heading-copy p::before, .pub-home-heading-copy p::after { content: ''; width: 22px; height: 1px; background: linear-gradient(90deg, transparent, #aebed4); }
-.pub-home-heading-copy p::after { transform: rotate(180deg); }
-.public-surface .route-home .pub-freshness { margin: 0; max-width: 100%; }
-.public-surface .route-home .pub-freshness > summary { justify-content: center; min-height: 44px; white-space: normal; }
-.public-surface .route-home .pub-freshness > div { left: 50%; right: auto; transform: translateX(-50%); text-align: left; }
+.public-surface .route-home .pub-home-heading { position: relative; isolation: isolate; flex-direction: column; justify-content: center; align-items: flex-start; gap: 0; min-height: 224px; margin-bottom: 16px; padding: 22px 28px; text-align: left; background: var(--skin-page); z-index: 2; }
+.pub-home-atmosphere { position: absolute; inset: 0 0 0 auto; width: 65%; max-width: 560px; z-index: 0; pointer-events: none; overflow: hidden; }
+.pub-home-atmosphere img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: right center; }
+.pub-home-atmosphere::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, #f2f5fb 0%, #f2f5fb6b 32%, #f2f5fb00 60%), linear-gradient(270deg, #f2f5fb 0%, #f2f5fb 3.5%, #f2f5fb00 10%), linear-gradient(180deg, #f2f5fb 0%, #f2f5fb00 14%, #f2f5fb00 82%, #f2f5fb 100%); }
+.public-surface .pub-home-heading-copy { position: relative; z-index: 1; width: 58%; min-width: 0; }
+.public-surface .pub-home-heading-copy h1 { margin: 0; font-family: "Songti SC", "STSong", "SimSun", serif; font-size: 39px; font-weight: 600; line-height: 1.18; letter-spacing: 1px; color: #233c5b; white-space: normal; }
+.public-surface .pub-home-heading-topic { display: block; white-space: nowrap; }
+.public-surface .pub-home-heading-product { font-family: Georgia, "Times New Roman", serif; letter-spacing: -.8px; margin-right: 6px; }
+.public-surface .pub-home-heading-accent { display: block; margin-top: 3px; color: var(--skin-accent); letter-spacing: 4px; }
+.public-surface .pub-home-heading-copy p { font-size: 12px; line-height: 20px; letter-spacing: .8px; margin: 9px 0 0; color: #516985; white-space: normal; }
+.public-surface .route-home .pub-freshness { position: relative; z-index: 2; margin: 2px 0 0; max-width: 58%; padding: 0; }
+.public-surface .route-home .pub-freshness > summary { justify-content: flex-start; min-height: 44px; white-space: normal; }
+.public-surface .route-home .pub-freshness > div { left: 0; right: auto; transform: none; text-align: left; }
 @media (min-width: 701px) and (max-width: 1180px) {
-  .pub-home-atmosphere { left: 148px; }
   .public-surface .pub-topbar .pub-brand { gap: 6px; }
   .public-surface .pub-topbar .pub-brand-mark { width: 24px; height: 27px; }
   .public-surface .pub-topbar .pub-brand strong { font-size: 11.5px; }
@@ -345,24 +348,28 @@ html:has(.public-surface) body { background: #f2f5fb; color: #14263e; }
   .public-surface .pub-topbar .pub-brand { gap: 9px; }
   .public-surface .pub-topbar .pub-brand-mark { width: 31px; height: 32px; }
   .public-surface .pub-topbar .pub-brand strong { font-size: 16px; }
-  .pub-home-atmosphere { left: 0; top: 60px; height: min(66.6667vw, 400px); }
-  .pub-home-atmosphere img { object-fit: fill; }
-  .pub-home-atmosphere::after { background: linear-gradient(180deg, #f2f5fb00 48%, #f2f5fb 100%); }
-  .public-surface .route-home .pub-home-heading { min-height: 124px; margin-bottom: 12px; }
-  .public-surface .pub-home-heading-copy h1 { font-size: 28px; letter-spacing: .8px; }
-  .public-surface .pub-home-heading-copy p { font-size: 11px; }
+  .public-surface .route-home .pub-home-heading { width: calc(100% + 44px); min-height: 176px; margin: 0 -22px 12px; padding: 15px 22px 5px; }
+  .pub-home-atmosphere { width: 100%; max-width: none; }
+  .public-surface .pub-home-heading-copy h1 { font-size: 30px; letter-spacing: .7px; }
+  .public-surface .pub-home-heading-accent { letter-spacing: 3px; }
+  .public-surface .pub-home-heading-copy p { font-size: 11px; line-height: 18px; margin-top: 7px; letter-spacing: .4px; }
   .public-surface .route-home .pub-freshness > summary { font-size: 10px; }
   .public-surface .pub-topbar-heading { min-width: 0; }
   .public-surface .pub-topbar-title { overflow: hidden; text-overflow: ellipsis; }
 }
 
+@media (max-width: 360px) {
+  .public-surface .route-home .pub-home-heading { width: calc(100% + 34px); margin-left: -17px; margin-right: -17px; padding-left: 17px; padding-right: 17px; }
+}
 @media (max-width: 350px) {
-  .public-surface .pub-home-heading-copy h1 { font-size: 25px; letter-spacing: .3px; }
+  .public-surface .pub-home-heading-copy h1 { font-size: 26px; letter-spacing: .3px; }
   .public-surface .pub-home-heading-copy p { font-size: 10px; letter-spacing: .8px; }
 }
 
 /* A quiet status group, one primary reminder action, and a signal on the page canvas. */
 .public-surface .pub-home-completions-heading { color: var(--skin-muted); }
+.public-surface .pub-home-completions-heading { justify-content: space-between; align-items: center; }
+.public-surface .pub-home-completions-heading>a { display: inline-flex; align-items: center; min-height: 32px; color: var(--skin-accent); font-size: 10px; }
 .public-surface .pub-home-completion > .pub-icon { color: var(--skin-success); }
 .public-surface .pub-home-actions .pub-home-reminder { background: var(--skin-accent); border-color: var(--skin-accent); color: var(--skin-on-accent); box-shadow: none; }
 .public-surface .pub-home-actions .pub-home-reminder:hover { background: var(--skin-accent-hover); border-color: var(--skin-accent-hover); }

@@ -26,7 +26,7 @@ test('原生首页与网页一致地展示独立信号，不标记预告或承�
   const data=forecasts(),outlook={status:'monitoring'} as const;
   const view=statusTimelineModel(outlook,now,undefined,data);
   assert.deepEqual(view,webTimeline(outlook,now,undefined,data));
-  assert.equal(view.title,'发现重置信号');assert.equal(view.note,'观察截至 2026-10-17 13:00');
+  assert.equal(view.title,'发现重置信号');assert.equal(view.note,'观察有效至 2026-10-17 13:00');
   assert.equal(view.currentStage,-1);assert.equal(view.scheduled,false);assert.equal(view.completed,false);
   assert.equal(view.sourceUrl,signal.sourceUrl);assert.match(view.detail,/尚无明确预告/);
 });
@@ -89,7 +89,7 @@ test('前台信号只预约一次到期更新，后台取消；无额外轮询�
   assert.equal(pending.size,1);assert.equal(intervals,0);assert.equal(writes,0);
   const timer=[...pending.values()][0];assert.equal(timer.delay,3600020);
   clock=Date.parse(expiry)+20;pending.clear();timer.callback();
-  assert.equal(writes,1);assert.equal(page.data.timeline.watching,false);assert.equal(page.data.timeline.title,'等待新消息');assert.equal(pending.size,0);
+  assert.equal(writes,1);assert.equal(page.data.timeline.watching,false);assert.equal(page.data.timeline.title,'等待下一次 Reset');assert.equal(pending.size,0);
   clock=Date.parse(now);registration.afterRender.call(page);assert.equal(pending.size,1);
   page._visible=false;registration.hide.call(page);assert.equal(pending.size,0);
 });

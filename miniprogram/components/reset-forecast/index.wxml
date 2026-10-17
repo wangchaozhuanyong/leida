@@ -1,5 +1,5 @@
 <view class="forecast-card">
-  <view class="forecast-heading"><text>{{snapshot ? '固定预测记录' : '下一次重置参考'}}</text><text class="forecast-state">{{view.state}}</text></view>
+  <view class="forecast-heading"><text>{{snapshot ? '固定历史实验记录' : '历史间隔统计'}}</text><text class="forecast-state">{{view.state}}</text></view>
   <view wx:if="{{!snapshot}}" class="forecast-types"><button class="{{target === 'automatic_reset' ? 'selected' : ''}}" data-target="automatic_reset" bindtap="selectTarget" aria-pressed="{{target === 'automatic_reset'}}">用量重置</button><button class="{{target === 'banked_reset' ? 'selected' : ''}}" data-target="banked_reset" bindtap="selectTarget" aria-pressed="{{target === 'banked_reset'}}">重置卡</button></view>
   <view wx:if="{{view.ready && view.rangeLabel}}" class="forecast-range"><text class="forecast-range-label">预计{{view.target === 'banked_reset' ? '发卡' : '重置'}}时间范围</text><view class="forecast-range-value">{{view.rangeLabel}}</view><text class="forecast-range-label">北京时间 · 历史估算</text></view>
   <view wx:if="{{view.ready}}" class="forecast-metrics"><view><text>24小时内</text><view>{{view.p24}}</view></view><view><text>48小时内</text><view>{{view.p48}}</view></view></view>

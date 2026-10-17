@@ -333,8 +333,8 @@ test('云托管使用实际环境和服务标识、只初始化一次，保持�
   assert.deepEqual(await request('/api/v1/version', 'fixture-v1').promise, { unchanged: true });
   assert.deepEqual(init, [{ traceUser: false }]);
   assert.deepEqual(calls[0].config, { env: 'fixture-environment' });
-  assert.deepEqual(calls[0].header, { 'X-WX-SERVICE': 'fixture-public' });
-  assert.deepEqual(calls[1].header, { 'X-WX-SERVICE': 'fixture-public', 'If-None-Match': '"fixture-v1"' });
+  assert.deepEqual(calls[0].header, { 'X-Radar-Watch-Contract':'2', 'X-WX-SERVICE': 'fixture-public' });
+  assert.deepEqual(calls[1].header, { 'X-Radar-Watch-Contract':'2', 'X-WX-SERVICE': 'fixture-public', 'If-None-Match': '"fixture-v1"' });
   assert.equal(calls[0].method, 'GET');
 });
 
@@ -551,7 +551,7 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   // Last uploaded client artifact. Backend-only releases must not relabel the installed client.
-  const buildVersion='1.0.18';
+  const buildVersion='1.0.20';
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);assert.equal(news.data.navigationTitle,'动态 · 共42篇');news.onUnload();
   const records=h.page('announcements');assert.equal(records.data.navigationTitle,'重置公告 · 42个事件');records.onUnload();
@@ -639,7 +639,7 @@ test('十个原生页面用同一公共输入执行真实页面构建，无未�
   for (const name of pages) {
     const page = harness.page(name,{ publicationId:'pub-done', id:'fixture-activity' });
     assert.ok(page.data);
-    if (name === 'home') assert.deepEqual(Array.from(page.data.completions,(item:any)=>item.title).sort(),['公告称已发放重置卡','公告称已重置用量'].sort());
+    if (name === 'home') assert.deepEqual(Array.from(page.data.completions,(item:any)=>item.title).sort(),['公告称已发放重置卡','公告称已重置用量','公告称已重置用量'].sort());
     if (name === 'settings') { assert.equal(page.data.connected,true); assert.equal(page.data.sources,undefined); }
     page.onUnload?.();
   }

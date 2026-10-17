@@ -32,6 +32,20 @@ function fixture(){
 }
 async function fullStorage<T>(fn:()=>Promise<T>){const prior=process.env.RADAR_STORAGE_BACKEND;process.env.RADAR_STORAGE_BACKEND='cloudbase';try{return await fn();}finally{if(prior===undefined)delete process.env.RADAR_STORAGE_BACKEND;else process.env.RADAR_STORAGE_BACKEND=prior;}}
 
+test('云端首页轻量投影保留连续多次同类型完成，不只保留每类最后一条且不增加RPC',async()=>{
+ const f=fixture();
+ const rows=['2026-10-08T03:44:55Z','2026-10-11T04:01:09Z','2026-10-13T05:06:06Z','2026-10-15T06:28:13Z'].map((statementAt,i)=>{
+   const id=`p-${i}`,eventId=`e-${i}`,articleId=`a-${i}`;
+   return {id,eventId,articleId,publishedAt:statementAt,cutoffAt:statementAt,mode:'state_change',reason:'合成回归',event:{id:eventId,publicationId:id,title:'完成公告',version:1,status:'published',updatedAt:statementAt,evidenceIds:[],actions:[{id:`action-${i}`,kind:i===0?'banked_reset':'automatic_reset',stage:'claimed_complete',scope:'public',statementAt,evidenceIds:[],eligibility:'公开'}]},article:{id:articleId,eventId,publicationId:id,title:'完成公告',summary:'',translation:'',category:'reset',version:1,status:'published',evidenceIds:[],publishedAt:statementAt,sourcePublishedAt:statementAt,updatedAt:statementAt,historical:true}};
+ });
+ Object.assign(f.bundle,{publications:rows,events:rows.map(p=>p.event),articles:rows.map(p=>p.article)});
+ const before=structuredClone(f.bundle);
+ const value=await createCloudbasePublicReader(f.rpc,()=>at).read({view:'home'});
+ assert.deepEqual(value.data.publications.map(p=>p.id).sort(),['p-0','p-1','p-2','p-3']);
+ assert.equal(f.calls.filter(call=>call.operation==='radar_cb_public_bundle').length,1);
+ assert.equal(f.calls.length,1,'没有新增历史分页请求或数据库往返');assert.deepEqual(f.bundle,before);
+});
+
 test('有合法摘要签名也不能接受未来cutoff、窗口外发生时间或未来结局',()=>{
  const f=fixture();
  assert.throws(()=>createCadencePublicProjection([{...f.automatic,cutoffAt:when(1)}],[]),/validity/);

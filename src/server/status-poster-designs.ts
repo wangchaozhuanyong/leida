@@ -6,7 +6,7 @@ import type { StatusPosterCode } from './status-poster';
 interface DesignedPoster {
   style: StatusPosterStyle; name: string; title: string; interval: string;
   statementAt: string; generatedAt: string; nextNote: string; nextIsForecast: boolean;
-  sourceLabel: string; brand: string; code?: StatusPosterCode; intervalLabel?: string;
+  sourceLabel: string; brand: string; code?: StatusPosterCode; intervalLabel?: string; statementLabel?:string;
 }
 const backgrounds = new Map<StatusPosterStyle, string>();
 const escape = (value: string) => value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!));
@@ -21,6 +21,7 @@ function wrap(value: string, width: number): string[] {
   const lines: string[] = []; let line = '';
   for (const c of value) { if (widthUnits(line + c) > width) { lines.push(line); line = ''; } line += c; }
   if (line) lines.push(line);
+  if(lines.length>3){lines.length=3;lines[2]=lines[2].slice(0,-1)+'…';}
   return lines;
 }
 
@@ -51,7 +52,7 @@ export function designedStatusPoster(input: DesignedPoster): string {
     ${text(input.title, 540, 311, fit(input.title, 111, 948), ink, 700, 'middle')}
     ${text(input.intervalLabel ?? '距该公告', 540, 610, 52, ink, 400, 'middle')}${interval}
     ${code(890, 1248, 158)}
-    ${text('公告时间', 72, 1495, 34, muted)}
+    ${text(input.statementLabel??'公告时间', 72, 1495, 34, muted)}
     ${text(date.date, 72, 1556, 59, ink, 600)}${text(`${date.time} · 北京时间`, 72, 1612, 35, muted)}
     ${line(543, 1472, 543, 1650)}
     ${nextLines.map((value, i) => text(value, 590, 1526 + i * 47, nextSize, ink, 500)).join('')}
@@ -68,7 +69,7 @@ export function designedStatusPoster(input: DesignedPoster): string {
     ${text(input.title.replace(/^公告称/, ''), 64, 769, fit(input.title.replace(/^公告称/, ''), 157, 948), ink, 700)}
     ${line(64, 831, 1016, 831)}${text(input.intervalLabel ?? '距该公告', 64, 916, 48, ink, 600)}${interval}
     ${line(563, 886, 563, 1349)}
-    ${text('公告时间', 600, 923, 35)}${text(date.date, 600, 1000, 62, ink, 600)}
+    ${text(input.statementLabel??'公告时间', 600, 923, 35)}${text(date.date, 600, 1000, 62, ink, 600)}
     ${text(date.time, 600, 1076, 73, ink, 600)}${text('北京时间', 600, 1126, 32, muted)}
     ${line(600, 1170, 1016, 1170)}
     ${nextLines.map((value, i) => text(value, 600, 1234 + i * 47, nextSize, ink, 600)).join('')}

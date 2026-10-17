@@ -1,3 +1,4 @@
+import {publicWatchForClient} from '@/server/reset-watch';
 import {getPublicData} from '@/server/service';
 import {json,apiError} from '@/server/http';
 import {posterSvg} from '@/server/poster';
@@ -11,6 +12,7 @@ import type {PublicData} from '@/lib/types';
 import {getPublicVersion,publicRevision} from '@/server/public-version';
 import {generateWechatCode,publicWechatAvailability,resolveWechatScene} from '@/server/wechat';
 import {publicActions,publicationWithdrawn} from '@/lib/public-facts';
+import {statusPosterSnapshot} from '@/lib/status-timeline';
 import {publicResetOutlook} from '@/lib/reset-outlook';
 import {getForecastSnapshot,getResetCadenceSnapshot} from '@/server/forecast';
 import {forecastPosterSvg} from '@/server/forecast-poster';
@@ -18,19 +20,19 @@ import {getLightPublicVersion,getPublicRead,parsePublicRead} from '@/server/publ
 import {publicReplayRuns,publicReplayStep} from '@/server/historical-replay';
 import releaseManifest from '../../../../../release-manifest.json';
 export const dynamic='force-dynamic';
-export async function GET(request:Request,{params}:{params:Promise<{path:string[]}>}){try{const {path}=await params;const [kind,id]=path;
+export async function GET(request:Request,{params}:{params:Promise<{path:string[]}>}){try{const {path}=await params;const [kind,id]=path;const acceptsObserved=request.headers.get('X-Radar-Watch-Contract')==='2';
  if(kind==='release'&&path.length===1)return json(releaseManifest);
  if(kind==='replays'&&path.length<=2){const query=new URL(request.url).searchParams;if([...query.keys()].some(key=>key!=='step')||query.getAll('step').length>1||!id&&query.has('step'))throw Object.assign(new Error('回放查询无效'),{status:400});return json(id?await publicReplayStep(id,query.get('step')??undefined):await publicReplayRuns());}
  if(kind==='version'&&new URL(request.url).searchParams.get('light')==='1'){const state=await getLightPublicVersion(),etag=`"${state.version}"`;if(request.headers.get('if-none-match')===etag)return new Response(null,{status:304,headers:{ETag:etag,'Cache-Control':'no-store'}});return Response.json({data:state},{headers:{ETag:etag,'Cache-Control':'no-store'}});}
- if((kind==='bootstrap'||kind==='status')&&new URL(request.url).searchParams.has('view'))return Response.json(await getPublicRead(parsePublicRead(new URL(request.url).searchParams)),{headers:{'Cache-Control':'no-store'}});
+ if((kind==='bootstrap'||kind==='status')&&new URL(request.url).searchParams.has('view')){const result=await getPublicRead(parsePublicRead(new URL(request.url).searchParams));return Response.json({...result,data:publicWatchForClient(result.data,acceptsObserved)},{headers:{'Cache-Control':'no-store'}});}
  if(kind==='version'){const version=await getPublicVersion();const etag=`"${version}"`;if(request.headers.get('if-none-match')===etag)return new Response(null,{status:304,headers:{ETag:etag,'Cache-Control':'no-store'}});return Response.json({data:{version}},{headers:{ETag:etag,'Cache-Control':'no-store'}});}
  if(kind==='wechat'&&id==='availability'&&path.length===2)return json(await publicWechatAvailability());
  if(kind==='wechat'&&id==='code'&&path.length===3){const code=await generateWechatCode(path[2]);return json({...code,image:undefined,imageBase64:code.image.toString('base64')});}
  if(kind==='wechat'&&id==='scene'&&path.length===3)return json(await resolveWechatScene(path[2]));
  if(kind==='forecasts'&&id==='cadence'&&path.length===3){const snapshot=await getResetCadenceSnapshot(path[2]);if(!snapshot)throw Object.assign(new Error('未找到固定重置时间预测'),{status:404});return json(snapshot);}
- if(kind==='forecasts'&&path.length<=2){if(!id)return json((await getPublicData()).forecasts);const snapshot=await getForecastSnapshot(id);if(!snapshot)throw Object.assign(new Error('未找到固定预测快照'),{status:404});return json(snapshot);}
+ if(kind==='forecasts'&&path.length<=2){if(!id)return json(publicWatchForClient(await getPublicData(),acceptsObserved).forecasts);const snapshot=await getForecastSnapshot(id);if(!snapshot)throw Object.assign(new Error('未找到固定预测快照'),{status:404});return json(snapshot);}
  const data=await getPublicData();
- if(kind==='status'||kind==='bootstrap')return Response.json({data,version:publicRevision(data)},{headers:{'Cache-Control':'no-store'}});
+ if(kind==='status'||kind==='bootstrap')return Response.json({data:publicWatchForClient(data,acceptsObserved),version:publicRevision(data)},{headers:{'Cache-Control':'no-store'}});
  if(kind==='health')return json({database:'ready',serverTime:data.serverTime,sources:data.sources});
  if(kind==='forecast-posters'&&id&&path.length===2){const snapshot=await getForecastSnapshot(id);if(!snapshot)throw Object.assign(new Error('未找到固定预测快照'),{status:404});const shareUrl=`${requestShareOrigin(request)}/methodology?snapshot=${encodeURIComponent(snapshot.id)}`;return new Response(forecastPosterSvg(snapshot,data.site.name,shareUrl),{headers:{'Content-Type':'image/svg+xml; charset=utf-8','Content-Disposition':'attachment; filename="moyao-radar-forecast.svg"','Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; sandbox"}});}
  if(kind==='activity-posters'&&id){const selected=resolveActivityPoster(data,parseActivityShare(id,new URL(request.url).searchParams));const shareUrl=activityPublicationUrl(requestShareOrigin(request),selected.manifest);return new Response(activityPosterSvg(selected,data.site.name,shareUrl),{headers:{'Content-Type':'image/svg+xml; charset=utf-8','Content-Disposition':'attachment; filename="moyao-radar-activity-day.svg"','Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; sandbox"}})}
@@ -42,7 +44,8 @@ export async function GET(request:Request,{params}:{params:Promise<{path:string[
   // Validate the round before any provider call. A later state never retargets an open poster.
   currentStatusPosterSvg(data,at,round,options.style);
   let code:StatusPosterCode|undefined;
-  if(options.includeCode&&round!=='waiting'){try{code=await generateWechatCode(round);}catch(error){if(!(error instanceof WechatServiceError))throw error;}}
+  const codePublication=round.startsWith('state:')?statusPosterSnapshot(data,at).publicationId:round==='waiting'?'':round;
+  if(options.includeCode&&codePublication){try{code=await generateWechatCode(codePublication);}catch(error){if(!(error instanceof WechatServiceError))throw error;}}
   return new Response(currentStatusPosterSvg(data,at,round,options.style,code),{headers:{'Content-Type':'image/svg+xml; charset=utf-8','Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox",'X-Poster-Code':code?'included':options.includeCode?'unavailable':'omitted'}});
  }
  if(kind==='posters'&&id){
