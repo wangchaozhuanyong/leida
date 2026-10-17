@@ -1,7 +1,7 @@
 import type { ActionKind, ActionStage, BenefitAction } from '../lib/types';
 
 /** Change only when fact interpretation changes, so unchanged inputs are evaluated once. */
-export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261017-1';
+export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261017-2';
 export interface BenefitClaim {
   kind: ActionKind; stage: ActionStage; eligibility: string; scope: BenefitAction['scope'];
   quote: string; expectedAt?: string; timeNote?: string;
@@ -96,7 +96,7 @@ export function benefitStage(text: string): ActionStage | undefined {
   // This exact all-paid announcement describes already reset limits. A bare
   // "Enjoy a reset" or any future landing sentence still has no completion.
   if(allPaidResetGreeting.test(s))return 'claimed_complete';
-  if (/\b(?:have|has)\s+(?:now\s+|already\s+|just\s+|been\s+|fully\s+)*(?:reset|added|credited|granted|given|loaded|deposited|landed|propagated|completed|processed)\b|^(?:added|credited|granted|loaded)\b|\b(?:confirmed|fully|all)\s+(?:landed|propagated|credited|loaded|completed)\b|\b(?:reset|resets)\s+(?:have\s+)?(?:all\s+)?(?:landed|propagated|completed)\b|已(?:经|全部)?(?:为.{0,80})?(?:确认|重置|发放|到账|落地|传播|加载|存入|添加)|全部.{0,20}(?:落地|传播)/i.test(s)) return 'claimed_complete';
+  if (/\b(?:have|has|(?:i|we|they)'ve)\s+(?:now\s+|already\s+|just\s+|been\s+|fully\s+)*(?:reset|added|credited|granted|given|loaded|deposited|landed|propagated|completed|processed)\b|^(?:added|credited|granted|loaded)\b|\b(?:confirmed|fully|all)\s+(?:landed|propagated|credited|loaded|completed)\b|\b(?:reset|resets)\s+(?:have\s+)?(?:all\s+)?(?:landed|propagated|completed)\b|已(?:经|全部)?(?:为.{0,80})?(?:确认|重置|发放|到账|落地|传播|加载|存入|添加)|全部.{0,20}(?:落地|传播)/i.test(s)) return 'claimed_complete';
   if (/^all\s+reset\s+for\s+everyone[.!]?$/i.test(s)) return 'claimed_complete';
   // The original's short announcement omits "will", but a global action with
   // a prospective deadline still states a promise, not a completed reset.
@@ -271,7 +271,9 @@ export function extractBenefitClaims(text: string, publishedAt: string): Benefit
     const next = clauses[index + 1];
     // A product reset followed by a direct invitation to burn usage identifies
     // a usage action. It does not assert paid plans or expand to every plan.
-    const productUsageAnnouncement = /^your\s+(?:Codex\s+and\s+ChatGPT\s+Work|ChatGPT\s+Work\s+and\s+Codex)\s+reset\s+will\s+land\b/i.test(normalize(clause)) &&
+    const declaredProductReset=/\b(?:i|we)(?:\s+have|'ve)\s+(?:now\s+|just\s+|already\s+)*reset\s+(?:usage|rate)\s+limits\s+(?:for|across)\s+(?:Codex\s+and\s+ChatGPT\s+Work|ChatGPT\s+Work\s+and\s+Codex)[.!]?$/i.test(normalize(clause)) &&
+      !excluded.test(clause)&&!targeted.test(clause)&&!isQuestionOrHypothesis(clause);
+    const productUsageAnnouncement = declaredProductReset || /^your\s+(?:Codex\s+and\s+ChatGPT\s+Work|ChatGPT\s+Work\s+and\s+Codex)\s+reset\s+will\s+land\b/i.test(normalize(clause)) &&
       !!next && /^I\s+challenge\s+you\s+to\s+burn\s+(?:as\s+much\s+)?usage\b/i.test(normalize(next)) &&
       !excluded.test(text) && !targeted.test(text) &&
       !/\b(?:banked|not|never|unconfirmed|rumou?rs?|maybe|only|except|excluding|selected|specific|affected|if|unless|created|registered|upgraded|region|country)\b|\b(?:my|your|our)\s+accounts?\b/i.test(text);

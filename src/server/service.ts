@@ -186,6 +186,13 @@ async function withdrawalNotice(publication:Publication, kind:'event'|'article',
   const title=`${kind==='event'?'事件':'文章'}已撤回：${publication.article.title}`;
   await insert('notices',{id:`notice_${semanticKey}`,semanticKey,eventId:publication.eventId,publicationId:publication.id,title,summary:`撤回原因：${reason}`,categories:['correction'],status:'active',createdAt:now()} satisfies Notice,c);
 }
+/** Internal maintenance only. Uses normal fact validation and never emits historical alerts. */
+export async function publishHistoricalDraft(content:DraftContent,c:Client,reason:string):Promise<Publication> {
+  const evidence=await list<Evidence>('evidence',c),cited=evidence.filter(row=>content.evidenceIds.includes(row.id));
+  if(cited.length!==new Set(content.evidenceIds).size||!isHistoricalContent(cited,now())||!cited.every(row=>Number.isFinite(Date.parse(row.publishedAt))&&Date.parse(row.publishedAt)<=Date.now()))throw new DomainError('历史补录证据范围不符');
+  return publish(content,c,{actor:'authorized-history-backfill',reason,suppressNotice:true});
+}
+
 export async function createEvidence(input: Omit<Evidence,'id'|'hash'>,actor?:string):Promise<{evidence:Evidence;created:boolean;candidate?:Candidate}> {
   return transaction(async c=> {
     await lockTransaction(c,'evidence:'+input.sourceId+':'+input.messageId);
