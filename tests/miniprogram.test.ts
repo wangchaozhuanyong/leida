@@ -551,7 +551,7 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   // Bundled client source version. Backend-only releases must not relabel an installed client.
-  const buildVersion='1.0.26';
+  const buildVersion='1.0.30';
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);assert.equal(news.data.navigationTitle,'动态 · 共42篇');news.onUnload();
   const records=h.page('announcements');assert.equal(records.data.navigationTitle,'重置记录');records.onUnload();
@@ -650,7 +650,7 @@ test('四个主入口使用switchTab，公告详情保留版本参数，非法�
   const harness=nativeHarness(),page=harness.page('home');
   for(const path of ['/pages/news/index','/pages/announcements/index','/pages/settings/index','/pages/detail/index?publicationId=pub-done','javascript:alert(1)'])page.navigate({currentTarget:{dataset:{path}}});
   assert.deepEqual(harness.ui.navigations,['tab:/pages/news/index','tab:/pages/announcements/index','tab:/pages/settings/index','/pages/detail/index?publicationId=pub-done']);
-  const detail=harness.page('detail',{publicationId:'pub-done'});detail.toggleSection({currentTarget:{dataset:{section:'recordOpen'}}});assert.equal(detail.data.recordOpen,true);
+  const detail=harness.page('detail',{publicationId:'pub-done'});detail.toggleSection({currentTarget:{dataset:{section:'evidenceOpen'}}});assert.equal(detail.data.evidenceOpen,true);
   detail.toggleSection({currentTarget:{dataset:{section:'detail'}}});assert.equal(detail.data.detail.title,fixture().publications[0].article.title);
   page.onUnload();detail.onUnload();assert.equal(harness.subscriptions,0);
 });

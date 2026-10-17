@@ -8,11 +8,12 @@ function readerToken(request: Request): string {
   return token;
 }
 const missing = () => { throw Object.assign(new Error('未找到微信操作。'), { status: 404 }); };
+const subscriptionView = (request:Request) => ({includeLastResult:request.headers.get('X-Radar-Subscription-View')!=='summary'});
 export async function GET(request: Request, context: { params: Promise<{ path: string[] }> }) {
   try {
     const { path } = await context.params;
     if (path.join('/') !== 'subscription') return missing();
-    return json(await wechatSubscriptionState(readerToken(request)));
+    return json(await wechatSubscriptionState(readerToken(request),subscriptionView(request)));
   } catch (error) { return apiError(error); }
 }
 export async function POST(request: Request, context: { params: Promise<{ path: string[] }> }) {
@@ -23,7 +24,7 @@ export async function POST(request: Request, context: { params: Promise<{ path: 
         const input = await body(request);
         return json(await wechatLogin(input?.code));
       }
-      case 'subscription/challenge': return json(await wechatSubscriptionChallenge(readerToken(request)));
+      case 'subscription/challenge': return json(await wechatSubscriptionChallenge(readerToken(request),subscriptionView(request)));
       case 'subscription/confirm': return json(await confirmWechatSubscription(readerToken(request), await body(request)));
       case 'subscription/preferences': return json(await saveWechatReminderPreferences(readerToken(request), await body(request)));
       default: return missing();

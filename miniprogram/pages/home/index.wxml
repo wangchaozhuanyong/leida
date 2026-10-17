@@ -1,8 +1,9 @@
 <page-meta root-background-color="#f2f5fb" page-style="background-color:#f2f5fb" />
 <navigation-header title="模钥重置雷达" brand="{{true}}" />
+<view class="refresh-track {{refreshing ? 'is-active' : ''}}" aria-label="{{refreshing ? '正在更新' : ''}}"><view/></view>
 <view class="page home-page">
   <view class="home-heading">
-    <image class="home-atmosphere" src="/assets/neural/codex-reset-hero.jpg" mode="aspectFit" aria-hidden="true" />
+    <image class="home-atmosphere" src="/assets/neural/codex-reset-hero.jpg" mode="aspectFill" aria-hidden="true" />
     <view class="home-atmosphere-fade" aria-hidden="true" />
     <view class="home-heading-copy"><view class="home-heading-title"><view class="home-heading-topic"><text class="home-heading-product">Codex</text><text>重置</text></view><view class="home-heading-accent">一目了然</view></view><view class="home-heading-subtitle">不要错过每一次重置。</view></view><view class="freshness-summary" bindtap="toggleFreshness" role="button" aria-label="公开资料状态" aria-expanded="{{freshnessOpen}}"><view class="health-dot {{sourceDelayed || error ? 'delayed' : ''}}"></view><text>{{error ? connected ? '更新暂时中断' : '暂时无法连接' : connected ? sourceStatusLabel : loading ? '加载中' : '等待连接公开资料'}}</text><text class="info-symbol">ⓘ</text></view>
   </view>
@@ -16,9 +17,8 @@
       <view class="timeline-main">
         <view class="timeline-copy">
           <view class="timeline-head">{{timeline.lead}}</view>
-          <view class="timeline-row"><view class="timeline-title {{timeline.title === '等待下一次 Reset' ? 'timeline-waiting' : ''}}">{{timeline.title}}<text wx:if="{{timeline.scheduled}}" class="timeline-unit">小时 : 分钟</text></view></view>
-          <view class="timeline-note">{{timeline.note}}</view><view wx:if="{{timeline.forecastWindow}}" class="timeline-detail">信号发布时预计：{{timeline.forecastWindow}}</view><view wx:if="{{timeline.observedLabel}}" class="timeline-detail">{{timeline.observedLabel}}</view><view wx:if="{{timeline.chanceLabel}}" class="timeline-detail">{{timeline.chanceLabel}}</view>
-          <view wx:if="{{timeline.scheduled || timeline.watching}}" class="timeline-timezone">北京时间</view>
+          <view class="timeline-row"><view class="timeline-title {{timeline.title === '等待下一次 Reset' ? 'timeline-waiting' : ''}}"><block wx:if="{{timeline.scheduled && timeline.countdownParts.length}}"><text wx:for="{{timeline.countdownParts}}" wx:key="unit" class="duration-part">{{item.value}}<text class="duration-unit">{{item.unit}}</text></text></block><block wx:else>{{timeline.title}}</block></view></view>
+          <view class="timeline-date"><view class="timeline-note">{{timeline.note}}</view><text wx:if="{{timeline.scheduled || timeline.overdue || timeline.watching}}" class="timeline-timezone">北京时间</text></view><view wx:if="{{timeline.forecastWindow}}" class="timeline-detail">信号发布时预计：{{timeline.forecastWindow}}</view><view wx:if="{{timeline.observedLabel}}" class="timeline-detail">{{timeline.observedLabel}}</view><view wx:if="{{timeline.chanceLabel}}" class="timeline-detail">{{timeline.chanceLabel}}</view>
           <view wx:if="{{timeline.detail}}" class="timeline-detail">{{timeline.detail}}</view>
         </view>
         <neural-orb class="timeline-orb" aria-hidden="true" />
@@ -32,10 +32,10 @@
     </view>
     <button class="share-entry" disabled="{{!connected}}" bindtap="openPoster" hover-class="share-entry-pressed" aria-label="生成分享海报，分享重置动态，黑金或水墨两款可选">
       <view class="share-entry-posters" aria-hidden="true"><image class="share-entry-poster precision" src="/assets/posters/precision.jpg" mode="aspectFill"/><image class="share-entry-poster editorial" src="/assets/posters/editorial.jpg" mode="aspectFill"/></view>
-      <view class="share-entry-copy"><view class="share-entry-title">分享重置动态</view><view class="share-entry-description">黑金 / 水墨 · 两款固定海报</view></view>
-      <signal-arrow class="share-entry-signal" aria-hidden="true" />
+      <view class="share-entry-copy"><view class="share-entry-title">分享重置动态</view><view class="share-entry-description">黑金 / 水墨 · 两款海报</view><view class="feature-action"><text>生成分享海报</text><signal-arrow class="feature-arrow" aria-hidden="true" /></view></view>
+
     </button>
-    <view wx:if="{{activity}}" class="activity-entry" data-path="{{activity.path}}" bindtap="navigate" role="button"><image src="/assets/neural/calendar-blue.png" class="action-icon" aria-hidden="true"/><view class="grow"><view class="activity-title">{{activity.title}}</view><view class="small muted">{{activity.phase}} · 已收录{{activity.entries}}项进展</view></view><text class="activity-link">查看进展 →</text></view>
+    <view wx:if="{{activity}}" class="activity-entry" data-path="{{activity.path}}" bindtap="navigate" role="button"><image src="/assets/neural/calendar-blue.png" class="action-icon" aria-hidden="true"/><view class="grow"><view class="activity-title">{{activity.title}}</view><view class="small muted">{{activity.phase}} · 已收录{{activity.entries}}项进展</view><view class="feature-action">查看挑战进展 →</view></view></view>
     <view class="row section"><view class="heading">最近动态</view><button class="text-button" data-path="/pages/news/index" bindtap="navigate">全部动态 →</button></view>
     <publication-card wx:for="{{recent}}" wx:key="id" item="{{item}}" />
     <view wx:if="{{!recent.length}}" class="card empty">暂无公开公告。</view>

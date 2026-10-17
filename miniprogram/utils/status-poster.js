@@ -15,7 +15,7 @@ function statusPosterInput(data){
   const publicationId=model.publicationId||(model.completed?latest?.publication.id??'':'');
   const minutes=model.completed?Math.max(0,Math.floor((Date.parse(now)-Date.parse(model.statementAt))/60000)):0;
   const value=model.completed?(minutes<1?'刚刚':String(minutes<60?minutes:minutes<1440?Math.floor(minutes/60):Math.floor(minutes/1440))):model.watching?'观察中':model.title;
-  const unit=model.scheduled?'小时 : 分钟':model.completed&&minutes>=1?(minutes<60?'分钟':minutes<1440?'小时':'天'):'';
+  const unit=model.completed&&minutes>=1?(minutes<60?'分钟':minutes<1440?'小时':'天'):'';
   const date=dateTime(model.statementAt),generated=dateTime(now);
   return {name:data.site.name||'模钥重置雷达',round:statusTimelineRevision(model),publicationId,generatedAt:now,
     title:model.scheduled?(model.kind==='banked_reset'?'重置卡发放预告':'用量重置预告'):model.completed?(model.kind==='banked_reset'?'公告称已发放重置卡':'公告称已重置用量'):model.title,

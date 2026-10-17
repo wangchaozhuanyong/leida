@@ -191,7 +191,7 @@ function publicationCard(data, publication) {
   const withdrawn = publicationWithdrawn(data, publication);
   const kinds = [...new Set(actions.map(action => actionLabels[action.kind]))].join('＋');
   return {
-    id: publication.id, path: sharePath(publication), title: publication.article.title, summary: publicArticleSummary(publication.article), reviewStatus: publication.article.reviewStatus || '', reviewReasons: (publication.article.reviewReasons || []).join(''),
+    id: publication.id, path: sharePath(publication), title: publication.article.title, summary: publicArticleSummary(publication.article), reviewStatus: publication.article.reviewStatus || '', reviewReasons: (publication.article.reviewReasons || []).join('').replace('活动简写已收录；套餐资格和具体发放安排仍需后续声明核对。', '适用套餐和具体发放时间尚未明确，请以发布方后续公告为准。'),
     time: displayTime(publicationSourceTime(publication)), historical: isHistoricalArticle(publication.article, data.evidence),
     label: withdrawn ? '已撤回' : isNewsOnly(publication) ? '来源消息' : kinds || (publication.article.category === 'activity' ? '活动动态' : '产品更新'),
     note: withdrawn ? '已撤回，不能作为当前发放依据' : isNewsOnly(publication) ? '仅新闻收录，不改变发放状态' : '公开公告',
@@ -220,6 +220,7 @@ function noticeModel(data, preferences, read) {
 function publicArticleSummary(article) {
   if (article.contentOrigin !== 'template' || article.manualFields?.includes('summary')) return article.summary;
   return article.summary
+    .replace(/^已保存公开来源消息。活动简写已收录；套餐资格和具体发放安排仍需后续声明核对。此条不计入已重置、已发卡或预测准确率；请查看原文依据。$/, '发布方提及后续活动，具体安排仍待明确。')
     .replace('已保存发布说明；完整中文改动会在智能服务可用后自动补充。', '更新细节请查看官方发布说明。')
     .replace(/^公开归档收录(?:产品动态|消息)：[“「]([\s\S]*?)[”」]。此条仅作(?:产品)?消息记录，完整细节请查看原文。$/, '$1')
     .replace(/^根据(?:公开归档保存的原帖|公开原文)，/, '')
@@ -253,10 +254,10 @@ function resolveDetail(data, query) {
     seenSources.add(key); return true;
   });
   return {
-    missing: false, publicationId: publication.id, title: publication.article.title, ...publicArticleContent(publication.article), reviewStatus: publication.article.reviewStatus || '', reviewReasons: (publication.article.reviewReasons || []).join(''),
+    missing: false, publicationId: publication.id, title: publication.article.title, ...publicArticleContent(publication.article), reviewStatus: publication.article.reviewStatus || '', reviewReasons: (publication.article.reviewReasons || []).join('').replace('活动简写已收录；套餐资格和具体发放安排仍需后续声明核对。', '适用套餐和具体发放时间尚未明确，请以发布方后续公告为准。'),
     time: displayTime(articleSourceTime(publication.article)),
     historical: isHistoricalArticle(publication.article, data.evidence), newsOnly, withdrawn, merged, isOld,
-    version: newsOnly ? publication.article.version : publication.event.version, cutoff: displayTime(publication.cutoffAt), publishedAt: displayTime(publication.publishedAt), reason: publication.reason || '公开资料核验发布',
+    version: newsOnly ? publication.article.version : publication.event.version, cutoff: displayTime(publication.cutoffAt), publishedAt: displayTime(publication.publishedAt),
     canShare: !withdrawn && !merged, mergePath: targetPublication ? sharePath(targetPublication) : '', latestPath: !merged && isOld && current ? sharePath(current) : '',
     actions: newsOnly ? [] : publication.event.actions.map(action => ({ id: action.id, label: actionLabels[action.kind], stage: stageText(action, isOld || merged ? publication.cutoffAt : data.serverTime), eligibility: action.eligibility, scope: { public: '普发', targeted: '定向', private: '私人' }[action.scope], expectedAt: action.expectedAt ? displayTime(action.expectedAt) : action.timeNote || '尚未明确时间', quote: action.evidenceQuote || '' })),
     evidence: evidence.map(item => ({ id: item.id, label: { official: '官方原文', archive: '第三方收录', manual: '补充来源' }[item.provenance], text: item.text, origin: item.textOrigin === 'archive_excerpt' ? '仅收录原文片段' : item.textOrigin === 'structured' ? '来源摘要' : '', complete: item.contextComplete, time: displayTime(item.publishedAt), url: safeUrl(item.url) || '' }))

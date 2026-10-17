@@ -33,7 +33,7 @@ test('发卡与普通重置交错，以及同类不同轮次完成，都不能�
     assert.ok(activeResetSchedule(watch,now));
     addCompletion(value);
     const view=currentStatusModel(value);
-    assert.equal(view.title,'01:00');assert.equal(view.kind,'banked_reset');assert.equal(view.completed,false);
+    assert.equal(view.title,'1小时0分钟');assert.equal(view.kind,'banked_reset');assert.equal(view.completed,false);
     assert.deepEqual(native.statusTimelineModel(nativeModel.resetOutlookModel(value),now,null,value.forecasts),view);
     assert.equal(currentStatusModel({...value,serverTime:'2026-10-17T05:00:00Z'}).title,'等待确认');
   }
@@ -41,7 +41,7 @@ test('发卡与普通重置交错，以及同类不同轮次完成，都不能�
 test('较新的明确预告接替旧安排；检查时钟和倒计时不改变同一轮海报版本',()=>{
   const value=data(schedule()),outlook={status:'scheduled' as const,active:{actionId:'old-action',eventId:'old-event',publicationId:'old-pub',kind:'automatic_reset' as const,stage:'promised' as const,statementAt:'2026-10-17T02:00:00Z',expectedAt:'2026-10-17T06:00:00Z'}};
   const view=statusTimelineModel(outlook,now,null,value.forecasts);
-  assert.equal(view.kind,'banked_reset');assert.equal(view.title,'01:00');
+  assert.equal(view.kind,'banked_reset');assert.equal(view.title,'1小时0分钟');
   assert.equal(statusTimelineRevision(view),statusTimelineRevision(statusTimelineModel(outlook,'2026-10-17T04:30:00Z',null,value.forecasts)));
 });
 test('九小时前的窗口明确归属信号发布时间，不重新变成从现在起未来十小时',()=>{
@@ -122,7 +122,7 @@ test('桌面表盘与手机状态共用信号发布时间表达，无链接观�
   const html=renderToStaticMarkup(createElement(InstrumentDial,{outlook:{status:'monitoring'},serverTime:now,forecasts:value.forecasts}));
   assert.match(html,/信号发布时预计：10小时内/);assert.match(html,/信号时间 2026-10-17 03:00/);assert.match(html,/数据来自 Codex Resets/);assert.doesNotMatch(html,/未来10小时|href=""/);
   const scheduled=data(schedule());const chart=renderToStaticMarkup(createElement(InstrumentDial,{outlook:{status:'monitoring'},serverTime:now,forecasts:scheduled.forecasts}));
-  assert.match(chart,/is-scheduled/);assert.match(chart,/01:00/);
+  assert.match(chart,/is-scheduled/);assert.match(chart,/1小时0分钟/);
 });
 test('接受协议允许的微秒和时区日期，并规范成旧客户端也可读取的UTC毫秒',()=>{
   const input=response();input.meta.generated_at='2026-10-17T12:00:00.000000+08:00';input.data.active_watch.observed_at='2026-10-17T03:00:00.000000+08:00';input.data.active_watch.expires_at='2026-10-17T13:00:00.000000+08:00';
@@ -137,14 +137,14 @@ test('即使类型和时间相同，新的上游预告ID也使上一轮海报失
   assert.equal(nativePoster.statusPosterAvailable(nativePoster.statusPosterInput(original),changed),false);
 });
 
-test('预告海报圈内标签保留安全宽度，单位独立显示，预计时刻不拆成单个数字',()=>{
+test('预告海报圈内标签保留安全宽度，单位随数字显示，预计时刻不拆成单个数字',()=>{
   const value=data(schedule()),snapshot=statusPosterSnapshot(value),mini=nativePoster.statusPosterInput(value);
   assert.match(snapshot.nextNote,/\n13:00$/);
   const measure=(text:string,size:number)=>Array.from(text).reduce((n,c)=>n+(/[a-z0-9 :]/i.test(c)?.56:1)*size,0);
   for(const style of ['precision','editorial'] as const){
-    const svg=currentStatusPosterSvg(value,now,snapshot.round,style);assert.match(svg,/>13:00<\/text>/);assert.match(svg,/>小时 : 分钟<\/text>/);
+    const svg=currentStatusPosterSvg(value,now,snapshot.round,style);assert.match(svg,/>13:00<\/text>/);assert.ok(svg.includes(snapshot.value));assert.equal(snapshot.unit,'');
     const layout=nativePoster.createStatusPosterLayout(mini,measure,style);
     assert.ok(layout.commands.some((c:any)=>c.value==='13:00'));
-    if(style==='precision'){const label=layout.commands.find((c:any)=>c.value===mini.label);assert.ok(measure(label.value,label.size)<=390.01);const unit=layout.commands.find((c:any)=>c.value==='小时 : 分钟');assert.ok(unit.y>label.y);}
+    if(style==='precision'){const label=layout.commands.find((c:any)=>c.value===mini.label);assert.ok(measure(label.value,label.size)<=390.01);const duration=layout.commands.find((c:any)=>c.value===mini.value);assert.ok(measure(duration.value,duration.size)<=730.01);}
   }
 });

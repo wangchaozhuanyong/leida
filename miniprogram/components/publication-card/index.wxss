@@ -1,3 +1,5 @@
 .publication-footer{margin-top:12px;gap:8px}.publication-footer .text-button{flex:none;font-size:12px}.publication-summary{font-size:14px;line-height:1.8}
 
 .announcement-title,.publication-summary{display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}.announcement-title{-webkit-line-clamp:2}.publication-summary{-webkit-line-clamp:3}
+
+.publication-card{padding:20px;border-radius:18px}.publication-card .announcement-title{margin:14px 0 10px;font-size:18px;line-height:1.5}.publication-summary{margin:0;color:#63748c}.publication-context{margin-top:16px;padding:12px 14px;border-radius:10px;background:#f1f5fc;color:#63748c;font-size:12px;line-height:1.8}.context-label{display:block;font-weight:600;color:#8a6b34;margin-bottom:4px}.publication-footer{margin-top:16px;gap:12px}.publication-footer .text-button{min-height:44px;white-space:nowrap}.publication-footer .grow{font-size:10px;line-height:1.6}

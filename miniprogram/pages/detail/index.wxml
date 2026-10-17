@@ -24,10 +24,12 @@
       <view wx:for="{{detail.evidence}}" wx:key="id" class="card"><view class="row wrap"><text class="badge">{{item.label}}</text><text class="small muted">{{item.time}}</text></view><view wx:if="{{item.origin}}" class="small muted lead">{{item.origin}}</view><view wx:if="{{!item.complete}}" class="small muted lead">内容不完整，请结合原始链接查看。</view>
         <text class="source-text quote" style="display:block" user-select="{{true}}">{{item.text}}</text><button wx:if="{{item.url}}" class="secondary full" style="margin-top:14px" data-url="{{item.url}}" bindtap="copySource">复制原文链接</button>
       </view><view wx:if="{{!detail.evidence.length}}" class="card muted">暂未提供可展示的原文。</view>
-      </block><view class="card"><button class="disclosure-heading" data-section="recordOpen" bindtap="toggleSection" aria-expanded="{{recordOpen}}"><text>记录信息</text><text class="disclosure-symbol">{{recordOpen ? '−' : '+'}}</text></button><view wx:if="{{recordOpen}}"><view class="fact record-row"><view class="muted">资料截止</view><view>{{detail.cutoff}}</view></view><view class="fact record-row"><view class="muted">本站发布</view><view>{{detail.publishedAt}}</view></view><view class="fact record-row"><view class="muted">版本说明</view><view>{{detail.reason}}</view></view></view></view>
+      </block>
       <view wx:if="{{detail.canShare}}" class="detail-share">
-        <view class="share-heading">分享这条公告</view>
-        <view class="share-description">选一款长图，把这条公告分享给朋友。</view>
+        <view class="share-header">
+          <view class="share-heading">分享这条公告</view>
+          <view class="share-subtitle">把这条公告分享给朋友</view>
+        </view>
         <view class="announcement-themes" role="group" aria-label="公告长图样式">
           <button class="announcement-theme {{posterTheme === 'precision' ? 'is-selected' : ''}}" data-theme="precision" bindtap="selectPosterTheme" disabled="{{posterBusy || posterSaving}}" aria-pressed="{{posterTheme === 'precision'}}" aria-label="黑金长图{{posterTheme === 'precision' ? '，已选中' : ''}}">
             <view class="theme-swatch theme-swatch-dark" aria-hidden="true"><view class="swatch-rule"/><view class="swatch-title"/><view class="swatch-line"/><view class="swatch-line short"/></view>

@@ -61,13 +61,23 @@ test('不同数值、资格限定及更长正文保留阅读全文，不做模�
 });
 
 test('来源折叠保留原文、真实出处与片段提示，隐藏内部辅助字段', () => {
-  const html = renderArticle(fixture());
-  assert.match(html, /<summary>查看来源<\/summary>/);
-  assert.match(html, /第三方收录/);
-  assert.match(html, /Original text\./);
-  assert.match(html, /href="https:\/\/example.com\/original"/);
-  assert.match(html, /只收录了部分原文/);
-  assert.doesNotMatch(html, /辅助归档|内部收录标题|内部辅助摘要|本站采集|附加标题|附加摘要|官方原文/);
+  const data = fixture();
+  data.publications[0].reason = '规则核验通过，自动发布';
+  const before = JSON.stringify(data);
+  for (const html of [renderArticle(data), renderEvent(data)]) {
+    assert.match(html, /<summary>查看来源<\/summary>/);
+    assert.match(html, /第三方收录/);
+    assert.match(html, /Original text\./);
+    assert.match(html, /href="https:\/\/example.com\/original"/);
+    assert.match(html, /只收录了部分原文/);
+    assert.doesNotMatch(html, /辅助归档|内部收录标题|内部辅助摘要|本站采集|附加标题|附加摘要|官方原文|记录信息|版本说明|规则核验通过|自动发布/);
+  }
+  const native = createRequire(import.meta.url)('../miniprogram/utils/model.js');
+  const detail = native.resolveDetail(data, { publicationId: 'p' });
+  assert.equal('reason' in detail, false);
+  assert.equal(detail.evidence[0].text, evidence.text);
+  assert.equal(detail.evidence[0].url, evidence.url);
+  assert.equal(JSON.stringify(data), before);
 });
 
 test('相同正文同时间来源去重并优先官方，内容不同的来源保留', () => {

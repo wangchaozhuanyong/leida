@@ -64,15 +64,7 @@
 .home-atmosphere{position:absolute;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
 .home-atmosphere-fade{position:absolute;top:0;left:0;width:100%;height:100%;z-index:0;background:linear-gradient(90deg,#f2f5fb 0%,#f2f5fb6b 32%,#f2f5fb00 60%),linear-gradient(270deg,#f2f5fb 0%,#f2f5fb 3.5%,#f2f5fb00 10%),linear-gradient(180deg,#f2f5fb 0%,#f2f5fb00 14%,#f2f5fb00 82%,#f2f5fb 100%);pointer-events:none}
 .home-page>.home-heading,.home-page>.freshness-detail,.home-page>status-panel,.home-page>.warning,.home-page>.status-timeline,.home-page>.timeline-time-note,.home-page>.instrument-actions,.home-page>.completion-records,.home-page>.share-entry,.home-page>.previous-records,.home-page>.activity-entry,.home-page>.section,.home-page>publication-card,.home-page>.card,.home-page>.foot{position:relative;z-index:1}
-.home-heading{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:0;width:calc(100% + 40px);min-height:176px;margin:-8px -20px 12px;padding:15px 20px 5px;text-align:left;background:#f2f5fb}
-.home-heading-copy{position:relative;z-index:1;flex:none;width:58%;min-width:0}
-.home-heading .home-heading-title{font-family:"Songti SC","STSong","SimSun",serif;font-size:30px;font-weight:600;line-height:1.18;letter-spacing:.7px;color:#233c5b}
-.home-heading-topic{white-space:nowrap}
-.home-heading-product{font-family:Georgia,"Times New Roman",serif;letter-spacing:-.8px;margin-right:6px}
-.home-heading-accent{margin-top:3px;letter-spacing:3px;color:#2458ce}
-.home-heading .home-heading-subtitle{font-size:11px;line-height:18px;letter-spacing:.4px;margin-top:7px;color:#516985}
-.home-heading .freshness-summary{position:relative;z-index:1;justify-content:flex-start;min-height:44px;max-width:58%;font-size:10px;line-height:16px;color:#4d607b}
-@media(max-width:350px){.home-heading .home-heading-title{font-size:26px;letter-spacing:.3px}.home-heading .home-heading-subtitle{font-size:10px}}
+
 
 /* Keep status, factual records and their actions in one stable reading group. */
 .home-page>.status-card{position:relative;z-index:1;border:1px solid #ccd9ed;border-radius:17px;background:linear-gradient(130deg,#ffffffed,#f6f9fff2);overflow:hidden;box-shadow:0 8px 24px #264f8b06}
@@ -114,3 +106,18 @@
 .is-watching .timeline-title,.is-estimating .timeline-title{font-size:23px;color:#2458ce}
 .is-estimating .timeline-note{font-variant-numeric:tabular-nums}
 @media(max-width:350px){.is-watching .timeline-title,.is-estimating .timeline-title{font-size:21px}}
+
+/* Centred artwork with live, accessible typography. */
+.home-heading{display:flex;flex-direction:column;gap:0;position:relative;background:#f2f5fb;width:calc(100% + 40px);height:300px;min-height:0;margin:0 -20px 12px;padding:12px 20px 0;box-sizing:border-box;align-items:center;justify-content:flex-start;text-align:center}
+.home-atmosphere{inset:0;width:100%;height:100%}.home-atmosphere-fade{background:linear-gradient(180deg,#f2f5fb66,transparent 18%,transparent 82%,#f2f5fb)}
+.home-heading-copy{position:relative;z-index:1;flex:none;min-width:0;width:100%}.home-heading-title{font-family:"Songti SC","STSong","SimSun",serif;font-weight:600;font-size:34px;line-height:1.15;letter-spacing:2px;color:#153356}.home-heading-product{font-family:Georgia,"Times New Roman",serif;font-style:italic;font-weight:500;letter-spacing:-1.5px;margin-right:10px}.home-heading-accent{color:#2458ce;display:flex;align-items:center;justify-content:center;gap:18px;font-size:26px;letter-spacing:5px;margin-top:4px}.home-heading-accent::before,.home-heading-accent::after{content:'';width:26px;height:1px;background:#9eb8ee}.home-heading-subtitle{color:#516985;line-height:18px;font-size:11px;letter-spacing:1px;margin-top:7px}
+.home-heading .freshness-summary{position:absolute;bottom:0;z-index:1;color:#4d607b;font-size:10px;line-height:16px;max-width:100%;min-height:44px;margin:0;justify-content:center;align-self:center}
+.is-scheduled .timeline-main{position:relative}.is-scheduled .timeline-copy{width:100%}.is-scheduled .timeline-orb{position:absolute;right:0;top:-8px;width:44px;height:44px}
+.is-scheduled .timeline-title{font-size:36px;line-height:1.25;margin-top:16px;color:#2458ce;letter-spacing:-1px}.duration-part{white-space:nowrap}.duration-unit{font-size:15px;font-weight:500;margin:0 5px 0 3px;color:#536d91;letter-spacing:0}
+.timeline-date{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:12px}.timeline-date .timeline-note{font-size:12px;margin:0;line-height:1.7}.timeline-date .timeline-timezone{font-size:10px;margin:0;white-space:nowrap;color:#8493a9}.timeline-detail{font-size:11px;line-height:1.7;margin-top:8px;color:#73839a}
+.home-page .share-entry,.home-page .activity-entry{position:relative;display:flex;align-items:center;gap:16px;width:100%;min-height:154px;box-sizing:border-box;margin:14px 0 0;padding:20px;border:1px solid #e0e8f4;border-radius:20px;background:#ffffffeb;box-shadow:0 6px 24px #2d54800a;text-align:left;line-height:normal}
+.home-page .share-entry::before,.home-page .share-entry::after{display:none}.share-entry-copy{order:0;flex:1}.home-page .share-entry-posters{order:1;width:86px;height:100px;margin-right:4px}.home-page .share-entry-poster{width:58px;height:88px;box-shadow:0 6px 13px #27426122}.home-page .share-entry-poster.editorial{left:30px}.home-page .share-entry-poster.precision{top:9px}
+.home-page .share-entry-title,.home-page .activity-title{font-size:17px;line-height:1.5;font-weight:650;color:#20344f}.home-page .share-entry-description,.home-page .activity-entry .small{font-size:11px;line-height:1.7;margin-top:6px;color:#73839a}.feature-action{display:block;font-size:12px;line-height:24px;color:#2458ce;margin-top:14px;font-weight:500}.activity-entry .action-icon{order:1;width:65px;height:65px;padding:12px;box-sizing:border-box;border-radius:18px;background:#edf4ff;transform:rotate(6deg);flex:none}
+@media(max-width:350px){.home-heading{height:278px}.home-heading-title{font-size:30px}.home-heading-accent{font-size:24px}.is-scheduled .timeline-title{font-size:32px}.duration-unit{font-size:14px}.home-page .share-entry,.home-page .activity-entry{padding:16px;gap:12px}.home-page .share-entry-posters{width:68px;transform:scale(.85);transform-origin:right center}.home-page .share-entry-title,.home-page .activity-title{font-size:16px}}
+
+.share-entry .feature-action{display:flex;align-items:center;gap:4px}.feature-arrow{width:24px;height:24px;display:block}

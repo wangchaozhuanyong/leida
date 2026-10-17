@@ -149,6 +149,17 @@ test('云托管读者请求也只向明确私有接口发送bearer，公共码�
   await createWechatTransport(wx,cloud)('/api/wechat/subscription',{sessionToken:'fixture-reader-session'}).promise;
   await createTransport(wx,cloud)(`/api/v1/wechat/scene/${scene}`).promise;
   assert.equal(calls[0].header.Authorization,'Bearer fixture-reader-session');assert.equal(calls[1].header.Authorization,undefined);
+  assert.equal(calls[0].header['X-Radar-Subscription-View'],'summary');assert.equal(calls[1].header['X-Radar-Subscription-View'],undefined);
+});
+
+test('次数读取和预备请求采用摘要，确认、关闭和登录沿用原合同',async()=>{
+  const h=mock({sessionMs:600000,challengeMs:300000});await h.reader.loadForPage();
+  await h.reader.authorize({userInitiated:true});await h.reader.revoke({userInitiated:true});
+  for(const request of h.requests){
+    const summary=request.url.endsWith('/subscription')&&request.method==='GET'||request.url.endsWith('/challenge');
+    assert.equal(request.header['X-Radar-Subscription-View'],summary?'summary':undefined);
+  }
+  assert.equal(h.reader.getState().remainingCount,0);assert.equal(h.subscribe,1);
 });
 
 test('页面声明真实canvas、主动授权和隐私入口，场景解析不按事件猜最新',()=>{
@@ -274,6 +285,42 @@ test('已有次数直接展示；短时间切回提醒页复用准备，不重�
     assert.equal(h.requests.length,before);assert.equal(h.login,1);assert.equal(h.subscribe,0);
     assert.equal(page.data.wechat.canRevoke,true);
   } finally {page.onUnload();}
+});
+
+test('慢速首次读取不伪造零次数；次数到达立即展示，不等待后续预备请求',async()=>{
+  const h=mock({state:'available',sessionMs:600000,challengeMs:300000}),request=h.wx.request;
+  const held:Options[]=[];
+  h.wx.request=(options:Options)=>{
+    if(options.url.endsWith('/subscription')||options.url.endsWith('/challenge')){held.push(options);return{abort(){}};}
+    return request(options);
+  };
+  const page=pageHarness(h.reader).page('settings');
+  try{
+    await flush();assert.equal(held.length,1);assert.equal(page.data.wechat.safe,null);assert.equal(page.data.wechat.remainingCount,null);
+    request(held.shift()!);await flush();
+    assert.equal(held.length,1);assert.match(held[0].url,/challenge$/);
+    assert.equal(page.data.wechat.remainingCount,1);assert.equal(page.data.wechat.busy,true);
+    page.onHide();page.onShow();
+    assert.equal(page.data.wechat.remainingCount,1,'切回时同步显示已确认次数');
+    await flush();assert.equal(held.length,1,'预备未结束时不重复请求');
+    request(held.shift()!);await flush();assert.equal(page.data.wechat.ready,true);assert.equal(h.subscribe,0);
+  }finally{held.splice(0).forEach(request);await flush();page.onUnload();}
+});
+
+test('超过缓存时间切回仍立即保留次数，慢速核对返回后更新实际已消耗次数',async()=>{
+  const h=mock({state:'available',sessionMs:900000,challengeMs:300000}),page=pageHarness(h.reader).page('settings');
+  const request=h.wx.request;let held:Options|undefined;
+  try{
+    await flush();page.onHide();h.advance(300001);h.changeState('consumed');
+    h.wx.request=(options:Options)=>{
+      if(options.url.endsWith('/subscription')){held=options;return{abort(){}};}
+      return request(options);
+    };
+    page.onShow();assert.equal(page.data.wechat.remainingCount,1);
+    await flush();assert.ok(held);assert.equal(page.data.wechat.remainingCount,1);
+    request(held);held=undefined;await flush();
+    assert.equal(page.data.wechat.remainingCount,0);assert.equal(h.login,1);assert.equal(h.subscribe,0);
+  }finally{if(held)request(held);await flush();page.onUnload();}
 });
 
 test('准备到期前续期，状态同步复用仍有效nonce，不把预备算作提醒次数',async()=>{
