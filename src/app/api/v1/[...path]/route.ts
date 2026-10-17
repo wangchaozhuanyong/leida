@@ -1,4 +1,5 @@
-import {publicWatchForClient} from '@/server/reset-watch';
+import {after} from 'next/server';
+import {getResetWatch,publicWatchForClient} from '@/server/reset-watch';
 import {getPublicData} from '@/server/service';
 import {json,apiError} from '@/server/http';
 import {posterSvg} from '@/server/poster';
@@ -20,8 +21,9 @@ import {getLightPublicVersion,getPublicRead,parsePublicRead} from '@/server/publ
 import {publicReplayRuns,publicReplayStep} from '@/server/historical-replay';
 import releaseManifest from '../../../../../release-manifest.json';
 export const dynamic='force-dynamic';
-export async function GET(request:Request,{params}:{params:Promise<{path:string[]}>}){try{const {path}=await params;const [kind,id]=path;const acceptsObserved=request.headers.get('X-Radar-Watch-Contract')==='2';
+export async function GET(request:Request,{params}:{params:Promise<{path:string[]}>}){let keepWatchAlive=false;try{const {path}=await params;const [kind,id]=path;const acceptsObserved=request.headers.get('X-Radar-Watch-Contract')==='2';
  if(kind==='release'&&path.length===1)return json(releaseManifest);
+ keepWatchAlive=true;
  if(kind==='replays'&&path.length<=2){const query=new URL(request.url).searchParams;if([...query.keys()].some(key=>key!=='step')||query.getAll('step').length>1||!id&&query.has('step'))throw Object.assign(new Error('回放查询无效'),{status:400});return json(id?await publicReplayStep(id,query.get('step')??undefined):await publicReplayRuns());}
  if(kind==='version'&&new URL(request.url).searchParams.get('light')==='1'){const state=await getLightPublicVersion(),etag=`"${state.version}"`;if(request.headers.get('if-none-match')===etag)return new Response(null,{status:304,headers:{ETag:etag,'Cache-Control':'no-store'}});return Response.json({data:state},{headers:{ETag:etag,'Cache-Control':'no-store'}});}
  if((kind==='bootstrap'||kind==='status')&&new URL(request.url).searchParams.has('view')){const result=await getPublicRead(parsePublicRead(new URL(request.url).searchParams));return Response.json({...result,data:publicWatchForClient(result.data,acceptsObserved)},{headers:{'Cache-Control':'no-store'}});}
@@ -75,4 +77,4 @@ export async function GET(request:Request,{params}:{params:Promise<{path:string[
  const key=keys[kind as keyof typeof keys];if(!key)throw Object.assign(new Error('未找到页面'),{status:404});
  const list=data[key] as PublicData[typeof key];if(id){const item=list.find(item=>item.id===id);if(!item)throw Object.assign(new Error('未找到公开记录'),{status:404});return json(item)}
  const url=new URL(request.url),limit=Math.max(1,Math.min(100,Number(url.searchParams.get('limit'))||20)),cursor=url.searchParams.get('cursor');const start=cursor?list.findIndex(item=>item.id===cursor)+1:0;if(cursor&&start===0)throw Object.assign(new Error('分页位置已失效，请刷新'),{status:400});const rows=list.slice(start,start+limit);return Response.json({data:rows,nextCursor:start+limit<list.length?rows.at(-1)?.id:null,serverTime:data.serverTime},{headers:{'Cache-Control':'no-store'}});
- }catch(e){return apiError(e)}}
+ }catch(e){return apiError(e)}finally{if(keepWatchAlive&&getResetWatch.refreshing()){const refresh=getResetWatch.settle();after(()=>refresh);}}}

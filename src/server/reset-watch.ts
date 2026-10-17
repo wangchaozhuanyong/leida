@@ -5,6 +5,9 @@ import {activeResetWatch, resetWatchRevision, resetWatchTime, validResetWatch, t
 
 export const RESET_WATCH_ENDPOINT = 'https://codex-resets.com/api/v1/status';
 export const RESET_WATCH_CACHE_MS = 5 * 60_000;
+export const RESET_WATCH_TIMEOUT_MS = 8_000;
+export const RESET_WATCH_RESPONSE_BUDGET_MS = 1_500;
+export const RESET_WATCH_FAILURE_BACKOFF_MS = 60_000;
 // Changing the public selection/interpretation must invalidate an unchanged facts cache once.
 const PUBLIC_RESET_PRESENTATION_VERSION='source-driven-public-reset-20261017-2';
 const MAX_BODY_BYTES = 64 * 1024;
@@ -60,14 +63,17 @@ export function parseResetWatchResponse(value: unknown, checkedAt: string): Rese
   return result;
 }
 
-interface ReaderOptions { fetcher?: typeof fetch; now?: () => number; ttlMs?: number; timeoutMs?: number; onFailure?:(code:FailureCode)=>void; }
-export function createResetWatchReader({fetcher = fetch, now = Date.now, ttlMs = RESET_WATCH_CACHE_MS, timeoutMs = 1500, onFailure = code => console.warn('RESET_WATCH_UNAVAILABLE', code)}: ReaderOptions = {}) {
+interface FailureDetails {phase:'headers'|'body'|'parse';elapsedMs:number;}
+interface ReaderOptions { fetcher?: typeof fetch; now?: () => number; ttlMs?: number; timeoutMs?: number; responseBudgetMs?: number; failureBackoffMs?: number; onFailure?:(code:FailureCode,details:FailureDetails)=>void; }
+export function createResetWatchReader({fetcher = fetch, now = Date.now, ttlMs = RESET_WATCH_CACHE_MS, timeoutMs = RESET_WATCH_TIMEOUT_MS, responseBudgetMs = RESET_WATCH_RESPONSE_BUDGET_MS, failureBackoffMs = RESET_WATCH_FAILURE_BACKOFF_MS, onFailure = (code,details) => console.warn('RESET_WATCH_UNAVAILABLE', code, details.phase, details.elapsedMs)}: ReaderOptions = {}) {
   let cached: ResetWatch | undefined, validUntil = 0, pending: Promise<ResetWatch> | undefined;
-  return async function read(): Promise<ResetWatch> {
+  async function read(): Promise<ResetWatch> {
     const current = now();
     if (!pending && (!cached || current >= validUntil)) {
       pending = (async () => {
         const controller = new AbortController();
+        const startedAt = Date.now();
+        let phase:FailureDetails['phase']='headers';
         let timer: ReturnType<typeof setTimeout> | undefined;
         const deadline = new Promise<never>((_, reject) => { timer = setTimeout(() => {controller.abort(); reject(new WatchReadError('TIMEOUT','Reset watch timeout'));}, timeoutMs); });
         try {
@@ -78,6 +84,7 @@ export function createResetWatchReader({fetcher = fetch, now = Date.now, ttlMs =
             const length = Number(response.headers.get('content-length'));
             if (Number.isFinite(length) && length > MAX_BODY_BYTES) throw new WatchReadError('BODY_TOO_LARGE','Reset watch response too large');
             if (!response.body) throw new WatchReadError('BODY_EMPTY','Missing reset watch response');
+            phase='body';
             const reader = response.body.getReader();
             const chunks: Uint8Array[] = []; let size = 0;
             try {
@@ -88,24 +95,38 @@ export function createResetWatchReader({fetcher = fetch, now = Date.now, ttlMs =
                 chunks.push(part.value);
               }
             } finally { void reader.cancel().catch(() => {}); }
+            phase='parse';
             let value:unknown;try {value=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch {throw new WatchReadError('JSON_INVALID','Invalid reset watch JSON');}
             return parseResetWatchResponse(value, new Date(now()).toISOString());
           })()]);
           cached = result;
+          validUntil = now() + ttlMs;
         } catch(error) {
-          onFailure(safeResetWatchFailure(error));
+          onFailure(safeResetWatchFailure(error),{phase,elapsedMs:Math.max(0,Date.now()-startedAt)});
           cached = {status: 'unavailable', checkedAt: new Date(now()).toISOString()};
+          validUntil = now() + failureBackoffMs;
         } finally {
           controller.abort(); if (timer) clearTimeout(timer);
-          validUntil = now() + ttlMs; pending = undefined;
+          pending = undefined;
         }
         return cached!;
       })();
     }
-    const result = pending ? await pending : cached!;
+    // A slow source must not hold the public page for its entire network deadline.
+    // The caller keeps this shared refresh alive with Next after(); a budget expiry
+    // is provisional and never poisons the five-minute success cache.
+    let budgetTimer: ReturnType<typeof setTimeout> | undefined;
+    const result = pending ? await Promise.race([pending, new Promise<ResetWatch>(resolve => {
+      budgetTimer = setTimeout(() => resolve(cached ?? {status:'unavailable', checkedAt:new Date(now()).toISOString()}), responseBudgetMs);
+    })]).finally(() => {if(budgetTimer)clearTimeout(budgetTimer);}) : cached!;
     // Time alone can expire a cached signal, without extending its original deadline.
     return result.status === 'active' && !activeResetWatch(result, new Date(now()).toISOString()) ? {status: 'none', checkedAt: result.checkedAt} : result;
-  };
+  }
+  return Object.assign(read, {
+    refreshing: () => pending !== undefined,
+    // Only await work already started by an ordinary read; never add a polling loop.
+    settle: async (): Promise<void> => {await pending;},
+  });
 }
 export const getResetWatch = createResetWatchReader();
 export function resetWatchVersion(base: string, watch: ResetWatch | undefined, now: string): string {
