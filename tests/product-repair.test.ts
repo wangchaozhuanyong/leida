@@ -36,3 +36,17 @@ test('网页真实小程序码只在主动请求后加载，同一版本复用�
   await loadEntryCode('repair-entry',signal,fetcher);assert.equal(calls,1);
   for(const data of [{publicationId:'wrong',contentType:'image/png',imageBase64:'AAAA'},{publicationId:'bad-entry',contentType:'image/svg+xml',imageBase64:'AAAA'}])await assert.rejects(loadEntryCode('bad-entry',signal,async()=>Response.json({data})),/暂不可用/);
 });
+
+
+test('空站内信也显示扫码入口；点击后解析真实公开版本，撤回或空首页不请求伪造小程序码',async()=>{
+  const html=renderToStaticMarkup(createElement(WechatEntryGuide,{codeAvailable:true}));assert.match(html,/显示小程序码/);
+  const calls:string[]=[],signal=new AbortController().signal;
+  const publication={id:'resolved-inbox-entry',eventId:'entry-event',articleId:'entry-article',event:{status:'published'},article:{status:'published'}};
+  const home={publications:[{...publication,id:'withdrawn-entry',article:{status:'withdrawn'}},publication],events:[{id:'entry-event',status:'published'}],articles:[{id:'entry-article',status:'published'}]};
+  const fetcher:typeof fetch=async(input,options)=>{const path=String(input);calls.push(path);assert.equal(options?.signal,signal);return Response.json({data:path.includes('bootstrap')?home:{publicationId:publication.id,contentType:'image/png',imageBase64:'iVBORw0KGgo='}});};
+  assert.match(await loadEntryCode(undefined,signal,fetcher),/^data:image\/png;base64,/);
+  assert.deepEqual(calls,['/api/v1/bootstrap?view=home','/api/v1/wechat/code/resolved-inbox-entry']);
+  for(const data of [{...home,publications:[]},{...home,events:[{id:'entry-event',status:'withdrawn'}]},{}]){
+    let attempts=0;await assert.rejects(loadEntryCode(undefined,signal,async()=>{attempts++;return Response.json({data});}),/小程序码/);assert.equal(attempts,1);
+  }
+});

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { CandidateAutomation, DraftContent, Evidence, BenefitAction } from '../lib/types';
-import { evidenceBenefitClaims, hasCompleteContext, hasStandaloneContext, isTruncatedText, isCampaignResetShorthand, isVerifiedCampaignCalendar, originalConflict } from './source-context';
+import { evidenceBenefitClaims, hasCompleteContext, hasStandaloneContext, isTruncatedText, isCampaignResetShorthand, isVerifiedCampaignCalendar, originalConflict, campaignMembership } from './source-context';
 import { AUTOMATIC_RULES_VERSION, benefitStage, eligibilityKey } from './benefit-rules';
 export { AUTOMATIC_RULES_VERSION } from './benefit-rules';
 
@@ -26,12 +26,14 @@ export function classifyBlockers(reasons:string[],evidence:Evidence[]):Candidate
 export function buildAutomaticTemplate(evidence:Evidence[]):DraftContent|undefined {
   const primary=evidence[0];
   if(!primary||primary.provenance==='manual')return;
+  const membership=campaignMembership(primary,evidence);
   // Keep complete supporting statements; older unrelated ancestors remain saved
   // for lineage but must not become required publication citations.
   if(hasCompleteContext(primary,evidence))evidence=evidence.filter(item=>hasCompleteContext(item,evidence)||isVerifiedCampaignCalendar(item,evidence));
   const base:DraftContent={title:'',summary:'',translation:'',category:'product',actions:[],evidenceIds:evidence.map(item=>item.id),publicationMode:'news_only',contentOrigin:'template'};
   const attachment=primary.metadata?.activity;
   if(attachment&&primary.metadata?.activityDay){base.activityId=attachment.id;base.activityDay=primary.metadata.activityDay;base.category='activity';}
+  else if(membership){Object.assign(base,membership);base.category='activity';}
   if(primary.sourceId==='official-status'){
     const labels:Record<string,string>={investigating:'正在调查',identified:'已定位问题',monitoring:'正在监测恢复',resolved:'事件已解决',postmortem:'发布事故分析'};
     const status=labels[primary.metadata?.status??''];

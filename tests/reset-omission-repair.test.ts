@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import type {Evidence} from '../src/lib/types';
-import {gatherEvidenceContext,evidenceBenefitClaims,hasCompleteContext,processingObstacles} from '../src/server/source-context';
+import {campaignMembership,gatherEvidenceContext,evidenceBenefitClaims,hasCompleteContext,processingObstacles} from '../src/server/source-context';
 import {buildAutomaticTemplate} from '../src/server/automatic-content';
 import {validateDraft} from '../src/server/domain';
 import {actionIdentityEvidence} from '../src/server/worker';
@@ -16,6 +16,8 @@ test('Oct15 explicit chain inherits the verified campaign, calculates its own tw
  assert.equal(buildAutomaticTemplate(context(root.messageId))?.reviewStatus,'pending');
  const promise=buildAutomaticTemplate(context(deadline.messageId))!;
  const completion=buildAutomaticTemplate(context(done.messageId))!;
+ assert.equal(promise.activityId,'challenge-28');assert.equal(promise.activityDay,10);
+ assert.equal(completion.activityId,'challenge-28');assert.equal(completion.activityDay,10);
  assert.equal(promise.actions[0]?.expectedAt,'2026-10-15T06:56:07.000Z');
  assert.equal(completion.actions[0]?.stage,'claimed_complete');
  assert.equal(completion.actions[0]?.statementAt,'2026-10-15T06:28:13.000Z');
@@ -56,10 +58,10 @@ test('campaign needs original rule, verified day-one calendar, same author and m
  const root=find('2110595484180214059');
  const rule=find('2106845241357824205');
  for(const available of [all.filter(e=>e.messageId!==rule.messageId),all.filter(e=>e.messageId!=='2107158998495748264'),all.map(e=>e.id===rule.id?{...e,url:e.url.replace('thsottiaux','other_author')}:e)]){
-  assert.deepEqual(evidenceBenefitClaims(root,gatherEvidenceContext(root,available)),[]);
+  assert.deepEqual(evidenceBenefitClaims(root,gatherEvidenceContext(root,available)),[]);assert.equal(campaignMembership(root,gatherEvidenceContext(root,available)),undefined);
  }
  const wrongDay={...root,id:'wrongday',text:'Day 20/ Reset'};
- assert.deepEqual(evidenceBenefitClaims(wrongDay,gatherEvidenceContext(wrongDay,[...all,wrongDay])),[]);
+ assert.deepEqual(evidenceBenefitClaims(wrongDay,gatherEvidenceContext(wrongDay,[...all,wrongDay])),[]);assert.equal(campaignMembership(wrongDay,gatherEvidenceContext(wrongDay,[...all,wrongDay])),undefined);
 });
 
 test('completion cannot borrow across authors, missing parents, different benefits or truncated text',()=>{
@@ -73,4 +75,11 @@ test('full unsupported original stops network retries; missing parent and trunca
  assert.equal(blocked.missing,false);assert.ok(blocked.codes.includes('ambiguous_kind_or_audience'));
  assert.ok(processingObstacles([{...generic,parentId:'absent'}]).codes.includes('missing_parent'));
  assert.ok(processingObstacles([{...generic,text:'The reset has been…'}]).codes.includes('truncated_body'));
+});
+
+
+test('同一日历对应不同活动身份时不选择任意一个活动归属',()=>{
+ const root=find('2110595484180214059'),calendar=all.find(e=>e.metadata?.activity)!;
+ const other={...calendar,id:'another-calendar',metadata:{...calendar.metadata,activity:{...calendar.metadata!.activity!,id:'other-campaign'}}};
+ assert.equal(campaignMembership(root,gatherEvidenceContext(root,[...all,other])),undefined);
 });

@@ -173,7 +173,9 @@ async function publish(content:DraftContent, c:Client, opts:PublishOptions):Prom
   const activity=content.activityId?await one<Activity>('activities',content.activityId,c,true):undefined;
   if(content.activityId&&!activity) throw new DomainError('关联活动不存在');
   if(activity&&content.activityDay) { if(content.activityDay>activity.days) throw new DomainError('天数超出活动范围'); const items=activity.items.filter(x=>x.articleId!==articleId); await put('activities',{...activity,version:activity.version+1,items:[...items,{day:content.activityDay,articleId,eventId}]},c); }
-  const semantic=key??(activity&&cited[0]?hash(`activity:${activity.id}:${content.activityDay}:${providerIdentity(cited[0])}`):undefined);
+  // Linking an already published article to its campaign is enrichment, not a
+  // new announcement. Actual benefit changes still have their own fact key.
+  const semantic=key??(activity&&cited[0]&&!opts.existingArticle?hash(`activity:${activity.id}:${content.activityDay}:${providerIdentity(cited[0])}`):undefined);
   if(semantic&&(!historical||(opts.correction&&opts.actor!=='worker'))&&!opts.suppressNotice&&!opts.withdrawn) { const categories:Notice['categories']=opts.correction?['correction']:newsOnly?[]:content.actions.filter(a=>a.scope==='public').some(a=>a.stage==='claimed_complete')?['result']:['announcement']; if(activity) categories.push('activity'); await insert('notices',{id:`notice_${semantic}`,semanticKey:semantic,eventId,publicationId,title:article.title,summary:article.summary,categories,status:'active',createdAt:time} satisfies Notice,c); }
   await audit(opts.actor,opts.withdrawn?'publication.withdraw':opts.correction?'publication.correct':'publication.publish',eventId,opts.reason,existing,publication,c);
   await markForecastInputsChanged(c);
@@ -251,7 +253,7 @@ export async function previewCandidate(candidateId:string,version:number):Promis
   const previousArticle=articleForPrimary(candidate!,content,primary,evidence,articles,!candidate!.humanEdited&&primary?.provenance!=='manual');
   const eventEvidenceIds=[...new Set([...(existing?.evidenceIds??[]),...content.evidenceIds])],cited=evidence.filter(e=>content.evidenceIds.includes(e.id));const historical=isHistoricalContent(cited,previousArticle?.publishedAt??now());
   const proposed:RadarEvent={id:existing?.id??'preview-event',title:content.title,version:(existing?.version??0)+1,status:'published',actions:merged,evidenceIds:eventEvidenceIds,publicationId:'preview',updatedAt:now()};
-  const materialChange=!!noticeKey(proposed,existing)||!!content.activityId;const canPublish=reasons.length===0,willNotify=canPublish&&!historical&&materialChange;
+  const materialChange=!!noticeKey(proposed,existing)||!!content.activityId&&!previousArticle;const canPublish=reasons.length===0,willNotify=canPublish&&!historical&&materialChange;
   const noticeReason=!canPublish?'内容未通过校验，不会发布提醒':historical?'首次发布历史资料，不生成实时提醒':!materialChange?'没有新的公开动作变化或活动条目，不重复提醒':'发布包含新的公开动作变化或活动条目，将生成一条站内提醒';
   return {canPublish,reasons:[...new Set(reasons)],changes,pages:canPublish?['首页','公告列表','事件详情','日程','分享海报',...(content.activityId?['活动页']:[]),...(willNotify?['站内提醒']:[])]:[],willNotify,noticeReason,expectedEventVersion:existing?.version};
 });}
@@ -371,7 +373,7 @@ export async function executeCommand(action:string,input:Record<string,unknown>,
       const notice=createAdminNotice(input,noticeId,now());
       const existing=requestId?await one<Notice>('notices',noticeId,c):undefined;
       if(existing){
-        if(existing.origin!=='admin'||existing.title!==notice.title||existing.body!==notice.body)throw new DomainError('这次发布内容已变化，请重新打开编辑后发布',409);
+        if(existing.origin!=='admin'||existing.title!==notice.title||existing.body!==notice.body||input.createdAt!==undefined&&existing.createdAt!==notice.createdAt)throw new DomainError('这次发布内容已变化，请重新打开编辑后发布',409);
         return existing;
       }
       await insert('notices',notice,c);

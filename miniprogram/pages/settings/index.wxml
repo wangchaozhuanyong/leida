@@ -22,7 +22,8 @@
     <view class="small muted lead">设置自动保存。重新开启只提醒新消息，不补发关闭期间的内容。完成声明不代表已检测到你的个人账户到账。</view>
     <view wx:if="{{wechat.error}}" class="warning lead">{{wechat.error}}</view>
     <view wx:if="{{wechat.privacyNeeded}}" class="stack lead"><button class="secondary full" bindtap="openPrivacyContract">查看隐私指引</button><button class="primary full" open-type="agreePrivacyAuthorization" bindagreeprivacyauthorization="agreeWechatPrivacy">同意隐私指引并继续</button></view>
-    <block wx:else><button class="primary full reminder-add" loading="{{wechat.busy}}" disabled="{{wechat.busy || (!wechat.ready && !wechat.confirmNeeded && !wechat.error)}}" bindtap="addWechat">{{wechat.busy ? '加载中' : wechat.confirmNeeded ? '重试' : wechat.error && !wechat.ready ? '重新加载' : wechat.safe && (!wechat.safe.configured || !wechat.safe.enabled || wechat.safe.state === 'unknown') ? '暂不可开启' : wechat.remainingCount > 0 ? '增加一次提醒' : '开启微信提醒'}}</button>
+    <block wx:else><button class="primary full reminder-add" loading="{{wechat.busy}}" disabled="{{wechat.busy || (!wechat.ready && !wechat.confirmNeeded && !wechat.error)}}" bindtap="addWechat">{{wechat.busy ? '加载中' : wechat.confirmNeeded ? '重试' : wechat.error && !wechat.ready ? '重新加载' : wechat.safe && (!wechat.safe.configured || !wechat.safe.enabled) ? '暂不可开启' : wechat.safe && wechat.safe.state === 'unknown' ? '重新授权增加一次' : wechat.remainingCount > 0 ? '增加一次提醒' : '开启微信提醒'}}</button>
+    <view wx:if="{{wechat.safe && wechat.safe.state === 'unknown'}}" class="small muted lead">上次发送的结果未确认，该消息不会重复发送。重新授权后只接收新消息，未确认的次数不计入可用次数。</view>
     <view wx:if="{{wechat.ready}}" class="small muted lead">每次在微信中同意接收，增加一次提醒机会。</view><view wx:elif="{{wechat.safe}}" class="small muted lead">{{wechat.label}}</view>
     <button wx:if="{{wechat.canRevoke}}" class="secondary full reminder-close" disabled="{{wechat.busy}}" bindtap="revokeWechat">关闭微信提醒</button></block>
     <view class="small muted lead">关闭后停止后续提醒，已提交微信的消息可能仍会收到。</view>

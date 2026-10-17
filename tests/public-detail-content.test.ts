@@ -1,3 +1,5 @@
+import { createRequire } from 'node:module';
+import { posterSvg } from '../src/server/poster';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
@@ -89,4 +91,15 @@ test('原文详情只呈现读者可理解的来源信息且不冒充官方', ()
   assert.match(html, /Original text\./);
   assert.match(html, /打开原文/);
   assert.doesNotMatch(html, /辅助归档|来源结构化|本站采集|内部收录标题|内部辅助摘要|官方原文/);
+});
+
+
+test('网页、小程序卡片及公告海报使用相同客户摘要，内部处理说明不进入分享图',()=>{
+  const require=createRequire(import.meta.url),native=require('../miniprogram/utils/model.js'),poster=require('../miniprogram/utils/poster.js');
+  const data=fixture({summary:'根据公开归档保存的原帖，额度提高至 20 次。\n原文发布时间：2026/10/16 09:00（北京时间）。这是中文事实摘要，个人账户是否到账尚未观测。'}),p=data.publications[0],before=JSON.stringify(data);
+  const summary=publicArticleContent(p.article).summary;
+  assert.equal(native.publicationCard(data,p).summary,summary);assert.equal(poster.posterInput(data,p.id).summary,summary);
+  const image=posterSvg(p,'测试雷达');assert.doesNotMatch(image,/根据公开归档保存的原帖|这是中文事实摘要/);assert.match(image,/额度提高至 20 次/);
+  assert.equal(JSON.stringify(data),before);
+  const manual=fixture({...data.articles[0],manualFields:['summary']});assert.equal(native.publicationCard(manual,manual.publications[0]).summary,manual.articles[0].summary);
 });

@@ -1,3 +1,4 @@
+import { publicArticleSummary } from '@/lib/public-content';
 import type { Publication } from '@/lib/types';
 import { fullTime, actionLabels, stageLabels } from '@/lib/labels';
 import { isLocalShareUrl } from '@/lib/share';
@@ -34,7 +35,7 @@ export function posterSvg(publication: Publication, name: string, shareUrl?: str
   y += 12;
   text(publication.article.title, 44, '#eceeea', 650);
   y += 15;
-  text(publication.article.summary, 27);
+  text(publicArticleSummary(publication.article), 27);
   for (const action of actions) {
     y += 28;
     content.push(`<path d="M60 ${y - 13}H840" stroke="#3f494a"/>`);
