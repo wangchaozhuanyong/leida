@@ -5,6 +5,7 @@ import type {Evidence,Source,Publication,RadarEvent,Article} from '../lib/types'
 import {FORECAST_RULE_VERSION,FORECAST_MODEL_VERSION,referenceForecast,forecastWindows,forecastSourceAvailable,qualifyForecastSignal,matchForecastCase,buildForecastSnapshot,publicForecastCaseProjection,effectiveForecastOutcome,type ForecastPublicData,type ForecastCase,type ForecastSnapshot,type ForecastOutcome} from '../lib/forecast';
 import {executeResetCadence,getCadenceSnapshot,isCadence,projectCadenceForecast,cadenceOutcomes,publicCadenceHorizonOutcomes,forecastCycleDue,type CadenceRuntime,type StoredCadenceForecast} from './reset-cadence-runtime';
 import {configuredPublicRpc} from './cloudbase/public-config';
+import {CloudbaseRpcError} from './cloudbase/rpc';
 import {publicResetOutlook} from '../lib/reset-outlook';
 import type {PublicFactsData} from '../lib/public-facts';
 
@@ -43,13 +44,14 @@ export function projectPublicForecastRecords(input:{cases:ForecastCase[];outcome
  const base={ruleVersion:FORECAST_RULE_VERSION,modelVersion:FORECAST_MODEL_VERSION,generatedAt:timestamp,reference:referenceForecast(),outlook:publicResetOutlook(facts)};
  const cadenceHistory=compact==='home'?[]:(snapshots as unknown as StoredCadenceForecast[]).filter(s=>s.recordType==='reset_cadence').sort((a,b)=>Date.parse(b.generatedAt)-Date.parse(a.generatedAt)).slice(0,12);
  const computationFailed=runtime?.status==='error';
+ const readingFailed=runtime?.status==='read_unavailable',unavailable=computationFailed||readingFailed;
  const cadenceByKind:NonNullable<ForecastPublicData['cadenceByKind']>={};
  for(const target of ['automatic_reset','banked_reset'] as const){const id=runtime?.cadenceSnapshotIds?.[target],stored=id?(snapshots as unknown as StoredCadenceForecast[]).find(s=>s.id===id):target==='automatic_reset'?cadenceSnapshot:undefined;const projected=projectCadenceForecast(stored,sources,timestamp);if(projected)cadenceByKind[target]=projected;}
  const cadence=cadenceByKind.automatic_reset??projectCadenceForecast(cadenceSnapshot,sources,timestamp);
  const visibleCadenceIds=new Set([...cadenceHistory.map(s=>s.id),...Object.values(runtime?.cadenceSnapshotIds??{}),...(cadenceSnapshot?[cadenceSnapshot.id]:[])]);
  const visibleCadence=(snapshots as unknown as StoredCadenceForecast[]).filter(s=>visibleCadenceIds.has(s.id));
  const cadenceHorizonOutcomes=compact==='home'?undefined:publicCadenceHorizonOutcomes(outcomes,visibleCadence,timestamp);
- return {...base,status:computationFailed?'unavailable':'ready',...(computationFailed?{reason:'预测观察处理失败，暂不提供当前实验估计；公开公告与固定历史记录继续保留。'}:{}),cadence:computationFailed?undefined:cadence,cadenceByKind:computationFailed?undefined:cadenceByKind,cadenceEvaluationByKind:runtime?.cadenceEvaluationByKind,cadenceHistory,cadenceOutcomes:cadenceOutcomes(outcomes).slice(0,12),...(cadenceHorizonOutcomes?{cadenceHorizonOutcomes}:{}),cases:cases.slice().sort((a,b)=>Date.parse(b.signalAt)-Date.parse(a.signalAt)).map(c=>{
+ return {...base,status:unavailable?'unavailable':'ready',...(unavailable?{reason:readingFailed?'预测信息暂时不可用，稍后会自动更新；公开公告与历史记录仍可查看。':'预测观察处理失败，暂不提供当前实验估计；公开公告与固定历史记录继续保留。'}:{}),cadence:unavailable?undefined:cadence,cadenceByKind:unavailable?undefined:cadenceByKind,cadenceEvaluationByKind:runtime?.cadenceEvaluationByKind,cadenceHistory,cadenceOutcomes:cadenceOutcomes(outcomes).slice(0,12),...(cadenceHorizonOutcomes?{cadenceHorizonOutcomes}:{}),cases:cases.slice().sort((a,b)=>Date.parse(b.signalAt)-Date.parse(a.signalAt)).map(c=>{
   const available=forecastSourceAvailable(sources.find(s=>s.id===c.sourceId),timestamp);
   const projectedCase={...c,coverage:!available?{status:'gap' as const,sourceIds:c.coverage.sourceIds,reason:'信号来源暂停、失效或结构异常，不能据未找到消息标阴性'}:c.coverage},snapshot=snapshots.find(s=>s.id===c.snapshotId);
   const {status}=publicForecastCaseProjection(projectedCase,snapshot,timestamp);
@@ -130,7 +132,8 @@ export async function runForecastCycle(timestamp=iso(),options:{force?:boolean;i
   result.cadenceSnapshots=cadence.snapshots;result.cadenceOutcomes=cadence.outcomes;
   await put('settings',{id:'forecast_runtime',checkedAt:timestamp,status:'ready',ruleVersion:FORECAST_RULE_VERSION,modelVersion:FORECAST_MODEL_VERSION,cadencePublicProjection:cadence.publicProjection,cadenceSnapshotId:cadence.snapshotId,cadenceSnapshotIds:cadence.snapshotIds,cadenceEvaluationByKind:cadence.evaluationByKind,inputsRevision:inputs?.revision,cadenceModelVersion:cadence.evaluationByKind.automatic_reset?.modelVersion,nextDueAt:cadence.nextDueAt},c);
   return result;
- });}catch{
+ });}catch(error){
+  console.error('FORECAST_COMPUTE_FAILED',error instanceof CloudbaseRpcError?error.diagnosticCode:'UNCLASSIFIED');
   try{await put('settings',{id:'forecast_runtime',checkedAt:timestamp,status:'error',error:'预测观察处理失败，新闻与发放状态流程继续运行'});}catch{/* A storage failure cannot be repaired by this observation task. */}
   return {status:'error',discovered:0,snapshots:0,outcomes:0};
  }

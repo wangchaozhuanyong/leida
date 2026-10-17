@@ -87,27 +87,38 @@ function response(bundle:Bundle,options:PublicReadOptions|{view:'legacy'},timest
 const compatHash=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const has=(value:object,key:string)=>Object.prototype.hasOwnProperty.call(value,key);
 interface CompatibleRuntime extends Partial<CadenceRuntime> {id:'forecast_runtime';status:'ready';cadenceProjectionDigest:string;}
+type CadenceReadFailure='RUNTIME_INVALID'|'COMPUTATION_FAILED'|'PROJECTION_INVALID'|'MODEL_MISMATCH'|'EVALUATION_INVALID'|'READ_RESPONSE_INVALID'|'RUNTIME_CHANGED'|'PUBLIC_VERSION_CHANGED'|'READ_TIMEOUT'|'READ_FAILED';
+class CadenceReadError extends Error {
+ constructor(readonly reason:CadenceReadFailure){super(reason);}
+}
 function compatibilityRuntime(value:unknown,timestamp:string):{runtime:CompatibleRuntime;projection:CadencePublicProjection} {
- if(!value||typeof value!=='object')throw new CloudbaseRpcError('response');
+ if(!value||typeof value!=='object')throw new CadenceReadError('RUNTIME_INVALID');
  const row=value as CadenceRuntime&{status?:string};
- if(row.id!=='forecast_runtime'||row.status!=='ready'||!Number.isFinite(Date.parse(row.checkedAt))||Date.parse(row.checkedAt)>Date.parse(timestamp))throw new CloudbaseRpcError('response');
+ if(row.id!=='forecast_runtime')throw new CadenceReadError('RUNTIME_INVALID');
+ if(row.status==='error')throw new CadenceReadError('COMPUTATION_FAILED');
+ if(row.status!=='ready'||!Number.isFinite(Date.parse(row.checkedAt))||Date.parse(row.checkedAt)>Date.parse(timestamp))throw new CadenceReadError('RUNTIME_INVALID');
  const ids=row.cadenceSnapshotIds;
- if(!ids||!['automatic_reset','banked_reset'].every(target=>/^forecast_cadence_[a-f0-9]{64}$/.test(String(ids[target as keyof typeof ids])))||row.cadenceSnapshotId!==ids.automatic_reset)throw new CloudbaseRpcError('response');
- const projection=parseCadencePublicProjection(row.cadencePublicProjection,timestamp);
- for(const target of ['automatic_reset','banked_reset'] as const)if(!projection.snapshots.some(s=>s.id===ids[target]&&s.target===target&&s.modelVersion===RESET_CADENCE_MODEL_VERSION))throw new CloudbaseRpcError('response');
+ if(!ids||!['automatic_reset','banked_reset'].every(target=>/^forecast_cadence_[a-f0-9]{64}$/.test(String(ids[target as keyof typeof ids])))||row.cadenceSnapshotId!==ids.automatic_reset)throw new CadenceReadError('RUNTIME_INVALID');
+ let projection:CadencePublicProjection;
+ try{projection=parseCadencePublicProjection(row.cadencePublicProjection,timestamp);}catch{throw new CadenceReadError('PROJECTION_INVALID');}
+ for(const target of ['automatic_reset','banked_reset'] as const)if(!projection.snapshots.some(s=>s.id===ids[target]&&s.target===target&&s.modelVersion===RESET_CADENCE_MODEL_VERSION))throw new CadenceReadError('MODEL_MISMATCH');
  const evaluation=row.cadenceEvaluationByKind;
- if(!evaluation?.automatic_reset||!evaluation.banked_reset)throw new CloudbaseRpcError('response');
- const runtime:CompatibleRuntime={id:'forecast_runtime',status:'ready',cadenceSnapshotId:ids.automatic_reset,cadenceSnapshotIds:{automatic_reset:ids.automatic_reset,banked_reset:ids.banked_reset},cadenceEvaluationByKind:{automatic_reset:publicCadenceEvaluation(evaluation.automatic_reset),banked_reset:publicCadenceEvaluation(evaluation.banked_reset)},cadenceProjectionDigest:projection.digest};
+ if(!evaluation?.automatic_reset||!evaluation.banked_reset)throw new CadenceReadError('EVALUATION_INVALID');
+ let cadenceEvaluationByKind:CompatibleRuntime['cadenceEvaluationByKind'];
+ try{cadenceEvaluationByKind={automatic_reset:publicCadenceEvaluation(evaluation.automatic_reset),banked_reset:publicCadenceEvaluation(evaluation.banked_reset)};}catch{throw new CadenceReadError('EVALUATION_INVALID');}
+ const runtime:CompatibleRuntime={id:'forecast_runtime',status:'ready',cadenceSnapshotId:ids.automatic_reset,cadenceSnapshotIds:{automatic_reset:ids.automatic_reset,banked_reset:ids.banked_reset},cadenceEvaluationByKind,cadenceProjectionDigest:projection.digest};
  return {runtime,projection};
 }
 /** Existing backend-only fixed-row read. Never list settings, commit, lease, or read credentials. */
 async function readCompatibilityRuntime(rpc:CloudbaseRpc,timestamp:string,signal:AbortSignal) {
  if(signal.aborted)throw new CloudbaseRpcError('unknown',undefined,'REQUEST_TIMEOUT');
  const value=await rpc.call<{fingerprint?:unknown;rows?:unknown;more?:unknown;after?:unknown}>('radar_cb_store_read',{p_table:'settings',p_after:null,p_id:'forecast_runtime'},{signal});
- if(!value||typeof value.fingerprint!=='string'||!/^[a-f0-9]{32}$/.test(value.fingerprint)||!Array.isArray(value.rows)||value.rows.length!==1||value.more!==false||value.after!==null)throw new CloudbaseRpcError('response');
+ if(!value||typeof value.fingerprint!=='string'||!/^[a-f0-9]{32}$/.test(value.fingerprint)||!Array.isArray(value.rows)||value.rows.length!==1||value.more!==false||value.after!==null)throw new CadenceReadError('READ_RESPONSE_INVALID');
  const row=value.rows[0] as {id?:string;payload?:unknown;createdAt?:string};
- if(row.id!=='forecast_runtime'||!Number.isFinite(Date.parse(row.createdAt??'')))throw new CloudbaseRpcError('response');
- return {...compatibilityRuntime(row.payload,timestamp),fingerprint:value.fingerprint};
+ if(!row||row.id!=='forecast_runtime'||!Number.isFinite(Date.parse(row.createdAt??'')))throw new CadenceReadError('READ_RESPONSE_INVALID');
+ // fingerprint describes the entire settings table, including unrelated heartbeats.
+ // Consistency below compares the fixed prediction's validated public projection.
+ return compatibilityRuntime(row.payload,timestamp);
 }
 function patchVersionRuntime(version:VersionData,runtime:Record<string,unknown>,projection?:CadencePublicProjection):VersionData {
  const snapshots=new Map(version.snapshots.map(s=>[s.id,s]));
@@ -121,8 +132,11 @@ async function supplementLegacyProjection(rpc:CloudbaseRpc,version:VersionData,t
  validVersion(version);
  const original=version.settings.find(row=>row.id==='forecast_runtime');
  if(process.env.RADAR_STORAGE_BACKEND!=='cloudbase'||!original||has(original,'cadenceSnapshotIds'))return {version,bundle};
- const unavailable=()=>{
-  const runtime={id:'forecast_runtime',status:'error',cadenceSnapshotId:typeof original.cadenceSnapshotId==='string'?original.cadenceSnapshotId:undefined,cadenceSnapshotIds:{},cadenceProjectionDigest:'unavailable'};
+ if(original.status==='error')return {version,bundle};
+ const unavailable=(reason:CadenceReadFailure,error?:unknown)=>{
+  // Only fixed reason codes and the RPC's already-sanitized diagnostic code reach logs.
+  console.warn('FORECAST_READ_UNAVAILABLE',reason,error instanceof CloudbaseRpcError?error.diagnosticCode:'');
+  const runtime={id:'forecast_runtime',status:reason==='COMPUTATION_FAILED'?'error':'read_unavailable',cadenceSnapshotId:typeof original.cadenceSnapshotId==='string'?original.cadenceSnapshotId:undefined,cadenceSnapshotIds:{},cadenceProjectionDigest:'unavailable'};
   const next=patchVersionRuntime(version,runtime);
   return {version:next,...(bundle?{bundle:{...bundle,versionData:next,forecastRecords:{...bundle.forecastRecords,runtime}}}:{})};
  };
@@ -133,11 +147,12 @@ async function supplementLegacyProjection(rpc:CloudbaseRpc,version:VersionData,t
  try{return await Promise.race([deadline,(async()=>{
   const first=await readCompatibilityRuntime(rpc,timestamp,controller.signal);
   if(controller.signal.aborted)throw new CloudbaseRpcError('unknown',undefined,'REQUEST_TIMEOUT');
-  if(first.runtime.cadenceSnapshotId!==original.cadenceSnapshotId||first.runtime.status!==original.status)return unavailable();
+  if(first.runtime.cadenceSnapshotId!==original.cadenceSnapshotId||first.runtime.status!==original.status)return unavailable('RUNTIME_CHANGED');
   const [last,after]=await Promise.all([readCompatibilityRuntime(rpc,timestamp,controller.signal),rpc.call<VersionData>('radar_cb_public_version',{},{signal:controller.signal})]);
   if(controller.signal.aborted)throw new CloudbaseRpcError('unknown',undefined,'REQUEST_TIMEOUT');
   validVersion(after);
-  if(first.fingerprint!==last.fingerprint||compatHash(first.runtime)!==compatHash(last.runtime)||compatHash(version)!==compatHash(after))return unavailable();
+  if(compatHash(first.runtime)!==compatHash(last.runtime))return unavailable('RUNTIME_CHANGED');
+  if(compatHash(version)!==compatHash(after))return unavailable('PUBLIC_VERSION_CHANGED');
   const next=patchVersionRuntime(version,first.runtime as unknown as Record<string,unknown>,first.projection);
   if(!bundle)return {version:next};
   const snapshots=new Map(first.projection.snapshots.map(s=>[s.id,s as unknown as ForecastSnapshot]));
@@ -145,7 +160,7 @@ async function supplementLegacyProjection(rpc:CloudbaseRpc,version:VersionData,t
   const outcomes=new Map(first.projection.horizonOutcomes.map(o=>[o.id,o as unknown as ForecastOutcome]));
   for(const o of bundle.forecastRecords.outcomes)outcomes.set(o.id,o);
   return {version:next,bundle:{...bundle,versionData:next,forecastRecords:{...bundle.forecastRecords,snapshots:[...snapshots.values()],outcomes:[...outcomes.values()],runtime:first.runtime}}};
- })()]);}catch{return unavailable();}finally{controller.abort();clearTimeout(timeout);}
+ })()]);}catch(error){return unavailable(error instanceof CadenceReadError?error.reason:controller.signal.aborted?'READ_TIMEOUT':'READ_FAILED',error);}finally{controller.abort();clearTimeout(timeout);}
 }
 async function compatibleBundle(rpc:CloudbaseRpc,options:Record<string,unknown>,timestamp:string):Promise<Bundle> {
  const bundle=await rpc.call<Bundle>('radar_cb_public_bundle',{p_options:options,p_now:timestamp});

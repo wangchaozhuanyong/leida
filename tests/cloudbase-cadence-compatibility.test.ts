@@ -69,6 +69,68 @@ test('新SQL完整投影零额外RPC，未启用完整存储也不越权读取se
  const old=fixture(),prior=process.env.RADAR_STORAGE_BACKEND;process.env.RADAR_STORAGE_BACKEND='native';try{await createCloudbasePublicReader(old.rpc,()=>at).read({view:'home'});assert.equal(old.calls.length,1);}finally{if(prior===undefined)delete process.env.RADAR_STORAGE_BACKEND;else process.env.RADAR_STORAGE_BACKEND=prior;}
 });
 
+test('旧SQL：无关设置或心跳更新不使同一份预测降级，仍只读取固定行且最多3额外RPC',()=>fullStorage(async()=>{
+ const f=fixture();let reads=0;
+ const rpc=new CloudbaseRpc('local-cadence-qa','synthetic-transport-only',async(input,init)=>{
+  const response=await f.transport(input,init);
+  if(!String(input).endsWith('/radar_cb_store_read'))return response;
+  const body=await response.json();
+  // The SQL fingerprint covers the whole settings table. Only worker_runtime changed.
+  body.fingerprint=(++reads===1?'1':'2').repeat(32);
+  return Response.json(body);
+ });
+ const value=await createCloudbasePublicReader(rpc,()=>at).read({view:'home'});
+ assert.equal(value.data.forecasts?.status,'ready');
+ assert.equal(value.data.forecasts?.cadenceByKind?.automatic_reset?.id,f.automatic.id);
+ assert.equal(value.data.forecasts?.cadenceByKind?.banked_reset?.id,f.banked.id);
+ assert.equal(f.calls.length,4);assert.equal(reads,2);
+}));
+
+test('旧SQL：持久化计算错误保留计算失败提示，读取不一致使用独立提示',()=>fullStorage(async()=>{
+ const failed=fixture();failed.version.settings[1].status='error';failed.bundle.forecastRecords.runtime.status='error';
+ const calculation=await createCloudbasePublicReader(failed.rpc,()=>at).read({view:'home'});
+ assert.equal(calculation.data.forecasts?.status,'unavailable');
+ assert.match(calculation.data.forecasts?.reason??'',/处理失败/);
+ assert.equal(calculation.data.forecasts?.cadenceByKind,undefined);
+ assert.equal(failed.calls.length,1,'已有明确计算错误不再做兼容补读');
+ const race=fixture();
+ const rpc=new CloudbaseRpc('local-cadence-qa','synthetic-transport-only',async(input,init)=>String(input).endsWith('/radar_cb_public_version')?Response.json({...race.version,outcomeDigest:'3'.repeat(32)}):race.transport(input,init));
+ const reading=await createCloudbasePublicReader(rpc,()=>at).read({view:'home'});
+ assert.equal(reading.data.forecasts?.status,'unavailable');
+ assert.match(reading.data.forecasts?.reason??'',/稍后会自动更新/);
+ assert.doesNotMatch(reading.data.forecasts?.reason??'',/处理失败/);
+ assert.equal(reading.data.forecasts?.cadenceByKind,undefined);
+}));
+
+test('旧SQL：同一快照ID的投影内容变化仍降级，不依赖整表指纹变化',()=>fullStorage(async()=>{
+ const f=fixture();let reads=0;
+ const rpc=new CloudbaseRpc('local-cadence-qa','synthetic-transport-only',async(input,init)=>{
+  const response=await f.transport(input,init);
+  if(!String(input).endsWith('/radar_cb_store_read')||++reads!==2)return response;
+  const body=await response.json(),snapshots=body.rows[0].payload.cadencePublicProjection.snapshots;
+  snapshots[0].p24=0.1;
+  body.rows[0].payload.cadencePublicProjection=createCadencePublicProjection(snapshots,[f.horizon]);
+  return Response.json(body);
+ });
+ const value=await createCloudbasePublicReader(rpc,()=>at).read({view:'home'});
+ assert.equal(value.data.forecasts?.status,'unavailable');assert.equal(value.data.forecasts?.cadenceByKind,undefined);
+ assert.match(value.data.forecasts?.reason??'',/稍后会自动更新/);
+}));
+
+test('旧SQL：不同模型仍拒绝，诊断仅记录固定原因与安全RPC码，不包含响应正文',t=>fullStorage(async()=>{
+ const logs:unknown[][]=[];t.mock.method(console,'warn',(...values:unknown[])=>{logs.push(values);});
+ const old=fixture();old.runtime.cadencePublicProjection=createCadencePublicProjection([{...old.automatic,modelVersion:'old-model'},old.banked,old.historical],[old.horizon]);
+ const blocked=await createCloudbasePublicReader(old.rpc,()=>at).read({view:'home'});
+ assert.equal(blocked.data.forecasts?.status,'unavailable');assert.equal(blocked.data.forecasts?.cadenceByKind,undefined);
+ assert.deepEqual(logs.pop(),['FORECAST_READ_UNAVAILABLE','MODEL_MISMATCH','']);
+ const f=fixture(),canary='private-provider-response-must-not-be-logged';
+ const rpc=new CloudbaseRpc('local-cadence-qa','synthetic-transport-only',async(input,init)=>String(input).endsWith('/radar_cb_store_read')?Response.json({code:'42501',message:canary},{status:403}):f.transport(input,init));
+ const value=await createCloudbasePublicReader(rpc,()=>at).read({view:'home'});
+ assert.deepEqual(logs,[['FORECAST_READ_UNAVAILABLE','READ_FAILED','CB_REJECTED_403_42501']]);
+ assert.equal(JSON.stringify({logs,value}).includes(canary),false);
+ assert.equal(JSON.stringify(value).includes('READ_FAILED'),false,'技术原因只写服务端日志');
+}));
+
 for(const failure of ['runtime-race','public-version-race','future','future-cutoff','future-actual','actual-before-window','actual-after-window','invalid-probability','missing-projection','denied-fixed-read'] as const)test(`旧SQL ${failure}明确不可用，保留公开事实且不增加重试或写入`,()=>fullStorage(async()=>{
  const f=fixture();let runtimeCalls=0,versionCalls=0;
  if(failure==='future')f.runtime.checkedAt=when(1);
@@ -81,7 +143,7 @@ for(const failure of ['runtime-race','public-version-race','future','future-cuto
  if(failure==='missing-projection')delete (f.runtime as Partial<typeof f.runtime>).cadencePublicProjection;
  const rpc=new CloudbaseRpc('local-cadence-qa','synthetic-transport-only',async(input,init)=>{
   const op=String(input).split('/').at(-1);
-  if(op==='radar_cb_store_read'){runtimeCalls++;if(failure==='denied-fixed-read')return Response.json({code:'42501',message:'private body'},{status:403});const response=await f.transport(input,init);if(failure==='runtime-race'&&runtimeCalls===2){const body=await response.json();body.fingerprint='2'.repeat(32);return Response.json(body);}return response;}
+  if(op==='radar_cb_store_read'){runtimeCalls++;if(failure==='denied-fixed-read')return Response.json({code:'42501',message:'private body'},{status:403});const response=await f.transport(input,init);if(failure==='runtime-race'&&runtimeCalls===2){const body=await response.json();body.rows[0].payload.cadenceEvaluationByKind.automatic_reset.unknownSamples++;return Response.json(body);}return response;}
   if(op==='radar_cb_public_version'){versionCalls++;if(failure==='public-version-race')return Response.json({...f.version,outcomeDigest:'3'.repeat(32)});}
   return f.transport(input,init);
  });
