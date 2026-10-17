@@ -44,22 +44,22 @@ test('小程序回放路径白名单不允许私有请求、额外查询或路�
  for(const path of ['/api/v1/replays/../admin','/api/v1/replays/'+runId+'?step=0&admin=1','/api/v1/replays/'+runId+'?step=-1'])await assert.rejects(transport(path).promise);
  assert.equal(calls,1);
 });
-test('小程序离开回放页后，迟到响应不能更新页面，返回后可重试',async()=>{
- let definition:any,pendingResolve:(v:unknown)=>void=()=>{},aborted=0;
- const pending=new Promise(resolve=>pendingResolve=resolve);
+test('旧回放链接直接进入真实重置记录，不读取回放数据，跳转失败后可手动重试',()=>{
+ let definition:any;const calls:string[]=[];
  const code=readFileSync(new URL('../miniprogram/pages/replay/index.js',import.meta.url),'utf8');
- runInNewContext(code,{require:(name:string)=>require('../miniprogram/pages/replay/'+name),Page:(value:unknown)=>definition=value,getApp:()=>({publicApi:()=>({promise:pending,abort(){aborted++;}})})});
- const page={...definition,data:structuredClone(definition.data),setData(patch:unknown){Object.assign(this.data,patch);}};
- page.onLoad();page.onHide();pendingResolve({data:[detail().run]});await new Promise(resolve=>setTimeout(resolve,0));
- assert.equal(aborted,1);assert.equal(page.data.view,null);assert.equal(page.data.loading,false);
+ runInNewContext(code,{Page:(value:unknown)=>definition=value,wx:{switchTab:({url}:{url:string})=>calls.push(url)},getApp:()=>{throw new Error('兼容入口不应读取任何回放数据');}});
+ definition.onLoad();definition.openRecords();
+ assert.deepEqual(calls,['/pages/announcements/index','/pages/announcements/index']);
 });
-test('记录页共享导航实际允许进入回放，拒绝未登记路径',()=>{
+test('客户导航不能进入回放，仍能打开日程和真实重置记录',()=>{
  const calls:string[]=[],module={exports:{} as any};
- runInNewContext(readFileSync(new URL('../miniprogram/utils/page.js',import.meta.url),'utf8'),{module,require:(name:string)=>require('../miniprogram/utils/'+name),wx:{navigateTo:({url}:{url:string})=>calls.push(url)}});
+ runInNewContext(readFileSync(new URL('../miniprogram/utils/page.js',import.meta.url),'utf8'),{module,require:(name:string)=>require('../miniprogram/utils/'+name),wx:{navigateTo:({url}:{url:string})=>calls.push(url),switchTab:({url}:{url:string})=>calls.push('tab:'+url)}});
  const page=module.exports.createPage(()=>({}));
  page.navigate({currentTarget:{dataset:{path:'/pages/replay/index'}}});
  page.navigate({currentTarget:{dataset:{path:'/pages/../admin/index'}}});
- assert.deepEqual(calls,['/pages/replay/index']);
+ page.navigate({currentTarget:{dataset:{path:'/pages/schedule/index'}}});
+ page.navigate({currentTarget:{dataset:{path:'/pages/announcements/index'}}});
+ assert.deepEqual(calls,['/pages/schedule/index','tab:/pages/announcements/index']);
 });
 test('回放以本轮公告时间跟踪，统计估计不替换预告；过期不能自行显示完成',()=>{
  const value=detail();

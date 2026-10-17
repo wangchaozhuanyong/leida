@@ -3,7 +3,7 @@
 <view class="page">
 
     <view class="chips"><button wx:for="{{filters}}" wx:key="value" class="{{filter === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectFilter">{{item.label}}</button></view>
-  <view class="schedule-actions"><button class="text-button date-schedule-link" data-path="/pages/replay/index" bindtap="navigate">历史预测回放 →</button><button class="text-button date-schedule-link" data-path="/pages/schedule/index" bindtap="navigate">按日期查看日程 →</button></view>
+  <view class="schedule-actions"><button class="text-button date-schedule-link" data-path="/pages/schedule/index" bindtap="navigate">按日期查看日程 →</button></view>
   <status-panel wx:if="{{!connected}}" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />
   <block wx:else><view wx:if="{{error}}" class="warning">{{error}}<button class="secondary" bindtap="retry">重新加载</button></view>
     <button wx:if="{{updateAvailable}}" class="update-prompt" bindtap="applyUpdates">有新内容 · 点击更新</button>

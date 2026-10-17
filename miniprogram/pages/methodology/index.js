@@ -84,7 +84,6 @@ Page({
   retryFixed() { void this.loadFixed(); },
   toggleCadenceStats() { this.setData({showCadenceStats:!this.data.showCadenceStats}); },
   openCadence(event) { const id=event.currentTarget.dataset.id;if(cadenceSnapshotId(id))wx.navigateTo({url:`/pages/methodology/index?cadence=${encodeURIComponent(id)}`}); },
-  openReplay() { wx.navigateTo({url:'/pages/replay/index'}); },
   openForecast() { const forecast = this.data.forecast; if (forecast) wx.navigateTo({ url: forecast.path }); },
   copySignal() { const url = this.data.forecast && this.data.forecast.url; if (url) wx.setClipboardData({ data: url }); },
   onShareAppMessage() {
