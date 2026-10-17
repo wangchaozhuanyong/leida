@@ -94,7 +94,7 @@ test('并发合并为一次读取，五分钟缓存不会延长信号原始截�
  clock+=1;const next=read();assert.equal(calls,2);const data=response();data.meta.generated_at=new Date(clock).toISOString();release(Response.json(data));await next;
  clock=Date.parse('2026-10-17T05:00:00.000Z');const last=read();const expired=response();expired.meta.generated_at=new Date(clock).toISOString();release(Response.json(expired));assert.equal((await last).status,'none');
 });
-test('缓存内也即时过期；失败撤下旧信号且五分钟内不反复请求',async()=>{
+test('缓存内也即时过期；读取失败撤下旧信号且冷却期内不反复请求',async()=>{
  let clock=Date.parse(now),calls=0,fail=false;
  const payload=response();payload.data.active_watch.expires_at='2026-10-17T04:02:00.000Z';
  const read=createResetWatchReader({now:()=>clock,fetcher:stub(async()=>{calls++;if(fail)throw Error('network unavailable');return Response.json(payload);})});
@@ -127,4 +127,41 @@ test('公开读取投影不修改公告或提醒；所有视图版本包含同�
  assert.equal(result.data.notices,data.notices);assert.equal(result.data.events,data.events);
  const state=withResetWatchEnvelope({data:facts,version:'base',contentVersion:'base'},watch(),now);
  assert.equal(state.contentVersion,result.contentVersion);assert.equal(state.data.forecasts,undefined);
+});
+
+
+test('慢响应先放行页面，继续共享同一次读取；成功结果补入缓存而非缓存五分钟假失败',async()=>{
+ let calls=0;let release!:(r:Response)=>void;const failures:string[]=[];
+ const read=createResetWatchReader({now:()=>Date.parse(now),timeoutMs:1000,responseBudgetMs:5,onFailure:code=>failures.push(code),fetcher:stub(async()=>{calls++;return new Promise(resolve=>{release=resolve;});})});
+ const first=await read();assert.equal(first.status,'unavailable');assert.equal(read.refreshing(),true);
+ assert.equal((await read()).status,'unavailable');assert.equal(calls,1);assert.deepEqual(failures,[]);
+ release(Response.json(response()));await read.settle();assert.equal(read.refreshing(),false);
+ assert.equal((await read()).status,'active');assert.equal(calls,1);assert.deepEqual(failures,[]);
+ await read.settle();assert.equal(calls,1,'settle仅等待已有请求，不启动额外采集');
+});
+
+test('实际超时覆盖连接和正文阶段，终止请求后只记录安全分类；一分钟后才允许重试',async()=>{
+ for(const phase of ['headers','body'] as const){
+  let calls=0,clock=Date.parse(now),aborted=false;const failures:{code:string;phase:string;elapsedMs:number}[]=[];
+  const read=createResetWatchReader({now:()=>clock,timeoutMs:20,responseBudgetMs:2,onFailure:(code,details)=>failures.push({code,...details}),fetcher:stub(async(_url,init)=>{
+   calls++;init!.signal!.addEventListener('abort',()=>{aborted=true;});
+   if(phase==='headers')return new Promise(()=>{});
+   return new Response(new ReadableStream({start(controller){init!.signal!.addEventListener('abort',()=>controller.error(new Error('private body discarded')));}}),{headers:{'content-type':'application/json'}});
+  })});
+  assert.equal((await read()).status,'unavailable');await read.settle();
+  assert.equal(aborted,true);assert.equal(read.refreshing(),false);assert.equal(failures.length,1);assert.equal(failures[0].code,'TIMEOUT');assert.equal(failures[0].phase,phase);assert.ok(failures[0].elapsedMs>=0);
+  clock+=59999;await read();assert.equal(calls,1);clock+=1;await read();assert.equal(calls,2);await read.settle();assert.equal(failures.length,2);
+  assert.doesNotMatch(JSON.stringify(failures),/private|https|token/);
+ }
+});
+
+test('后台刷新期间可用的旧信号仍按原时间过期，迟到的新结果不会延长旧观察',async()=>{
+ let clock=Date.parse(now),calls=0;let release!:(r:Response)=>void;
+ const first=response();first.data.active_watch.expires_at='2026-10-17T04:05:01.000Z';
+ const read=createResetWatchReader({now:()=>clock,timeoutMs:1000,responseBudgetMs:2,onFailure:()=>assert.fail('不应失败'),fetcher:stub(async()=>{calls++;return calls===1?Response.json(first):new Promise(resolve=>{release=resolve;});})});
+ assert.equal((await read()).status,'active');clock+=300000;
+ assert.equal((await read()).status,'active');assert.equal(read.refreshing(),true);
+ clock+=1000;assert.equal((await read()).status,'none');assert.equal(calls,2);
+ const fresh=response();fresh.meta.generated_at=new Date(clock).toISOString();fresh.data.active_watch=null as any;
+ release(Response.json(fresh));await read.settle();assert.equal((await read()).status,'none');assert.equal(calls,2);
 });
