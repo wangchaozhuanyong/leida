@@ -3,6 +3,16 @@ import assert from 'node:assert/strict';
 import {extractBenefitClaims} from '../src/server/benefit-rules';
 import {publicHistoryEvidence,refreshHistoryOriginalContext} from '../src/lib/reset-history-candidates';
 import {evidenceBenefitClaims,gatherEvidenceContext,hasStandaloneContext,originalConflict} from '../src/server/source-context';
+import type {Evidence} from '../src/lib/types';
+
+test('同一原帖的图片链接表现差异不构成正文冲突，事实与父帖差异仍受保护',()=>{
+ const common={sourceId:'tibo-public',messageId:'2078320950488297917',url:'https://x.com/thsottiaux/status/2078320950488297917',publishedAt:'2026-07-18T03:28:22Z',collectedAt:'2026-10-17T12:18:00Z',hash:'',historical:true,provenance:'archive',textOrigin:'original',contextComplete:true} as const;
+ const text='Enjoy reset usage limits for all paid users for Codex and ChatGPT Work.';
+ const first:Evidence={...common,id:'old',text:text+' https://t.co/3NwNqHG7TV pic.twitter.com/WIuS07doKA'};
+ const second:Evidence={...common,id:'new',text:text+' https://t.co/WIuS07doKA'};
+ assert.equal(originalConflict(first,[first,second]),false);
+ for(const changed of [{...second,text:second.text.replace('all paid','selected paid')},{...second,text:second.text+' https://example.com/new-condition'},{...second,parentId:'2'}])assert.equal(originalConflict({...first,parentId:'1'},[changed]),true);
+});
 
 // Exact clauses retained in the project's public original cache for these posts.
 const at='2026-03-08T02:42:13.120Z';

@@ -1,5 +1,5 @@
 {
-  "id": "public-history-20260417-20261017-2",
+  "id": "public-history-20260417-20261017-3",
   "schemaVersion": 1,
   "sourceRepository": "gdutxiaoxu/codex-reset-radar",
   "sourceCommit": "2c2b709d484217ca102e44f47985ec77d3ae4eb1",
@@ -7,7 +7,7 @@
   "reviewedAt": "2026-10-17T12:31:14.739Z",
   "startsAt": "2026-04-16T16:00:00.000Z",
   "endsAt": "2026-10-17T12:31:14.739Z",
-  "rulesVersion": "benefit-rules-20261017-2",
+  "rulesVersion": "benefit-rules-20261017-3",
   "evidence": [
     {
       "sourceId": "tibo-public",
@@ -2308,6 +2308,12 @@
       "messageId": "2105120226027450685",
       "url": "https://x.com/thsottiaux/status/2105120226027450685",
       "reason": "原文没有重置或发卡声明，排除第三方误收录"
+    }
+  ],
+  "reposts": [
+    {
+      "messageId": "2094251180121854309",
+      "replacementId": "2094252447271366730"
     }
   ]
 }
