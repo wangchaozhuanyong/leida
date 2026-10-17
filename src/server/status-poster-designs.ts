@@ -6,7 +6,7 @@ import type { StatusPosterCode } from './status-poster';
 interface DesignedPoster {
   style: StatusPosterStyle; name: string; title: string; interval: string;
   statementAt: string; generatedAt: string; nextNote: string; nextIsForecast: boolean;
-  sourceLabel: string; brand: string; code?: StatusPosterCode; intervalLabel?: string; statementLabel?:string;
+  sourceLabel: string; brand: string; code?: StatusPosterCode; intervalLabel?: string; statementLabel?:string; intervalUnit?:string;
 }
 const backgrounds = new Map<StatusPosterStyle, string>();
 const escape = (value: string) => value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!));
@@ -19,7 +19,7 @@ function dateTime(value: string) {
 }
 function wrap(value: string, width: number): string[] {
   const lines: string[] = []; let line = '';
-  for (const c of value) { if (widthUnits(line + c) > width) { lines.push(line); line = ''; } line += c; }
+  for (const c of value) { if(c==='\n'){if(line)lines.push(line);line='';continue;} if (widthUnits(line + c) > width) { lines.push(line); line = ''; } line += c; }
   if (line) lines.push(line);
   if(lines.length>3){lines.length=3;lines[2]=lines[2].slice(0,-1)+'…';}
   return lines;
@@ -50,7 +50,7 @@ export function designedStatusPoster(input: DesignedPoster): string {
     ${mark(64, 72)}${text(input.name, 183, 118, fit(input.name, 44, 510))}
     ${line(710, 111, 766, 111)}${text('Codex 用量动态', 1016, 121, 33, ink, 400, 'end')}
     ${text(input.title, 540, 311, fit(input.title, 111, 948), ink, 700, 'middle')}
-    ${text(input.intervalLabel ?? '距该公告', 540, 610, 52, ink, 400, 'middle')}${interval}
+    ${text(input.intervalLabel ?? '距该公告', 540, 610, fit(input.intervalLabel??'距该公告',52,390), ink, 400, 'middle')}${interval}${input.intervalUnit?text(input.intervalUnit,540,1050,42,ink,400,'middle'):''}
     ${code(890, 1248, 158)}
     ${text(input.statementLabel??'公告时间', 72, 1495, 34, muted)}
     ${text(date.date, 72, 1556, 59, ink, 600)}${text(`${date.time} · 北京时间`, 72, 1612, 35, muted)}
@@ -67,7 +67,7 @@ export function designedStatusPoster(input: DesignedPoster): string {
     ${text('关注公开公告，追踪用量动态', 64, 371, 28, muted, 400, 'start', 'letter-spacing="6"')}
     ${text(input.title.startsWith('公告称') ? '公告称' : '公开状态', 64, 578, 146, ink, 700)}
     ${text(input.title.replace(/^公告称/, ''), 64, 769, fit(input.title.replace(/^公告称/, ''), 157, 948), ink, 700)}
-    ${line(64, 831, 1016, 831)}${text(input.intervalLabel ?? '距该公告', 64, 916, 48, ink, 600)}${interval}
+    ${line(64, 831, 1016, 831)}${text(input.intervalLabel ?? '距该公告', 64, 916, 48, ink, 600)}${interval}${input.intervalUnit?text(input.intervalUnit,64,1285,35):''}
     ${line(563, 886, 563, 1349)}
     ${text(input.statementLabel??'公告时间', 600, 923, 35)}${text(date.date, 600, 1000, 62, ink, 600)}
     ${text(date.time, 600, 1076, 73, ink, 600)}${text('北京时间', 600, 1126, 32, muted)}

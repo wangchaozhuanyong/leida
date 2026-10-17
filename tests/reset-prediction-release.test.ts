@@ -136,3 +136,15 @@ test('即使类型和时间相同，新的上游预告ID也使上一轮海报失
   assert.notEqual(snapshot.round,statusPosterSnapshot(changed).round);assert.throws(()=>assertStatusPosterRound(changed,snapshot.round),/已变化/);
   assert.equal(nativePoster.statusPosterAvailable(nativePoster.statusPosterInput(original),changed),false);
 });
+
+test('预告海报圈内标签保留安全宽度，单位独立显示，预计时刻不拆成单个数字',()=>{
+  const value=data(schedule()),snapshot=statusPosterSnapshot(value),mini=nativePoster.statusPosterInput(value);
+  assert.match(snapshot.nextNote,/\n13:00$/);
+  const measure=(text:string,size:number)=>Array.from(text).reduce((n,c)=>n+(/[a-z0-9 :]/i.test(c)?.56:1)*size,0);
+  for(const style of ['precision','editorial'] as const){
+    const svg=currentStatusPosterSvg(value,now,snapshot.round,style);assert.match(svg,/>13:00<\/text>/);assert.match(svg,/>小时 : 分钟<\/text>/);
+    const layout=nativePoster.createStatusPosterLayout(mini,measure,style);
+    assert.ok(layout.commands.some((c:any)=>c.value==='13:00'));
+    if(style==='precision'){const label=layout.commands.find((c:any)=>c.value===mini.label);assert.ok(measure(label.value,label.size)<=390.01);const unit=layout.commands.find((c:any)=>c.value==='小时 : 分钟');assert.ok(unit.y>label.y);}
+  }
+});
