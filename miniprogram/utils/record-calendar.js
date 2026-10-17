@@ -40,7 +40,7 @@ function recordCalendar(data, options = {}) {
   filtered.forEach(item => { const date = dateKey(item.action.statementAt); byDate.set(date, [...(byDate.get(date) || []), item]); });
   const first = new Date(`${month}-01T12:00:00Z`), offset = (first.getUTCDay()+6)%7;
   const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth()+1, 0)).getUTCDate();
-  const days = Array.from({ length: 42 }, (_,index) => {
+  const days = Array.from({ length: Math.ceil((offset + last) / 7) * 7 }, (_,index) => {
     const day = index-offset+1, blank = day<1 || day>last, date = blank ? `blank-${index}` : `${month}-${String(day).padStart(2,'0')}`;
     const items = byDate.get(date) || [];
     return { date, day: blank ? '' : String(day), blank, disabled: blank || date<start || date>end, selected: date===selected, today: date===end,

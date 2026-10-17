@@ -41,12 +41,26 @@ test('近半年按北京时间与自然月边界，月底和闰年正确截断',
 });
 test('默认最新完成、北京时间归档；排除未完成、定向、未来及半年以外',()=>{
   const data=fixture(),before=structuredClone(data),model=recordCalendar(data);
-  assert.equal(model.selected,'2026-10-15');assert.equal(model.days.length,42);
+  assert.equal(model.selected,'2026-10-15');assert.equal(model.days.length,35);
   assert.deepEqual(completedRecords(data).map(item=>item.action.id),['oct15','oct13','oct8','midnight']);
   assert.equal(model.automaticCount,2);assert.equal(model.bankedCount,1);
   assert.equal(recordCalendar(data,{date:'2026-04-17'}).selectedItems[0].id,'midnight');
   assert.equal(recordCalendar(data,{date:'2026-10-08'}).selectedItems[0].time,'11:44');
   assert.deepEqual(data,before);
+});
+test('月历只保留有日期的完整周，四至六周均不裁掉月底',()=>{
+  const data=fixture();
+  for(const [serverTime,date,cells,last] of [
+    ['2026-10-17T08:00:00Z','2026-10-15',35,'31'],
+    ['2026-10-17T08:00:00Z','2026-08-01',42,'31'],
+    ['2027-02-28T08:00:00Z','2027-02-01',28,'28']
+  ] as const) {
+    data.serverTime=serverTime;
+    const days=recordCalendar(data,{date}).days;
+    assert.equal(days.length,cells);
+    assert.equal(days.filter(day=>!day.blank).at(-1)?.day,last);
+    assert.ok(days.slice(-7).some(day=>!day.blank));
+  }
 });
 test('日历不重复计同一动作，撤回和合并从标记与计数同步撤下',()=>{
   const data=fixture();const duplicate=structuredClone(data.publications[0]);duplicate.id='dup';duplicate.eventId='dup';duplicate.event.id='dup';duplicate.event.publicationId='dup';data.publications.push(duplicate);data.events.push(duplicate.event);
