@@ -200,7 +200,7 @@
 .pub-page-intro { color: var(--pub-muted); margin: 0 0 20px; font-size: 14px; }
 .pub-home-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 68px; margin-bottom: 16px; }
 .pub-home-heading-copy { min-width: 0; }
-.pub-home-heading-copy strong { display: block; color: var(--pub-text); font-size: 22px; font-weight: 650; line-height: 1.4; letter-spacing: -.3px; white-space: nowrap; }
+.pub-home-heading-copy h1 { display: block; margin: 0; color: var(--pub-text); font-size: 22px; font-weight: 650; line-height: 1.4; letter-spacing: -.3px; white-space: nowrap; }
 .pub-home-heading-copy p { margin-top: 4px; color: var(--pub-muted); font-size: 12px; line-height: 1.5; white-space: nowrap; }
 .public-surface .pub-freshness { display: block; position: relative; flex-shrink: 0; margin: 0 0 0 auto; padding: 0; border: 0; font-size: 11px; color: var(--pub-muted); }
 .pub-freshness > summary { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; min-height: 44px; cursor: pointer; list-style: none; border: 0; color: #929f9a; font-size: 11px; line-height: 1.5; font-weight: 400; white-space: nowrap; }
@@ -321,7 +321,7 @@
   .pub-page-back { display: none; }
   .pub-context-count { font-size: 11px; padding: 2px 6px; }
   .pub-home-heading { gap: 12px; min-height: 64px; margin-bottom: 14px; }
-  .pub-home-heading-copy strong { font-size: 19px; }
+  .pub-home-heading-copy h1 { font-size: 19px; }
   .pub-home-heading-copy p { font-size: 11px; }
   .pub-freshness > div p { white-space: normal; }
   .pub-instrument-layout.is-idle { min-height: 0; gap: 22px; }

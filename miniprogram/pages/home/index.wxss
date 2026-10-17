@@ -2,14 +2,15 @@
 .completion-record + .completion-record{border-top:1px solid #ccd9ed;padding-top:16px;margin-top:0}.completion-record .secondary-title{font-size:16px;color:#4d607b}.previous-records{margin-bottom:14px}
 .completion-record{display:flex;flex-direction:column;align-items:stretch}.completion-time{display:block;width:100%}
 
-/* Retain the progress timeline geometry; the neural ornament is decorative. */
+/* Status copy and decorative radar have separate columns; stages span the card. */
 .status-timeline{width:100%;min-height:140px;padding:13px 15px 11px;border:1px solid #ccd9ed;border-radius:12px;background:linear-gradient(115deg,#ffffff,#e1eaf8)}
-.timeline-head{display:flex;justify-content:space-between;align-items:center;gap:9px;color:#355a86;font-size:10px;line-height:16px;letter-spacing:.7px}
-.timeline-timezone{font-size:9px;letter-spacing:0;white-space:nowrap}
-.timeline-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:7px}
+.timeline-main{display:flex;align-items:center;gap:12px;min-height:96px}
+.timeline-copy{flex:1;min-width:0}
+.timeline-head{color:#355a86;font-size:10px;line-height:16px;letter-spacing:.7px}
+.timeline-timezone{margin-top:5px;color:#7085a0;font-size:9px;line-height:13px;letter-spacing:.5px}
+.timeline-row{margin-top:5px}
 .timeline-title{font-size:25px;font-weight:600;line-height:1.3;color:#14263e;word-break:break-word;font-variant-numeric:tabular-nums}
-.timeline-unit{font-size:10px;font-weight:400;margin-left:6px;white-space:nowrap;color:#355a86}
-.timeline-symbol{font-size:28px;line-height:28px;flex:none;color:#91aaca}
+.timeline-unit{display:block;font-size:9px;font-weight:400;line-height:13px;margin-top:2px;white-space:nowrap;color:#355a86}
 .is-scheduled .timeline-title{color:#2458ce}.is-completed .timeline-title{color:#21634b}
 .timeline-note{margin-top:5px;font-size:10px;line-height:15px;color:#4d607b}
 .timeline-stages{display:flex;justify-content:space-between;margin-top:10px;position:relative}
@@ -54,11 +55,11 @@
 .share-entry[disabled]{background:transparent;color:#4d607b}
 @media(max-width:350px){.share-entry{gap:14px;padding-left:16px;padding-right:16px}.share-entry-title{font-size:15px}.share-entry-description{font-size:10px}}
 
-/* Silver neural skin: a small ornament stays behind the existing text. */
+/* Keep motion inside the radar island without touching the page background. */
 .status-timeline{position:relative;overflow:hidden;background-color:#e1eaf8;background-image:linear-gradient(110deg,#ffffff 0%,#ffffff 34%,transparent 100%),linear-gradient(#365bd209 1px,transparent 1px),linear-gradient(90deg,#365bd209 1px,transparent 1px);background-size:auto,18px 18px,18px 18px;box-shadow:inset 0 1px 0 #fff,0 8px 24px #1b457314}
-.timeline-orb{position:absolute;top:15px;right:0;width:46%;max-width:170px;height:80px;z-index:0}
-.timeline-head,.timeline-row,.timeline-note,.timeline-stages{position:relative;z-index:1}
-.timeline-symbol{opacity:0}
+.timeline-orb{position:relative;display:block;flex:none;width:96px;height:96px;pointer-events:none}
+.timeline-main,.timeline-stages{position:relative;z-index:1}
+@media(max-width:350px){.timeline-main{gap:10px;min-height:84px}.timeline-orb{width:84px;height:84px}}
 .share-entry-poster{box-shadow:0 3px 8px #1b457326}
 
 /* Static observatory artwork blends into the same opaque page background. */
@@ -66,8 +67,15 @@
 .home-atmosphere{position:absolute;top:0;left:0;width:100%;height:66.6667vw;max-height:400px;z-index:0;pointer-events:none}
 .home-atmosphere-fade{position:absolute;top:0;left:0;width:100%;height:66.6667vw;max-height:400px;z-index:0;background:linear-gradient(180deg,#f2f5fb00 48%,#f2f5fb 100%);pointer-events:none}
 .home-page>.home-heading,.home-page>.freshness-detail,.home-page>status-panel,.home-page>.warning,.home-page>.status-timeline,.home-page>.timeline-time-note,.home-page>.instrument-actions,.home-page>.completion-records,.home-page>.share-entry,.home-page>.previous-records,.home-page>.activity-entry,.home-page>.section,.home-page>publication-card,.home-page>.card,.home-page>.foot{position:relative;z-index:1}
-.home-heading{flex-direction:column;align-items:flex-start;justify-content:center;gap:6px;min-height:124px;margin-bottom:12px}
-.home-heading .freshness-summary{justify-content:flex-start;min-height:28px;max-width:100%}
+.home-heading{flex-direction:column;align-items:center;justify-content:center;gap:0;min-height:124px;margin-bottom:12px;text-align:center}
+.home-heading-copy{width:100%;min-width:0}
+.home-heading .home-heading-title{font-family:"Songti SC","STSong","SimSun",serif;font-size:28px;font-weight:600;line-height:1.4;letter-spacing:.8px;color:#233c5b;white-space:nowrap}
+.home-heading-accent{color:#2458ce}
+.home-heading .home-heading-subtitle{display:flex;align-items:center;justify-content:center;gap:9px;font-size:11px;line-height:20px;letter-spacing:1.2px;margin-top:5px;color:#516985}
+.home-heading-subtitle::before,.home-heading-subtitle::after{content:"";width:22px;height:1px;background:linear-gradient(90deg,transparent,#aebed4)}
+.home-heading-subtitle::after{transform:rotate(180deg)}
+.home-heading .freshness-summary{justify-content:center;min-height:44px;max-width:100%;font-size:10px;line-height:16px}
+@media(max-width:350px){.home-heading .home-heading-title{font-size:25px;letter-spacing:.3px}.home-heading .home-heading-subtitle{font-size:10px;letter-spacing:.8px}}
 
 /* Keep status, factual records and their actions in one stable reading group. */
 .home-page>.status-card{position:relative;z-index:1;border:1px solid #ccd9ed;border-radius:17px;background:linear-gradient(130deg,#ffffffed,#f6f9fff2);overflow:hidden;box-shadow:0 8px 24px #264f8b06}
@@ -97,3 +105,13 @@
 .share-entry .share-entry-posters{width:50px;height:59px}
 .home-page>.activity-entry{border-top:0;min-height:78px;padding:14px 0}
 @media(max-width:350px){.status-card .status-timeline{padding-left:15px;padding-right:15px}.recent-complete,.status-card .instrument-actions{margin-left:15px;margin-right:15px}.completion-date{font-size:9px}.status-card .instrument-action-button{min-width:105px;padding:10px 13px}.home-page>.share-entry{padding-left:12px;padding-right:12px;gap:11px}.share-entry .share-entry-title{font-size:14px}.share-entry .share-entry-description{font-size:9px}.share-entry-signal{width:40px}}
+
+/* Forecasts remain distinct from the confirmed progress line. */
+.timeline-detail{margin-top:5px;font-size:10px;line-height:16px;color:#617b9c}
+.timeline-watch-sources{position:relative;z-index:1;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;column-gap:12px;margin-top:5px}
+.timeline-watch-sources button{margin:0;padding:6px 0;min-height:36px;line-height:22px;background:transparent;border:0;border-radius:0;box-shadow:none;text-align:left;font-size:10px;font-weight:400}
+.timeline-watch-sources button::after{border:0}
+.timeline-source-link{color:#2458ce}.timeline-provider-link{color:#7085a0}
+.is-watching .timeline-title,.is-estimating .timeline-title{font-size:23px;color:#2458ce}
+.is-estimating .timeline-note{font-variant-numeric:tabular-nums}
+@media(max-width:350px){.is-watching .timeline-title,.is-estimating .timeline-title{font-size:21px}}

@@ -101,7 +101,7 @@ export interface ResetCadenceInput {
 }
 
 export type CadenceLookback=8|12|20|30;
-export const RESET_CADENCE_MODEL_VERSION='conditional-beta-reset-cadence-20261016-2';
+export const RESET_CADENCE_MODEL_VERSION='conditional-beta-reset-cadence-20261017-1';
 export const RESET_CADENCE_MIN_INTERVALS=8;
 export const RESET_CADENCE_MAX_INTERVALS=30;
 // Fixed recent window balances several months of cadence and historical support.

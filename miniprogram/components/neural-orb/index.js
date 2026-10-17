@@ -59,7 +59,7 @@ Component({
             if (!ctx) return;
             const info = typeof wx.getWindowInfo === 'function' ? wx.getWindowInfo() : {};
             const ratio = Math.max(1, Math.min(1.6, info.pixelRatio || 1));
-            const width = Math.min(170, result.width), height = Math.min(80, result.height);
+            const width = Math.min(170, result.width), height = Math.min(170, result.height);
             const pixelWidth = Math.round(width * ratio), pixelHeight = Math.round(height * ratio);
             if (canvas.width !== pixelWidth || canvas.height !== pixelHeight || canvas !== this._canvas) {
               canvas.width = pixelWidth; canvas.height = pixelHeight;

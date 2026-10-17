@@ -1,6 +1,15 @@
 :host{display:block;width:100%;height:100%}
 .neural-art{position:relative;width:100%;height:100%;pointer-events:none}
 .neural-static,.neural-canvas{position:absolute;left:0;top:0;width:100%;height:100%}
+.radar-face{position:absolute;left:7.6%;top:7.6%;width:84.8%;height:84.8%;box-sizing:border-box;border:1px solid #4370b761;border-radius:50%;background:#eef6ffb3;overflow:hidden}
+.radar-ring{position:absolute;box-sizing:border-box;border:1px solid #436eb833;border-radius:50%}
+.radar-ring.middle{width:66%;height:66%;left:17%;top:17%}.radar-ring.inner{width:33%;height:33%;left:33.5%;top:33.5%}
+.radar-axis{position:absolute;background:#436eb829}.radar-axis.horizontal{left:3%;top:50%;width:94%;height:1px}.radar-axis.vertical{top:3%;left:50%;height:94%;width:1px}
+.radar-sweep{position:absolute;left:50%;top:50%;width:50%;height:1px;background:#2c74d1bf;transform-origin:left center;transform:rotate(-6deg)}
+.radar-point{position:absolute;width:3px;height:3px;margin:-1.5px;border-radius:50%;background:#3171beba;box-shadow:0 0 0 3px #4291d71a}
+.radar-point.first{left:64.2%;top:25.3%}.radar-point.second{left:81%;top:73.6%}.radar-point.third{left:31.3%;top:62.5%}
+.radar-center{position:absolute;left:50%;top:50%;width:3px;height:3px;margin:-2.5px;border:1px solid #fff;border-radius:50%;background:#3c76be}
+.radar-marker{position:absolute;background:#436eb885}.radar-marker.north,.radar-marker.south{left:50%;width:1px;height:4px}.radar-marker.north{top:2%}.radar-marker.south{bottom:2%}.radar-marker.east,.radar-marker.west{top:50%;height:1px;width:4px}.radar-marker.east{right:2%}.radar-marker.west{left:2%}
 .neural-canvas{visibility:hidden}
 .is-ready .neural-canvas{visibility:visible}
 .is-ready .neural-static{visibility:hidden}

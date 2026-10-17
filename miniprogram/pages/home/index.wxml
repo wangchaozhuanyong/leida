@@ -3,18 +3,25 @@
 <view class="page home-page">
   <image class="home-atmosphere" src="/assets/neural/observatory-header.jpg" mode="aspectFill" aria-hidden="true" />
   <view class="home-atmosphere-fade" aria-hidden="true" />
-  <view class="home-heading"><view class="home-heading-copy"><view class="home-heading-title">Codex重置</view><view class="home-heading-subtitle">不要错过每一次重置。</view></view><view class="freshness-summary" bindtap="toggleFreshness" role="button" aria-label="公开资料状态" aria-expanded="{{freshnessOpen}}"><view class="health-dot {{sourceDelayed || error ? 'delayed' : ''}}"></view><text>{{error ? connected ? '更新暂时中断' : '暂时无法连接' : connected ? sourceStatusLabel : loading ? '加载中' : '等待连接公开资料'}}</text><text class="info-symbol">ⓘ</text></view></view>
+  <view class="home-heading"><view class="home-heading-copy"><view class="home-heading-title"><text>重置动态，</text><text class="home-heading-accent">一目了然</text></view><view class="home-heading-subtitle">不要错过每一次重置。</view></view><view class="freshness-summary" bindtap="toggleFreshness" role="button" aria-label="公开资料状态" aria-expanded="{{freshnessOpen}}"><view class="health-dot {{sourceDelayed || error ? 'delayed' : ''}}"></view><text>{{error ? connected ? '更新暂时中断' : '暂时无法连接' : connected ? sourceStatusLabel : loading ? '加载中' : '等待连接公开资料'}}</text><text class="info-symbol">ⓘ</text></view></view>
   <view wx:if="{{freshnessOpen && connected}}" class="freshness-detail"><view>最近采集成功：{{collectedAt}} · 北京时间</view><view>最新消息发布于：{{latestSourceTime}} · 北京时间</view><view class="muted">成功时间来自最近成功的来源，不代表所有来源同时更新。</view></view>
   <status-panel wx:if="{{!connected}}" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />
   <block wx:else>
     <view wx:if="{{error}}" class="warning">连接暂时中断，保留最近读取的资料。<button class="text-button" bindtap="retry" loading="{{loading}}">重新连接 →</button></view>
     <view wx:if="{{historical}}" class="warning">当前公告为历史收录，不代表刚刚发放。</view>
     <view class="status-card">
-    <view wx:if="{{timeline}}" class="status-timeline {{timeline.completed ? 'is-completed' : ''}} {{timeline.scheduled ? 'is-scheduled' : ''}}" aria-label="公开重置进展">
-      <neural-orb class="timeline-orb" aria-hidden="true" />
-      <view class="timeline-head"><text>{{timeline.lead}}</text><text class="timeline-timezone">北京时间</text></view>
-      <view class="timeline-row"><view class="timeline-title">{{timeline.title}}<text wx:if="{{timeline.scheduled}}" class="timeline-unit">小时 : 分钟</text></view><text class="timeline-symbol" aria-hidden="true">↗</text></view>
-      <view class="timeline-note">{{timeline.note}}</view>
+    <view wx:if="{{timeline}}" class="status-timeline {{timeline.completed ? 'is-completed' : ''}} {{timeline.scheduled ? 'is-scheduled' : ''}} {{timeline.watching ? 'is-watching' : ''}} {{timeline.estimating ? 'is-estimating' : ''}}" aria-label="公开重置进展">
+      <view class="timeline-main">
+        <view class="timeline-copy">
+          <view class="timeline-head">{{timeline.lead}}</view>
+          <view class="timeline-row"><view class="timeline-title">{{timeline.title}}<text wx:if="{{timeline.scheduled}}" class="timeline-unit">小时 : 分钟</text></view></view>
+          <view class="timeline-note">{{timeline.note}}</view>
+          <view class="timeline-timezone">北京时间</view>
+          <view wx:if="{{timeline.detail}}" class="timeline-detail">{{timeline.detail}}</view>
+        </view>
+        <neural-orb class="timeline-orb" aria-hidden="true" />
+      </view>
+      <view wx:if="{{timeline.watching}}" class="timeline-watch-sources"><button class="timeline-source-link" bindtap="copyWatchSource">复制信号来源 ↗</button><button class="timeline-provider-link" bindtap="copyWatchProvider">数据来自 Codex Resets</button></view>
       <view class="timeline-stages" aria-label="公开进展阶段"><view wx:for="{{timeline.stages}}" wx:key="*this" class="timeline-stage {{timeline.currentStage === index ? 'current' : ''}}" aria-label="{{item}}{{timeline.currentStage === index ? '，当前阶段' : ''}}"><view class="stage-dot"/>{{item}}</view></view>
     </view>
     <view wx:if="{{pending.timeNote}}" class="timeline-time-note small muted">{{pending.timeNote}}</view>

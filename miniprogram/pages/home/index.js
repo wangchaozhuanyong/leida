@@ -33,7 +33,7 @@ Page(createPage((data, query, page, app) => {
     evidenceLabel: pending ? '查看本次公告' : latest ? '查看最近公告' : '浏览历史记录',
     pending: pending ? { label: m.actionLabels[pending.kind], stage: m.stageText(pending, data.serverTime), countdown: countdown.label, timed: countdown.status !== 'unknown', counting: countdown.status === 'upcoming', time: pending.expectedAt ? m.displayTime(pending.expectedAt) : '', timeNote: pending.timeNote || '', path: pathFor(pending) } : null,
     forecast: null, outlookStatus: outlook.status,
-    timeline: statusTimelineModel(outlook, data.serverTime, latestAction || null), posterPath, posterDescription,
+    timeline: statusTimelineModel(outlook, data.serverTime, latestAction || null, data.forecasts), posterPath, posterDescription,
     sourceDelayed: m.sourceStatus(data.sources).warning, sourceStatusLabel:m.sourceStatus(data.sources).label,
     collectedAt: m.displayTime(recentSuccess), latestSourceTime: latestArticle ? m.displayTime(m.articleSourceTime(latestArticle)) : '暂无记录',
     waitingText: outlook.status === 'completed' ? '本次已有公开完成声明，等待下一次预告。' : outlook.status === 'cancelled' ? '本次安排已取消，等待下一次预告。' : '等待下一次预告，暂无新的时间依据。',
@@ -43,7 +43,7 @@ Page(createPage((data, query, page, app) => {
     shareLabel: '分享这条公告给朋友',
     historical: data.articles.length > 0 && data.articles.every(article => m.isHistoricalArticle(article, data.evidence))
   };
-}, { view:()=>({view:'home'}), data: { name: '模钥重置雷达', freshnessOpen: false }, afterRender() { this.syncCountdown(); }, hide() { this.stopCountdown(); }, unload() { this.stopCountdown(); }, methods: {
+}, { view:()=>({view:'home'}), data: { name: '模钥重置雷达', freshnessOpen: false }, afterRender() { this.syncCountdown(); this.syncForecastExpiry(); }, hide() { this.stopCountdown(); this.stopForecastExpiry(); }, unload() { this.stopCountdown(); this.stopForecastExpiry(); }, methods: {
   toggleFreshness() { this.setData({ freshnessOpen: !this.data.freshnessOpen }); },
   openPoster() { if (this.data.connected) wx.navigateTo({ url:'/pages/poster/index' }); },
   syncCountdown() {
@@ -55,7 +55,7 @@ Page(createPage((data, query, page, app) => {
     const state=getApp().client.getState();if(!state.data)return;
     const now=new Date(Date.parse(state.data.serverTime)+Math.max(0,Date.now()-state.receivedAt)).toISOString();
     const outlook=m.resetOutlookModel(state.data),completed=m.latestCompletedBenefits(state.data)[0];
-    const timeline=statusTimelineModel(outlook,now,completed?.action||null);
+    const timeline=statusTimelineModel(outlook,now,completed?.action||null,state.data.forecasts);
     // Only the clock region crosses the native bridge; lists and page layout stay untouched.
     if(JSON.stringify(timeline)!==JSON.stringify(this.data.timeline))this.setData({timeline});
     if(outlook.active && this.data.pending){
@@ -65,6 +65,39 @@ Page(createPage((data, query, page, app) => {
     this.syncCountdown();
   },
   stopCountdown() { if (this._countdownTimer) clearInterval(this._countdownTimer); this._countdownTimer = null; },
+  syncForecastExpiry() {
+    if (!this._visible) { this.stopForecastExpiry(); return; }
+    const state=getApp().client.getState(),forecasts=state.data && state.data.forecasts;
+    if (!forecasts) { this.stopForecastExpiry(); return; }
+    const now=Date.parse(state.data.serverTime)+Math.max(0,Date.now()-state.receivedAt);
+    const dates=[];
+    if (forecasts.watch && forecasts.watch.status==='active' && forecasts.watch.signal) dates.push(forecasts.watch.signal.expiresAt);
+    const snapshots=Object.values(forecasts.cadenceByKind || {});
+    if(forecasts.cadence)snapshots.push(forecasts.cadence);
+    for(const snapshot of snapshots)if(snapshot && snapshot.status==='ready')dates.push(snapshot.validUntil,snapshot.windowEnd);
+    const next=dates.map(Date.parse).filter(at=>Number.isFinite(at)&&at>now).sort((a,b)=>a-b)[0];
+    if (!next) { this.stopForecastExpiry(); return; }
+    if (this._forecastExpiryAt===next && this._forecastExpiryTimer) return;
+    this.stopForecastExpiry();this._forecastExpiryAt=next;
+    // One boundary update, not a new polling or per-second rendering loop.
+    this._forecastExpiryTimer=setTimeout(()=>{this._forecastExpiryTimer=null;this.tickForecastExpiry();},Math.min(2147483647,Math.max(1,next-now+20)));
+  },
+  tickForecastExpiry() {
+    if(!this._visible)return;
+    const state=getApp().client.getState();if(!state.data)return;
+    const now=new Date(Date.parse(state.data.serverTime)+Math.max(0,Date.now()-state.receivedAt)).toISOString();
+    const outlook=m.resetOutlookModel(state.data),completed=m.latestCompletedBenefits(state.data)[0];
+    const timeline=statusTimelineModel(outlook,now,completed?.action||null,state.data.forecasts);
+    const patch={forecastNow:now};
+    if(JSON.stringify(timeline)!==JSON.stringify(this.data.timeline))patch.timeline=timeline;
+    this.setData(patch);this.syncCountdown();this.syncForecastExpiry();
+  },
+  stopForecastExpiry() { if(this._forecastExpiryTimer)clearTimeout(this._forecastExpiryTimer);this._forecastExpiryTimer=null;this._forecastExpiryAt=null; },
+  copyWatchSource() {
+    const url=this.data.timeline && this.data.timeline.sourceUrl;
+    if(typeof url==='string' && /^https:\/\/x\.com\/thsottiaux\/status\/\d{15,20}$/.test(url))wx.setClipboardData({data:url,fail(){wx.showToast({title:'复制失败，请稍后重试',icon:'none'});}});
+  },
+  copyWatchProvider() { wx.setClipboardData({data:'https://codex-resets.com/',fail(){wx.showToast({title:'复制失败，请稍后重试',icon:'none'});}}); },
   openWechatSettings() { wx.switchTab({ url: '/pages/settings/index' }); },
   openDay(event) { wx.navigateTo({ url: `/pages/schedule/index?date=${event.currentTarget.dataset.date}` }); },
   onShareAppMessage() { return { title: this.data.shareTitle || '模钥重置雷达', path: this.data.sharePath || '/pages/home/index' }; }
