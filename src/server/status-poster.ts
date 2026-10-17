@@ -47,7 +47,7 @@ export function currentStatusPosterSvg(data:PublicData, generatedAt:string, roun
     const input=statusPosterSnapshot(data,generatedAt);
     if(input.round!==roundId)throw Object.assign(new Error('公开状态已变化，请关闭后重新生成海报'),{status:409});
     if(code&&(code.publicationId!==input.publicationId||validateWechatImage(code.image)!==code.contentType))throw new Error('小程序码与海报版本不匹配');
-    return designedStatusPoster({style,name:data.site.name,title:input.title,interval:input.value+(/^\d+$/.test(input.value)&&input.unit?' '+input.unit:''),intervalLabel:input.label+(input.unit==='小时 : 分钟'?' · 小时 : 分钟':''),statementAt:input.statementAt,statementLabel:input.statementLabel,generatedAt,nextNote:input.nextNote,nextIsForecast:false,sourceLabel:input.sourceLabel,brand:brandMarkup(0,0,100,75),code});
+    return designedStatusPoster({style,name:data.site.name,title:input.title,interval:input.value+(/^\d+$/.test(input.value)&&input.unit?' '+input.unit:''),intervalLabel:input.label,intervalUnit:input.unit==='小时 : 分钟'?input.unit:undefined,statementAt:input.statementAt,statementLabel:input.statementLabel,generatedAt,nextNote:input.nextNote,nextIsForecast:false,sourceLabel:input.sourceLabel,brand:brandMarkup(0,0,100,75),code});
   }
   const outlook=data.forecasts?.outlook??publicResetOutlook({...data,serverTime:generatedAt});
   const active=outlook.active;
