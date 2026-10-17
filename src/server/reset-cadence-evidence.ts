@@ -19,7 +19,9 @@ const presentOrPast = /\b(?:have|has)\s+(?:now\s+|already\s+|just\s+|been\s+|ful
 // explicit membership condition that the shared claim parser could not verify.
 const explicitEligibility = /\b(?:if|unless|except|excluding|eligible|created|registered|upgraded|regions?|countr(?:y|ies))\b|\b(?:users?|accounts?|plans?|subscriptions?|everyone)\s+(?:in|from|with|without|who|that|having|older|younger)\b|符合资格|创建|注册|升级|地区|区域|国家|除了|排除|除.{0,25}以外/iu;
 const unrestrictedClaim = (claim: ReturnType<typeof extractBenefitClaims>[number]) => claim.scope === 'public' &&
-  !/（(?:资格原文|地区原文|限定范围)[:：]/u.test(claim.eligibility);
+  !/（(?:资格原文|地区原文|限定范围)[:：]/u.test(claim.eligibility) &&
+  // A readable historical product announcement is not proof of an unrestricted audience.
+  !/用户（原帖未列明具体套餐）/u.test(claim.eligibility);
 
 function strictTime(value:string):number {
   if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value))return NaN;
@@ -101,6 +103,7 @@ function statementKind(evidence: Evidence): CadenceObservation['kind'] | undefin
     const parsed = extractBenefitClaims(clause, evidence.publishedAt);
     const claims = parsed.filter(claim => unrestrictedClaim(claim) && (claim.stage === 'claimed_complete' || claim.stage === 'in_progress'));
     for (const claim of claims) kinds.add(claim.kind);
+    if(!claims.length&&parsed.some(claim=>claim.scope==='public'&&/用户（原帖未列明具体套餐）/u.test(claim.eligibility)))kinds.add('unspecified');
     // A rejected or restricted finite claim must not enter via the wider
     // auxiliary fallback below. Valid relative timing stays in the parser path.
     if (parsed.length || explicitEligibility.test(clause)) continue;

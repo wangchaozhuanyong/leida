@@ -40,7 +40,7 @@ export function sourceRetryAt(source:Source,retryAt?:string,timestamp=Date.now()
   const backoff=source.pauseReason==='structure'?CONTEXT_PROBE_INTERVAL:Math.min(60,2**Math.min(failures,6))*60_000;
   return new Date(Math.max(timestamp+backoff,retryAt?Date.parse(retryAt):0)).toISOString();
 }
-function contextFor(candidate:Candidate,primary:Evidence,all:Evidence[]):Evidence[] {
+export function contextFor(candidate:Candidate,primary:Evidence,all:Evidence[]):Evidence[] {
   const supplemental=all.filter(item=>candidate.content.evidenceIds.includes(item.id)&&all.find(latest=>latest.sourceId===item.sourceId&&latest.messageId===item.messageId)?.id===item.id);
   const context=[...new Map([...gatherEvidenceContext(primary,all),...supplemental].map(item=>[item.id,item])).values()];
   return hasCompleteContext(primary,context)?context.filter(item=>hasCompleteContext(item,context)||isVerifiedCampaignCalendar(item,context)):context;

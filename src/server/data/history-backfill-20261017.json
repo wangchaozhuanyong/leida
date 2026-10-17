@@ -1,0 +1,2313 @@
+{
+  "id": "public-history-20260417-20261017-1",
+  "schemaVersion": 1,
+  "sourceRepository": "gdutxiaoxu/codex-reset-radar",
+  "sourceCommit": "2c2b709d484217ca102e44f47985ec77d3ae4eb1",
+  "sourcePath": "data/resets.json",
+  "reviewedAt": "2026-10-17T12:31:14.739Z",
+  "startsAt": "2026-04-16T16:00:00.000Z",
+  "endsAt": "2026-10-17T12:31:14.739Z",
+  "rulesVersion": "benefit-rules-20261017-2",
+  "evidence": [
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2044943514832871564",
+      "url": "https://x.com/thsottiaux/status/2044943514832871564",
+      "text": "Hi! To celebrate its 1-year anniversary, I have allowed Codex to reset its own rate limits across all plans. Enjoy all the new features. https://t.co/xIGXQwMzpa",
+      "publishedAt": "2026-04-17T00:58:21.000Z",
+      "collectedAt": "2026-10-17T12:18:56.908Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2044943514832871564",
+      "hash": "d876d594ea82072c577e223b7fcc9ea72d63468f4defeec585448a9c5724f8bf",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2046364656789532739",
+      "url": "https://x.com/thsottiaux/status/2046364656789532739",
+      "text": "🚨 Codex is partially down. Team is investigating.",
+      "publishedAt": "2026-04-20T23:05:28.000Z",
+      "collectedAt": "2026-10-17T12:19:06.008Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "product"
+      },
+      "id": "history_original_2046364656789532739",
+      "hash": "3f52f3d6659c8ae39f67b8b60656aed34ef3f730ccc0673f904d5eea6acfb09c",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2046367145588916687",
+      "url": "https://x.com/thsottiaux/status/2046367145588916687",
+      "text": "Codex incident is mitigated, seeing recovery. Lasted about 10 mins, Codex itself helped with the remediation, but ultimately the insight came from a human this time. \n\nApologies for the disruption and rate limit reset incoming. https://t.co/RiuRnNsH2u",
+      "publishedAt": "2026-04-20T23:15:21.000Z",
+      "collectedAt": "2026-10-17T12:18:56.939Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "parentId": "2046364656789532739",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2046367145588916687",
+      "hash": "71046b15a53943e9c6f351a79799d65488f412a7dfc2b4101093e3fdc7a0f025",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2048997818673537399",
+      "url": "https://x.com/thsottiaux/status/2048997818673537399",
+      "text": "Don't just reset Codex rate limits for fun, it costs money.\nDon't just reset Codex rate limits for fun, it costs money.\n\n... but the vibes are good ...\n\nI have reset Codex rate limits for ALL paid plans to celebrate a good week and allow everyone to build more with GPT-5.5. Enjoy",
+      "publishedAt": "2026-04-28T05:28:43.000Z",
+      "collectedAt": "2026-10-17T12:18:56.079Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2048997818673537399",
+      "hash": "bb4ead38db8e45fc013c6f8a161f60e0f8ae9b479b092f3147ff7466eeea713c",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2055316274394300829",
+      "url": "https://x.com/thsottiaux/status/2055316274394300829",
+      "text": "Codex team is aware of reports of GPT-5.5 performing worse for some users and investigating. We don't have anything conclusive yet and systems are healthy but we will share updates as we go.",
+      "publishedAt": "2026-05-15T15:56:00.000Z",
+      "collectedAt": "2026-10-17T12:19:07.514Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "product"
+      },
+      "id": "history_original_2055316274394300829",
+      "hash": "e395004ce2182136a390c49c7f7ff520f22a5d2e753a1682043d68cfa7a074f5",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2055446089957036402",
+      "url": "https://x.com/thsottiaux/status/2055446089957036402",
+      "text": "We found and fixed two issues that could explain this degradation of the capability of GPT-5.5 in Codex over the last ~ 48 hours. \n\nWe are monitoring over the coming hours to fully confirm and I will reset usage limits this evening.\n\nApologies and now is the time for /fast maxxing.",
+      "publishedAt": "2026-05-16T00:31:50.000Z",
+      "collectedAt": "2026-10-17T12:19:05.905Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "parentId": "2055316274394300829",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2055446089957036402",
+      "hash": "2ad8a3fa01a1f0e34bca8801f57d3a72e923405d9060053e25127a895f6cecf6",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2055707616605835333",
+      "url": "https://x.com/thsottiaux/status/2055707616605835333",
+      "text": "Codex usage limits have now been reset across all paid plans. Enjoy the weekend!",
+      "publishedAt": "2026-05-16T17:51:03.000Z",
+      "collectedAt": "2026-10-17T12:18:56.073Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "parentId": "2055446089957036402",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2055707616605835333",
+      "hash": "d67d95d59cc2ceb6f4e730023dc6b851ab397c76e01f0b7c0235effaeb6d1f22",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2058280452851638313",
+      "url": "https://x.com/thsottiaux/status/2058280452851638313",
+      "text": "Some of you noticed limits drained faster in Codex, we root caused it to an optimization that we rolled back that had an impact on cache hit rates when compacting across long running sessions. \n\nWe fixed this and have now reset usage limits for all accounts. Enjoy the weekend.",
+      "publishedAt": "2026-05-23T20:14:35.000Z",
+      "collectedAt": "2026-10-17T12:18:55.297Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2058280452851638313",
+      "hash": "76ff5570cf8819f67583395f54dd959d7315e06bb119a4e97f2ebbe6778e34cd",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2060964284117782996",
+      "url": "https://x.com/thsottiaux/status/2060964284117782996",
+      "text": "Five million users would agree. Resetting the limits tomorrow morning to celebrate.\n\nTime to go /fast",
+      "publishedAt": "2026-05-31T05:59:10.000Z",
+      "collectedAt": "2026-10-17T12:19:05.226Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2060964284117782996",
+      "hash": "84c64cfcfe3496597a5a33a43de893d72920f2dc0c44069b4744d7f54a5f52c2",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2061106703446450392",
+      "url": "https://x.com/thsottiaux/status/2061106703446450392",
+      "text": "The Codex usage limits have been reset for all paid ChatGPT subscriptions. You should be back to 100% weekly and 100% hourly limits.\n\nLet the tokens do incredible things today and have fun.",
+      "publishedAt": "2026-05-31T15:25:06.000Z",
+      "collectedAt": "2026-10-17T12:18:55.242Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "parentId": "2060964284117782996",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2061106703446450392",
+      "hash": "6f93508b48185a8fcb87e7ec9008a415e2c996fc022e7ffac2886a0fb811d236",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2062329981548802523",
+      "url": "https://x.com/thsottiaux/status/2062329981548802523",
+      "text": "Hi. Over the last 24 hours we had three separate small incidents that affected Codex reliability. Those are three too many and we are taking active steps for them to not reproduce.\n\nI have reset usage limits for Codex across all paid plans. May the tokens flow again.",
+      "publishedAt": "2026-06-04T00:25:58.000Z",
+      "collectedAt": "2026-10-17T12:18:54.409Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2062329981548802523",
+      "hash": "e7dcca275b8da9138c9f0653433caa36438fb2d95631376addced63c836c59f7",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2067399435009622521",
+      "url": "https://x.com/thsottiaux/status/2067399435009622521",
+      "text": "Dearest gentle codexer.\n\nWe did a sneaky double reset. Not only do you get a full reset on us. But you are also getting one into the reset bank to use at your own leisure. \n\nEnjoy",
+      "publishedAt": "2026-06-18T00:10:10.000Z",
+      "collectedAt": "2026-10-17T12:18:54.473Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2067399435009622521",
+      "hash": "0f8e74eff091fa21f337cf008a4953fff277e38d701313c93cddfb1eb2a58043",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2070553131503776175",
+      "url": "https://x.com/thsottiaux/status/2070553131503776175",
+      "text": "Ola. The Codex team is investigating issues where some accounts are seeing faster usage draining than intended. We believe this is related to some abuse &amp; fraud prevention mechanisms that we have that might be overflagging. \n\nStay tuned.",
+      "publishedAt": "2026-06-26T17:01:50.000Z",
+      "collectedAt": "2026-10-17T12:19:05.093Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "product"
+      },
+      "id": "history_original_2070553131503776175",
+      "hash": "09192a8425d22ff9c5c688e616e4af0d920d4cd8ac3d8de47b81a917699d729c",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2070653282440405046",
+      "url": "https://x.com/thsottiaux/status/2070653282440405046",
+      "text": "We are giving all Codex users a usage reset on the house. Should be showing in your accounts in the next few hours.\n\nWe have applied some mitigations, but our investigation hasn't shown users being impacted at large. We are continuing to monitor the situation.",
+      "publishedAt": "2026-06-26T23:39:48.000Z",
+      "collectedAt": "2026-10-17T12:18:53.625Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "parentId": "2070553131503776175",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2070653282440405046",
+      "hash": "82c52e5ca19285651778ca2c5a5939e5198cf264e61b5c8bcb7083e1d73d1163",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2071357473659707441",
+      "url": "https://x.com/thsottiaux/status/2071357473659707441",
+      "text": "Codex team is in a warroom on a Sunday combing through logs and checking whether there is anything that could lead to increased usage drains for some users. Taking it very seriously and won't rest until we get to the bottom of it.",
+      "publishedAt": "2026-06-28T22:18:00.000Z",
+      "collectedAt": "2026-10-17T12:19:04.409Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "product"
+      },
+      "id": "history_original_2071357473659707441",
+      "hash": "2112073f6e504983b4416a704b9d4c09be4714b28fae9f7a102abd94b1412b31",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2071381664853319742",
+      "url": "https://x.com/thsottiaux/status/2071381664853319742",
+      "text": "As we are still investigating, I have reset everyone's Codex usage limits. This is a hard reset given some users had stacked up to three banked resets already that they can apply on their own schedule.\n\nFunnily enough, this week at OpenAI is called the RESET week, which is meant for folks to relax a bit. However it will be a different kind of RESET week. Enjoy.",
+      "publishedAt": "2026-06-28T23:54:07.000Z",
+      "collectedAt": "2026-10-17T12:18:53.629Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "parentId": "2071357473659707441",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2071381664853319742",
+      "hash": "5a6e2ad9f07053b281d4bf4d57ba3d81a42796e2c3e0331fc16814a7e6bbd83f",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2071740419030053227",
+      "url": "https://x.com/thsottiaux/status/2071740419030053227",
+      "text": "Codex usage limits will be fully reset again in the next hour and we will credit one additional reset into your bank for your own usage over the next 24 hours.\n\nWe investigated reports that Codex usage was being consumed faster than expected. There wasn't one central issue, but a few smaller problems compounded for some users.   \n\nHere's what we found and changed: \n- Actual usage: Auto-review had become more proactive, another change was triggering more subagent work, and background suggestions could run twice or retry too frequently after failures. We reverted the changes and fixed suggestion scheduling, duplicate generation, and retry behavior. This should reduce unnecessary background token consumption while preserving the work users explicitly request. \n- Usage reporting: Auto-review was incorrectly appearing as GPT‑5.4 usage, and failed or rate-limited requests were still shown as turns. Auto-review now appears as its own category, and only successful requests count toward the turn graphs. Rate-limited requests were never charged, but they were being displayed incorrectly. \n- Immediate relief: We reset usage limits while rolling out the fixes, then shipped hotfixes across the CLI, desktop app, and usage backend. \n- What to expect: New usage data should be clearer and actual consumption should be lower. Historical charts may still show auto-review under GPT‑5.4 because older turn data was not relabeled. Features that intentionally perform more work; such as /goal, subagents, and higher reasoning levels will still naturally use more capacity.  \n\nAll fixes are now deployed, and we've added more detailed monitoring so we can detect background-usage regressions sooner. We'll continue watching the results closely.\n\nThank you for building and doing all sorts of things with Codex.",
+      "publishedAt": "2026-06-29T23:39:41.000Z",
+      "collectedAt": "2026-10-17T12:18:52.809Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "parentId": "2071357473659707441",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2071740419030053227",
+      "hash": "43371603548abaaf54bac5061f38f6adab1ec4dddf956872732f07df0a3b2fcf",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2075330198887940337",
+      "url": "https://x.com/thsottiaux/status/2075330198887940337",
+      "text": "Enjoy a full reset of your usage limits for ChatGPT Work and Codex. Propagating in the next hour.\n\n@_rajanagarwal just joined to work on model research and push on coding capabilities. You can thank him for pressing the button today. https://t.co/vMMwKJibBI",
+      "publishedAt": "2026-07-09T21:24:11.000Z",
+      "collectedAt": "2026-10-17T12:18:52.808Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2075330198887940337",
+      "hash": "3efc3f40b1737495fc1bfabd368c51d659618b912e16053108811b6e9f32f748",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2075641131002700120",
+      "url": "https://x.com/thsottiaux/status/2075641131002700120",
+      "text": "Hello beautiful people! We have reset usage limits across Codex and ChatGPT Work. And another one will come later in the day. Rejoice.\n\nNow that I have your attention, a quick update on ChatGPT Work, Codex and all the updates we shared yesterday.\n\nWe’ve spent the last 24 hours reading feedback, looking at usage patterns, and talking with many of you. The short version is that there is a *lot* of excitement for GPT 5.6 Sol, ChatGPT Work on mobile & web, but also that we didn't get everything quite right.\n\n- We made it too easy to use the highest-compute settings without making the impact on usage limits sufficiently clear.\n- We reorganized the desktop app in one bold move, making familiar things like chats and projects harder to find.\n- Our launch framing was focused on ChatGPT Work and to some of our Codex fans it made it feel like Codex was going away over time. Absolutely not our intention, we love Codex and it is here to stay.\n- And we introduced regressions for some existing multi-agent workflows, alongside a collection of rough edges in plugins and other parts of the experience.\n\nWe’re landing a first set of improvements today. We’re resetting usage twice so people can keep experimenting, changing defaults and the model picker so they don’t push people toward unnecessarily expensive settings, fixing several plugin submission issues, improving how we represent Codex in the product, and cleaning up some of the most immediate desktop problems.\n\nA larger set of improvements will land next week. We’re bringing chats and projects back into the sidebar in a more familiar and customizable way, making usage and reset timing much more visible, clarifying when to use ChatGPT Work and when to use Codex, and addressing the many other smaller pieces of great feedback we've had.\n\nThe ambition behind this launch hasn’t changed. We think bringing ChatGPT and Codex together into a workspace where people and agents can collaborate is a very important step forward. But an ambitious direction doesn’t excuse avoidable confusion or regressions in the first version.\n\nPlease keep the feedback coming. We’re moving quickly, and you should see the experience already get better with a few updates today; and substantially better again next week.",
+      "publishedAt": "2026-07-10T17:59:43.000Z",
+      "collectedAt": "2026-10-17T12:18:51.967Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2075641131002700120",
+      "hash": "b045380177626bfc7cfe947e21700003421aa37ee731afb575d83407112c2249",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2075820987833274448",
+      "url": "https://x.com/thsottiaux/status/2075820987833274448",
+      "text": "Introducing... another usage limit reset for all our ChatGPT Work and Codex users. Should land over next 30 minutes. Hope you have an awesome weekend.\n\nThank you for pushing our systems to the absolute limit, we have never seen traffic increase so quickly. Keep the feedback coming and we'll keep shipping.",
+      "publishedAt": "2026-07-11T05:54:25.000Z",
+      "collectedAt": "2026-10-17T12:18:51.880Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "parentId": "2075641131002700120",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2075820987833274448",
+      "hash": "c90822d991e96981c4b29e222a3cdbfdf81f35c148378cb8240abcafa111468f",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2076418567143408112",
+      "url": "https://x.com/thsottiaux/status/2076418567143408112",
+      "text": "Added a banked reset to 500k users of ChatGPT Work and Codex.\n\nWhat’s been happening:\n- Just released the ability to use a banked reset from web and mobile. Before today you could only do it in the desktop app\n- Had an issue where less than 10% of users who used a banked reset and it didn’t actually reset. This was during a 2 hour window.\n- It was hard to find all the exact users where it didn’t apply, so instead granted a banked reset to everyone who pressed the reset button in that 2 hour window. This also gives us the opportunity to validate the new infra ahead of tomorrow\n\nTomorrow we will celebrate our 7M active users milestone and grant the first banked reset across all of our ChatGPT Work and Codex users.\n\nWe will also release a bunch of updates to the desktop app, addressing a ton of your feedback.\n\nTalk soon",
+      "publishedAt": "2026-07-12T21:28:59.000Z",
+      "collectedAt": "2026-10-17T12:18:51.168Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2076418567143408112",
+      "hash": "dd36e2c8318f5ac829ef7662812e7a4f7ba98e045ea9cc00415725e58e078e70",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2076735790567338203",
+      "url": "https://x.com/thsottiaux/status/2076735790567338203",
+      "text": "Thank you to the 7M active users who are now using Codex and ChatGPT Work.\n\nWe have added a banked reset to everyone's account to celebrate the milestone. You can apply the reset in the desktop app or on web and it will replenish the weekly usage for you.\n\nHave fun out there.",
+      "publishedAt": "2026-07-13T18:29:31.000Z",
+      "collectedAt": "2026-10-17T12:18:51.074Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2076735790567338203",
+      "hash": "f638ffa6e99f648e95a6b2cc1e3f345a846aa19f7eba1738f175625a8c83ed9c",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2077114635308986427",
+      "url": "https://x.com/thsottiaux/status/2077114635308986427",
+      "text": "Hello. We have reached 8M active users across Codex and ChatGPT Work.\n\nWe are once again resetting the usage limits for all. And we continue to not have the 5h rate limit as well, allowing everyone to explore the boundaries of GPT-5.6 Sol and discover how ambitious you can be.\n\nSee you tomorrow for more updates on our growth!",
+      "publishedAt": "2026-07-14T19:34:54.000Z",
+      "collectedAt": "2026-10-17T12:18:50.354Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2077114635308986427",
+      "hash": "68938093b0d123d2cbe03da5ef131d74540fabbae336c9ddf2f1737b55cc35d1",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2077607697487188198",
+      "url": "https://x.com/thsottiaux/status/2077607697487188198",
+      "text": "Another reset for our Codex and ChatGPT Work users. Actually hit 9M active users way earlier today, but then got distracted by the approximately millions of things the team is doing to keep the systems up and reliable.\n\nShould have that sweet 100% weekly usage limit back in a few minutes. Go be your productive self and close twitter. Shoo!",
+      "publishedAt": "2026-07-16T04:14:09.000Z",
+      "collectedAt": "2026-10-17T12:18:50.280Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2077607697487188198",
+      "hash": "6061ae72fd3434bdab7fd65befd9f41bc66559ead31a76eeb013ec2226782d78",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2078310751878647932",
+      "url": "https://x.com/thsottiaux/status/2078310751878647932",
+      "text": "GPT-5.6 Sol confirmed to be an extremely good model",
+      "publishedAt": "2026-07-18T02:47:51.000Z",
+      "collectedAt": "2026-10-17T12:19:04.251Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "product"
+      },
+      "id": "history_original_2078310751878647932",
+      "hash": "17575b98845123de53862198cfa07657040f125d74c49adeb08700695bb81820",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2078320950488297917",
+      "url": "https://x.com/thsottiaux/status/2078320950488297917",
+      "text": "Oops... I did it again. \n\nEnjoy reset usage limits for all paid users for Codex and ChatGPT Work. Super grateful for an incredible team who is iterating at lightspeed and keeping the infra up as we scale faster than ever.\n\nEnjoy the weekend! https://t.co/WIuS07doKA",
+      "publishedAt": "2026-07-18T03:28:22.000Z",
+      "collectedAt": "2026-10-17T12:18:49.515Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "parentId": "2078310751878647932",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2078320950488297917",
+      "hash": "3a50f66fda66ab9c1031080f85e4dab7fc91533e4492093a29a09b19c06f736f",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2079609157934886975",
+      "url": "https://x.com/thsottiaux/status/2079609157934886975",
+      "text": "10M! \n\nNew day, new usage reset for paid users of Codex and ChatGPT Work. Lands in the next hour. Enjoy. https://t.co/VUJ4S3vKDG",
+      "publishedAt": "2026-07-21T16:47:15.000Z",
+      "collectedAt": "2026-10-17T12:18:49.485Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2079609157934886975",
+      "hash": "627dec7ce84a4695f0ea01e59c4d5ac12ce28e587b662ef7203590f35ef50430",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2081096447718723984",
+      "url": "https://x.com/thsottiaux/status/2081096447718723984",
+      "text": "We have reset usage limits for all Codex and ChatGPT Work users.\n\nLast night around 2am to 4am we suffered an almost global outage. All well and recovered, but you know what comes next.\n\nWe learn. We reset. Enjoy.",
+      "publishedAt": "2026-07-25T19:17:12.000Z",
+      "collectedAt": "2026-10-17T12:18:48.695Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2081096447718723984",
+      "hash": "269fafa34d141af75aa19595bf2ff82f34e32bc000aa0392a73a86463f7387a8",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2081899343091843463",
+      "url": "https://x.com/thsottiaux/status/2081899343091843463",
+      "text": "We’re celebrating the fast adoption of chatGPT Work and all the incredible effort that went into it today. I’m feeling like a limit reset.\n\nHold on tight to your ultra and /fast and see you in a few hours when I’m back at the laptop!",
+      "publishedAt": "2026-07-28T00:27:37.000Z",
+      "collectedAt": "2026-10-17T12:19:03.565Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2081899343091843463",
+      "hash": "b1c6024dbdbf017c7ba574181987ff3d3d41a6daa8143c556726d972164fafb9",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2081940052154933696",
+      "url": "https://x.com/thsottiaux/status/2081940052154933696",
+      "text": "Back at the laptop. The usage limits have been reset for all paid users of Codex and ChatGPT Work. Weeeeeeeee. It's a good day!",
+      "publishedAt": "2026-07-28T03:09:23.000Z",
+      "collectedAt": "2026-10-17T12:18:48.683Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "parentId": "2081899343091843463",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2081940052154933696",
+      "hash": "f15b297661247b9cbaec26a0555df807fe12770bb67b9eb1bbcf1efb619c94d6",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2082317452755751098",
+      "url": "https://x.com/thsottiaux/status/2082317452755751098",
+      "text": "Hello people of Sol! I've reset usage limits for all ChatGPT Work and Codex users. Together with that, a quick update on GPT-5.6 Sol usage limits.\n\nOver the past few weeks, many of you have told us that Sol was using your Codex limits faster than expected. To be clear, we have not reduced usage on any subscription plans.\n\nWe’ve been digging into what was happening and have landed several improvements. As a result, we expect your usage to last around 18% longer during typical use of Sol. Some of you should already see significantly larger improvements from today. Tomorrow, we’ll also restore the five-hour limit that we temporarily paused while investigating.\n\nHere’s what we found:\n- GPT-5.6 Sol is much more willing to work for longer, make additional tool calls, and coordinate complex workflows across tools and subagents. That makes it better at solving hard problems, but some tasks were using far more than we intended.\n- Sol also works harder at the same reasoning effort than previous models. High on Sol can use more tokens than High did on GPT-5.5.\n- Programmatic tool calling, also referred to as code mode, gives Sol much more flexibility to run tool calls in parallel or continue working while waiting. But it also led to more responses per turn, more cached input tokens, and higher usage than expected.\n- This was particularly noticeable when Sol was waiting for tool calls to finish or running many web searches. We’ve improved how we handle both cases and are continuing to make code mode more efficient.\n- The impact was also very uneven. The median user actually found Sol quite token efficient, while some power users working on harder tasks saw their usage drain much faster. We were very focused on average and median usage before launch and missed some cases where the long tail could use significantly more usage.\n\nSol is a significant step forward in what Codex can do, but capability and efficiency do not always improve at the same pace, and some issues only become clear once people are using the model at real-world scale. We should have recognized this sooner and been more upfront about it.\n\nYou keep pushing the frontier and we’ll keep improving efficiency and sharing updates as we go.",
+      "publishedAt": "2026-07-29T04:09:02.000Z",
+      "collectedAt": "2026-10-17T12:18:47.842Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2082317452755751098",
+      "hash": "53e594f5c781e0bbd834e6d3e0560d9fa84d4d2c2346a195c2eafec0a89ad1ae",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2083395449814229287",
+      "url": "https://x.com/thsottiaux/status/2083395449814229287",
+      "text": "To celebrate a week of efficiency and let you run 100'000 Luna threads this weekend... that's right... wait for it... I have reset usage limits for Codex and ChatGPT Work.\n\nEnjoy.",
+      "publishedAt": "2026-08-01T03:32:37.000Z",
+      "collectedAt": "2026-10-17T12:18:47.843Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2083395449814229287",
+      "hash": "9c3a36b44acd0b5133c732aa6ff7272b1ed1d97d2d8b5604e3049ed3a7c8d655",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2086188036493344823",
+      "url": "https://x.com/thsottiaux/status/2086188036493344823",
+      "text": "That's right, GPT-5.6 Sol is awesome and can be used pretty much anywhere, including in the CC harness. \n\nTo celebrate this, together with the fact that I'm not going anywhere... I have reset usage limits for all paid users of ChatGPT Work and Codex. \n\nHave fun out there!",
+      "publishedAt": "2026-08-08T20:29:22.000Z",
+      "collectedAt": "2026-10-17T12:18:47.049Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2086188036493344823",
+      "hash": "d33d607bb1e2738d1935bceda6add9c3990a272a5a6c4937b275ffa98a086def",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2086972802457063486",
+      "url": "https://x.com/thsottiaux/status/2086972802457063486",
+      "text": "Hi.\n\nIt is done.",
+      "publishedAt": "2026-08-11T00:27:44.000Z",
+      "collectedAt": "2026-10-17T12:18:47.059Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "product"
+      },
+      "id": "history_original_2086972802457063486",
+      "hash": "c0eb3254511e441361b5170a8e8b1701cb3123cec407bf0881d3e4396edffdee",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2087423996115681767",
+      "url": "https://x.com/thsottiaux/status/2087423996115681767",
+      "text": "I previously promised a reset for every 1M in additional active users for Codex, until 10M. \n\nWe blew past that and have been silent since 10M. Little surprise for you tomorrow.",
+      "publishedAt": "2026-08-12T06:20:37.000Z",
+      "collectedAt": "2026-10-17T12:19:03.369Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2087423996115681767",
+      "hash": "3ffa2acd560e32b644866a47827a9a29754fa4c53e107c450dee2762c249c1b4",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2087706104814023111",
+      "url": "https://x.com/thsottiaux/status/2087706104814023111",
+      "text": "Old news actually from a bunch of days ago, but crossed that 15M. Enjoy a nice reset everyone. Landing in the next hour or so, go /fast.",
+      "publishedAt": "2026-08-13T01:01:37.000Z",
+      "collectedAt": "2026-10-17T12:18:46.243Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "parentId": "2087423996115681767",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2087706104814023111",
+      "hash": "7a3bbf66906a27e2e0ced230d9c19141c98854626831f3b5ff6acb5fbd283df8",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2090675027670978569",
+      "url": "https://x.com/thsottiaux/status/2090675027670978569",
+      "text": "We've investigated a few messages about codex usage limits being different. That's not something we change without engaging the community and being transparent.\n\nWhat we did see is that when talking to affected users many were using sub2api. Converting a subscription into api traffic to then re-serve or share across many users is not something we support and this type of usage gets flagged by our fraud-prevention systems.\n\nYou are completely fine if you use your subscription through Sign in With ChatGPT, either through the official clients or through one of the many OSS clients (Pi, OpenCode, ...) that support signing in with your account and using your included usage.",
+      "publishedAt": "2026-08-21T05:39:04.000Z",
+      "collectedAt": "2026-10-17T12:19:02.774Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "product"
+      },
+      "id": "history_original_2090675027670978569",
+      "hash": "dbed8d3ff61e239916b77b2401ea06db4402929ff13c8b0e7e23e79e6a25e24d",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2090766694897619318",
+      "url": "https://x.com/thsottiaux/status/2090766694897619318",
+      "text": "It's me again. I come bearing great news. \n\nFirst of all, we have hit 20M active users for Codex some time this week. Second of all, this is cause for celebration and during the day we will credit every Codex and ChatGPT Work user with a BANKED reset that you can use at your own leisure. And we will have some other good news later too!\n\nNow, on usage limits draining faster, while we're not seeing anything abnormal, we do take it incredibly seriously and there is an ongoing investigation. I will share if we do find anything and my below post is really a clarification on a specific pattern that we did see that I wanted to call out.\n\nGo do something amazing today.",
+      "publishedAt": "2026-08-21T11:43:19.000Z",
+      "collectedAt": "2026-10-17T12:18:46.225Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "parentId": "2090675027670978569",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2090766694897619318",
+      "hash": "2e3ef7e4fad889291885bdc357673b95487b6d7fd50fa0ded3a86c94dcf3b603",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2090947107469558188",
+      "url": "https://x.com/thsottiaux/status/2090947107469558188",
+      "text": "The banked reset will be there by 8pm. For all paid users of ChatGPT Work and Codex. Do with this information what you may.",
+      "publishedAt": "2026-08-21T23:40:12.000Z",
+      "collectedAt": "2026-10-17T12:18:45.404Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2090947107469558188",
+      "hash": "0070c42f8320fe33ca6048909137f23d014510c9dfc0e1d2908cc7fbca1e02ca",
+      "historical": true
+    },
+    {
+      "id": "history_original_2090947196107764189",
+      "sourceId": "tibo-public",
+      "messageId": "2090947196107764189",
+      "url": "https://x.com/thsottiaux/status/2090947196107764189",
+      "text": "The banked reset will be there by 8pm PST. For all paid users of ChatGPT Work and Codex. Do with this information what you may.",
+      "publishedAt": "2026-08-21T23:40:34.000Z",
+      "collectedAt": "2026-10-11T17:13:35.273Z",
+      "hash": "bb096269784324eb8601d368c4c0502b06b85abbe20acba51dba760b7120e989",
+      "contextComplete": true,
+      "historical": true,
+      "provenance": "archive",
+      "textOrigin": "original",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      }
+    },
+    {
+      "id": "history_original_2090964822422949999",
+      "sourceId": "tibo-public",
+      "messageId": "2090964822422949999",
+      "url": "https://x.com/thsottiaux/status/2090964822422949999",
+      "text": "The banked reset has landed, I repeat, the banked reset has landed. Have an amazing weekend.",
+      "parentId": "2090947196107764189",
+      "publishedAt": "2026-08-22T00:50:36.000Z",
+      "collectedAt": "2026-10-11T17:13:35.273Z",
+      "hash": "636e1b7fdf3bc6d12f6be2a3d5045fc74f0dd72d8a9083212564a13beddd3963",
+      "contextComplete": false,
+      "historical": true,
+      "provenance": "archive",
+      "textOrigin": "original",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      }
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2091033630147854385",
+      "url": "https://x.com/thsottiaux/status/2091033630147854385",
+      "text": "Update on rate limits in Codex. We do see that for some users the cache hit rate has been worse this week than the stable state the weeks before. This could explain that usage is draining somewhat faster for those users as hitting the cache consistently is an important component of being efficient.\n\nWe are investigating and will have an update tomorrow.",
+      "publishedAt": "2026-08-22T05:24:01.000Z",
+      "collectedAt": "2026-10-17T12:19:06.802Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "product"
+      },
+      "id": "history_original_2091033630147854385",
+      "hash": "df0e4fc550f34f6ecbd25d555c9e77cca361ca519646b539082e145f685124f9",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2091407991736332689",
+      "url": "https://x.com/thsottiaux/status/2091407991736332689",
+      "text": "Update on rate limits in Codex. \n\nWe’ve found (a) some inefficiencies when using images in long sessions with multiple compactions (b) high p95+ usage for Computer History (c) a feature that was meant to generate conversation titles that was draining a bit more usage than intended. And we have a tiger team combing through everything and shipping fixes tomorrow. We also found a novel approach to drive efficiency up significantly that is completely unrelated and we will be working on next week.\n\nAs part of some of the fixes tomorrow, we will also do a full reset of the usage for all paid subscriptions.\n\nSee you then.",
+      "publishedAt": "2026-08-23T06:11:36.000Z",
+      "collectedAt": "2026-10-17T12:19:02.586Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "parentId": "2091033630147854385",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2091407991736332689",
+      "hash": "11498bbada88752e47429b1bf4deba8d682e8bf89004c19ae87923ed79ec378e",
+      "historical": true
+    },
+    {
+      "id": "history_original_2091412393368945027",
+      "sourceId": "tibo-public",
+      "messageId": "2091412393368945027",
+      "url": "https://x.com/thsottiaux/status/2091412393368945027",
+      "text": "Reset will land around 14pm PST tomorrow.",
+      "parentId": "2091407991736332689",
+      "publishedAt": "2026-08-23T06:29:05.000Z",
+      "collectedAt": "2026-10-11T17:13:35.273Z",
+      "hash": "99ace32f753901e1e4426638fbfda864930ed946288703a123a02e1b127bb09b",
+      "contextComplete": false,
+      "historical": true,
+      "provenance": "archive",
+      "textOrigin": "original",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      }
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2091688655828246890",
+      "url": "https://x.com/thsottiaux/status/2091688655828246890",
+      "text": "Good Sunday. Reset has been propagated to accounts and we landed some fixes to usage for things mentioned yesterday as issues we found. You should feel a positive difference. More to come tomorrow and will keep communicating.",
+      "publishedAt": "2026-08-24T00:46:51.000Z",
+      "collectedAt": "2026-10-17T12:18:45.403Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "parentId": "2091407991736332689",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2091688655828246890",
+      "hash": "e762e59d4d65749236f2afb27f29f2aebe41f9bf5d4fe4cb0fe9ddb3726be853",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2093014447833116908",
+      "url": "https://x.com/thsottiaux/status/2093014447833116908",
+      "text": "Never slept better and feeling reseted. Brand new me and brand new usage for all ChatGPT Work and Codex users. Regaining my youth one button press at a time.\n\nHappy Thursday",
+      "publishedAt": "2026-08-27T16:35:05.000Z",
+      "collectedAt": "2026-10-17T12:18:44.581Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2093014447833116908",
+      "hash": "f774af5a44590decdcf3356fb1d25f94fea47644d5f76f965f8091a407645ac0",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2093573991965557198",
+      "url": "https://x.com/thsottiaux/status/2093573991965557198",
+      "text": "Looking at the dashboard we might hit a new milestone to celebrate tomorrow. Hold on to your Codex",
+      "publishedAt": "2026-08-29T05:38:31.000Z",
+      "collectedAt": "2026-10-17T12:19:06.716Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "product"
+      },
+      "id": "history_original_2093573991965557198",
+      "hash": "f1554057a5ae1d676cf75f07357fba9b691a1f2cfdf411333537c6695af9ef5a",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2093801758665715784",
+      "url": "https://x.com/thsottiaux/status/2093801758665715784",
+      "text": "We are reseting usage for all paid users of Codex and ChatGPT Work.\n\nPlease continue reading for an update on Codex usage limits. The team has been working around the clock, going through thousands of reports and shipping fixes.\n\nDepending on how you use Codex, you should see your usage go between 10% and 50% further than before.\n\nWe really went with a fine comb, with many uncovered small things being longstanding and here is what we found and fixed:\n- Compaction. We were keeping old images during compaction, sometimes making the context large enough to trigger compaction again. After the fix, usage dropped around 10% for users making heavy use of images. Fixed.\n- Memory. Background memory workers could inherit Stop hooks and keep running when the hook wouldn’t let them finish. This affected fewer than 1% of users, with the long tail being pretty bad and we saw one example thread check whether it could stop 15,000 times. Fixed.\n- Goals. In some cases, a set /goal could finish and then keep going past the intended stop condition, or the model would keep retrying broken tools without stopping. We saw examples consume anywhere from 15% to 70% of a weekly allowance. Fixed.\n- Automations. Some custom schedules could run more frequently than configured. Fixed.\n- Subagents. Smaller models (e.g. Luna) sometimes picked more capable helpers without being explicitly asked. The same was true where the orchestrating model not running in /fast mode could request sub-agents to run /fast. Fixed.\n- Computer History. The older implementation could lead to repeatedly summarizing overlapping activity. For some cases we saw it consume up to one fifth of the weekly usage per week. Fixed.\n- Rolling task summaries. Ordinary turns were triggering extra background requests. These added about 1% to token usage. Small each time, but it adds up. We have disabled this.\n- MCP. Some tool results could be encoded twice. We also found tool instructions getting cut off and fetched again. Fixed.\n\nWe’ve also made architectural changes to prevent these from regressing and our teams will get paged if it happens regardless. We are also working on showing you directly in the app where your usage goes so you don’t have to guess.\n\nGoes without saying that we’re resetting usage limits and I hope you enjoy a very nice Saturday!",
+      "publishedAt": "2026-08-29T20:43:34.000Z",
+      "collectedAt": "2026-10-17T12:18:44.547Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2093801758665715784",
+      "hash": "8a003b13ce8f82fdd5166afb23aa95825bb51591c2c0f44174480261b8e9dc0e",
+      "historical": true
+    },
+    {
+      "id": "history_original_2093801838504186008",
+      "sourceId": "tibo-public",
+      "messageId": "2093801838504186008",
+      "url": "https://x.com/thsottiaux/status/2093801838504186008",
+      "text": "Landing 2:30pm PST",
+      "parentId": "2093801758665715784",
+      "publishedAt": "2026-08-29T20:43:53.000Z",
+      "collectedAt": "2026-10-11T17:13:31.419Z",
+      "hash": "7ddc01b3606f41e1dda4984930eff813dd92f6b8deacf20c678c4bf7dd1287d6",
+      "contextComplete": false,
+      "historical": true,
+      "provenance": "archive",
+      "textOrigin": "original",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      }
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2093811840258293947",
+      "url": "https://x.com/thsottiaux/status/2093811840258293947",
+      "text": "This celebration is moved to tomorrow as the button was already pressed today.",
+      "publishedAt": "2026-08-29T21:23:38.000Z",
+      "collectedAt": "2026-10-17T12:19:01.788Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "parentId": "2093573991965557198",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "product"
+      },
+      "id": "history_original_2093811840258293947",
+      "hash": "c6aeacb867744d0da3286ea32f91895d81397c84437eaf6e990e7c72233f4633",
+      "historical": true
+    },
+    {
+      "id": "history_original_2094144275957350900",
+      "sourceId": "tibo-public",
+      "messageId": "2094144275957350900",
+      "url": "https://x.com/thsottiaux/status/2094144275957350900",
+      "text": "Your Codex and ChatGPT Work reset will land at 6pm PST. \n\nI challenge you to burn as much usage as you can and discover and the latest awesome features. \n\nTime to go /fast",
+      "publishedAt": "2026-08-30T19:24:37.000Z",
+      "collectedAt": "2026-10-11T17:13:31.419Z",
+      "hash": "47448e06e699724d204fb84b99af7ec6690f8372ab9584b500c0ed4bd906e110",
+      "contextComplete": true,
+      "historical": true,
+      "provenance": "archive",
+      "textOrigin": "original",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      }
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2094251180121854309",
+      "url": "https://x.com/thsottiaux/status/2094251180121854309",
+      "text": "What I wanted to say yesterday is that we hit 25M active users and to celebrate we have now reset usage for all paid subscriptions for ChatGPT Work and Codex.\n\nSee you see for more news from The Reset Company.",
+      "publishedAt": "2026-08-31T02:29:25.000Z",
+      "collectedAt": "2026-10-17T12:18:43.714Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "parentId": "2093811840258293947",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2094251180121854309",
+      "hash": "634edb58318a7aceca6aa91d5c6c7f38b2f84de6b98a60e77504475be04727aa",
+      "historical": true
+    },
+    {
+      "id": "history_original_2094252447271366730",
+      "sourceId": "tibo-public",
+      "messageId": "2094252447271366730",
+      "url": "https://x.com/thsottiaux/status/2094252447271366730",
+      "text": "What I wanted to say yesterday is that we hit 25M active users and to celebrate we have now reset usage for all paid subscriptions for ChatGPT Work and Codex.\n\nSee you soon for more news from The Reset Company.",
+      "parentId": "2093811840258293947",
+      "publishedAt": "2026-08-31T02:34:27.000Z",
+      "collectedAt": "2026-10-11T17:13:31.419Z",
+      "hash": "70db1e86effb9820d2b87cb72aae6ec4d606586ce711bfc575612c6fa09d67e8",
+      "contextComplete": true,
+      "historical": true,
+      "provenance": "archive",
+      "textOrigin": "original",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      }
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2095651088502591861",
+      "url": "https://x.com/thsottiaux/status/2095651088502591861",
+      "text": "We will give one banked reset for every day you don't have access to Astra on your paid ChatGPT plan, starting today.  Team is moving mountains to give access as fast as we can.\n\nFirst one will land in ~ 3 hours. There is still time to create your account if you don't have one.",
+      "publishedAt": "2026-09-03T23:12:09.000Z",
+      "collectedAt": "2026-10-17T12:18:43.722Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2095651088502591861",
+      "hash": "62d2d08fd94e8f7c644614e1f92053a8b0f8d610ee6348542a435d360a50fac5",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2095979536043401428",
+      "url": "https://x.com/thsottiaux/status/2095979536043401428",
+      "text": "Some Plus and Business users won't yet get access to Astra today, we've got you covered with a banked reset. Lands by end of day and if you create your account by 8pm PT then you'll get it too.",
+      "publishedAt": "2026-09-04T20:57:17.000Z",
+      "collectedAt": "2026-10-17T12:18:42.772Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2095979536043401428",
+      "hash": "84b24fb8b31798ea157ca9b1553ad97fc0f4e8bb83a91522acc379cc3d6721e3",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2096035437299237298",
+      "url": "https://x.com/thsottiaux/status/2096035437299237298",
+      "text": "Because we are beyond happy to have Astra rolled out today ahead of schedule and you have been super patient with us (not really, but it’s ok!)… we will do the full banked reset today too for all Plus, Pro and Business users. Lands end of day.\n\nHappy Astra day and enjoy a phenomenal weekend. \n\nPS: If you create the account or upgrade before 8pm PT you will get it too. Still time!",
+      "publishedAt": "2026-09-05T00:39:25.000Z",
+      "collectedAt": "2026-10-17T12:18:42.712Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2096035437299237298",
+      "hash": "bacb77d25506794495e906beea3edaf61858fcd1d91bfab3bcf3e31dfd4b2cd5",
+      "historical": true
+    },
+    {
+      "id": "history_original_2097043464538264003",
+      "sourceId": "tibo-public",
+      "messageId": "2097043464538264003",
+      "url": "https://x.com/thsottiaux/status/2097043464538264003",
+      "text": "Never gonna give you up\nNever gonna let you down\nNever gonna run around and desert you\nNever gonna make you cry\nNever gonna say goodbye\nNever gonna tell a lie and hurt you\n\nThanks for reading. We will do a global reset of the usage for all paid subscriptions so that you can keep enjoying Astra after burning through all of it doing fun 3D modeling in blender. The work week is about to start.\n\nLands around 6pm PST today.",
+      "publishedAt": "2026-09-07T19:24:57.000Z",
+      "collectedAt": "2026-10-15T17:35:40.195Z",
+      "hash": "27e5167241ce36d0a057c5fc5a33241fe72579660946cc2e5c241684d0ec6505",
+      "contextComplete": true,
+      "historical": true,
+      "provenance": "archive",
+      "textOrigin": "original",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      }
+    },
+    {
+      "id": "history_original_2097174560412246215",
+      "sourceId": "tibo-public",
+      "messageId": "2097174560412246215",
+      "url": "https://x.com/thsottiaux/status/2097174560412246215",
+      "text": "All reset for everyone. Enjoy the week with Astra.",
+      "parentId": "2097043464538264003",
+      "publishedAt": "2026-09-08T04:05:53.000Z",
+      "collectedAt": "2026-10-15T17:35:40.195Z",
+      "hash": "a7b576705246ef1d4e3c09602bdb460de0168014c34ffac206d3f599c5055554",
+      "contextComplete": false,
+      "historical": true,
+      "provenance": "archive",
+      "textOrigin": "original",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      }
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2098612714704891959",
+      "url": "https://x.com/thsottiaux/status/2098612714704891959",
+      "text": "Hi Astra users. A reset and a quick update on quality issues that have been posted around.\n\nWorking with some of you, we have found and fixed the following issues:\n- Some skills written for previous models were triggering too often or preventing the model from checking its work.\n- An opt-in context management experiment that could cause early stops or replies to older messages. We've disabled it. Our rough estimate is that 4-5k users were affected by this experiment.\n- We've also removed some badly configured engines that resulted in a measured quality degradation for a long tail of traffic flowing through them.\n\nWe’ve also made some more minor improvements and things should feel significantly better across the board. More consistent follow-through, better tracking of your latest message, and better checks on the work as it’s going through the motions.\n\nThe examples posted and all the users who worked directly with us were incredibly useful in helping fix things quickly. Always grateful for this incredible community.\n\nAnd of course, a reset is also landing by midnight today.",
+      "publishedAt": "2026-09-12T03:20:36.000Z",
+      "collectedAt": "2026-10-17T12:19:01.768Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2098612714704891959",
+      "hash": "3bf824911a096df2ce5c4a694c7d1454257c4b7f889daf5d55fa415f6ba75c35",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2098685367058612394",
+      "url": "https://x.com/thsottiaux/status/2098685367058612394",
+      "text": "Reset all propagated. Sweet dreams.",
+      "publishedAt": "2026-09-12T08:09:17.000Z",
+      "collectedAt": "2026-10-17T12:18:41.984Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "parentId": "2098612714704891959",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2098685367058612394",
+      "hash": "95cd808e297fb42a1b3fd251123155d17ab2d46b59bf7b840257441d5fc1dc89",
+      "historical": true
+    },
+    {
+      "id": "history_original_2102254445082116335",
+      "sourceId": "tibo-public",
+      "messageId": "2102254445082116335",
+      "url": "https://x.com/thsottiaux/status/2102254445082116335",
+      "text": "Ladies and gentlemen... start... your... ENGINES. We are almost Tuesday and I promised a reset for Tuesday. Among some other things. See you soon.",
+      "publishedAt": "2026-09-22T04:31:32.000Z",
+      "collectedAt": "2026-10-15T17:35:53.175Z",
+      "hash": "257267bf18cc9ddf7eeab3ca09b1880eba19b49fc4ec103b75e787735218e767",
+      "contextComplete": false,
+      "historical": true,
+      "provenance": "archive",
+      "textOrigin": "original",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      }
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2102440619616682120",
+      "url": "https://x.com/thsottiaux/status/2102440619616682120",
+      "text": "We have been focusing on efficiency and intelligence for all. \n\nVery proud of the team. Only possible when you have incredible models at the top end of the capability that you can then use to make a big difference in everything else.",
+      "publishedAt": "2026-09-22T16:51:19.000Z",
+      "collectedAt": "2026-10-17T12:19:00.978Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "product"
+      },
+      "id": "history_original_2102440619616682120",
+      "hash": "030a07c6a4e3287a9db566eb6f369f1398cd52944f76548a9243fab5875e7ade",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2102463847714247142",
+      "url": "https://x.com/thsottiaux/status/2102463847714247142",
+      "text": "GPT-6 Sol and Luna are out. Not only are they a very significant improvement across the board, but also in writing and general \"you know when you try it\" quality. \n\nWe are also permanently reducing the API price by 50% making both of them viable for a ton of new usecases and making your usage go further too, even on the subscriptions.\n\nAnd one more thing. We are loading a banked reset into all accounts of our Plus, Pro and Business users. Let's go!\n\nhttps://t.co/00DRh1sRrO",
+      "publishedAt": "2026-09-22T18:23:37.000Z",
+      "collectedAt": "2026-10-17T12:18:41.898Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "parentId": "2102440619616682120",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2102463847714247142",
+      "hash": "4ac9290d6548527970e017547345489ef39dd0524473d62d748ba3d7f30f7d66",
+      "historical": true
+    },
+    {
+      "id": "history_original_2103620061156290622",
+      "sourceId": "tibo-public",
+      "messageId": "2103620061156290622",
+      "url": "https://x.com/thsottiaux/status/2103620061156290622",
+      "text": "We are aware that codex is down and are working hard to bring back normal service.",
+      "publishedAt": "2026-09-25T22:58:00.000Z",
+      "collectedAt": "2026-10-15T17:35:52.383Z",
+      "hash": "b4085daac03cf1ddef15c736bcd711d64c9c61de3855accbbb26b415d863e5fd",
+      "contextComplete": false,
+      "historical": true,
+      "provenance": "archive",
+      "textOrigin": "original",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      }
+    },
+    {
+      "id": "history_original_2103622639386574979",
+      "sourceId": "tibo-public",
+      "messageId": "2103622639386574979",
+      "url": "https://x.com/thsottiaux/status/2103622639386574979",
+      "text": "o no :(",
+      "parentId": "2103620061156290622",
+      "publishedAt": "2026-09-25T23:08:15.000Z",
+      "collectedAt": "2026-10-15T17:35:52.383Z",
+      "hash": "781c0e1646f690af3d7ef79ac73fdf6e5221ee92c4d842120ee301242ef0178d",
+      "contextComplete": false,
+      "historical": true,
+      "provenance": "archive",
+      "textOrigin": "original",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      }
+    },
+    {
+      "id": "history_original_2103637477760311522",
+      "sourceId": "tibo-public",
+      "messageId": "2103637477760311522",
+      "url": "https://x.com/thsottiaux/status/2103637477760311522",
+      "text": "o yes… we’re back in action and we’ll reset usage limits for all paid users across codex and ChatGPT work\n\nsorry about the brief disruption!\n\n(and yes we have a special spare codex when things are down to help us out)",
+      "parentId": "2103622639386574979",
+      "publishedAt": "2026-09-26T00:07:13.000Z",
+      "collectedAt": "2026-10-15T17:35:52.383Z",
+      "hash": "d7b13796da3548f665c218f835a73359a2fb05a5167149b3fdedd9506ae9fc0e",
+      "contextComplete": true,
+      "historical": true,
+      "provenance": "archive",
+      "textOrigin": "original",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      }
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2103911959544610829",
+      "url": "https://x.com/thsottiaux/status/2103911959544610829",
+      "text": "Resets all propagated. That will be all. Have a fantastic weekend.",
+      "publishedAt": "2026-09-26T18:17:54.000Z",
+      "collectedAt": "2026-10-17T12:18:41.156Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2103911959544610829",
+      "hash": "33028b1e3dc42196e305d27b627c725522162a0f1d4ac3ca79638d09a5d7790b",
+      "historical": true
+    },
+    {
+      "id": "history_original_2103963215885701493",
+      "sourceId": "tibo-public",
+      "messageId": "2103963215885701493",
+      "url": "https://x.com/thsottiaux/status/2103963215885701493",
+      "text": "@giadotai Sorry Gia. More resets coming next week",
+      "publishedAt": "2026-09-26T21:41:35.000Z",
+      "collectedAt": "2026-10-15T17:35:51.653Z",
+      "hash": "22f44ea510671227439a9482c1ac3b7ab8cf9d70c5c8c9378a1f9df393772b62",
+      "contextComplete": false,
+      "historical": true,
+      "provenance": "archive",
+      "textOrigin": "original",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      }
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2105843926221660585",
+      "url": "https://x.com/thsottiaux/status/2105843926221660585",
+      "text": "Global reset landing tomorrow 10am PST for all paid ChatGPT accounts. Apologies for the slow start with GPT-6.1 Sol, it's now back to running at expected speeds after the massive load spike in the first two days.",
+      "publishedAt": "2026-10-02T02:14:51.000Z",
+      "collectedAt": "2026-10-17T12:19:00.923Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2105843926221660585",
+      "hash": "6ff4b7ace879159dc59556ace703ca9a4246ab012d3cfc8e552758efd3364e86",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2106131810921136451",
+      "url": "https://x.com/thsottiaux/status/2106131810921136451",
+      "text": "Reset all propagated. Enjoy.",
+      "publishedAt": "2026-10-02T21:18:48.000Z",
+      "collectedAt": "2026-10-17T12:18:39.769Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "parentId": "2105843926221660585",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2106131810921136451",
+      "hash": "8c1e94dab450ab1074427e389293bb9e0a2e67b5edcb39af4fdc7fba3ab17521",
+      "historical": true
+    },
+    {
+      "id": "history_original_2106233145163141249",
+      "sourceId": "tibo-public",
+      "messageId": "2106233145163141249",
+      "url": "https://x.com/thsottiaux/status/2106233145163141249",
+      "text": "Seeing some reports that the Pro 500 didn’t get the reset as expected earlier. Investigating and will make up for it",
+      "publishedAt": "2026-10-03T04:01:28.000Z",
+      "collectedAt": "2026-10-15T17:35:47.899Z",
+      "hash": "e832cf4c7e349477e4f78fe017b5914055cdd80ef00e227516af190f5847c03a",
+      "contextComplete": false,
+      "historical": true,
+      "provenance": "archive",
+      "textOrigin": "original",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      }
+    },
+    {
+      "id": "history_original_2106239435461579088",
+      "sourceId": "tibo-public",
+      "messageId": "2106239435461579088",
+      "url": "https://x.com/thsottiaux/status/2106239435461579088",
+      "text": "All fixed. Surprising number of Pro 500 users on here.",
+      "parentId": "2106233145163141249",
+      "publishedAt": "2026-10-03T04:26:28.000Z",
+      "collectedAt": "2026-10-15T17:35:47.899Z",
+      "hash": "32f9d21499562b9c4b1a079c1fbd0325164715eb22609a54b328781aba790f9a",
+      "contextComplete": false,
+      "historical": true,
+      "provenance": "archive",
+      "textOrigin": "original",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      }
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2106610099720720811",
+      "url": "https://x.com/thsottiaux/status/2106610099720720811",
+      "text": "All right, we’re locking in. Only things being worked on are simplifications, more efficiency for more usage, groundbreaking features or new models. \n\nSometimes you have to invest ahead of the curve, but feedback is clear that you all want things to get simpler. On it.",
+      "publishedAt": "2026-10-04T04:59:21.000Z",
+      "collectedAt": "2026-10-17T12:23:44.801Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "product"
+      },
+      "id": "history_original_2106610099720720811",
+      "hash": "539e630c50781a63bd3c133ee7f88218ca189af009f2ad81524e90624c6539f9",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2106845241357824205",
+      "url": "https://x.com/thsottiaux/status/2106845241357824205",
+      "text": "Over the next 28 days, each day we’ll either ship one thing that is a clear improvement and relevant for most codex/work users or ship a full reset. Let the improvements begin.",
+      "publishedAt": "2026-10-04T20:33:43.000Z",
+      "collectedAt": "2026-10-17T12:23:44.801Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "parentId": "2106610099720720811",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2106845241357824205",
+      "hash": "475366fe53d83fa6571e6ed1a9369448b13a6b88b4b4ea71c17b2e27f3cbb7fc",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2107575657014468879",
+      "url": "https://x.com/thsottiaux/status/2107575657014468879",
+      "text": "Roundup of Day 2/\n\n2.1/ Approve for me (auto-review) is now included and does not use usage. Can be between 2-10% of plan when used. Also better for you.\n2.2/ Simplified API for builders.\n2.3/ Meeting notes integrated.\n2.4/ Decisions API live for builders. Will use in the app to improve the experience.",
+      "publishedAt": "2026-10-06T20:56:08.000Z",
+      "collectedAt": "2026-10-17T12:19:00.187Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "product"
+      },
+      "id": "history_original_2107575657014468879",
+      "hash": "a2f3d4b2ca6c14f1a33bd41063460634f1336c7cabec41670b1714ecd6fe6828",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2107676072871600470",
+      "url": "https://x.com/thsottiaux/status/2107676072871600470",
+      "text": "We shipped four things that were deemed good to great and some math proofs, but the vote is clear and the community demands a reset. I did calibrate it and it *seems* that the game is rigged in reset's favor, but such are the rules at the moment.\n\nTherefore ... the reset has been processed. Enjoy!",
+      "publishedAt": "2026-10-07T03:35:09.000Z",
+      "collectedAt": "2026-10-17T12:18:39.732Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "parentId": "2107575657014468879",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2107676072871600470",
+      "hash": "1f63992ad36e3974b81537726aa309046ceecccb6730a178e22703240ca4eb2a",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2107913674593644711",
+      "url": "https://x.com/thsottiaux/status/2107913674593644711",
+      "text": "Day 3/\n\nThe big one is GPT-6 in Chat, but today is also a little celebration day with a new high of 40M active users across Codex and ChatGPT Work.\n\nLoading a banked reset in everyone's paid accounts. See you again tomorrow!",
+      "publishedAt": "2026-10-07T19:19:17.000Z",
+      "collectedAt": "2026-10-17T12:19:00.106Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "parentId": "2107575657014468879",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2107913674593644711",
+      "hash": "38ed184e49e4ecc06b346bb520c03ab99c2f259daefc162170bc582a8f11d3d8",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2107913738791596286",
+      "url": "https://x.com/thsottiaux/status/2107913738791596286",
+      "text": "Will be there by EOD PST.",
+      "publishedAt": "2026-10-07T19:19:33.000Z",
+      "collectedAt": "2026-10-17T12:23:17.106Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "parentId": "2107913674593644711",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "product"
+      },
+      "id": "history_original_2107913738791596286",
+      "hash": "8641eec7bb5cb7ad94e46f81d485b8af387696a2d8631ce8d1020848e5910283",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2108040921044639779",
+      "url": "https://x.com/thsottiaux/status/2108040921044639779",
+      "text": "Confirmed landed across all accounts. How are we doing so far?",
+      "publishedAt": "2026-10-08T03:44:55.000Z",
+      "collectedAt": "2026-10-17T12:18:38.949Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "parentId": "2107913674593644711",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "product"
+      },
+      "id": "history_original_2108040921044639779",
+      "hash": "10da2baa37f59d9498a822b75553561659deb7228ea360c2290e4671ad65fc64",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2109045220411351517",
+      "url": "https://x.com/thsottiaux/status/2109045220411351517",
+      "text": "Day 6/ Reset",
+      "publishedAt": "2026-10-10T22:15:39.000Z",
+      "collectedAt": "2026-10-17T12:18:59.338Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2109045220411351517",
+      "hash": "12c8da8032adfa1c00ee63642248456d90b5d41a591797e98f98b5ab23dad84c",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2109045392684032299",
+      "url": "https://x.com/thsottiaux/status/2109045392684032299",
+      "text": "Global reset by EOD. May the tokens do good things for you.",
+      "publishedAt": "2026-10-10T22:16:20.000Z",
+      "collectedAt": "2026-10-17T12:18:59.289Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "parentId": "2109045220411351517",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2109045392684032299",
+      "hash": "ffc17aa008c3eb1b166eaac808dd44a5c203e6035fae3f42d71ac685ba1458cd",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2109132167112782291",
+      "url": "https://x.com/thsottiaux/status/2109132167112782291",
+      "text": "Put the reset in the bag. All propagated.",
+      "publishedAt": "2026-10-11T04:01:09.000Z",
+      "collectedAt": "2026-10-17T12:18:38.916Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "parentId": "2109045392684032299",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2109132167112782291",
+      "hash": "dc80e3a7abbf06f3471a9b05ab48b47f68de755a2d9d74c286a72a2f2b0c7d94",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2109812216212099456",
+      "url": "https://x.com/thsottiaux/status/2109812216212099456",
+      "text": "Day 8/ Reset",
+      "publishedAt": "2026-10-13T01:03:25.000Z",
+      "collectedAt": "2026-10-17T12:18:57.715Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2109812216212099456",
+      "hash": "8164749d90ecd96301d2918bf1737d0c70308d4822448565319da533cae9775b",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2109812360596865224",
+      "url": "https://x.com/thsottiaux/status/2109812360596865224",
+      "text": "Global reset landing by EOD PST time. Enjoy",
+      "publishedAt": "2026-10-13T01:03:59.000Z",
+      "collectedAt": "2026-10-17T12:18:57.727Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": true,
+      "parentId": "2109812216212099456",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2109812360596865224",
+      "hash": "b91707f3032cf867bff652256672ebdf2845b99bf09cf0e2898cdac65d23bb7b",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2109873287853707513",
+      "url": "https://x.com/thsottiaux/status/2109873287853707513",
+      "text": "What would you like with your side of reset? It's done.",
+      "publishedAt": "2026-10-13T05:06:06.000Z",
+      "collectedAt": "2026-10-17T12:18:38.067Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "parentId": "2109812360596865224",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2109873287853707513",
+      "hash": "6bda9e585c088fe70dc525514f648224f529946104f63ec3106bf66933c8b326",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2110595484180214059",
+      "url": "https://x.com/thsottiaux/status/2110595484180214059",
+      "text": "The reports of my reset button being lost are greatly exaggerated\n\nDay 10/ Reset",
+      "publishedAt": "2026-10-15T04:55:51.000Z",
+      "collectedAt": "2026-10-17T12:18:58.490Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "reset"
+      },
+      "id": "history_original_2110595484180214059",
+      "hash": "587d6b5239545a6a8413672d01bea6d5f87f9dbebbdd2b7a5716dc67da939d6f",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2110595554036400151",
+      "url": "https://x.com/thsottiaux/status/2110595554036400151",
+      "text": "Landing within the next 2 hours",
+      "publishedAt": "2026-10-15T04:56:07.000Z",
+      "collectedAt": "2026-10-17T12:18:58.496Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "parentId": "2110595484180214059",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "product"
+      },
+      "id": "history_original_2110595554036400151",
+      "hash": "8516c339fed841a33c4834a2d43ead6a08ddbcf42508579c8144b6eabec9f634",
+      "historical": true
+    },
+    {
+      "sourceId": "tibo-public",
+      "messageId": "2110618732666257557",
+      "url": "https://x.com/thsottiaux/status/2110618732666257557",
+      "text": "Done and dusted",
+      "publishedAt": "2026-10-15T06:28:13.000Z",
+      "collectedAt": "2026-10-17T12:18:38.093Z",
+      "provenance": "archive",
+      "textOrigin": "original",
+      "contextComplete": false,
+      "parentId": "2110595554036400151",
+      "metadata": {
+        "sourceGroup": "fxembed:thsottiaux",
+        "category": "product"
+      },
+      "id": "history_original_2110618732666257557",
+      "hash": "4e68971b3a0de09a3fad966bc99a5c3322e6881369d6ba534c81b4e19cf81db7",
+      "historical": true
+    }
+  ],
+  "messages": [
+    {
+      "messageId": "2044943514832871564",
+      "publishedAt": "2026-04-17T00:58:21.000Z",
+      "listedType": "global",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2046367145588916687",
+      "publishedAt": "2026-04-20T23:15:21.000Z",
+      "listedType": "global",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2048997818673537399",
+      "publishedAt": "2026-04-28T05:28:43.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2055707616605835333",
+      "publishedAt": "2026-05-16T17:51:03.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2058280452851638313",
+      "publishedAt": "2026-05-23T20:14:35.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2061106703446450392",
+      "publishedAt": "2026-05-31T15:25:06.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2062329981548802523",
+      "publishedAt": "2026-06-04T00:25:58.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2067399435009622521",
+      "publishedAt": "2026-06-18T00:10:10.000Z",
+      "listedType": "global",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2070653282440405046",
+      "publishedAt": "2026-06-26T23:39:48.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "in_progress"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2071381664853319742",
+      "publishedAt": "2026-06-28T23:54:07.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2071740419030053227",
+      "publishedAt": "2026-06-29T23:39:41.000Z",
+      "listedType": "global",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2075330198887940337",
+      "publishedAt": "2026-07-09T21:24:11.000Z",
+      "listedType": "global",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2075641131002700120",
+      "publishedAt": "2026-07-10T17:59:43.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2075820987833274448",
+      "publishedAt": "2026-07-11T05:54:25.000Z",
+      "listedType": "global",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2076418567143408112",
+      "publishedAt": "2026-07-12T21:28:59.000Z",
+      "listedType": "global",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2076735790567338203",
+      "publishedAt": "2026-07-13T18:29:31.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "banked_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2077114635308986427",
+      "publishedAt": "2026-07-14T19:34:54.000Z",
+      "listedType": "global",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2077607697487188198",
+      "publishedAt": "2026-07-16T04:14:09.000Z",
+      "listedType": "global",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2078320950488297917",
+      "publishedAt": "2026-07-18T03:28:22.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2079609157934886975",
+      "publishedAt": "2026-07-21T16:47:15.000Z",
+      "listedType": "global",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2081096447718723984",
+      "publishedAt": "2026-07-25T19:17:12.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2081940052154933696",
+      "publishedAt": "2026-07-28T03:09:23.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2082317452755751098",
+      "publishedAt": "2026-07-29T04:09:02.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2083395449814229287",
+      "publishedAt": "2026-08-01T03:32:37.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2086188036493344823",
+      "publishedAt": "2026-08-08T20:29:22.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2086972802457063486",
+      "publishedAt": "2026-08-11T00:27:44.000Z",
+      "listedType": "global",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2087423996115681767",
+      "publishedAt": "2026-08-12T06:20:37.000Z",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2087706104814023111",
+      "publishedAt": "2026-08-13T01:01:37.000Z",
+      "listedType": "global",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2090766694897619318",
+      "publishedAt": "2026-08-21T11:43:19.000Z",
+      "listedType": "banked",
+      "expectedActions": [
+        {
+          "kind": "banked_reset",
+          "stage": "promised"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2090947107469558188",
+      "publishedAt": "2026-08-21T23:40:12.000Z",
+      "listedType": "unknown",
+      "expectedActions": [
+        {
+          "kind": "banked_reset",
+          "stage": "promised"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2090947196107764189",
+      "publishedAt": "2026-08-21T23:40:34.000Z",
+      "expectedActions": [
+        {
+          "kind": "banked_reset",
+          "stage": "promised"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2090964822422949999",
+      "publishedAt": "2026-08-22T00:50:36.000Z",
+      "expectedActions": [
+        {
+          "kind": "banked_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2091407991736332689",
+      "publishedAt": "2026-08-23T06:11:36.000Z",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "promised"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2091412393368945027",
+      "publishedAt": "2026-08-23T06:29:05.000Z",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "promised"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2091688655828246890",
+      "publishedAt": "2026-08-24T00:46:51.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2093014447833116908",
+      "publishedAt": "2026-08-27T16:35:05.000Z",
+      "listedType": "global",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2093801758665715784",
+      "publishedAt": "2026-08-29T20:43:34.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "in_progress"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2093801838504186008",
+      "publishedAt": "2026-08-29T20:43:53.000Z",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "in_progress"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2094144275957350900",
+      "publishedAt": "2026-08-30T19:24:37.000Z",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "promised"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2094251180121854309",
+      "publishedAt": "2026-08-31T02:29:25.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2094252447271366730",
+      "publishedAt": "2026-08-31T02:34:27.000Z",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2095651088502591861",
+      "publishedAt": "2026-09-03T23:12:09.000Z",
+      "listedType": "banked",
+      "expectedActions": [
+        {
+          "kind": "banked_reset",
+          "stage": "promised"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2095979536043401428",
+      "publishedAt": "2026-09-04T20:57:17.000Z",
+      "listedType": "banked",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2096035437299237298",
+      "publishedAt": "2026-09-05T00:39:25.000Z",
+      "listedType": "banked",
+      "expectedActions": [
+        {
+          "kind": "banked_reset",
+          "stage": "promised"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2097043464538264003",
+      "publishedAt": "2026-09-07T19:24:57.000Z",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "promised"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2097174560412246215",
+      "publishedAt": "2026-09-08T04:05:53.000Z",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2098685367058612394",
+      "publishedAt": "2026-09-12T08:09:17.000Z",
+      "listedType": "global",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2102254445082116335",
+      "publishedAt": "2026-09-22T04:31:32.000Z",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2102463847714247142",
+      "publishedAt": "2026-09-22T18:23:37.000Z",
+      "listedType": "banked",
+      "expectedActions": [
+        {
+          "kind": "banked_reset",
+          "stage": "in_progress"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2103637477760311522",
+      "publishedAt": "2026-09-26T00:07:13.000Z",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "promised"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2103911959544610829",
+      "publishedAt": "2026-09-26T18:17:54.000Z",
+      "listedType": "global",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2103963215885701493",
+      "publishedAt": "2026-09-26T21:41:35.000Z",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2105843926221660585",
+      "publishedAt": "2026-10-02T02:14:51.000Z",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "promised"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2106131810921136451",
+      "publishedAt": "2026-10-02T21:18:48.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2106233145163141249",
+      "publishedAt": "2026-10-03T04:01:28.000Z",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2106239435461579088",
+      "publishedAt": "2026-10-03T04:26:28.000Z",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2106845241357824205",
+      "publishedAt": "2026-10-04T20:33:43.000Z",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2107676072871600470",
+      "publishedAt": "2026-10-07T03:35:09.000Z",
+      "listedType": "global",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2107913674593644711",
+      "publishedAt": "2026-10-07T19:19:17.000Z",
+      "expectedActions": [
+        {
+          "kind": "banked_reset",
+          "stage": "in_progress"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2107913738791596286",
+      "publishedAt": "2026-10-07T19:19:33.000Z",
+      "expectedActions": [
+        {
+          "kind": "banked_reset",
+          "stage": "in_progress"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2108040921044639779",
+      "publishedAt": "2026-10-08T03:44:55.000Z",
+      "listedType": "banked",
+      "expectedActions": [
+        {
+          "kind": "banked_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2109045220411351517",
+      "publishedAt": "2026-10-10T22:15:39.000Z",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2109045392684032299",
+      "publishedAt": "2026-10-10T22:16:20.000Z",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "promised"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2109132167112782291",
+      "publishedAt": "2026-10-11T04:01:09.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2109812216212099456",
+      "publishedAt": "2026-10-13T01:03:25.000Z",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2109812360596865224",
+      "publishedAt": "2026-10-13T01:03:59.000Z",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "promised"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2109873287853707513",
+      "publishedAt": "2026-10-13T05:06:06.000Z",
+      "listedType": "global",
+      "expectedActions": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete"
+        }
+      ],
+      "referenceOnly": false
+    },
+    {
+      "messageId": "2110595484180214059",
+      "publishedAt": "2026-10-15T04:55:51.000Z",
+      "expectedActions": [],
+      "referenceOnly": true
+    },
+    {
+      "messageId": "2110618732666257557",
+      "publishedAt": "2026-10-15T06:28:13.000Z",
+      "listedType": "global",
+      "expectedActions": [],
+      "referenceOnly": true
+    }
+  ],
+  "excluded": [
+    {
+      "messageId": "2105120226027450685",
+      "url": "https://x.com/thsottiaux/status/2105120226027450685",
+      "reason": "原文没有重置或发卡声明，排除第三方误收录"
+    }
+  ]
+}

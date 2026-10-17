@@ -2,6 +2,7 @@ import { pool } from '../src/db';
 import { runOne, writeWorkerHeartbeat } from '../src/server/worker';
 import {createWorkerHeartbeat,WORKER_HEARTBEAT_MS,WORKER_IDLE_MS,workerRetryDelay} from '../src/server/worker-timing';
 import {setTimeout as sleep} from 'node:timers/promises';
+import {applyBundledHistory} from '../src/server/history-backfill';
 import {readFile,writeFile,rename,mkdir} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {dirname,resolve} from 'node:path';
@@ -25,6 +26,7 @@ const pause=async(ms:number)=>{try{await sleep(ms,undefined,{signal:shutdown.sig
 let heartbeatTimer:ReturnType<typeof setInterval>|undefined;
 const heartbeat=createWorkerHeartbeat((error,processedAt)=>writeWorkerHeartbeat(error,processedAt??false));
 let failures=0;
+let historyFinished=false,historyRetryAt=0;
 try {
   if(process.argv.includes('--once')) {
     const did=await runOne();await writeWorkerHeartbeat(undefined,did);
@@ -35,6 +37,10 @@ try {
     heartbeatTimer=setInterval(()=>{void heartbeat.flush();},WORKER_HEARTBEAT_MS);
     while(!stopping) {
       try {
+        if(!historyFinished&&Date.now()>=historyRetryAt){
+          try{const result=await applyBundledHistory();historyFinished=result.phase==='complete';console.log(`HISTORY_BACKFILL_COMPLETE published=${result.published} references=${result.references} existing=${result.existing}`);}
+          catch{historyRetryAt=Date.now()+5*60_000;console.error('HISTORY_BACKFILL_PENDING');}
+        }
         const did=await runOne();
         failures=0;heartbeat.setError(undefined);
         if(did)heartbeat.processed();
