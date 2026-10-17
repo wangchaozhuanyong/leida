@@ -27,6 +27,17 @@ export function publicActions(data: PublicFactsData) {
   });
 }
 
+/** Every completed public round counts; benefit type is not an event identity. */
+export function completedPublicActions(data: PublicFactsData) {
+  const now=Date.parse(data.serverTime);
+  if(!Number.isFinite(now))return [];
+  return publicActions(data).filter(({action,publication})=>action.stage==='claimed_complete'
+    && Number.isFinite(Date.parse(action.statementAt))&&Date.parse(action.statementAt)<=now
+    && Number.isFinite(Date.parse(publication.publishedAt))&&Date.parse(publication.publishedAt)<=now)
+    .sort((a,b)=>Date.parse(b.action.statementAt)-Date.parse(a.action.statementAt)||a.action.id.localeCompare(b.action.id));
+}
+export const recentCompletedBenefits=(data:PublicFactsData)=>completedPublicActions(data).slice(0,5);
+
 /** Current published rounds only; an elapsed deadline never proves completion. */
 export function pendingPublicActions(data: PublicFactsData, currentTime = data.serverTime) {
   const now = Date.parse(currentTime);

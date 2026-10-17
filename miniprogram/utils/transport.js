@@ -73,6 +73,7 @@ function createTransport(wxApi, config, {privateRequests=false}={}) {
       if (!allowed) { reject(new Error('请求路径不受支持')); return; }
       if(privateRequests && path!=='/api/wechat/login' && !options.sessionToken){reject(requestError(401,{error:'请先点击微信提醒，重新建立当前会话。'}));return;}
       const header = typeof etag==='string' && etag ? { 'If-None-Match': `"${etag}"` } : {};
+      if(!privateRequests)header['X-Radar-Watch-Contract']='2';
       if(privateRequests){header['content-type']='application/json';if(options.sessionToken)header.Authorization=`Bearer ${options.sessionToken}`;}
       const receive = response => {
         if (cancelled) return;

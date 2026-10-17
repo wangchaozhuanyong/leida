@@ -2,7 +2,7 @@ import { transaction, type Client } from '../db';
 import type { Activity, Article, Evidence, PublicData, Publication, RadarEvent, Source } from '../lib/types';
 import type { PublicReadEnvelope, PublicReadOptions, PublicView } from '../lib/public-read';
 import { projectPublicHistory } from '../lib/history';
-import { publicActions, publicationSourceTime } from '../lib/public-facts';
+import { publicActions, publicationSourceTime, recentCompletedBenefits } from '../lib/public-facts';
 import { publicResetOutlook } from '../lib/reset-outlook';
 import { activityDayNumber } from '../lib/activity-display';
 import { getPublicForecast, forecastTablesAvailable } from './forecast';
@@ -136,6 +136,7 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
       const outlook = publicResetOutlook(facts);
       for (const id of [outlook.active?.publicationId, outlook.latestCompletion?.publicationId, outlook.lastResolved?.publicationId]) if (id) selected.add(id);
       const actions = publicActions(facts).sort((a,b) => Date.parse(b.action.statementAt)-Date.parse(a.action.statementAt));
+      recentCompletedBenefits(facts).forEach(item=>selected.add(item.publication.id));
       for (const kind of ['automatic_reset','banked_reset']) { const item = actions.find(item => item.action.kind === kind && item.action.stage === 'claimed_complete' && Date.parse(item.action.statementAt) <= Date.parse(now) && Date.parse(item.publication.publishedAt) <= Date.parse(now)); if (item) selected.add(item.publication.id); }
       facts.articles.slice().sort((a,b) => Date.parse(b.sourcePublishedAt || b.publishedAt)-Date.parse(a.sourcePublishedAt || a.publishedAt)).slice(0,3).forEach(article => selected.add(article.publicationId));
     } else if (options.view === 'calendar') {

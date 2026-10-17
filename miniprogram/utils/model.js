@@ -35,14 +35,20 @@ function elapsed(value, now) {
 function completionTime(value) {
   return validTime(value) ? displayTime(value).replace(/-/g, '/') : '暂无记录';
 }
-/** Select each benefit independently from current public factual versions. */
-function latestCompletedBenefits(data) {
-  const now = Date.parse(data.serverTime), seen = new Set();
+/** Each completed round remains visible even when its benefit kind repeats. */
+function completedBenefits(data) {
+  const now = Date.parse(data.serverTime);
   if (!Number.isFinite(now)) return [];
   return publicActions(data).filter(({ action, publication }) => action.stage === 'claimed_complete'
     && validTime(action.statementAt) && Date.parse(action.statementAt) <= now
     && validTime(publication.publishedAt) && Date.parse(publication.publishedAt) <= now)
-    .sort((a, b) => Date.parse(b.action.statementAt) - Date.parse(a.action.statementAt) || a.action.id.localeCompare(b.action.id))
+    .sort((a, b) => Date.parse(b.action.statementAt) - Date.parse(a.action.statementAt) || a.action.id.localeCompare(b.action.id));
+}
+function recentCompletedBenefits(data) { return completedBenefits(data).slice(0,5); }
+/** Per-kind latest state remains useful for posters and current announcement selection. */
+function latestCompletedBenefits(data) {
+  const seen=new Set();
+  return completedBenefits(data)
     .filter(({ action }) => { if (seen.has(action.kind)) return false; seen.add(action.kind); return true; });
 }
 /** Refreshing or reopening the page never restarts the original 24-hour result window. */
@@ -331,17 +337,25 @@ function validateForecastPublicData(value) {
     && (item.snapshot === undefined || validateForecastSnapshot(item.snapshot) && item.snapshot.caseId === item.id && item.snapshot.id === item.snapshotId && item.snapshot.target === item.target));
 }
 function watchTime(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value)) return NaN;
+  if(typeof value!=='string'||value.length>64||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value))return NaN;
   const year=Number(value.slice(0,4)),month=Number(value.slice(5,7)),day=Number(value.slice(8,10));
   if (month<1 || month>12 || day<1 || day>new Date(Date.UTC(year,month,0)).getUTCDate() || Number(value.slice(11,13))>23 || Number(value.slice(14,16))>59 || Number(value.slice(17,19))>59) return NaN;
   return Date.parse(value);
 }
+function validWatchSource(value) {
+  if(value.sourceType===undefined||value.sourceType==='x_post')return typeof value.sourceUrl==='string'&&/^https:\/\/x\.com\/thsottiaux\/status\/\d{15,20}$/.test(value.sourceUrl);
+  if(value.sourceType!=='observed')return false;
+  return value.sourceUrl===undefined||typeof value.sourceUrl==='string'&&value.sourceUrl.length<=2048&&!!safeUrl(value.sourceUrl)&&value.sourceUrl.startsWith('https://');
+}
 function validateResetWatch(value) {
   if (!value || !['active','none','unavailable'].includes(value.status) || !Number.isFinite(watchTime(value.checkedAt))) return false;
+  const s=value.scheduledReset;
+  if(s!==undefined&&(!s||typeof s!=='object'||value.status!=='none'||typeof s.id!=='string'||!s.id.trim()||s.id.length>64||!['automatic_reset','banked_reset'].includes(s.kind)||!validWatchSource(s)||typeof s.text!=='string'||!s.text.trim()||s.text.length>4000||!Number.isFinite(watchTime(s.announcedAt))||watchTime(s.announcedAt)>watchTime(value.checkedAt)||s.scheduledFor!==null&&(!Number.isFinite(watchTime(s.scheduledFor))||watchTime(s.scheduledFor)<watchTime(s.announcedAt))))return false;
   if (value.status !== 'active') return value.signal === undefined;
   const signal=value.signal;
-  if (!signal || !['elevated','strong'].includes(signal.level) || typeof signal.sourceUrl !== 'string' || !/^https:\/\/x\.com\/thsottiaux\/status\/\d{15,20}$/.test(signal.sourceUrl)
-    || typeof signal.text !== 'string' || !signal.text.trim() || signal.text.length>4000 || typeof signal.forecastWindow !== 'string' || !signal.forecastWindow.trim() || signal.forecastWindow.length>200) return false;
+  if (!signal || !['elevated','strong'].includes(signal.level) || !validWatchSource(signal)
+    || typeof signal.text !== 'string' || !signal.text.trim() || signal.text.length>4000 || typeof signal.forecastWindow !== 'string' || !signal.forecastWindow.trim() || signal.forecastWindow.length>200
+    || signal.chancePercent!==undefined&&signal.chancePercent!==null&&(!Number.isInteger(signal.chancePercent)||signal.chancePercent<0||signal.chancePercent>100)) return false;
   const observed=watchTime(signal.observedAt),expires=watchTime(signal.expiresAt),checked=watchTime(value.checkedAt);
   return Number.isFinite(observed) && Number.isFinite(expires) && observed<=checked && expires>observed;
 }
@@ -350,6 +364,18 @@ function activeResetWatch(watch, now, resolvedAt) {
   const current=Date.parse(now),signal=watch.signal,resolved=Date.parse(resolvedAt);
   if (!Number.isFinite(current) || watchTime(watch.checkedAt)>current || watchTime(signal.observedAt)>current || watchTime(signal.expiresAt)<=current || Number.isFinite(resolved)&&resolved>=watchTime(signal.observedAt)) return null;
   return signal;
+}
+function activeResetSchedule(watch,now) {
+  if(!validateResetWatch(watch)||!watch.scheduledReset)return null;
+  const current=Date.parse(now),s=watch.scheduledReset;
+  if(!Number.isFinite(current)||watchTime(watch.checkedAt)>current||watchTime(s.announcedAt)>current)return null;
+  return s;
+}
+function resetWatchWindow(value) {
+  const hours=value.trim().match(/^(?:within|in(?: the next)?)\s+(\d+(?:\.\d+)?)\s+hours?\.?$/i);
+  if(hours)return `${hours[1]}小时内`;
+  if(/^(?:within|in(?: the next)?)\s+(?:a\s+)?few\s+hours\.?$/i.test(value.trim()))return '数小时内';
+  return value;
 }
 function probabilityText(value) { return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1 ? `${Number((value * 100).toFixed(1))}%` : null; }
 function intervalText(value) { return value ? `${probabilityText(value[0])}—${probabilityText(value[1])}` : '样本不足'; }
@@ -400,4 +426,4 @@ function forecastOutcomeModel(snapshot, data) {
   });
   return { available: true, entries, message: entries.length ? '按后续观测时间排列，最新记录在前。' : '尚无已关联的后续记录；不代表没有公告或不会发放。', note };
 }
-module.exports = { publicArticleSummary, publicArticleContent, sourceStatus, actionLabels, preferenceDefaults, dateKey, displayTime, elapsed, completionTime, latestCompletedBenefits, completionElapsed, articleSourceTime, sortedArticles, isNewsOnly, currentPublication, statePublication, publicationSourceTime, sortedPublications, sortedStatePublications, publicActions, isHistoricalArticle, upcomingActions, announcementCountdown, resetOutlookModel, stageText, calendarDays, safeUrl, sharePath, publicationWithdrawn, publicationCard, calendarModel, noticeModel, resolveDetail, activityDayNumber, activityHomeVisible, activityModel, validateForecastSnapshot, validateForecastPublicData, validateResetWatch, activeResetWatch, probabilityText, forecastPath, forecastSnapshotModel, currentForecast, forecastReferenceModel, forecastOutcomeModel };
+module.exports = { publicArticleSummary, publicArticleContent, sourceStatus, actionLabels, recentCompletedBenefits, preferenceDefaults, dateKey, displayTime, elapsed, completionTime, latestCompletedBenefits, completionElapsed, articleSourceTime, sortedArticles, isNewsOnly, currentPublication, statePublication, publicationSourceTime, sortedPublications, sortedStatePublications, publicActions, isHistoricalArticle, upcomingActions, announcementCountdown, resetOutlookModel, stageText, calendarDays, safeUrl, sharePath, publicationWithdrawn, publicationCard, calendarModel, noticeModel, resolveDetail, activityDayNumber, activityHomeVisible, activityModel, validateForecastSnapshot, validateForecastPublicData, validateResetWatch, activeResetWatch, activeResetSchedule, resetWatchWindow, probabilityText, forecastPath, forecastSnapshotModel, currentForecast, forecastReferenceModel, forecastOutcomeModel };

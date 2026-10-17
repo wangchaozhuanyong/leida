@@ -54,7 +54,7 @@ test('发卡名称独立，旧完成记录不代替新安排；超过24小时继
   assert.equal(ongoing.title, '发卡进行中'); assert.equal(ongoing.currentStage, 1); assert.equal(ongoing.completed, false);
   for (const statementAt of ['2026-10-14T04:00:00Z', '2026-10-15T04:00:01Z', 'invalid']) {
     const model = statusTimelineModel({status: 'completed', latestCompletion: {...completed, statementAt}}, now);
-    assert.equal(model.title, '等待预告'); assert.equal(model.currentStage, -1);
+    assert.equal(model.title, '等待下一次 Reset'); assert.equal(model.currentStage, -1);
   }
 });
 
@@ -66,7 +66,7 @@ test('信号优先于旧完成，不能标为公开预告；两端显示同一�
   const web=statusTimelineModel(outlook,now,completed,data);
   assert.deepEqual(native.statusTimelineModel(outlook,now,completed,data),web);
   assert.equal(web.title,'发现重置信号');assert.equal(web.currentStage,-1);assert.equal(web.completed,false);
-  assert.equal(web.note,'观察截至 2026-10-15 13:00');
+  assert.equal(web.note,'观察有效至 2026-10-15 13:00');
   const html=renderToStaticMarkup(createElement(StatusTimeline,{outlook,serverTime:now,forecasts:data}));
   assert.match(html,/AI 信号推测，尚无明确预告/);assert.match(html,/数据来自 Codex Resets/);
   assert.doesNotMatch(html,/aria-current="step"|预计 2026-10-15 13:00/);
@@ -83,12 +83,32 @@ test('明确预告、后来的完成声明、撤回、到期与无效来源压�
   }
   assert.equal(statusTimelineModel({status:'monitoring'},'2026-10-15T05:00:00Z',null,data).watching,false);
 });
-test('无信号且样本有效时显示预计时间范围，样本不足不制造日期',()=>{
+test('没有有效新信号时，即使历史模型可计算或给出很宽区间也必须等待，不展示日期',()=>{
   const generated=Date.parse(now),observations=Array.from({length:10},(_,i)=>{const at=new Date(generated-(9-i)*48*3600_000).toISOString();return {id:`e${i}`,url:`https://x.com/thsottiaux/status/${100+i}`,evidenceIds:[`e${i}`],kind:'automatic_reset' as const,at,firstKnownAt:at,timePrecision:'exact' as const};});
   const cadence=buildResetCadenceForecast({observations,generatedAt:now,target:'automatic_reset',inputFingerprint:'test'});
   const data={...forecasts(),watch:{status:'none' as const,checkedAt:now},cadence};
-  const web=statusTimelineModel({status:'monitoring'},now,null,data);
-  assert.equal(web.estimating,true);assert.match(web.note,/10月17日 12:00附近/);assert.equal(web.currentStage,-1);
-  assert.deepEqual(native.statusTimelineModel({status:'monitoring'},now,null,data),web);
-  assert.equal(statusTimelineModel({status:'monitoring'},now,null,{...data,cadence:{...cadence,status:'insufficient',anchorAt:null}}).estimating,false);
+  assert.equal(cadence.status,'ready','回归输入确实能产生历史估算，不能依靠样本不足掩盖问题');
+  for(const watch of [undefined,{status:'none' as const,checkedAt:now},{status:'unavailable' as const,checkedAt:now},{...forecasts().watch!,signal:{...forecasts().watch!.signal!,expiresAt:now}}]){
+    for(const window of [{}, {windowStart:'2026-10-18T14:21:00Z',predictedAt:'2026-10-24T06:42:00Z',windowEnd:'2026-11-05T06:42:00Z'}]){
+      const snapshot={...cadence,...window};
+      const input={...data,watch,cadence:snapshot,cadenceByKind:{automatic_reset:snapshot}};
+      const web=statusTimelineModel({status:'monitoring'},now,null,input);
+      assert.equal(web.title,'等待下一次 Reset');assert.equal(web.estimating,false);assert.equal(web.currentStage,-1);
+      assert.deepEqual(native.statusTimelineModel({status:'monitoring'},now,null,input),web);
+      const html=renderToStaticMarkup(createElement(StatusTimeline,{outlook:{status:'monitoring'},serverTime:now,forecasts:input}));
+      assert.match(html,/等待下一次 Reset/);assert.doesNotMatch(html,/预计重置时间|历史间隔估算|10月18|11月05|北京时间/);
+    }
+  }
+});
+
+test('新信号到期即回等待，历史区间不会重新接管；新的公开时间仍可展示',()=>{
+  const data=forecasts(),outlook:ResetOutlook={status:'monitoring'};
+  const before=structuredClone(data);
+  assert.equal(statusTimelineModel(outlook,now,null,data).watching,true);
+  const expiry=data.watch!.signal!.expiresAt;
+  const waiting=statusTimelineModel(outlook,expiry,null,data);
+  assert.equal(waiting.title,'等待下一次 Reset');assert.equal(waiting.watching,false);assert.equal(waiting.estimating,false);
+  assert.deepEqual(native.statusTimelineModel(outlook,expiry,null,data),waiting);
+  assert.equal(statusTimelineModel({status:'scheduled',active},now,null,data).note,'预计 2026-10-15 15:20');
+  assert.deepEqual(data,before,'切换显示状态不能重写信号或延长预测期限');
 });

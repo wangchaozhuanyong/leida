@@ -18,7 +18,7 @@ function fixture(stage?:BenefitAction['stage'],expectedAt?:string):PublicData {
 }
 const measure=(text:string,size:number)=>Array.from(text).reduce((n,c)=>n+(c.charCodeAt(0)<128?.56:1)*size,0);
 test('两款固定海报在无公告、预告、进行中和逾期时均可用，不捏造完成或经过天数',()=>{
-  for(const [stage,time,value]of [[undefined,undefined,'等待预告'],['promised','2026-10-15T03:00:00Z','03:00'],['in_progress',undefined,'重置进行中'],['promised','2026-10-14T23:00:00Z','等待确认']] as const){
+  for(const [stage,time,value]of [[undefined,undefined,'等待下一次 Reset'],['promised','2026-10-15T03:00:00Z','03:00'],['in_progress',undefined,'重置进行中'],['promised','2026-10-14T23:00:00Z','等待确认']] as const){
     const data=fixture(stage,time),input=native.statusPosterInput(data);
     assert.equal(input.value,value);assert.notEqual(input.label,'距该公告');assert.ok(native.statusPosterAvailable(input,data));
     for(const theme of ['precision','editorial']){const layout=native.createStatusPosterLayout(input,measure,theme);assert.equal(layout.width,1080);assert.equal(layout.height,1920);assert.match(layout.background,new RegExp(theme+'\\.jpg$'));assert.ok(layout.commands.some((c:any)=>c.value===value));assert.equal(layout.commands.some((c:any)=>c.asset==='code'),false);}
@@ -42,7 +42,7 @@ test('黑金海报的数字与单位保留独立安全区，覆盖分钟、小�
   }
 });
 test('网站两款海报也支持等待状态；公开轮次变化时拒绝旧预览而非替换事实',()=>{
-  const waiting=fixture();for(const theme of ['precision','editorial'] as const){const svg=currentStatusPosterSvg(waiting,now,'waiting',theme);assert.match(svg,/1080.*1920/);assert.match(svg,/等待预告/);assert.match(svg,/暂无公开公告/);assert.doesNotMatch(svg,/公告称已|data-poster-code/);}
+  const waiting=fixture();for(const theme of ['precision','editorial'] as const){const svg=currentStatusPosterSvg(waiting,now,'waiting',theme);assert.match(svg,/1080.*1920/);assert.match(svg,/等待下一次 Reset/);assert.match(svg,/暂无公开公告/);assert.doesNotMatch(svg,/公告称已|data-poster-code/);}
   const announced=fixture('promised','2026-10-15T03:00:00Z');assert.match(currentStatusPosterSvg(announced,now,'fixed-publication'),/03:00/);
   assert.throws(()=>currentStatusPosterSvg(announced,now,'waiting'),/已变化/);assert.throws(()=>currentStatusPosterSvg(fixture('claimed_complete'),now,'fixed-publication'),/已变化/);
 });
@@ -85,5 +85,5 @@ test('固定海报十次切换和预览返回复用两张成品，撤回立即�
   page.show();await new Promise(r=>setImmediate(r));
   for(let i=0;i<10;i++){const theme=i%2?'precision':'editorial';page.selectTheme({currentTarget:{dataset:{theme}}});await new Promise(r=>setImmediate(r));assert.equal(page.data.preview,theme);}
   page.hide();page.show();await new Promise(r=>setImmediate(r));assert.equal(renders,2);assert.equal(page.data.posterBusy,false);
-  page._snapshot.publicationId='fixed-publication';data.articles[0].status='withdrawn';page.afterRender();assert.equal(page.data.preview,'');assert.match(page.data.blocked,/不可分享/);assert.equal(Object.keys(page._artifacts).length,0);page.unload();
+  page._snapshot.publicationId='fixed-publication';data.articles[0].status='withdrawn';page.afterRender();assert.equal(page.data.preview,'');assert.match(page.data.blocked,/状态已变化/);assert.equal(Object.keys(page._artifacts).length,0);page.unload();
 });

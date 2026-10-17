@@ -2,7 +2,6 @@
   "navigationBarTitleText": "模钥重置雷达",
   "usingComponents": {
     "neural-orb": "/components/neural-orb/index",
-    "reset-forecast": "/components/reset-forecast/index",
     "signal-arrow": "/components/signal-arrow/index"
   }
 }

@@ -15,9 +15,9 @@ import type {ForecastSnapshot} from '@/lib/forecast';
 import {HistoricalReplayPanel} from './HistoricalReplayPanel';
 import {ForecastPanel} from './ForecastPanel';
 import {InstrumentDial} from './InstrumentDial';
+import {statusPosterSnapshot} from '@/lib/status-timeline';
 import {StatusTimeline} from './StatusTimeline';
 import {ResetOutlookPanel} from './ResetOutlookPanel';
-import {ResetForecastCard} from './ResetForecastCard';
 import {publicResetOutlook} from '@/lib/reset-outlook';
 import { actionLabels } from '@/lib/labels';
 import { activityDayNumber, activityHomeVisible } from '@/lib/activity-display';
@@ -26,7 +26,7 @@ import { createPosterFromEndpoint, savePosterImage, type PosterImage } from './p
 import { statusPosterStyles, statusPosterVariant, type StatusPosterStyle } from '@/lib/status-poster-style';
 import { activityPublicationUrl, activityShareQuery, buildActivityShare, parseActivityShare, resolveActivityShare, type ActivityDayShare } from '@/lib/activity-share';
 import { briefTime, articleSourceTime, publicationSourceTime, publicationWithdrawn, sortedArticles, sortedStatePublications, currentPublication, dateKey, displayTime, elapsed, publicActions, safeUrl, statePublication, isNewsOnly, stageText } from './model';
-import { latestSourceSuccess, publicArticleSummary, publicArticleContent, publicNavSection, latestCompletedBenefits, completionTime } from './model';
+import { latestSourceSuccess, publicArticleSummary, publicArticleContent, publicNavSection, latestCompletedBenefits, recentCompletedBenefits, completionTime } from './model';
 
 type IconName = 'radar' | 'home' | 'settings' | 'arrow' | 'back' | 'bell' | 'link' | 'share' | 'card' | 'clock' | 'check' | 'close' | 'external' | 'info' | 'refresh' | 'calendar' | 'news' | 'more';
 function Icon({ name, className = '' }: { name: IconName; className?: string }) {
@@ -162,7 +162,7 @@ export default function PublicApp() {
   else if (route === 'activities' && path[1]) content = <ActivityPage data={data} activity={data ? currentActivity : activityCache.current.get(path[1])} id={path[1]} query={query} onDay={value => changeFilter('day', value === null ? null : String(value))} pending={!data ? pending : undefined} onPoster={setPoster} onDayPoster={value => { setPoster(null); setDayPoster(value); }} />;
   else if (!readPath) content = <><Empty title="暂时没有这条记录" detail="链接可能已变化，请返回首页查看公开动态。" /><TextLink href="/">返回首页</TextLink></>;
   else if (!data) content = pending;
-  else if (route === 'home') content = <Home data={data} onWechatReminders={() => setWechatReminders(true)} onPoster={(publication, actionId='') => setStatusPoster({ publication, actionId,round:(data.forecasts?.outlook??publicResetOutlook(data)).active?.publicationId??'waiting',generatedAt:currentTime()||data.serverTime })} onShare={share} historical={historical} wechatEntry={wechatEntry} />;
+  else if (route === 'home') content = <Home data={data} onWechatReminders={() => setWechatReminders(true)} onPoster={() => {const at=currentTime()||data.serverTime;setStatusPoster({actionId:'',round:statusPosterSnapshot(data,at).round,generatedAt:at});}} onShare={share} historical={historical} wechatEntry={wechatEntry} />;
   else if (route === 'events' && path[1]) content = <EventPage data={data} id={path[1]} onPoster={setPoster} onShare={share} />;
   else if (route === 'articles' && path[1]) content = <ArticlePage data={data} id={path[1]} onPoster={setPoster} />;
   else if (route === 'sources' && path[1]) content = <EvidencePage data={data} id={path[1]} />;
@@ -170,7 +170,6 @@ export default function PublicApp() {
   else if (route === 'methodology') content = <Methodology data={data} snapshotId={query.get('snapshot')} cadenceId={query.get('cadence')} target={query.get('target')==='banked_reset'?'banked_reset':'automatic_reset'} onPoster={setForecastPoster} onShare={s=>shareUrl(`${location.origin}/methodology?snapshot=${encodeURIComponent(s.id)}`,'重置实验预测快照')} />;
   else content = <><Empty title="暂时没有这条记录" detail="链接可能已变化，请返回首页查看公开动态。" /><TextLink href="/">返回首页</TextLink></>;
   return <div className={`pub-shell route-${route} ${subpage ? 'is-detail' : ''}`} onClickCapture={onNavigateCapture}>
-    {route === 'home' && <div className="pub-home-atmosphere" aria-hidden="true"><img src="/skin/observatory-header.jpg" alt="" width="1152" height="768" fetchPriority="high" /></div>}
     <Suspense fallback={null}><PublicRouteReader onChange={onLocation} /></Suspense>
     <a className="pub-skip" href="#public-main">跳到主要内容</a>
     <header className="pub-topbar">
@@ -179,7 +178,8 @@ export default function PublicApp() {
     </header>
     {subpage && <nav className="pub-page-back" aria-label="返回上级"><Link scroll={false} className="pub-back-link" href={backHref}><Icon name="back" />返回</Link></nav>}
     {route === 'home' && <div className="pub-home-heading">
-      <div className="pub-home-heading-copy"><h1>重置动态，<span>一目了然</span></h1><p>不要错过每一次重置。</p></div>
+      <div className="pub-home-atmosphere" aria-hidden="true"><img src="/skin/codex-reset-hero.jpg" alt="" width="1152" height="576" fetchPriority="high" /></div>
+      <div className="pub-home-heading-copy"><h1><span className="pub-home-heading-topic"><span className="pub-home-heading-product">Codex</span>重置</span><span className="pub-home-heading-accent">一目了然</span></h1><p>不要错过每一次重置。</p></div>
       {!navigationLoading && data && <details className="pub-freshness"><summary><span className={`pub-status-dot${error || sourceStatus(data.sources).warning ? ' is-delayed' : ''}`} />{error ? '连接中断，保留已有资料' : sourceStatus(data.sources).label}<Icon name="info" /></summary><div><p>最近采集成功：<time dateTime={collectedAt}>{collectedAt ? `${briefTime(collectedAt)} · 北京时间` : '暂无记录'}</time></p><p>最新消息发布于：<time dateTime={latestArticle ? articleSourceTime(latestArticle) : undefined}>{latestArticle ? `${briefTime(articleSourceTime(latestArticle))} · 北京时间` : '暂无记录'}</time></p><p>采集成功时间来自最近成功的来源，不代表所有消息已完成核验。待确认消息可在新闻页查看。</p></div></details>}
     </div>}
     <main className="pub-main" id="public-main" tabIndex={-1}>
@@ -191,7 +191,7 @@ export default function PublicApp() {
     </main>
     <footer className={`pub-footer ${subpage ? 'subpage' : ''}`}>{navigationLoading ? null : route==='methodology'&&query.get('snapshot') ? <p>预测资料截止时间见固定快照</p> : cutoff && !['home', 'events', 'articles', 'sources'].includes(route) ? <p>{historical ? '历史资料' : '资料截至'} · {displayTime(cutoff)}</p> : !data && !loading && !error && readPath ? <p>暂无已发布资料</p> : null}<p>所有时间均为北京时间</p><Link scroll={false} href="/more#privacy">隐私说明</Link></footer>
     <nav className="pub-bottom-nav" aria-label="手机主导航">{navigation}</nav>
-    {statusPoster && <PosterModal statusDesign codeAvailable={posterCodeAvailable} target={{ id: `${statusPoster.publication?.id??'current'}:${statusPoster.actionId}`, cutoffAt: statusPoster.publication?.cutoffAt??statusPoster.generatedAt, title: '公开重置状态', endpoint: `/api/v1/posters/${encodeURIComponent(statusPoster.publication?.id??'current')}?${new URLSearchParams({ layout: 'status', action: statusPoster.actionId,round:statusPoster.round,at:statusPoster.generatedAt })}`, filename: `模钥重置雷达-重置状态-${dateKey(data?.serverTime || new Date().toISOString())}.png` }} name={data?.site.name || '模钥重置雷达'} blocked={data && statusPoster.publication && publicationWithdrawn(data, statusPoster.publication) ? '此内容已撤回，已停止生成海报。' : ''} onClose={() => setStatusPoster(null)} onShare={() => share(statusPoster.publication)} />}
+    {statusPoster && <PosterModal statusDesign codeAvailable={posterCodeAvailable} target={{ validUntil:data?statusPosterSnapshot(data,statusPoster.generatedAt).validUntil:undefined,id: `${statusPoster.publication?.id??'current'}:${statusPoster.actionId}`, cutoffAt: statusPoster.publication?.cutoffAt??statusPoster.generatedAt, title: '公开重置状态', endpoint: `/api/v1/posters/${encodeURIComponent(statusPoster.publication?.id??'current')}?${new URLSearchParams({ layout: 'status', action: statusPoster.actionId,round:statusPoster.round,at:statusPoster.generatedAt })}`, filename: `模钥重置雷达-重置状态-${dateKey(data?.serverTime || new Date().toISOString())}.png` }} name={data?.site.name || '模钥重置雷达'} blocked={data && statusPoster.round!==statusPosterSnapshot(data,currentTime()||data.serverTime).round ? '公开状态已变化，请关闭后重新生成海报。' : ''} onClose={() => setStatusPoster(null)} onShare={() => share(statusPoster.publication)} />}
     {poster && <PosterModal target={{ id: poster.id, cutoffAt: poster.cutoffAt, title: poster.article.title, endpoint: `/api/v1/posters/${encodeURIComponent(poster.id)}`, filename: `模钥重置雷达-${dateKey(poster.cutoffAt)}-${poster.id}.png` }} name={data?.site.name || '模钥重置雷达'} blocked={posterWithdrawn ? '此内容已撤回，已停止生成海报。' : ''} onClose={() => setPoster(null)} onShare={() => share(poster)} />}
     {!poster && dayPoster && <PosterModal target={{ id: `${dayPoster.activityId}:${dayPoster.day}:${dayPoster.publicationIds.join(',')}`, cutoffAt: dayPosterCutoff, title: `活动第${dayPoster.day}天整合海报`, endpoint: `/api/v1/activity-posters/${encodeURIComponent(dayPoster.activityId)}?${activityShareQuery(dayPoster)}`, filename: `模钥重置雷达-活动第${dayPoster.day}天.png` }} name={data?.site.name || '模钥重置雷达'} blocked={dayPosterError} onClose={() => setDayPoster(null)} onShare={() => shareUrl(activityPublicationUrl(location.origin, dayPoster), `活动第${dayPoster.day}天进展`)} />}
     {!poster && !dayPoster && forecastPoster && <PosterModal target={{id:forecastPoster.id,cutoffAt:forecastPoster.evidenceCutoffAt,title:'重置实验预测快照',endpoint:`/api/v1/forecast-posters/${encodeURIComponent(forecastPoster.id)}`,filename:`模钥重置雷达-实验预测-${forecastPoster.id}.png`}} name={data?.site.name||'模钥重置雷达'} blocked={forecastPosterState.unavailable ? '此固定预测记录已不可用，已停止生成与分享海报。' : ''} onClose={()=>setForecastPoster(null)} onShare={()=>shareUrl(`${location.origin}/methodology?snapshot=${encodeURIComponent(forecastPoster.id)}`,'重置实验预测快照')} />}
@@ -235,14 +235,14 @@ export function Home({ data, onWechatReminders, onPoster, onShare, historical, w
     };
   }, []);
   const outlook = data.forecasts?.outlook ?? publicResetOutlook(data);
-  const completions = latestCompletedBenefits(data), latest = completions[0];
+  const completions = recentCompletedBenefits(data), latest = latestCompletedBenefits(data)[0];
   const recent = sortedArticles(data.articles).map(article => data.publications.find(p => p.id === article.publicationId)).filter((p): p is Publication => !!p).slice(0, 3);
   const activity = data.activities.find(item => activityHomeVisible(item, data.serverTime));
   const activityDay = activity ? activityDayNumber(activity, data.serverTime) : undefined;
   const activityPhase = activityDay === undefined ? '活动动态' : activityDay < 1 ? '尚未开始' : activity && activityDay > activity.days ? '活动已结束' : `第${activityDay}天 / 共${activity?.days}天`;
-  const latestRecord = completions.length ? <section className="pub-home-completions" aria-label="各类福利最近完成公告">
-    <div className="pub-home-completions-heading"><h2>最近完成</h2><span>以公开公告为准</span></div>
-    {completions.map(item => <Link scroll={false} className="pub-home-completion" key={item.action.kind} href={`/events/${encodeURIComponent(item.event.id)}`} aria-label={`公告称已${item.action.kind === 'banked_reset' ? '发放重置卡' : '重置用量'}，${completionTime(item.action.statementAt)}，查看公开依据`}>
+  const latestRecord = completions.length ? <section className="pub-home-completions" aria-label="最近五条公开完成公告">
+    <div className="pub-home-completions-heading"><h2>最近完成</h2><Link scroll={false} href="/history">全部记录 →</Link></div>
+    {completions.map(item => <Link scroll={false} className="pub-home-completion" key={item.action.id} href={`/events/${encodeURIComponent(item.event.id)}`} aria-label={`公告称已${item.action.kind === 'banked_reset' ? '发放重置卡' : '重置用量'}，${completionTime(item.action.statementAt)}，查看公开依据`}>
       <Icon name="check"/><span className="pub-home-completion-name">{item.action.kind === 'banked_reset' ? '重置卡发放' : '用量重置'}</span>
       <time dateTime={item.action.statementAt} title={`${displayTime(item.action.statementAt)} · 北京时间`}>{completionTime(item.action.statementAt).replace(/^(\d{4})\/(\d{2})\/(\d{2}) /, (_, year: string, month: string, day: string) => `${year === dateKey(data.serverTime).slice(0, 4) ? '' : `${year}年`}${Number(month)}月${Number(day)}日 `)}</time>
     </Link>)}
@@ -272,7 +272,6 @@ export function Home({ data, onWechatReminders, onPoster, onShare, historical, w
         {activity && <Link scroll={false} className="pub-instrument-activity" href={`/activities/${encodeURIComponent(activity.id)}`}><Icon name="calendar"/><div><h2>{activity.title}</h2><p>{activityPhase} · 已收录{activity.items.length}项进展</p></div><span>查看进展 <Icon name="arrow"/></span></Link>}
       </aside>
     </div>
-    <ResetForecastCard data={data.forecasts} now={data.serverTime}/>
     <section className="pub-recent"><div className="pub-section-heading"><div><h2>最近动态</h2></div><TextLink href="/news">全部动态</TextLink></div><div className="pub-recent-grid">{recent.length ? recent.map(p => <Announcement key={p.id} publication={p} withdrawn={publicationWithdrawn(data,p)} />) : <Empty title="暂无公开公告" detail="采集并核验后的重置记录会显示在这里。" />}</div></section>
   </>;
 }
@@ -454,8 +453,8 @@ function ShareLinkModal({ url, onClose }: { url: string; onClose: () => void }) 
   const copy = async () => { try { await navigator.clipboard.writeText(url); setMessage('链接已复制'); } catch { input.current?.select(); setMessage('请长按或选中链接复制。'); } };
   return <dialog className="pub-dialog" ref={dialog} onClose={onClose} onCancel={onClose} aria-labelledby="pub-share-title"><div className="pub-dialog-heading"><h2 id="pub-share-title">转发给朋友</h2><button className="pub-icon-button" aria-label="关闭分享" onClick={onClose}><Icon name="close" /></button></div><div className="pub-dialog-body"><label className="pub-share-link-label" htmlFor="pub-share-url">此版本链接</label><input className="pub-share-link-input" id="pub-share-url" ref={input} value={url} readOnly onClick={event => event.currentTarget.select()} /><button className="pub-button primary full" onClick={() => void copy()}>复制链接</button><p className="pub-dialog-note" role="status">{message}</p>{isLocalShareUrl(url) && <p className="pub-dialog-note">当前为本机链接，其他设备需通过正式网站地址访问。</p>}</div></dialog>;
 }
-interface PosterTarget { id: string; cutoffAt: string; title: string; endpoint: string; filename: string; }
-function PosterModal({ target, name, blocked, note, statusDesign = false, codeAvailable = false, onClose, onShare }: { target: PosterTarget; name: string; blocked: string; note?: string; statusDesign?: boolean; codeAvailable?: boolean; onClose: () => void; onShare: () => Promise<void> }) {
+interface PosterTarget { validUntil?:string; id: string; cutoffAt: string; title: string; endpoint: string; filename: string; }
+function PosterModal({ target, name, blocked:externalBlocked, note, statusDesign = false, codeAvailable = false, onClose, onShare }: { target: PosterTarget; name: string; blocked: string; note?: string; statusDesign?: boolean; codeAvailable?: boolean; onClose: () => void; onShare: () => Promise<void> }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const cache = useRef(new Map<string, PosterImage>());
   const [result, setResult] = useState<{ image: PosterImage; key: string } | null>(null);
@@ -470,6 +469,9 @@ function PosterModal({ target, name, blocked, note, statusDesign = false, codeAv
   const image = cache.current.get(requestKey) ?? (result?.key === requestKey ? result.image : null);
   const preview = image ?? result?.image;
   const selectedStyle = statusPosterStyles.find(option => option.id === style)!;
+  const [expired,setExpired]=useState(false);
+  const blocked=externalBlocked||(expired?'公开状态已变化，请关闭后重新生成海报。':'');
+  useEffect(()=>{setExpired(false);if(!target.validUntil)return;const remaining=Date.parse(target.validUntil)-Date.parse(target.cutoffAt);if(remaining<=0){setExpired(true);return;}const timer=window.setTimeout(()=>setExpired(true),Math.min(2147483647,remaining+20));return()=>clearTimeout(timer);},[target.id,target.cutoffAt,target.validUntil]);
   useEffect(() => { dialog.current?.showModal(); const previous = document.body.style.overflow; document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = previous; }; }, []);
   useEffect(() => () => {
     for (const image of cache.current.values()) URL.revokeObjectURL(image.url);

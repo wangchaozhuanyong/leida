@@ -57,7 +57,7 @@ test('返回缓存且版本 304 不读取正文，不重复检查微信入口', 
   await session.ensure(news);
   leaveAgain();
   assert.deepEqual(requests.map(request => request.url), [news, version]);
-  assert.deepEqual(requests[1].headers, { 'If-None-Match': '"c1"' });
+  assert.deepEqual(requests[1].headers, { 'If-None-Match': '"c1"', 'X-Radar-Watch-Contract':'2' });
 });
 
 test('后台正文更新重取原三页且原子替换，撤回条目不重新合并回来', async () => {

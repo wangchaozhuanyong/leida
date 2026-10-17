@@ -1,5 +1,6 @@
 import type { Article, BenefitAction, Notice, PublicData, Publication, RadarEvent } from '@/lib/types';
-import { pendingPublicActions, publicActions } from '@/lib/public-facts';
+import { pendingPublicActions, publicActions, completedPublicActions } from '@/lib/public-facts';
+export {recentCompletedBenefits} from '@/lib/public-facts';
 export { currentPublication, isNewsOnly, statePublication, publicActions, publicationSourceTime, publicationWithdrawn, sortedPublications, sortedStatePublications } from '@/lib/public-facts';
 
 export const zone = 'Asia/Shanghai';
@@ -16,12 +17,8 @@ export const completionTime = (value: string) => {
 };
 /** Keep one current public completion per benefit, ordered by its original statement time. */
 export function latestCompletedBenefits(data: PublicData) {
-  const now = Date.parse(data.serverTime), seen = new Set<BenefitAction['kind']>();
-  if (!Number.isFinite(now)) return [];
-  return publicActions(data).filter(({ action, publication }) => action.stage === 'claimed_complete'
-    && Number.isFinite(Date.parse(action.statementAt)) && Date.parse(action.statementAt) <= now
-    && Number.isFinite(Date.parse(publication.publishedAt)) && Date.parse(publication.publishedAt) <= now)
-    .sort((a, b) => Date.parse(b.action.statementAt) - Date.parse(a.action.statementAt) || a.action.id.localeCompare(b.action.id))
+  const seen = new Set<BenefitAction['kind']>();
+  return completedPublicActions(data)
     .filter(({ action }) => { if (seen.has(action.kind)) return false; seen.add(action.kind); return true; });
 }
 /** The 24-hour display expires from the public completion statement, never from page refresh. */

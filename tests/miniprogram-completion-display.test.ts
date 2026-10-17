@@ -42,6 +42,25 @@ test('小程序与网站采用相同的两类完成记录和24小时规则，保
  for(const row of native){assert.deepEqual(mini.completionElapsed(row.action,now),web.completionElapsed(row.action,now));assert.equal(mini.completionTime(row.action.statementAt),web.completionTime(row.action.statementAt));}
  assert.deepEqual(data,before);
 });
+test('首页最近完成按事件列出，连续同类型的11日和13日不会被15日覆盖',()=>{
+ const data=fixture([publication('card','banked_reset','2026-10-08T03:44:55Z'),publication('eleven','automatic_reset','2026-10-11T04:01:09Z'),publication('thirteen','automatic_reset','2026-10-13T05:06:06Z'),publication('fifteen','automatic_reset','2026-10-15T06:28:13Z')]);
+ data.serverTime='2026-10-17T04:00:00Z';
+ const before=structuredClone(data),expected=['action-fifteen','action-thirteen','action-eleven','action-card'];
+ assert.deepEqual(web.recentCompletedBenefits(data).map(row=>row.action.id),expected);
+ assert.deepEqual(mini.recentCompletedBenefits(data).map((row:any)=>row.action.id),expected);
+ const home=nativeHome(data);
+ assert.deepEqual(Array.from(home.page.data.completions,(row:any)=>row.id),expected);
+ assert.equal(home.page.data.completions[1].shortTime,'10月13日 13:06');assert.equal(home.page.data.completions[2].shortTime,'10月11日 12:01');
+ assert.equal(mini.latestCompletedBenefits(data).length,2,'按类型最新仅用于当前状态和海报，不是最近事件列表');
+ assert.deepEqual(data,before);home.page.onUnload();
+});
+test('最近完成有五条上限，按原始完成时间排序，不把同轮快照重复计数',()=>{
+ const data=fixture(Array.from({length:8},(_,i)=>publication(`r${i}`,'automatic_reset',`2026-10-${String(i+1).padStart(2,'0')}T01:00:00Z`)));
+ data.publications.push(structuredClone(data.publications[7]));
+ const expected=['action-r7','action-r6','action-r5','action-r4','action-r3'];
+ assert.deepEqual(web.recentCompletedBenefits(data).map(row=>row.action.id),expected);
+ assert.deepEqual(mini.recentCompletedBenefits(data).map((row:any)=>row.action.id),expected);
+});
 test('未来、个人、仅新闻、撤回和未完成公告不作为小程序完成依据',()=>{
  const reset=publication('reset','automatic_reset','2026-10-13T05:45:00Z');
  for(const kind of ['future','private','news','withdrawn','pending','invalid-publication']){
@@ -60,7 +79,7 @@ test('真实原生首页打开期间跨24小时自动恢复等待，并停止计
  const h=nativeHome(data);
  assert.equal(h.page.data.timeline.completed,true);assert.equal(h.timers.size,1);assert.equal(h.page.data.completions.length,2);
  h.advance(1000);
- assert.equal(h.page.data.timeline.completed,false);assert.equal(h.page.data.timeline.title,'等待预告');assert.equal(h.timers.size,0);assert.equal(h.page.data.completions.length,2);
+ assert.equal(h.page.data.timeline.completed,false);assert.equal(h.page.data.timeline.title,'等待下一次 Reset');assert.equal(h.timers.size,0);assert.equal(h.page.data.completions.length,2);
  assert.equal(h.page.data.completions[0].time,'2026/10/12 16:00');
  h.refresh();assert.equal(h.page.data.timeline.completed,false,'刷新不重开24小时');
  h.page.onUnload();assert.equal(h.timers.size,0);

@@ -157,7 +157,7 @@ export class PublicSession {
     this.controllers.add(controller);
     const timer = this.later(() => { timedOut = true; controller.abort(); }, timeout);
     try {
-      const result = await consume(await this.fetcher(endpoint, { cache: 'no-store', signal: controller.signal, headers }));
+      const result = await consume(await this.fetcher(endpoint, { cache: 'no-store', signal: controller.signal, headers:{...headers,'X-Radar-Watch-Contract':'2'} }));
       if (epoch !== this.epoch) throw new SessionStoppedError();
       if (timedOut) throw new Error('加载超时，请重试');
       return result;

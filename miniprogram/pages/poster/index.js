@@ -3,15 +3,18 @@ const {statusPosterInput,statusPosterAvailable,renderStatusPoster}=require('../.
 const poster=require('../../utils/poster');
 const {privacyRequired}=require('../../utils/wechat');
 function canvasNode(page){return new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('海报画布暂未准备好，请重试。')),10000);try{wx.createSelectorQuery().in(page).select('#status-poster-canvas').fields({node:true},result=>{clearTimeout(timer);result&&result.node?resolve(result.node):reject(new Error('海报画布暂不可用。'));}).exec();}catch(_){clearTimeout(timer);reject(new Error('海报画布暂不可用。'));}});}
-function stop(page){clearTimeout(page._posterTimeout);page._active=false;page._generation=(page._generation||0)+1;if(page._codeRequest)page._codeRequest.abort();}
+function currentData(){const state=getApp().client.getState(),data=state.data;if(!data)return data;const age=Number.isFinite(state.receivedAt)?Math.max(0,Date.now()-state.receivedAt):0;return {...data,serverTime:new Date(Date.parse(data.serverTime)+age).toISOString()};}
+function stop(page){clearTimeout(page._stateExpiryTimer);clearTimeout(page._posterTimeout);page._active=false;page._generation=(page._generation||0)+1;if(page._codeRequest)page._codeRequest.abort();}
 Page(createPage(data=>({available:!!data}),{
   view:()=>({view:'home'}),
   data:{available:false,theme:'precision',preview:'',posterBusy:false,posterSaving:false,posterError:'',codeNote:'',blocked:'',privacyNeeded:false},
   show(){this._active=true;if(this._snapshot)void this.generate();},hide(){stop(this);},unload(){stop(this);this.clearPosters();this._codeData=null;},
   afterRender(){
-    const state=getApp().client.getState(),data=state.data;
-    if(this._snapshot&&data&&!statusPosterAvailable(this._snapshot,data)){stop(this);this.clearPosters();this.setData({preview:'',posterBusy:false,blocked:'这条公开记录已不可分享，请返回首页重新生成。'});return;}
-    if(this._active&&!this.data.navigationLoading&&data&&!this._snapshot){this._snapshot=statusPosterInput({...data,serverTime:new Date(Date.parse(data.serverTime)+Math.max(0,Date.now()-state.receivedAt)).toISOString()});void this.generate();}
+    const data=currentData();
+    if(this._snapshot&&data&&!statusPosterAvailable(this._snapshot,data)){stop(this);this.clearPosters();this.setData({preview:'',posterBusy:false,blocked:'公开状态已变化，请返回首页重新生成。'});return;}
+    if(this._active&&!this.data.navigationLoading&&data&&!this._snapshot){this._snapshot=statusPosterInput(data);void this.generate();}
+    clearTimeout(this._stateExpiryTimer);
+    if(this._active&&data&&this._snapshot&&this._snapshot.validUntil){const remaining=Date.parse(this._snapshot.validUntil)-Date.parse(data.serverTime);if(remaining>0){this._stateExpiryTimer=setTimeout(()=>this.afterRender(),Math.min(2147483647,remaining+20));this._stateExpiryTimer.unref?.();}}
   },
   methods:{
     clearPosters(){
@@ -22,6 +25,7 @@ Page(createPage(data=>({available:!!data}),{
     selectTheme(event){const theme=event.currentTarget.dataset.theme;if(!['precision','editorial'].includes(theme)||theme===this.data.theme)return;this.setData({theme});void this.generate();},
     async generate(){
       if(!this._active||!this._snapshot||this.data.blocked)return;
+      if(!statusPosterAvailable(this._snapshot,currentData())){stop(this);this.clearPosters();this.setData({preview:'',posterBusy:false,blocked:'公开状态已变化，请返回首页重新生成。'});return;}
       if(this._codeRequest)this._codeRequest.abort();clearTimeout(this._posterTimeout);
       const generation=(this._generation||0)+1;this._generation=generation;
       const current=()=>this._active&&generation===this._generation,theme=this.data.theme;let asset;
@@ -45,13 +49,13 @@ Page(createPage(data=>({available:!!data}),{
     },
     previewImage(){if(this.data.preview&&!this.data.posterBusy)wx.previewImage({current:this.data.preview,urls:[this.data.preview]});},
     async save(){
-      if(!this._artifact||this.data.posterBusy||this.data.posterSaving||!statusPosterAvailable(this._snapshot,getApp().client.getState().data))return;
+      if(!this._artifact||this.data.posterBusy||this.data.posterSaving||!statusPosterAvailable(this._snapshot,currentData()))return;
       this.setData({posterSaving:true,posterError:'',privacyNeeded:false});
       try{if(await privacyRequired(wx)){this.setData({privacyNeeded:true});return;}await poster.savePoster(wx,this._artifact,{userInitiated:true});wx.showToast({title:'已保存到相册',icon:'success'});}
       catch(error){this.setData({posterError:error.message||'保存失败，请重试。'});}
       finally{this.setData({posterSaving:false});}
     },
     openPrivacyContract(){if(typeof wx.openPrivacyContract==='function')wx.openPrivacyContract({fail(){wx.showToast({title:'隐私指引暂不可用',icon:'none'});}});},
-    onShareAppMessage(){return{title:this._snapshot?this._snapshot.title:'模钥重置雷达',path:this._snapshot&&this._snapshot.publicationId?`/pages/detail/index?publicationId=${encodeURIComponent(this._snapshot.publicationId)}`:'/pages/home/index'};}
+    onShareAppMessage(){return{title:this._snapshot&&!this.data.blocked?this._snapshot.title:'模钥重置雷达',path:!this.data.blocked&&this._snapshot&&this._snapshot.publicationId?`/pages/detail/index?publicationId=${encodeURIComponent(this._snapshot.publicationId)}`:'/pages/home/index'};}
   }
 }));

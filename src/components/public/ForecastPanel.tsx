@@ -41,7 +41,7 @@ export function ForecastPanel({data,snapshotId,cadenceId,target='automatic_reset
  const reference=data?.reference;
  return <>
   {data?.outlook&&<div id="reset-prediction"><ResetOutlookPanel outlook={data.outlook} serverTime={data.generatedAt} details/></div>}
-  <div id="cadence-prediction"><CadencePanel key={target} data={data} initialTarget={target}/></div>
+  <details className="pub-card" id="cadence-prediction"><summary>历史间隔实验（不用于当前预测）</summary><p className="pub-muted">这里只保留历史统计与回测。没有新的有效信号时，首页保持等待，不用历史间隔推算下一次日期。</p><CadencePanel key={target} data={data} initialTarget={target}/></details>
   <details className="pub-card"><summary>额度异常观察（辅助模型）</summary>
   <section className="pub-card"><h2>实验预测如何计算</h2><p>仅将明确的用量异常信号加入观察，固定首次信号后的24／48小时。明确公告优先；普通故障和故障恢复不会变成发卡预告。</p>
    {reference?<><p>历史参考{reference.sampleCount}例：24小时{probabilityText(reference.p24)}，48小时{probabilityText(reference.p48)}；48小时95%可信区间{intervalText(reference.interval48)}。</p><p className="pub-muted">{reference.note}</p><details><summary>查看实验计算方式</summary><p>三个历史案例中，24小时内出现公告1例、24至48小时出现2例。加入固定先验[0.5，0.5，1]后计算窗口概率和95%可信区间。历史样本未完成连续覆盖核验及前瞻校准。</p></details></>:<p className="pub-muted">实验资料暂时不可用。</p>}
