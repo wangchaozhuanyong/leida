@@ -1,5 +1,8 @@
 <view class="neural-art {{ready ? 'is-ready' : ''}}" aria-hidden="true">
-  <image class="neural-static" src="/assets/neural/orb.png" mode="aspectFit" aria-hidden="true" />
+  <view class="neural-static" aria-hidden="true">
+    <view class="radar-face"><view class="radar-ring middle"/><view class="radar-ring inner"/><view class="radar-axis horizontal"/><view class="radar-axis vertical"/><view class="radar-sweep"/><view class="radar-point first"/><view class="radar-point second"/><view class="radar-point third"/><view class="radar-center"/></view>
+    <view class="radar-marker north"/><view class="radar-marker east"/><view class="radar-marker south"/><view class="radar-marker west"/>
+  </view>
   <canvas class="neural-canvas" id="neural-canvas" type="2d" binderror="onCanvasError" aria-hidden="true" />
   <view class="motion-preference" id="motion-preference" aria-hidden="true" />
 </view>

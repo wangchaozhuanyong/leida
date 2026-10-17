@@ -1,63 +1,57 @@
-// Decorative geometry only. It does not represent source activity or AI processing.
+// Decorative radar only. Its fixed signals are unrelated to source or account activity.
 const TAU = Math.PI * 2;
-const nodes = Array.from({ length: 142 }, (_, index) => {
-  const y = 1 - index / 141 * 2;
-  const radius = Math.sqrt(1 - y * y);
-  const angle = index * 2.399963;
-  return [radius * Math.cos(angle), y, radius * Math.sin(angle)];
-});
-const links = [];
-nodes.forEach((point, index) => {
-  let count = 0;
-  for (let next = index + 1; next < nodes.length && count < 4; next++) {
-    const distance = point.reduce((sum, value, axis) => sum + (value - nodes[next][axis]) ** 2, 0);
-    if (distance < .16) { links.push([index, next]); count++; }
-  }
-});
-
-function project(point, rotation) {
-  const [x, y, z] = point;
-  const xx = x * Math.cos(rotation) + z * Math.sin(rotation);
-  const zz = -x * Math.sin(rotation) + z * Math.cos(rotation);
-  const yy = y * Math.cos(.18) - zz * Math.sin(.18);
-  const depth = y * Math.sin(.18) + zz * Math.cos(.18);
-  const perspective = 3.6 / (3.6 - depth * .2);
-  return [xx * perspective, yy * perspective, depth];
-}
+const SIGNALS = [[-1.05, .57], [.65, .78], [2.55, .45]];
 
 function drawNeuralArt(ctx, width, height, time = 1.4) {
   if (!ctx || !width || !height) return;
   ctx.clearRect(0, 0, width, height);
   ctx.save();
   ctx.translate(width / 2, height / 2);
-  const scale = Math.min(width / 2.7, height / 2.55);
+  const scale = Math.min(width, height) / 2.36;
   ctx.scale(scale, scale);
   ctx.lineCap = 'round';
-  const points = nodes.map(point => project(point, time * .12));
   const dot = (x, y, radius, color) => {
     ctx.beginPath(); ctx.arc(x, y, radius, 0, TAU);
     ctx.fillStyle = color; ctx.fill();
   };
-  links.forEach(([from, to], index) => {
-    const a = points[from], b = points[to];
-    const depth = (a[2] + b[2] + 2) / 4;
-    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
-    ctx.strokeStyle = `rgba(54,91,210,${.08 + depth * .34})`;
-    ctx.lineWidth = .0055; ctx.stroke();
-    if (index % 17 === 0) {
-      const position = (time * .24 + index * .135) % 1;
-      dot(a[0] * (1 - position) + b[0] * position, a[1] * (1 - position) + b[1] * position, .014, 'rgba(72,169,198,.8)');
-    }
-  });
-  points.sort((a, b) => a[2] - b[2]).forEach((point, index) => {
-    dot(point[0], point[1], .009 + (point[2] + 1) * .006, `rgba(${index % 5 ? '54,91,210' : '72,169,198'},${.2 + (point[2] + 1) * .35})`);
-  });
-  ctx.beginPath(); ctx.arc(0, 0, 1.2, 0, TAU);
-  ctx.strokeStyle = 'rgba(54,91,210,.12)'; ctx.lineWidth = .004; ctx.stroke();
-  for (let index = 0; index < 4; index++) {
-    const angle = time * .09 + index * Math.PI / 2;
-    dot(Math.cos(angle) * 1.2, Math.sin(angle) * 1.2, .015, '#365bd2');
+  const line = (ax, ay, bx, by, color, size) => {
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+    ctx.strokeStyle = color; ctx.lineWidth = size; ctx.stroke();
+  };
+  dot(0, 0, 1, 'rgba(238,246,255,.7)');
+  for (const radius of [1, .66, .33]) {
+    ctx.beginPath(); ctx.arc(0, 0, radius, 0, TAU);
+    ctx.strokeStyle = radius === 1 ? 'rgba(67,110,184,.38)' : 'rgba(67,110,184,.2)';
+    ctx.lineWidth = .014; ctx.stroke();
   }
+  line(-.94, 0, .94, 0, 'rgba(67,110,184,.16)', .012);
+  line(0, -.94, 0, .94, 'rgba(67,110,184,.16)', .012);
+  for (let index = 0; index < 32; index++) {
+    const angle = index / 32 * TAU;
+    const inner = index % 4 === 0 ? 1.025 : 1.06;
+    line(Math.cos(angle) * inner, Math.sin(angle) * inner,
+      Math.cos(angle) * 1.105, Math.sin(angle) * 1.105,
+      index % 4 === 0 ? 'rgba(67,110,184,.52)' : 'rgba(67,110,184,.24)', .014);
+  }
+  const sweep = time / 6 * TAU - Math.PI / 2;
+  const tail = Math.PI * .4;
+  // Small translucent slices avoid an animated image or a per-frame data bridge.
+  for (let index = 0; index < 36; index++) {
+    const start = sweep - tail + tail * index / 36;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, .985, start, start + tail / 36 + .002); ctx.lineTo(0, 0);
+    ctx.fillStyle = `rgba(61,121,215,${.015 + (index / 35) ** 1.5 * .17})`; ctx.fill();
+  }
+  for (const [angle, radius] of SIGNALS) {
+    const age = ((sweep - angle) % TAU + TAU) % TAU;
+    const glow = Math.exp(-age * 2.2);
+    const x = Math.cos(angle) * radius, y = Math.sin(angle) * radius;
+    dot(x, y, .065 + glow * .035, `rgba(66,145,215,${.04 + glow * .15})`);
+    dot(x, y, .032, `rgba(49,113,190,${.48 + glow * .45})`);
+    dot(x - .006, y - .006, .01, 'rgba(255,255,255,.85)');
+  }
+  line(0, 0, Math.cos(sweep) * .985, Math.sin(sweep) * .985, 'rgba(44,116,209,.75)', .018);
+  dot(0, 0, .055, '#ffffff');
+  dot(0, 0, .025, '#3c76be');
   ctx.restore();
 }
 

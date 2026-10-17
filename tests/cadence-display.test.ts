@@ -23,7 +23,7 @@ test('网页和小程序使用相同类别、样本门槛及固定窗口',()=>{
  const data=publicForecast(),before=structuredClone(data);
  for(const target of ['automatic_reset','banked_reset'] as const){
   const s=cadenceForTarget(data,target),web=cadenceDisplay(s,now,target),mini=cadenceModel(data,now,target);
-  assert.equal(web.ready,true);assert.equal(mini.ready,true);assert.equal(web.p24,mini.p24);assert.equal(web.p48,mini.p48);assert.equal(web.state,mini.state);
+  assert.equal(web.ready,true);assert.equal(mini.ready,true);assert.equal(web.p24,mini.p24);assert.equal(web.p48,mini.p48);assert.equal(web.state,mini.state);assert.equal(web.rangeLabel,mini.rangeLabel);assert.equal(web.predictedLabel,mini.predictedLabel);
   assert.equal(web.window24,'2026-10-17T06:00:00.000Z');
   const later=cadenceDisplay(s,'2026-10-16T08:00:00Z',target);assert.equal(later.window24,web.window24);
  }
@@ -31,13 +31,23 @@ test('网页和小程序使用相同类别、样本门槛及固定窗口',()=>{
 });
 
 test('旧模型、过期、未来、类型错配和非法概率均不显示为当前估算',()=>{
- for(const change of [{target:undefined},{modelVersion:'old-model'},{validUntil:now},{generatedAt:'2026-10-17T06:00:00Z'},{target:'banked_reset'},{p24:NaN},{p48:1.5},{p24:.9,p48:.5},{eligibleCount:4},{sampleCount:7}] as Partial<ResetCadenceForecast>[]){
+ for(const change of [{target:undefined},{modelVersion:'old-model'},{validUntil:now},{generatedAt:'2026-10-17T06:00:00Z'},{target:'banked_reset'},{p24:NaN},{p48:1.5},{p24:.9,p48:.5},{eligibleCount:4},{sampleCount:7},{windowStart:null},{windowEnd:now},{predictedAt:'invalid'},{windowStart:'2026-10-20T00:00:00Z'}] as Partial<ResetCadenceForecast>[]){
   const s={...snapshot(),...change};const data=publicForecast(s);
   assert.equal(cadenceDisplay(s,now,'automatic_reset').ready,false,JSON.stringify(change));
   assert.equal(cadenceModel(data,now,'automatic_reset').ready,false,JSON.stringify(change));
  }
  assert.equal(cadenceDisplay(undefined,now,'automatic_reset').state,'积累记录中');
  assert.equal(cadenceForTarget({...publicForecast(),status:'unavailable'},'automatic_reset'),undefined);
+});
+
+test('缺起点和当前可比不足与总样本不足分别解释，不显示虚构时间',()=>{
+ const base=snapshot();
+ for(const anchorAt of [null,base.anchorAt]){
+  const s={...base,status:'insufficient' as const,sampleCount:14,eligibleCount:0,anchorAt,predictedAt:null,windowStart:null,windowEnd:null,p24:null,p48:null};
+  const web=cadenceDisplay(s,now,'automatic_reset'),mini=cadenceModel(publicForecast(s),now);
+  assert.equal(web.message,mini.message);assert.equal(web.state,mini.state);assert.equal(web.rangeLabel,'');assert.equal(web.ready,false);
+  assert.match(web.message,anchorAt?/当前等待时长下/:/时间依据待核对/);
+ }
 });
 
 test('明确公告只压过对应类型的历史估算',()=>{

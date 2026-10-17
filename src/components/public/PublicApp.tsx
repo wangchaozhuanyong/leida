@@ -179,7 +179,7 @@ export default function PublicApp() {
     </header>
     {subpage && <nav className="pub-page-back" aria-label="返回上级"><Link scroll={false} className="pub-back-link" href={backHref}><Icon name="back" />返回</Link></nav>}
     {route === 'home' && <div className="pub-home-heading">
-      <div className="pub-home-heading-copy"><strong>Codex重置</strong><p>不要错过每一次重置。</p></div>
+      <div className="pub-home-heading-copy"><h1>重置动态，<span>一目了然</span></h1><p>不要错过每一次重置。</p></div>
       {!navigationLoading && data && <details className="pub-freshness"><summary><span className={`pub-status-dot${error || sourceStatus(data.sources).warning ? ' is-delayed' : ''}`} />{error ? '连接中断，保留已有资料' : sourceStatus(data.sources).label}<Icon name="info" /></summary><div><p>最近采集成功：<time dateTime={collectedAt}>{collectedAt ? `${briefTime(collectedAt)} · 北京时间` : '暂无记录'}</time></p><p>最新消息发布于：<time dateTime={latestArticle ? articleSourceTime(latestArticle) : undefined}>{latestArticle ? `${briefTime(articleSourceTime(latestArticle))} · 北京时间` : '暂无记录'}</time></p><p>采集成功时间来自最近成功的来源，不代表所有消息已完成核验。待确认消息可在新闻页查看。</p></div></details>}
     </div>}
     <main className="pub-main" id="public-main" tabIndex={-1}>
@@ -252,10 +252,10 @@ export function Home({ data, onWechatReminders, onPoster, onShare, historical, w
   return <>
     {historical && <p className="pub-warning">当前展示历史收录资料。</p>}
     <div className={`pub-instrument-layout${outlook.active ? '' : ' is-idle'}`}>
-      <div className="pub-home-dial"><InstrumentDial outlook={outlook} serverTime={data.serverTime} completion={latest?.action ?? null}/></div>
+      <div className="pub-home-dial"><InstrumentDial outlook={outlook} serverTime={data.serverTime} completion={latest?.action ?? null} forecasts={data.forecasts}/></div>
       <aside className="pub-instrument-summary" aria-label="重置状态与操作">
         <div className="pub-home-state-zone">
-          <StatusTimeline outlook={outlook} serverTime={data.serverTime} completion={latest?.action ?? null}/>
+          <StatusTimeline outlook={outlook} serverTime={data.serverTime} completion={latest?.action ?? null} forecasts={data.forecasts}/>
           {outlook.active?.timeNote && <details className="pub-home-time-note"><summary>预告时间说明</summary><p>{outlook.active.timeNote}</p></details>}
           {outlook.active && <ResetOutlookPanel outlook={outlook} serverTime={data.serverTime} instrument />}
           {latestRecord}

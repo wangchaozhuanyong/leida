@@ -187,7 +187,9 @@ function contextStatement(primary: Evidence, latest: Map<string, Evidence[]>,cal
   return { kind: claims[0].kind,evidenceIds,proofEvidenceIds };
 }
 
-/** Latest known version first, then qualification: corrections cannot retain an old positive. */
+/** Originals and structured source records outrank archive descriptions of the
+ * same post. Within that evidence tier, the latest known version still wins:
+ * corrections cannot retain an old positive. */
 export function extractCadenceObservations(evidence: Evidence[], sources: Source[], cutoffAt: string): CadenceObservation[] {
   const cutoff = strictTime(cutoffAt);
   if (!Number.isFinite(cutoff)) return [];
@@ -203,8 +205,13 @@ export function extractCadenceObservations(evidence: Evidence[], sources: Source
     const url = canonicalUrl(item.url)!;
     // A later calendar excerpt for this URL cannot replace its original body.
     const versionsByPurpose=trustedEvidence(item,source)?latest:calendars,versions=versionsByPurpose.get(url);
-    if (!versions || collected > Date.parse(versions[0].collectedAt)) versionsByPurpose.set(url, [item]);
-    else if (collected === Date.parse(versions[0].collectedAt)) versions.push(item);
+    // A freshly polled translation may omit a reply's parent, its original
+    // wording, or seconds. It is not a newer version of the original post.
+    // Calendar definitions retain their independent latest-version rule.
+    const originRank=(record:Evidence)=>versionsByPurpose===latest&&['original','structured'].includes(record.textOrigin??'')?1:0;
+    const rankDifference=versions?originRank(item)-originRank(versions[0]):0;
+    if (!versions || rankDifference>0 || rankDifference===0&&collected > Date.parse(versions[0].collectedAt)) versionsByPurpose.set(url, [item]);
+    else if (rankDifference===0&&collected === Date.parse(versions[0].collectedAt)) versions.push(item);
   }
   const sameVersion=(item:Evidence)=>`${canonicalUrl(item.url)}|${versionMeaning(item)}`;
   const firstKnown=new Map<string,number>();

@@ -5,7 +5,6 @@
 .navigation-logo{width:25px;height:25px;flex:none}
 .navigation-copy{min-width:0;flex:1;text-align:left}
 .navigation-title{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:18px;line-height:24px;font-weight:650}
-.navigation-subtitle{font-size:9px;line-height:13px;letter-spacing:1.1px;color:#4d607b;white-space:nowrap}
 .navigation-inner.has-back{padding-left:8px;gap:2px}
 .navigation-back{width:44px;height:44px;min-height:44px;flex:none;display:flex;align-items:center;justify-content:center;margin:0;padding:0;border:0;border-radius:8px;background:transparent}
 .navigation-back::after{border:0}

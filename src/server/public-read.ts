@@ -10,6 +10,7 @@ import { hash } from './domain';
 import {forecastSourceAvailable} from '../lib/forecast';
 import { publicCached } from './public-cache';
 import { configuredPublicRpc } from './cloudbase/public-config';
+import {getResetWatch,resetWatchVersion,withResetWatchEnvelope} from './reset-watch';
 
 const views: PublicView[] = ['home', 'history', 'news', 'detail', 'activity', 'notices', 'methodology', 'state', 'calendar'];
 const fail = () => { throw Object.assign(new Error('公开读取参数无效，请重新打开页面'), { status: 400 }); };
@@ -69,7 +70,7 @@ export async function readPublicVersion(client: Client, timestamp = new Date().t
   }
   return finishPublicVersion(parts, rows.rows.map(row => row.payload as Source), timestamp);
 }
-export const getLightPublicVersion = async () => {
+const getStoredLightPublicVersion = async () => {
   const rpc=configuredPublicRpc();
   if(rpc)return (await import('./cloudbase/public-read')).createCloudbasePublicReader(rpc).version();
   return publicCached('light-version', () => transaction(async client => {
@@ -78,6 +79,12 @@ export const getLightPublicVersion = async () => {
   return { version: state.version, contentVersion: state.contentVersion };
   }));
 };
+
+export async function getLightPublicVersion() {
+  const [state, watch] = await Promise.all([getStoredLightPublicVersion(), getResetWatch()]);
+  const now = new Date().toISOString();
+  return {version: resetWatchVersion(state.version, watch, now), contentVersion: resetWatchVersion(state.contentVersion, watch, now)};
+}
 
 // Compatibility facts contain dates, qualifications and actions, but no original bodies.
 const articleSummary = `(payload - 'translation' - 'summary') || jsonb_build_object('translation','', 'summary',left(payload->>'summary',360))`;
@@ -96,7 +103,7 @@ export function decodeCursor(value: string | undefined, options: PublicReadOptio
   if (!value) return;
   try { const parsed = JSON.parse(Buffer.from(value, 'base64url').toString()); if (parsed.view !== options.view || parsed.filter !== options.filter || typeof parsed.id !== 'string' || !Number.isFinite(Date.parse(parsed.at)) || !Number.isFinite(Date.parse(parsed.publishedAt))) return fail(); return parsed; } catch { return fail(); }
 }
-export async function getPublicRead(options: PublicReadOptions): Promise<PublicReadEnvelope> {
+async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicReadEnvelope> {
   const rpc=configuredPublicRpc();
   if(rpc)return (await import('./cloudbase/public-read')).createCloudbasePublicReader(rpc).read(options);
   const key = JSON.stringify(options);
@@ -180,4 +187,10 @@ export async function getPublicRead(options: PublicReadOptions): Promise<PublicR
     return { data, version: state.version, contentVersion: state.contentVersion, ...(page ? { page } : {}) };
   }));
   return { ...result, data: { ...result.data, serverTime: new Date().toISOString() } };
+}
+
+/** Attach a bounded independent observation after the consistent database read. */
+export async function getPublicRead(options: PublicReadOptions): Promise<PublicReadEnvelope> {
+  const [result, watch] = await Promise.all([getStoredPublicRead(options), getResetWatch()]);
+  return withResetWatchEnvelope(result, watch, new Date().toISOString());
 }

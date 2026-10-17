@@ -93,3 +93,22 @@ test('同URL较新calendar只作上下文，不抹除原始正文或制造训练
  const day1=rows.find(row=>row.id==='day1')!,sameDay1={...proof,id:'same-day1-calendar',messageId:day1.messageId,url:day1.url,publishedAt:day1.publishedAt,collectedAt:'2026-10-16T03:00:00.000Z'};
  assert.equal(extract([...rows,sameDay1])[0]?.at,'2026-10-15T06:28:13.000Z','日历也不能遮蔽验证活动日期所需的原始Day1');
 });
+
+test('较新归档译文不遮蔽10/15原帖完成链，保留精确锚点与首次可知时间',()=>{
+ const rows=fixture(),done=rows.find(row=>row.id==='done')!,day1=rows.find(row=>row.id==='day1')!;
+ const archive:Source={...calendar,id:'reset-archive',kind:'archive',url:'https://codex-resets.com/zh-CN'};
+ const excerpt=(original:Evidence,text:string):Evidence=>({...original,id:`excerpt-${original.id}`,sourceId:archive.id,text,textOrigin:'archive_excerpt',parentId:undefined,collectedAt:'2026-10-16T12:00:00.000Z',metadata:{sourceGroup:'codex-resets',category:'reset'}});
+ const translated=[excerpt(done,'搞定了'),excerpt(day1,'第一天，速度已经提高。')];
+ for(const evidence of [[...rows,...translated],[...translated,...rows]]){
+  const before=structuredClone(evidence),observations=extract(evidence,[timeline,calendar,archive]);
+  assert.equal(observations.length,1);assert.equal(observations[0].at,'2026-10-15T06:28:13.000Z');
+  assert.equal(observations[0].timePrecision,'exact');assert.equal(observations[0].firstKnownAt,known);
+  assert.deepEqual(observations[0].evidenceIds,['day10','done','landing']);
+  const forecast=buildResetCadenceForecast({observations,target:'automatic_reset',generatedAt:cutoff,inputFingerprint:'original-with-later-translation'});
+  assert.equal(forecast.anchorAt,done.publishedAt);assert.deepEqual(evidence,before);
+ }
+ const correction={...done,id:'done-corrected',collectedAt:'2026-10-16T13:00:00.000Z',text:'Correction: no reset occurred. The previous statement was withdrawn.'};
+ assert.deepEqual(extract([...rows,...translated,correction],[timeline,calendar,archive]),[],'原文实际更正仍取消旧样本');
+ const conflict={...done,id:'same-time-conflict',text:'No reset occurred.'};
+ assert.deepEqual(extract([...rows,...translated,conflict],[timeline,calendar,archive]),[],'同刻原文冲突不能由归档译文解围');
+});

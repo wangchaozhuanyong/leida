@@ -5,7 +5,6 @@
     <image wx:if="{{brand}}" class="navigation-logo" src="/assets/neural/radar-blue.png" mode="aspectFit" aria-hidden="true" />
     <view class="navigation-copy">
       <view class="navigation-title">{{title}}</view>
-      <view wx:if="{{brand}}" class="navigation-subtitle">MOYAO RESET RADAR</view>
     </view>
   </view>
 </view>

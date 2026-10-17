@@ -7,6 +7,7 @@ import {getPublicForecast} from './forecast';
 import {readPublicFacts} from './public-read';
 import {publicCached} from './public-cache';
 import {configuredPublicRpc} from './cloudbase/public-config';
+import {getResetWatch,resetWatchVersion} from './reset-watch';
 
 interface RevisionParts {
   publicationCount: number;
@@ -28,7 +29,7 @@ function revision(parts: RevisionParts): string {
 }
 
 export function publicRevision(data: PublicData): string {
-  return revision({
+  const base = revision({
     publicationCount: data.publications.length,
     publicationKey: data.publications.map(p => p.id).sort().at(-1) ?? '',
     siteVersion: data.site.version,
@@ -36,10 +37,11 @@ export function publicRevision(data: PublicData): string {
     sources: data.sources,
     forecasts: forecastRevision(data.forecasts),
   });
+  return data.forecasts?.watch ? resetWatchVersion(base, data.forecasts.watch, data.serverTime) : base;
 }
 
 // Only public change metadata is read; unpublished candidates and AI configuration stay private.
-export async function getPublicVersion(): Promise<string> {
+async function getStoredPublicVersion(): Promise<string> {
   const rpc=configuredPublicRpc();if(rpc)return (await import('./cloudbase/public-read')).createCloudbasePublicReader(rpc).legacyVersion();
   return publicCached('legacy-version',()=>transaction(async c => {
     await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
@@ -58,4 +60,9 @@ export async function getPublicVersion(): Promise<string> {
     return revision({ publicationCount: publications.rows[0].count, publicationKey: publications.rows[0].key,
       siteVersion: site.rows[0]?.version ?? 1, activities: activities.rows, sources, forecasts:forecastRevision(forecasts) });
   }));
+}
+
+export async function getPublicVersion(): Promise<string> {
+ const [base,watch]=await Promise.all([getStoredPublicVersion(),getResetWatch()]);
+ return resetWatchVersion(base,watch,new Date().toISOString());
 }

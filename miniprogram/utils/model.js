@@ -321,6 +321,7 @@ function validateForecastSnapshot(value) {
 }
 function validateForecastPublicData(value) {
   if (!value || !['ready', 'unavailable'].includes(value.status) || typeof value.ruleVersion !== 'string' || typeof value.modelVersion !== 'string' || !validTime(value.generatedAt) || !Array.isArray(value.cases)) return false;
+  if (value.watch !== undefined && !validateResetWatch(value.watch)) return false;
   const reference = value.reference;
   if (!validEstimate(reference) || !stringList(reference.sampleIds) || reference.coverage !== 'unverified' || reference.calibrated !== false || typeof reference.method !== 'string' || typeof reference.note !== 'string') return false;
   return new Set(value.cases.map(item => item && item.id)).size === value.cases.length && value.cases.every(item => item && typeof item.id === 'string' && !!item.id && ['automatic_reset', 'banked_reset'].includes(item.target)
@@ -328,6 +329,27 @@ function validateForecastPublicData(value) {
     && ['watching', 'elapsed', 'observed', 'paused'].includes(item.status) && Array.isArray(item.outcomes)
     && new Set(item.outcomes.map(outcome => outcome && outcome.id)).size === item.outcomes.length && item.outcomes.every(outcome => validForecastOutcome(outcome, item))
     && (item.snapshot === undefined || validateForecastSnapshot(item.snapshot) && item.snapshot.caseId === item.id && item.snapshot.id === item.snapshotId && item.snapshot.target === item.target));
+}
+function watchTime(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value)) return NaN;
+  const year=Number(value.slice(0,4)),month=Number(value.slice(5,7)),day=Number(value.slice(8,10));
+  if (month<1 || month>12 || day<1 || day>new Date(Date.UTC(year,month,0)).getUTCDate() || Number(value.slice(11,13))>23 || Number(value.slice(14,16))>59 || Number(value.slice(17,19))>59) return NaN;
+  return Date.parse(value);
+}
+function validateResetWatch(value) {
+  if (!value || !['active','none','unavailable'].includes(value.status) || !Number.isFinite(watchTime(value.checkedAt))) return false;
+  if (value.status !== 'active') return value.signal === undefined;
+  const signal=value.signal;
+  if (!signal || !['elevated','strong'].includes(signal.level) || typeof signal.sourceUrl !== 'string' || !/^https:\/\/x\.com\/thsottiaux\/status\/\d{15,20}$/.test(signal.sourceUrl)
+    || typeof signal.text !== 'string' || !signal.text.trim() || signal.text.length>4000 || typeof signal.forecastWindow !== 'string' || !signal.forecastWindow.trim() || signal.forecastWindow.length>200) return false;
+  const observed=watchTime(signal.observedAt),expires=watchTime(signal.expiresAt),checked=watchTime(value.checkedAt);
+  return Number.isFinite(observed) && Number.isFinite(expires) && observed<=checked && expires>observed;
+}
+function activeResetWatch(watch, now, resolvedAt) {
+  if (!validateResetWatch(watch) || watch.status !== 'active') return null;
+  const current=Date.parse(now),signal=watch.signal,resolved=Date.parse(resolvedAt);
+  if (!Number.isFinite(current) || watchTime(watch.checkedAt)>current || watchTime(signal.observedAt)>current || watchTime(signal.expiresAt)<=current || Number.isFinite(resolved)&&resolved>=watchTime(signal.observedAt)) return null;
+  return signal;
 }
 function probabilityText(value) { return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1 ? `${Number((value * 100).toFixed(1))}%` : null; }
 function intervalText(value) { return value ? `${probabilityText(value[0])}—${probabilityText(value[1])}` : '样本不足'; }
@@ -378,4 +400,4 @@ function forecastOutcomeModel(snapshot, data) {
   });
   return { available: true, entries, message: entries.length ? '按后续观测时间排列，最新记录在前。' : '尚无已关联的后续记录；不代表没有公告或不会发放。', note };
 }
-module.exports = { publicArticleSummary, publicArticleContent, sourceStatus, actionLabels, preferenceDefaults, dateKey, displayTime, elapsed, completionTime, latestCompletedBenefits, completionElapsed, articleSourceTime, sortedArticles, isNewsOnly, currentPublication, statePublication, publicationSourceTime, sortedPublications, sortedStatePublications, publicActions, isHistoricalArticle, upcomingActions, announcementCountdown, resetOutlookModel, stageText, calendarDays, safeUrl, sharePath, publicationWithdrawn, publicationCard, calendarModel, noticeModel, resolveDetail, activityDayNumber, activityHomeVisible, activityModel, validateForecastSnapshot, validateForecastPublicData, probabilityText, forecastPath, forecastSnapshotModel, currentForecast, forecastReferenceModel, forecastOutcomeModel };
+module.exports = { publicArticleSummary, publicArticleContent, sourceStatus, actionLabels, preferenceDefaults, dateKey, displayTime, elapsed, completionTime, latestCompletedBenefits, completionElapsed, articleSourceTime, sortedArticles, isNewsOnly, currentPublication, statePublication, publicationSourceTime, sortedPublications, sortedStatePublications, publicActions, isHistoricalArticle, upcomingActions, announcementCountdown, resetOutlookModel, stageText, calendarDays, safeUrl, sharePath, publicationWithdrawn, publicationCard, calendarModel, noticeModel, resolveDetail, activityDayNumber, activityHomeVisible, activityModel, validateForecastSnapshot, validateForecastPublicData, validateResetWatch, activeResetWatch, probabilityText, forecastPath, forecastSnapshotModel, currentForecast, forecastReferenceModel, forecastOutcomeModel };

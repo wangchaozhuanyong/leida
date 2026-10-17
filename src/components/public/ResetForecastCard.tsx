@@ -4,8 +4,10 @@ import {useState} from 'react';
 import type {ForecastPublicData} from '@/lib/forecast';
 import {cadenceDisplay,cadenceForTarget,type CadenceTarget} from '@/lib/cadence-display';
 import {displayTime} from './model';
+import {usePublicClock} from './PublicSession';
 
-export function ResetForecastCard({data,now}:{data?:ForecastPublicData;now:string}) {
+export function ResetForecastCard({data,now:serverTime}:{data?:ForecastPublicData;now:string}) {
+ const now=usePublicClock(serverTime);
  const [target,setTarget]=useState<CadenceTarget>('automatic_reset');
  const snapshot=cadenceForTarget(data,target),view=cadenceDisplay(snapshot,now,target);
  const active=data?.outlook?.active;
@@ -17,6 +19,7 @@ export function ResetForecastCard({data,now}:{data?:ForecastPublicData;now:strin
    <button aria-pressed={target==='banked_reset'} onClick={()=>setTarget('banked_reset')}>重置卡</button>
   </div>
   {announced?<p className="pub-forecast-message">已有明确公开安排，请以上方公告进展和原文为准。</p>:<>
+   {view.ready&&<div className="pub-forecast-window"><span>预计时间范围 · 北京时间</span><strong>{view.rangeLabel}</strong></div>}
    {view.ready&&<div className="pub-forecast-metrics"><div><span>24小时内</span><strong>{view.p24}</strong></div><div><span>48小时内</span><strong>{view.p48}</strong></div></div>}
    <p className="pub-forecast-message" role="status">{view.message}</p>
    {snapshot&&<p className="pub-forecast-meta">{view.sampleCount}个历史间隔 · {view.eligibleCount}个当前可比间隔<br/>估算于 {displayTime(snapshot.generatedAt)} · 北京时间</p>}
