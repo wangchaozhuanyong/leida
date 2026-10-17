@@ -2,11 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import bundle from '../src/server/data/history-backfill-20261017.json';
-import {validateHistoryBundle,historicalDraft,type HistoryBundle} from '../src/server/history-backfill';
+import {validateHistoryBundle,historicalDraft,canUpgradeHistoryArticle,type HistoryBundle} from '../src/server/history-backfill';
+import type {Article,RadarEvent} from '../src/lib/types';
 import {validateDraft} from '../src/server/domain';
 
 const data=bundle as unknown as HistoryBundle;
 const digest=(value:HistoryBundle)=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
+test('历史补证仅升级已发布的机器待确认消息，保护人工字段、撤回和已确认事实',()=>{
+  const article={status:'published',publicationMode:'news_only',contentOrigin:'template'} as Article,event={status:'published'} as RadarEvent;
+  assert.equal(canUpgradeHistoryArticle(article,event),true);
+  assert.equal(canUpgradeHistoryArticle(article,event,true),false,'旧人工候选即使没有字段级标记也受保护');
+  for(const patch of [{status:'withdrawn'},{publicationMode:'state_change'},{contentOrigin:'generated'},{manualFields:['summary']}])assert.equal(canUpgradeHistoryArticle({...article,...patch} as Article,event),false);
+  assert.equal(canUpgradeHistoryArticle(article,{...event,manualFields:['title']}),false);
+  assert.equal(canUpgradeHistoryArticle(article,{...event,status:'withdrawn'}),false);
+});
 test('历史补录清单具有固定指纹、单一作者、有效时间和唯一消息身份',()=>{
   validateHistoryBundle(data);
   assert.ok(data.messages.length>=46);

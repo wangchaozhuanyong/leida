@@ -5,6 +5,16 @@ import { CloudbaseRpc, CloudbaseRpcError, type CloudbaseOperation } from '../src
 import { apiError } from '../src/server/http';
 import {setTimeout as delay} from 'node:timers/promises';
 
+test('旧公开快照支持半年原文体量，其他读取及写入仍保持原容量上限',async()=>{
+  const body={data:'x'.repeat(3*1024*1024)};
+  const rpc=new CloudbaseRpc('leida-test-qa','qa-only',async()=>Response.json(body));
+  assert.deepEqual(await rpc.call('radar_cb_public_bundle',{p_options:{view:'legacy'}}),body);
+  for(const [operation,params] of [['radar_cb_public_bundle',{p_options:{view:'calendar'}}],['radar_cb_store_read',{}]] as const)await assert.rejects(()=>rpc.call(operation,params),error=>error instanceof CloudbaseRpcError&&error.diagnosticCode==='CB_RESPONSE_200_RESPONSE_TOO_LARGE');
+  const bounded=new CloudbaseRpc('leida-test-qa','qa-only',async()=>Response.json({data:'x'.repeat(8*1024*1024)}));
+  await assert.rejects(()=>bounded.call('radar_cb_public_bundle',{p_options:{view:'legacy'}}),error=>error instanceof CloudbaseRpcError&&error.diagnosticCode==='CB_RESPONSE_200_RESPONSE_TOO_LARGE');
+  await assert.rejects(()=>rpc.call('radar_cb_store_commit',body),error=>error instanceof CloudbaseRpcError&&error.kind==='configuration');
+});
+
 test('CloudBase后端调用限定环境与函数，不允许任意SQL或转发秘密', async () => {
   const token=randomBytes(24).toString('hex'); let count=0;
   const transport:typeof fetch=async (url,options)=>{
