@@ -144,7 +144,7 @@ export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichme
       const probeDue=obstacles.missing && options.allowEnrichment!==false && canEnrich(original) && (!candidate.automation?.resumeAt||Date.parse(candidate.automation.resumeAt)<=Date.now());
       const newsContextProbe=enrichArticle&&actualArticle?.publicationMode==='news_only'&&!hasCompleteContext(original,context)&&probeDue;
       const candidateEvent=events.find(event=>event.id===(candidate.content.eventId??actualArticle?.eventId));
-      if(ruleOnly&&candidate.automation?.state==='conflict'&&!isStaleMachineConflict(candidate,candidateEvent))continue;
+      if(ruleOnly&&candidate.automation?.state==='conflict'&&!isStaleMachineConflict(candidate,candidateEvent)&&!isResolvedNewsContextConflict(candidate,original,context,events,evidence,articles))continue;
       // A rule release may re-evaluate supported templates once, not all old long-form model inputs.
       if(ruleOnly&&!template)continue;
       if(enrichArticle&&!ready&&!(publishedRecheck&&template)&&!newsContextProbe)continue;
@@ -218,14 +218,32 @@ function linkedBenefitContext(primary:Evidence,context:Evidence[]):{context:Evid
 export function actionIdentityEvidence(primary:Evidence,context:Evidence[]):Evidence {
   return linkedBenefitContext(primary,context).context.at(-1)??primary;
 }
-export function resolveLinkedEvents(primary:Evidence,context:Evidence[],events:RadarEvent[],all:Evidence[]):RadarEvent[] {
+export function resolveLinkedEvents(primary:Evidence,context:Evidence[],events:RadarEvent[],all:Evidence[],articles:Article[]=[]):RadarEvent[] {
   const {context:linkedContext,bounded}=linkedBenefitContext(primary,context);
   const keys=new Set(linkedContext.flatMap((item,index)=>[messageKey(item),...(item.parentId&&(!bounded||index<linkedContext.length-1)?[messageKey(item,item.parentId)]:[])]));
   keys.add(messageKey(primary));
-  return events.filter(event=>event.evidenceIds.some(id=>{
+  const linked=events.filter(event=>event.evidenceIds.some(id=>{
     const item=all.find(evidence=>evidence.id===id);
     return !!item&&item.provenance!=='manual'&&(keys.has(messageKey(item)) || !!item.parentId&&keys.has(messageKey(item,item.parentId)));
   }));
+  // A reviewed-as-pending ancestor is background, not a second benefit round.
+  // Keep its article/history intact and upgrade the time reply's own news shell.
+  if(primary.provenance==='manual'||primary.textOrigin!=='original'||!evidenceBenefitClaims(primary,context).some(claim=>claim.scope==='public'))return linked;
+  const ancestorKeys=new Set(gatherExplicitEvidenceContext(primary,context).slice(1).map(item=>messageKey(item)));
+  return linked.filter(event=>{
+    if(event.status!=='published'||event.actions.length||event.manualFields?.length||event.mergedInto)return true;
+    if(event.evidenceIds.some(id=>{const item=all.find(e=>e.id===id);return !item||item.provenance==='manual'||messageKey(item)===messageKey(primary)||!context.some(e=>e.id===id);}))return true;
+    const owned=articles.filter(article=>article.eventId===event.id);
+    if(owned.length!==1)return true;
+    const article=owned[0],main=all.find(item=>item.id===article.evidenceIds[0]);
+    return !(article.status==='published'&&article.publicationMode==='news_only'&&article.contentOrigin==='template'&&article.reviewStatus==='pending'&&!article.manualFields?.length&&main&&ancestorKeys.has(messageKey(main)));
+  });
+}
+/** Only release the exact machine conflict eliminated by excluding pending ancestor news. */
+export function isResolvedNewsContextConflict(candidate:Candidate,primary:Evidence,context:Evidence[],events:RadarEvent[],all:Evidence[],articles:Article[]):boolean {
+  if(candidate.humanEdited||candidate.automation?.state!=='conflict'||!candidate.reasons.length||candidate.reasons.some(reason=>reason!=='事件关联不明'))return false;
+  const before=resolveLinkedEvents(primary,context,events,all),after=resolveLinkedEvents(primary,context,events,all,articles);
+  return before.length>1&&after.length===1&&after[0].status==='published'&&!after[0].manualFields?.length&&after[0].evidenceIds.some(id=>all.some(e=>e.id===id&&messageKey(e)===messageKey(primary)));
 }
 function resolveTarget(event:RadarEvent,events:RadarEvent[]):RadarEvent|undefined {
   let current:RadarEvent|undefined=event;
@@ -320,16 +338,15 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
     draft.evidenceIds=[...new Set([...draft.evidenceIds,...context.map(item=>item.id)])];
     if(candidate.content.activityId) {draft.activityId=candidate.content.activityId;draft.activityDay=candidate.content.activityDay;}
     const events=await list<RadarEvent>('events');
-    const matched=resolveLinkedEvents(primary,gathered,events,all);
+    const articles=await list<Article>('articles');
+    const matched=resolveLinkedEvents(primary,gathered,events,all,articles);
     let linked=[...new Map(matched.map(event=>resolveTarget(event,events)).filter((event):event is RadarEvent=>!!event).map(event=>[event.id,event])).values()];
     if(linked.length>1){
-      const articles=await list<Article>('articles');
       linked=linked.filter(event=>!linked.some(target=>target.id!==event.id&&automaticNewsContextUpgrade(primary,draft,event,target,all,articles)));
     }
     if(draft.publicationMode==='news_only'&&draft.reviewStatus){
       // Campaign/background citations do not make independent product posts the
       // same event. Reuse only an article whose primary post has this identity.
-      const articles=await list<Article>('articles');
       linked=linked.filter(event=>articles.some(article=>article.eventId===event.id&&article.status==='published'&&all.some(item=>item.id===article.evidenceIds[0]&&messageKey(item)===messageKey(primary))));
     }
     const requestedEventId=draft.eventId;
