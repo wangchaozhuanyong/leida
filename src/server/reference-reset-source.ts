@@ -10,6 +10,13 @@ export const REFERENCE_RESET_SOURCE:Source={id:'aiplanwatch-reference',name:'AIP
 export const REFERENCE_SIGNAL_SOURCE:Source={...REFERENCE_RESET_SOURCE,id:'aiplanwatch-signals',name:'AIPlanWatch 公开信号对账',url:`${REFERENCE_DATA_ROOT}/signals.json`};
 export const REFERENCE_HISTORY_SOURCE:Source={...REFERENCE_RESET_SOURCE,id:'aiplanwatch-history',name:'AIPlanWatch 重置与重置卡对账',url:`${REFERENCE_DATA_ROOT}/resets.json`,intervalMinutes:360};
 export const REFERENCE_SOURCES=[REFERENCE_RESET_SOURCE,REFERENCE_SIGNAL_SOURCE,REFERENCE_HISTORY_SOURCE];
+/** The public Contents API serves the same fixed repository files. Keep the
+ * canonical source URL/proof unchanged; never derive a request from user input. */
+export function referenceContentsURL(source:Source):string|undefined {
+ const fixed=REFERENCE_SOURCES.find(item=>item.id===source.id&&item.kind===source.kind&&item.url===source.url);
+ if(!fixed)return;
+ return `https://api.github.com/repos/gdutxiaoxu/codex-reset-radar/contents/data/${fixed.url.slice(REFERENCE_DATA_ROOT.length+1)}?ref=master`;
+}
 const at=z.string().datetime({offset:true});
 const source=z.object({url:z.string().regex(/^https:\/\/x\.com\/thsottiaux\/status\/\d{15,20}$/),label:z.string().optional()});
 const record=z.object({event_id:z.string().min(1).max(180),reset_type:z.literal('global'),record_status:z.literal('recorded'),occurred_at:at,source});
