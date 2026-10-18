@@ -1,33 +1,39 @@
 'use client';
 import React from 'react';
 import type {ResetOutlook} from '@/lib/reset-outlook';
-import type {BenefitAction} from '@/lib/types';
+import type {BenefitAction,PublicData,ActionKind} from '@/lib/types';
 import {announcementCountdown, completionElapsed} from './model';
 import {usePublicClock} from './PublicSession';
 import type {ForecastPublicData} from '@/lib/forecast';
+import {resetStateCards} from '@/lib/reset-state-cards';
 import {statusTimelineModel} from './StatusTimeline';
 
 const point = (angle: number, radius: number) => ({x: 300 + Math.sin(angle * Math.PI / 180) * radius, y: 300 - Math.cos(angle * Math.PI / 180) * radius});
 const timeLabel = (at: string) => new Intl.DateTimeFormat('zh-CN', {timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'}).format(new Date(at));
 
 /** A Beijing clock face showing an active announcement or a recent public completion. */
-export function InstrumentDial({outlook, serverTime, completion = outlook.latestCompletion, forecasts}: {outlook: ResetOutlook; serverTime: string; completion?: Pick<BenefitAction, 'kind' | 'stage' | 'statementAt'> | null; forecasts?:ForecastPublicData}) {
+export function InstrumentDial({outlook, serverTime, completion = outlook.latestCompletion, forecasts, data, statusKind}: {outlook: ResetOutlook; serverTime: string; completion?: Pick<BenefitAction, 'kind' | 'stage' | 'statementAt'> | null; forecasts?:ForecastPublicData;data?:PublicData;statusKind?:ActionKind}) {
   const now = usePublicClock(serverTime);
-  const timeline=statusTimelineModel(outlook,now,completion,forecasts),reference=timeline.sourceCredit||timeline.watching||timeline.estimating;
-  const active = timeline.sourceCredit&&!timeline.watching?{expectedAt:timeline.expectedAt||undefined,kind:timeline.kind,stage:'promised' as const,timeNote:''}:outlook.active, countdown = active ? announcementCountdown(active, now) : undefined;
-  const completed = active||reference ? undefined : completionElapsed(completion, now);
+  const card=data&&statusKind?resetStateCards(data,now).cards.find(item=>item.kind===statusKind):undefined;
+  const legacy=statusTimelineModel(outlook,now,completion,forecasts);
+  const timeline=card?{...legacy,title:card.metric||card.title,lead:card.metric?card.metricLabel:card.evidence,note:card.timeAt?card.timeLabel+' '+card.time:card.description,detail:card.metric?card.description:'',sourceCredit:!!card.sourceName,sourceName:card.sourceName,sourceUrl:card.sourceUrl,sourceType:card.sourceType,watching:['signal','estimated'].includes(card.state),forecastWindow:card.window,observedLabel:'',chanceLabel:'',expectedAt:card.metric?card.timeAt:''}:legacy;
+  const reference=timeline.sourceCredit||timeline.watching||timeline.estimating;
+  const active = card ? (['scheduled','revised','overdue','announced','progress'].includes(card.state)?{expectedAt:['scheduled','revised','overdue'].includes(card.state)?card.timeAt:undefined,kind:statusKind!,stage:card.state==='progress'?'in_progress' as const:'promised' as const,timeNote:''}:undefined) : timeline.sourceCredit&&!timeline.watching?{expectedAt:timeline.expectedAt||undefined,kind:timeline.kind,stage:'promised' as const,timeNote:''}:outlook.active;
+  const countdown = active ? announcementCountdown(active, now) : undefined;
+  const completed = active||reference||card?.state==='cancelled' ? undefined : completionElapsed(completion, now);
   const bankedCompletion = !!completed && completion?.kind === 'banked_reset';
-  const longElapsed = (completed?.parts.reduce((length, part) => length + String(part.value).length, 0) ?? 0) > 3;
-  const scheduled = countdown?.status === 'upcoming';
+  const elapsedDays = completed?.parts.find(part=>part.unit==='天')?.value ?? 0;
+  const elapsedClock = completed?.parts.filter(part=>part.unit!=='天') ?? [];
+  const scheduled = card?!!card.metric:countdown?.status === 'upcoming';
   const remaining = scheduled ? Math.ceil((Date.parse(active!.expectedAt!) - Date.parse(now)) / 60000) : 0;
   const digits = scheduled ? timeline.title : undefined;
   const angle = (at: string) => {const [h,m] = timeLabel(at).split(':').map(Number); return (h + m / 60) * 15;};
   const currentAngle = angle(now), endAngle = scheduled ? angle(active!.expectedAt!) : currentAngle;
   const marker = point(endAngle, 255), start = point(currentAngle, 255);
   const sweep = Math.min(359.9, remaining / 4), arcEnd = point(currentAngle + sweep, 255);
-  const state = forecasts?timeline.title:countdown?.status === 'expired' ? '等待确认' : active ? active.stage === 'in_progress' ? '重置进行中' : '时间待明确' : '等待预告';
+  const state = card?card.title:forecasts?timeline.title:countdown?.status === 'expired' ? '等待确认' : active ? active.stage === 'in_progress' ? '重置进行中' : '时间待明确' : '等待预告';
   const lead = reference || scheduled ? timeline.lead : completed ? completed.lead : outlook.status === 'cancelled' ? '上轮安排已取消' : '公开动态追踪';
-  return <section className={`pub-instrument-dial ${scheduled ? 'is-scheduled' : completed ? 'is-completed' : 'is-waiting'}`} aria-label={scheduled ? `公开预告：${countdown.label}，北京时间${timeLabel(active!.expectedAt!)}` : completed ? `${completed.lead}：${completed.label}` : `重置雷达：${state}`}>
+  return <section className={`pub-instrument-dial ${scheduled ? 'is-scheduled' : completed ? 'is-completed' : 'is-waiting'}`} aria-label={scheduled ? `公开预告：${card?.metric||countdown?.label}，北京时间${timeLabel(active!.expectedAt!)}` : completed ? `${completed.lead}：${completed.label}` : `重置雷达：${state}`}>
     <h1 className="pub-visually-hidden">重置雷达</h1>
     <div className="pub-dial-viewport">
     <svg className="pub-dial-face" viewBox="0 0 600 600" aria-hidden="true">
@@ -44,13 +50,14 @@ export function InstrumentDial({outlook, serverTime, completion = outlook.latest
     <div className="pub-dial-readout">
       <p className={bankedCompletion ? 'pub-dial-banked-lead' : undefined}>{bankedCompletion ? <><span>距最近一次确认</span><span>发放重置卡</span></> : lead}</p>
       {digits ? <strong className="pub-dial-countdown">{digits}</strong> : completed ?
-        <strong className={`pub-dial-elapsed${longElapsed ? ' is-long' : ''}`} aria-label={completed.label}>
-          {completed.parts.length ? <>{completed.parts.map(part => <span className="pub-dial-duration" key={part.unit}><span>{part.value}</span><small>{part.unit}</small></span>)}</> : '刚刚'}
-        </strong> : <strong className="pub-dial-state">{state}</strong>}
+        <div className="pub-dial-elapsed-group" aria-label={completed.label}>
+          <div className="pub-dial-days">{elapsedDays>0&&<><strong>{elapsedDays}</strong><small>天</small></>}</div>
+          <strong className="pub-dial-elapsed">{elapsedClock.map(part=><span className={`pub-dial-duration${part.unit==='秒'?' is-seconds':''}`} key={part.unit}><span>{String(part.value).padStart(2,'0')}</span><small>{part.unit}</small></span>)}</strong>
+        </div> : <strong className="pub-dial-state">{state}</strong>}
       <span>{reference||scheduled?timeline.note : completed ? '以公开完成公告为准' : countdown?.status==='expired'?'已过预计时间，待公开确认':active?'有明确安排后，自动更新':forecasts?timeline.note:'暂无下一次明确时间'}</span>
       {(reference||scheduled)&&<span className="pub-dial-reference-note">{timeline.detail}</span>}
     </div>
     </div>
-    <div className="pub-dial-caption"><small>24 小时表盘 · 北京时间</small>{timeline.forecastWindow&&<small>信号发布时预计：{timeline.forecastWindow}</small>}{timeline.observedLabel&&<small>{timeline.observedLabel}</small>}{timeline.chanceLabel&&<small>{timeline.chanceLabel}</small>}{timeline.sourceCredit&&<div className="pub-watch-source">{timeline.sourceUrl&&<a href={timeline.sourceUrl} target="_blank" rel="noopener noreferrer">{timeline.sourceType==='observed'?'查看观察来源 ↗':'查看来源原帖 ↗'}</a>}<a href="https://codex-resets.com/" target="_blank" rel="noopener noreferrer">数据来自 Codex Resets ↗</a></div>}</div>
+    <div className="pub-dial-caption"><small>{statusKind==='banked_reset'?'重置卡 · ':statusKind?'额度重置 · ':''}24 小时表盘 · 北京时间</small>{timeline.forecastWindow&&<small>信号发布时预计：{timeline.forecastWindow}</small>}{timeline.observedLabel&&<small>{timeline.observedLabel}</small>}{timeline.chanceLabel&&<small>{timeline.chanceLabel}</small>}{timeline.sourceCredit&&<div className="pub-watch-source">{timeline.sourceUrl&&<a href={timeline.sourceUrl} target="_blank" rel="noopener noreferrer">{timeline.sourceType==='observed'?'查看观察来源 ↗':'查看来源原帖 ↗'}</a>}<a href={timeline.sourceName==='AIPlanWatch'?'https://codex-reset.aiplanwatch.com/':'https://codex-resets.com/'} target="_blank" rel="noopener noreferrer">数据来自 {timeline.sourceName||'Codex Resets'} ↗</a></div>}</div>
   </section>;
 }

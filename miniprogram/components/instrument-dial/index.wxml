@@ -4,10 +4,10 @@
     <view class="readout">
       <view class="lead-label"><block wx:if="{{model.bankedCompleted}}"><view>距最近一次确认</view><view>发放重置卡</view></block><block wx:else>{{model.lead}}</block></view>
       <view wx:if="{{model.scheduled}}" class="digits {{model.long ? 'long' : ''}}">{{model.digits}}</view>
-      <view wx:elif="{{model.completed}}" class="elapsed {{model.elapsedLong ? 'long' : ''}}" aria-label="{{model.elapsedLabel}}"><block wx:if="{{model.elapsedParts.length}}"><view wx:for="{{model.elapsedParts}}" wx:key="unit" class="duration"><text>{{item.value}}</text><text class="unit">{{item.unit}}</text></view></block><block wx:else>刚刚</block></view>
+      <view wx:elif="{{model.completed}}" class="elapsed-group" aria-label="{{model.elapsedLabel}}"><view class="days"><block wx:if="{{model.elapsedDays}}"><text>{{model.elapsedDays}}</text><text class="unit">天</text></block></view><view class="elapsed"><view wx:for="{{model.elapsedClock}}" wx:key="unit" class="duration {{item.unit === '秒' ? 'seconds' : ''}}"><text class="duration-value">{{item.value}}</text><text class="unit">{{item.unit}}</text></view></view></view>
       <view wx:else class="state">{{model.state}}</view>
       <view class="note">{{model.note}}</view>
     </view>
   </view>
-  <view class="caption">24 小时表盘 · 北京时间</view>
+  <view class="caption">{{model.category}} · 24 小时表盘 · 北京时间</view>
 </view>

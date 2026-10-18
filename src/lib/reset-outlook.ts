@@ -3,7 +3,7 @@ import { pendingPublicActions, publicActions, isNewsOnly, type PublicFactsData }
 
 export interface ResetOutlookRound {
   actionId: string; eventId: string; publicationId: string; kind: ActionKind; stage: ActionStage;
-  statementAt: string; expectedAt?: string; timeNote?: string;
+  statementAt: string; expectedAt?: string; timeNote?: string; previousExpectedAt?: string;
 }
 export interface ResolvedResetRound extends ResetOutlookRound {
   resolvedAt: string; announcedAt?: string; announcedDeadline?: string; announcedDeadlineNote?: string;
@@ -14,17 +14,20 @@ export interface ResetOutlook {
   evidenceCutoffAt?: string; latestGlobalCompletionAt?: string;
   latestResolutions?: Partial<Record<ActionKind, ResolvedResetRound>>;
   pendingReview?: ResetOutlookRound[];
+  /** Independent public states; optional for compatibility with existing clients. */
+  byKind?: Partial<Record<ActionKind, ResetOutlook>>;
 }
 
 /** Consumer forecast follows one published round, never a historical interval or another round's completion. */
-export function publicResetOutlook(data: PublicFactsData): ResetOutlook {
+export function publicResetOutlook(data: PublicFactsData, kind?: ActionKind): ResetOutlook {
   const now = Date.parse(data.serverTime);
-  const facts = publicActions(data).filter(({ action, publication }) => Number.isFinite(Date.parse(action.statementAt)) && Date.parse(action.statementAt) <= now && Date.parse(publication.publishedAt) <= now)
+  const facts = publicActions(data).filter(({ action, publication }) => (!kind || action.kind === kind) && Number.isFinite(Date.parse(action.statementAt)) && Date.parse(action.statementAt) <= now && Date.parse(publication.publishedAt) <= now)
     .sort((a, b) => Date.parse(b.action.statementAt) - Date.parse(a.action.statementAt));
   const round = (item: typeof facts[number]): ResetOutlookRound => ({
     actionId: item.action.id, eventId: item.event.id, publicationId: item.publication.id,
     kind: item.action.kind, stage: item.action.stage, statementAt: item.action.statementAt,
     ...(item.action.expectedAt && Number.isFinite(Date.parse(item.action.expectedAt)) ? { expectedAt: item.action.expectedAt } : {}), ...(item.action.timeNote ? { timeNote: item.action.timeNote } : {}),
+    ...previousArrangement(data, item),
   });
   const completed = facts.find(item => item.action.stage === 'claimed_complete');
   const resolved = facts.find(item => ['claimed_complete', 'cancelled'].includes(item.action.stage));
@@ -35,7 +38,7 @@ export function publicResetOutlook(data: PublicFactsData): ResetOutlook {
   }
   // A later same-kind completion does not prove which older promise it fulfilled.
   // Retain that promise for review, without using it as the current countdown.
-  const pendingAll=pendingPublicActions(data);
+  const pendingAll=pendingPublicActions(data).filter(item=>!kind||item.action.kind===kind);
   const needsReview=(item:typeof pendingAll[number])=>announcementNeedsReview(item.action,latestResolutions[item.action.kind]);
   const pendingReview=pendingAll.filter(needsReview).map(round);
   const pending=pendingAll.find(item=>!needsReview(item)&&(!resolved||Date.parse(item.action.statementAt)>=Date.parse(resolved.action.statementAt)||Date.parse(item.action.expectedAt??'')>=Date.parse(resolved.action.statementAt)));
@@ -54,7 +57,7 @@ export function publicResetOutlook(data: PublicFactsData): ResetOutlook {
   const relevant = [pending, completed, resolved].filter((item): item is typeof facts[number] => !!item);
   const evidenceIds = new Set(relevant.flatMap(item => item.action.evidenceIds));
   const collected = data.evidence.filter(item => evidenceIds.has(item.id) && Number.isFinite(Date.parse(item.collectedAt)) && Date.parse(item.collectedAt) <= now).map(item => item.collectedAt).sort((a, b) => Date.parse(b) - Date.parse(a));
-  const base = { ...(Object.keys(latestResolutions).length?{latestResolutions}:{}), ...(pendingReview.length?{pendingReview}:{}), ...(globalCompleted?{latestGlobalCompletionAt:globalCompleted.action.statementAt}:{}), ...(completed ? { latestCompletion: round(completed) } : {}), ...(lastResolved ? { lastResolved } : {}), ...(collected[0] ? { evidenceCutoffAt: collected[0] } : {}) };
+  const base = { ...(!kind ? {byKind: {automatic_reset: publicResetOutlook(data, 'automatic_reset'), banked_reset: publicResetOutlook(data, 'banked_reset')}} : {}), ...(Object.keys(latestResolutions).length?{latestResolutions}:{}), ...(pendingReview.length?{pendingReview}:{}), ...(globalCompleted?{latestGlobalCompletionAt:globalCompleted.action.statementAt}:{}), ...(completed ? { latestCompletion: round(completed) } : {}), ...(lastResolved ? { lastResolved } : {}), ...(collected[0] ? { evidenceCutoffAt: collected[0] } : {}) };
   if (pending) {
     const deadline = Date.parse(pending.action.expectedAt ?? '');
     const status = Number.isFinite(deadline) && deadline <= now ? 'overdue' : pending.action.stage === 'in_progress' ? 'in_progress' : Number.isFinite(deadline) ? 'scheduled' : 'announced';
@@ -66,4 +69,13 @@ export function publicResetOutlook(data: PublicFactsData): ResetOutlook {
 /** Shared by page selection and delivery checks; it never mutates the old event. */
 export function announcementNeedsReview(action: Pick<ResetOutlookRound,'kind'|'statementAt'>, resolution: Pick<ResolvedResetRound,'kind'|'statementAt'>|undefined): boolean {
   return !!resolution && action.kind===resolution.kind && Number.isFinite(Date.parse(action.statementAt)) && Date.parse(resolution.statementAt)>Date.parse(action.statementAt);
+}
+
+/** Only immutable versions of the same action prove a time adjustment. */
+function previousArrangement(data: PublicFactsData, item: ReturnType<typeof publicActions>[number]): {previousExpectedAt?: string} {
+  if (!item.action.expectedAt) return {};
+  const previous = data.publications.filter(p=>p.eventId===item.event.id && p.id!==item.publication.id && !isNewsOnly(p) && Date.parse(p.publishedAt)<Date.parse(item.publication.publishedAt))
+    .sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt))
+    .flatMap(p=>p.event.actions.filter(a=>a.id===item.action.id && a.kind===item.action.kind && a.scope==='public' && ['promised','in_progress'].includes(a.stage) && a.expectedAt && Number.isFinite(Date.parse(a.expectedAt))))[0];
+  return previous?.expectedAt && Date.parse(previous.expectedAt)!==Date.parse(item.action.expectedAt) ? {previousExpectedAt:previous.expectedAt} : {};
 }

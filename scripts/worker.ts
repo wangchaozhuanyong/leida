@@ -1,6 +1,6 @@
 import { pool } from '../src/db';
 import { runOne, writeWorkerHeartbeat } from '../src/server/worker';
-import {createWorkerHeartbeat,WORKER_HEARTBEAT_MS,WORKER_IDLE_MS,workerRetryDelay} from '../src/server/worker-timing';
+import {createWorkerHeartbeat,WORKER_HEARTBEAT_MS,WORKER_IDLE_MS,workerRetryDelay,safeWorkerFailure,type WorkerPhase} from '../src/server/worker-timing';
 import {setTimeout as sleep} from 'node:timers/promises';
 import {applyBundledHistory} from '../src/server/history-backfill';
 import {readFile,writeFile,rename,mkdir} from 'node:fs/promises';
@@ -26,10 +26,12 @@ const pause=async(ms:number)=>{try{await sleep(ms,undefined,{signal:shutdown.sig
 let heartbeatTimer:ReturnType<typeof setInterval>|undefined;
 const heartbeat=createWorkerHeartbeat((error,processedAt)=>writeWorkerHeartbeat(error,processedAt??false));
 let failures=0;
+let phase:WorkerPhase='cycle';
+const onStage=(value:WorkerPhase)=>{phase=value;};
 let historyFinished=false,historyRetryAt=0;
 try {
   if(process.argv.includes('--once')) {
-    const did=await runOne();await writeWorkerHeartbeat(undefined,did);
+    const did=await runOne({onStage});await writeWorkerHeartbeat(undefined,did);
     console.log(did?'已处理一个后台任务':'当前没有待处理任务');
   } else {
     console.log('后台任务服务已启动');
@@ -38,18 +40,19 @@ try {
     while(!stopping) {
       try {
         if(!historyFinished&&Date.now()>=historyRetryAt){
-          try{const result=await applyBundledHistory();historyFinished=result.phase==='complete';console.log(`HISTORY_BACKFILL_COMPLETE published=${result.published} references=${result.references} existing=${result.existing}`);}
-          catch{historyRetryAt=Date.now()+5*60_000;console.error('HISTORY_BACKFILL_PENDING');}
+          try{phase='history_backfill';const result=await applyBundledHistory();historyFinished=result.phase==='complete';console.log(`HISTORY_BACKFILL_COMPLETE published=${result.published} references=${result.references} existing=${result.existing}`);}
+          catch(error){historyRetryAt=Date.now()+5*60_000;console.error('HISTORY_BACKFILL_PENDING',safeWorkerFailure(error,'history_backfill'));}
         }
-        const did=await runOne();
+        const did=await runOne({onStage});
         failures=0;heartbeat.setError(undefined);
         if(did)heartbeat.processed();
         await heartbeat.flush();
         if(!did)await pause(WORKER_IDLE_MS);
-      } catch {
+      } catch(error) {
         // Do not print raw provider/database errors: those may contain endpoints or credentials.
-        console.error('后台任务暂时异常，将自动重试');
-        heartbeat.setError('任务服务暂时异常，正在自动恢复');
+        const diagnostic=safeWorkerFailure(error,phase);
+        console.error('后台任务暂时异常，将自动重试',diagnostic);
+        heartbeat.setError(`任务服务暂时异常，正在自动恢复 [${diagnostic}]`);
         await heartbeat.flush();
         await pause(workerRetryDelay(++failures));
       }

@@ -16,7 +16,7 @@ import { audit, createEvidence, publishCandidate, queueJob, defaultSite, publish
 import { isHistoricalContent } from '../lib/history';
 import {processWechatJob,scheduleWechatDeliveries} from './wechat';
 import {runForecastCycle} from './forecast';
-import {createWorkerCadence} from './worker-timing';
+import {createWorkerCadence,safeWorkerFailure,type WorkerPhase} from './worker-timing';
 import {sourceCollectionSchedule,sourceNextCollectionAt,verifiedCollectionWindow} from './source-collection-policy';
 
 const MAX_ACTIVE_GENERATION = 10;
@@ -434,7 +434,7 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
     return true;
   },job);
 }
-export interface WorkerDependencies { generate?:Generator; collect?:typeof collectSource; enrich?:typeof enrichKnownEvidence; enrichQuoted?:typeof enrichQuotedResetContext; schedule?:boolean; allowTemplates?:boolean; wechat?:typeof processWechatJob; cadence?:ReturnType<typeof createWorkerCadence>; }
+export interface WorkerDependencies { onStage?:(phase:WorkerPhase)=>void; generate?:Generator; collect?:typeof collectSource; enrich?:typeof enrichKnownEvidence; enrichQuoted?:typeof enrichQuotedResetContext; schedule?:boolean; allowTemplates?:boolean; wechat?:typeof processWechatJob; cadence?:ReturnType<typeof createWorkerCadence>; }
 const workerCadence=createWorkerCadence();
 let forecastInputsChanged=false;
 export async function writeWorkerHeartbeat(error?:string,processed:boolean|string=false):Promise<void> {
@@ -442,27 +442,33 @@ export async function writeWorkerHeartbeat(error?:string,processed:boolean|strin
   await put('settings',{id:'worker_runtime',heartbeatAt:now(),lastJobAt:typeof processed==='string'?processed:processed?now():previous?.lastJobAt,error});
 }
 export async function runOne(dependencies:WorkerDependencies={}):Promise<boolean> {
+  const phase=(name:WorkerPhase)=>dependencies.onStage?.(name);
   const allowTemplates=dependencies.allowTemplates??!dependencies.generate;
   const cadence=dependencies.cadence??workerCadence;
   if(dependencies.schedule!==false) {
-    await cadence.run('sources',()=>scheduleDue({allowTemplates,skipGeneration:true}));
+    await cadence.run('sources',()=>{phase('source_schedule');return scheduleDue({allowTemplates,skipGeneration:true});});
     // One small persisted marker replaces full scans when the inputs are stable.
     // createEvidence/publication transactions update it, including admin/backfill
     // writes performed outside this worker process.
+    phase('input_read');
     const inputs=await one<{revision?:string}>('settings','forecast_inputs');
     cadence.observe('generation',inputs?.revision);
-    await cadence.run('generation',()=>scheduleDue({allowTemplates,allowEnrichment:!dependencies.generate||!!dependencies.enrich,skipSources:true}));
-    try {await cadence.run('wechat',scheduleWechatDeliveries);} catch {console.error('微信提醒调度暂不可用，其他任务继续运行');}
+    await cadence.run('generation',()=>{phase('generation_schedule');return scheduleDue({allowTemplates,allowEnrichment:!dependencies.generate||!!dependencies.enrich,skipSources:true});});
+    try {await cadence.run('wechat',()=>{phase('wechat_schedule');return scheduleWechatDeliveries();});} catch(error) {console.error('微信提醒调度暂不可用，其他任务继续运行',safeWorkerFailure(error,'wechat_schedule'));}
     try {await cadence.run('forecast',async()=>{
+      phase('forecast');
       if((await runForecastCycle(now(),{inputsChanged:forecastInputsChanged})).status==='error')throw new Error('预测观察暂不可用');
       forecastInputsChanged=false;
-    });} catch {console.error('预测观察暂不可用，新闻任务继续运行');}
+    });} catch(error) {console.error('预测观察暂不可用，新闻任务继续运行',safeWorkerFailure(error,'forecast'));}
   }
+  phase('claim');
   const job=await claimJob();
   if(!job)return false;
   try {
     if(job.kind==='wechat_send') {
+      phase('job_wechat');
       const result=await (dependencies.wechat??processWechatJob)(job);
+      phase('job_result');
       await transaction(async c=>{
         const current=await one<Job>('jobs',job.id,c,true);
         if(current?.status!=='running'||current.leaseUntil!==job.leaseUntil)return;
@@ -475,15 +481,18 @@ export async function runOne(dependencies:WorkerDependencies={}):Promise<boolean
     }
     const enrich=dependencies.enrich??(dependencies.generate?async()=>undefined:enrichKnownEvidence);
     const enrichQuoted=dependencies.enrichQuoted??(dependencies.generate?async()=>[]:enrichQuotedResetContext);
+    phase(job.kind==='generate'?'job_generate':'job_collect');
     const generated=job.kind==='generate'?await generateCandidate(job,dependencies.generate??generateContent,allowTemplates,enrich,enrichQuoted):false;
     if(job.kind!=='generate') {
       const collected=await (dependencies.collect??collectSource)(job.sourceId!,job.kind==='backfill'||job.payload.historical===true);
+      phase('job_result');
       if(collected.created>0||collected.healthChanged){forecastInputsChanged=true;cadence.nudge('generation','forecast');}
       await transaction(async c=>{
         const source=await one<Source>('sources',job.sourceId!,c,true);
         if(source&&(source.status!==(source.enabled?'healthy':'paused')||!source.validated||source.publicationPaused||source.error)){forecastInputsChanged=true;await put('sources',{...source,validated:true,publicationPaused:false,pauseReason:undefined,consecutiveFailures:0,status:source.enabled?'healthy':'paused',error:undefined,...sourceCollectionSchedule(source),nextRunAt:sourceNextCollectionAt(source)},c);}
       });
     }
+    phase('job_result');
     await transaction(async c=>{
       const current=await one<Job>('jobs',job.id,c,true);
       if(current?.status==='running'&&current.leaseUntil===job.leaseUntil) {
@@ -496,6 +505,7 @@ export async function runOne(dependencies:WorkerDependencies={}):Promise<boolean
     const failureKind=error instanceof AIServiceError?error.failureKind:error instanceof SourceConfigurationError?'configuration':error instanceof SourceTransientError||isRecoverableStorageError(error)?'transient':error instanceof DomainError?error.status===409?'conflict':'validation':'unknown';
     const recoverableModelFailure=error instanceof AIServiceError&&['transient','validation'].includes(failureKind)||isRecoverableStorageError(error);
     const retry=job.kind==='generate'&&recoverableModelFailure&&job.attempts<MAX_GENERATION_ATTEMPTS||job.kind==='wechat_send'&&isRecoverableStorageError(error);
+    phase('job_failure_write');
     await transaction(async c=>{
       const current=await one<Job>('jobs',job.id,c,true);
       if(!current||current.leaseUntil!==job.leaseUntil)return;

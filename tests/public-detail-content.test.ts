@@ -65,7 +65,7 @@ test('来源折叠保留原文、真实出处与片段提示，隐藏内部辅�
   data.publications[0].reason = '规则核验通过，自动发布';
   const before = JSON.stringify(data);
   for (const html of [renderArticle(data), renderEvent(data)]) {
-    assert.match(html, /<summary>查看来源<\/summary>/);
+    assert.match(html, /<summary><span>查看来源/);
     assert.match(html, /第三方收录/);
     assert.match(html, /Original text\./);
     assert.match(html, /href="https:\/\/example.com\/original"/);

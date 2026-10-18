@@ -9,7 +9,7 @@ export const RESET_WATCH_TIMEOUT_MS = 8_000;
 export const RESET_WATCH_RESPONSE_BUDGET_MS = 1_500;
 export const RESET_WATCH_FAILURE_BACKOFF_MS = 60_000;
 // Changing the public selection/interpretation must invalidate an unchanged facts cache once.
-const PUBLIC_RESET_PRESENTATION_VERSION='unified-public-reset-20261018-4';
+const PUBLIC_RESET_PRESENTATION_VERSION='unified-public-reset-20261018-5';
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_RESPONSE_AGE_MS = 15 * 60_000;
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);

@@ -51,3 +51,12 @@ test('新预告、逾期未确认和无时间安排优先于最近完成结果',
   assert.match(html,expected);assert.doesNotMatch(html,/距最近一次确认|is-completed/);
  }
 });
+
+
+test('跨天时天数单独成行，时分秒固定三个位置并补零',()=>{
+ const html=render({status:'completed',latestCompletion:{...completion,statementAt:'2026-10-10T14:54:52Z'}});
+ assert.match(html,/pub-dial-days"><strong>1<\/strong><small>天/);
+ assert.equal((html.match(/class="pub-dial-duration/g)||[]).length,3);
+ assert.match(html,/is-seconds"><span>08<\/span><small>秒/);
+ assert.match(html,/1天12小时45分钟8秒/);
+});
