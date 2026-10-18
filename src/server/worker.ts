@@ -68,6 +68,26 @@ export function fingerprintChange(saved:string|undefined,current:string):'new'|'
  const previous=evidenceHash(saved),next=evidenceHash(current);
  return previous&&next&&previous===next?'rules':'evidence';
 }
+/** The latest typed completion is a reconciliation lead, not a published fact.
+ * Give its original-text check a turn before older history probes consume both
+ * slots. The usual source, context, publication and historical-alert guards still apply. */
+function latestReferenceCompletionLead(evidence:Evidence[],timestamp:number):Evidence|undefined {
+  return evidence.filter(item=>{
+    const proof=item.metadata?.referenceReset;
+    return item.sourceId===REFERENCE_RESET_SOURCE.id&&item.provenance==='archive'&&!item.parentId&&item.metadata?.sourceGroup==='aiplanwatch'&&item.metadata.benefitKind==='automatic_reset'&&proof?.referenceUrl===REFERENCE_RESET_SOURCE.url&&proof.occurredAt===item.publishedAt&&Number.isFinite(Date.parse(item.publishedAt))&&Date.parse(item.publishedAt)<=timestamp;
+  }).sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt)||Date.parse(b.collectedAt)-Date.parse(a.collectedAt))[0];
+}
+export function generationCandidateOrder(candidates:Candidate[],evidence:Evidence[],timestamp=Date.now()):Candidate[] {
+  const latestReference=latestReferenceCompletionLead(evidence,timestamp);
+  const at=new Date(timestamp).toISOString();
+  return [...candidates].sort((a,b)=>{
+    const first=evidence.find(item=>item.id===a.evidenceId),second=evidence.find(item=>item.id===b.evidenceId);
+    const firstHistorical=!!first&&isHistoricalContent([first],at),secondHistorical=!!second&&isHistoricalContent([second],at);
+    const firstTime=Date.parse(first?.publishedAt??a.createdAt),secondTime=Date.parse(second?.publishedAt??b.createdAt);
+    const firstLead=!!latestReference&&first?.id===latestReference.id,secondLead=!!latestReference&&second?.id===latestReference.id;
+    return Number(firstHistorical)-Number(secondHistorical)||Number(secondLead)-Number(firstLead)||(firstHistorical?firstTime-secondTime:secondTime-firstTime);
+  });
+}
 export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichment?:boolean;skipGeneration?:boolean;skipSources?:boolean}={}):Promise<void> {
   const allowTemplates=options.allowTemplates!==false;
   await transaction(async c=>{
@@ -109,14 +129,9 @@ export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichme
     const generating=jobs.filter(job=>job.kind==='generate');
     let active=generating.filter(activeJob).length;
     let historicalActive=generating.filter(job=>activeJob(job)&&(job.payload.historical===true||evidence.some(item=>item.id===candidates.find(candidate=>candidate.id===job.candidateId)?.evidenceId&&isHistoricalContent([item],job.createdAt)))).length;
-    const sorted=candidates.filter(candidate=>untouched(candidate)&&!candidate.reasons.some(reason=>reason.includes('由人工草稿'))).sort((a,b)=>{
-      const first=evidence.find(item=>item.id===a.evidenceId),second=evidence.find(item=>item.id===b.evidenceId);
-      const firstHistorical=!!first&&isHistoricalContent([first],now()),secondHistorical=!!second&&isHistoricalContent([second],now());
-      const firstTime=Date.parse(first?.publishedAt??a.createdAt),secondTime=Date.parse(second?.publishedAt??b.createdAt);
-      // Fresh messages remain first. Historical catch-up follows source order so
-      // an older promise is saved before its already available completion.
-      return Number(firstHistorical)-Number(secondHistorical)||(firstHistorical?firstTime-secondTime:secondTime-firstTime);
-    });
+    const sorted=generationCandidateOrder(candidates.filter(candidate=>untouched(candidate)&&!candidate.reasons.some(reason=>reason.includes('由人工草稿'))),evidence);
+    const lead=latestReferenceCompletionLead(evidence,Date.now());
+    const pendingReference=lead&&enabledSource(sources.find(source=>source.id===lead.sourceId))&&sorted.some(candidate=>candidate.evidenceId===lead.id&&candidate.status==='pending');
     for(const candidate of sorted) {
       if(active>=MAX_ACTIVE_GENERATION)break;
       if(candidate.automation?.reasonCodes.includes('parent_conflict'))continue;
@@ -131,6 +146,10 @@ export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichme
       }
       const historical=isHistoricalContent([original],now());
       if(historical&&historicalActive>=MAX_ACTIVE_HISTORICAL)continue;
+      // The persisted claim function serves old historical jobs first. Keep one
+      // slot free of new old probes until the latest completion check runs;
+      // sorting insertion alone would still starve it at claim time.
+      if(historical&&pendingReference&&original.id!==lead?.id&&historicalActive>=MAX_ACTIVE_HISTORICAL-1)continue;
       const previous=generating.filter(job=>job.candidateId===candidate.id);
       if(previous.some(activeJob))continue;
       const latest=previous[0];
