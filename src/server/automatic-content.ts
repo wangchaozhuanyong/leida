@@ -1,3 +1,4 @@
+import {referenceCompletionClaim} from './reference-reset-source';
 import { createHash } from 'node:crypto';
 import type { CandidateAutomation, DraftContent, Evidence, BenefitAction } from '../lib/types';
 import { evidenceBenefitClaims, hasCompleteContext, hasStandaloneContext, isTruncatedText, isCampaignResetShorthand, isVerifiedCampaignCalendar, originalConflict, campaignMembership } from './source-context';
@@ -58,11 +59,11 @@ export function buildAutomaticTemplate(evidence:Evidence[]):DraftContent|undefin
     });
     const name=(kind:BenefitAction['kind'])=>kind==='banked_reset'?'重置卡':'用量重置';
     const label:Record<BenefitAction['stage'],string>={promised:'发放预告',in_progress:'发放中',claimed_complete:'公告称已完成',cancelled:'公告宣布取消'};
-    const title=actions.map(action=>`${name(action.kind)}：${label[action.stage]}`).join('；');
+    const title=referenceCompletionClaim(primary)?'参考来源确认：用量重置已完成':actions.map(action=>`${name(action.kind)}：${label[action.stage]}`).join('；');
     const sourceTime=new Date(primary.publishedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false});
     const summary=actions.map(action=>`${name(action.kind)}${label[action.stage]}，适用对象：${action.eligibility}。${action.expectedAt?`预计时间：${new Date(action.expectedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})}（北京时间）。`:''}${action.timeNote??''}`).join('\n');
     if(title.length>160||summary.length>2100||actions.some(action=>action.evidenceQuote!.length>3000))return;
-    return {...base,title,summary:`根据${primary.provenance==='archive'?'公开归档保存的原帖':'公开原文'}，${summary}\n原文发布时间：${sourceTime}（北京时间）。这是中文事实摘要，个人账户是否到账尚未观测。`,category:base.activityId?'activity':'reset',publicationMode:'state_change',actions};
+    return {...base,title,summary:`${referenceCompletionClaim(primary)?'AIPlanWatch 将对应原帖记录为公共额度重置；原帖仅为简短完成表达，福利类型采用参考项目分类，未虚构回复关系。':''}根据${primary.provenance==='archive'?'公开归档保存的原帖':'公开原文'}，${summary}\n原文发布时间：${sourceTime}（北京时间）。这是中文事实摘要，个人账户是否到账尚未观测。`,category:base.activityId?'activity':'reset',publicationMode:'state_change',actions};
   }
   if(complete&&claims.length&&claims.every(claim=>claim.scope!=='public'))return {...base,title:'定向重置相关动态',category:base.activityId?'activity':'reset',summary:`公开原文提到面向限定账户的重置相关安排。此条只记录定向动态，不计入公共发放次数；具体资格请查看原文。`};
   if(review)return {...base,...review,category:'reset'};
@@ -135,7 +136,7 @@ export function resetReview(primary:Evidence,context:Evidence[]):Pick<DraftConte
   const campaign=/over the next \d+ days, each day we['’]ll either ship/i.test(text)&&/full reset/i.test(text);
   const incident=/\bPro\s+500\b/i.test(text)&&(/didn't get the reset|investigating/i.test(text)||/^All fixed\./i.test(text)&&context.some(e=>e.id!==primary.id&&primary.parentId===e.messageId&&/Pro 500.*(?:didn[’']t get the reset)/i.test(e.text)));
   const explicit=/(?:resets? (?:all propagated|has been processed|coming next week)|promised a reset|reset (?:will|by|in)|(?:^|\n)\s*Day \d+\/\s*Reset|(?:重置|发卡|存卡).{0,50}(?:预告|安排|传播|发放|已)|(?:will|promis|ship|give|load).{0,50}\b(?:reset|banked)\b)/i.test(text);
-  const reply=/^(?:done and dusted|it['’]s done|all fixed)[.!]?$/i.test(text.trim())&&context.some(e=>e.id!==primary.id&&/reset|重置/i.test(e.text));
+  const reply=/^(?:done(?: and dusted)?|it['’]s done|all fixed)[.!]?$/i.test(text.trim())&&context.some(e=>e.id!==primary.id&&/reset|重置/i.test(e.text));
   if(!incident&&!campaign&&!explicit&&!reply&&!isCampaignResetShorthand(primary))return;
   if(!campaign&&!incident&&(/[?？]/.test(text)||/\b(?:can['’]t|won['’]t|didn['’]t)|the day we reach perfection/i.test(text)||/\b(?:if|unless|would|could|maybe|hypothetical|not|never|cannot|cancelled)\b|假设|希望|传闻/i.test(text)))return;
   if(incident)return {title:'Pro 500 重置异常跟踪',summary:/^All fixed\./i.test(text)?'作者回复称 Pro 500 相关异常已修复。此记录只跟踪受影响用户，不新增全体重置次数，个人账户到账尚未观测。':'作者报告部分 Pro 500 用户未如期收到重置，正在调查并表示将补偿。此记录不代表全体用户新增一次重置。',reviewStatus:'targeted_update',reviewReasons:['仅涉及原文所述 Pro 500 异常及后续处理，不作为公共发放完成声明。']};

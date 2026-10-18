@@ -23,7 +23,9 @@
         </view>
         <neural-orb class="timeline-orb" aria-hidden="true" />
       </view>
-      <view wx:if="{{timeline.sourceCredit}}" class="timeline-watch-sources"><button wx:if="{{timeline.sourceUrl}}" class="timeline-source-link" bindtap="copyWatchSource">{{timeline.sourceType === 'observed' ? '复制观察来源 ↗' : '复制来源原帖 ↗'}}</button><button class="timeline-provider-link" bindtap="copyWatchProvider">数据来自 Codex Resets</button></view>
+      <view wx:if="{{timeline.sourceCredit}}" class="timeline-watch-sources"><button wx:if="{{timeline.sourceUrl}}" class="timeline-source-link" bindtap="copyWatchSource">{{timeline.sourceType === 'observed' ? '复制观察来源 ↗' : '复制来源原帖 ↗'}}</button><button class="timeline-provider-link" bindtap="copyWatchProvider">数据来自 {{timeline.sourceName}}</button></view>
+      <view wx:if="{{historicalProbability}}" class="historical-probability"><view class="small muted">历史节奏参考</view><view class="historical-probability-values"><view wx:for="{{historicalProbability}}" wx:key="hours"><view class="small muted">{{item.hours}}小时内</view><view>{{item.label}}</view></view></view><view class="small muted">至少一次公共额度重置的累计概率，非官方安排</view></view>
+      <view wx:if="{{lastReset}}" class="last-reset-clock"><view class="last-reset-caption"><text>上次额度重置</text><text>{{lastReset.time}} · 北京时间</text></view><view class="last-reset-duration">{{lastReset.elapsed}}</view></view>
       <view class="timeline-stages" aria-label="公开进展阶段"><view wx:for="{{timeline.stages}}" wx:key="*this" class="timeline-stage {{timeline.currentStage === index ? 'current' : ''}}" aria-label="{{item}}{{timeline.currentStage === index ? '，当前阶段' : ''}}"><view class="stage-dot"/>{{item}}</view></view>
     </view>
     <view wx:if="{{pending.timeNote}}" class="timeline-time-note small muted">{{pending.timeNote}}</view>

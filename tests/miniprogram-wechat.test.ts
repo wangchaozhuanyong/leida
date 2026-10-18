@@ -182,8 +182,8 @@ function pageHarness(reader?:Options) {
   if(reader)app.wechat=reader as typeof app.wechat;
   function page(name:string,query:Record<string,string>={}){
     let definition:Options|undefined;const cache=new Map<string,{exports:Options}>();
-    function load(filename:string):Options{const existing=cache.get(filename);if(existing)return existing.exports;const module={exports:{}};cache.set(filename,module);new Script(readFileSync(filename,'utf8'),{filename}).runInNewContext({module,exports:module.exports,wx:{showShareMenu(){},hideShareMenu(){},showToast(){},switchTab(options:Options){navigation.push({method:'switchTab',url:options.url});},navigateTo(options:Options){navigation.push({method:'navigateTo',url:options.url});}},getApp(){return app;},setTimeout,clearTimeout,Date,Page(value:Options){definition=value;},require(path:string){const target=resolve(dirname(filename),path.endsWith('.js')?path:`${path}.js`);assert.ok(target.startsWith(resolve(root,'miniprogram')+'/'));return load(target);}});return module.exports;}
-    load(resolve(root,`miniprogram/pages/${name}/index.js`));assert.ok(definition);const instance:Options={...definition,data:structuredClone(definition.data),setData(patch:Options){Object.assign(this.data,patch);}};instance.onLoad(query);instance.onShow();return instance;
+    function load(filename:string):Options{const existing=cache.get(filename);if(existing)return existing.exports;const module={exports:{}};cache.set(filename,module);new Script(readFileSync(filename,'utf8'),{filename}).runInNewContext({module,exports:module.exports,wx:{showShareMenu(){},hideShareMenu(){},showToast(){},switchTab(options:Options){navigation.push({method:'switchTab',url:options.url});},navigateTo(options:Options){navigation.push({method:'navigateTo',url:options.url});}},getApp(){return app;},setTimeout,clearTimeout,setInterval(){return 1;},clearInterval(){},Date,Page(value:Options){definition=value;},require(path:string){const target=resolve(dirname(filename),path.endsWith('.js')?path:`${path}.js`);assert.ok(target.startsWith(resolve(root,'miniprogram')+'/'));return load(target);}});return module.exports;}
+    load(resolve(root,`miniprogram/pages/${name}/index.js`));assert.ok(definition);const instance:Options={...definition,data:structuredClone(definition.data),setData(patch:Options){for(const [key,value] of Object.entries(patch)){const path=key.split('.');let target=this.data;for(const part of path.slice(0,-1)){target[part]??={};target=target[part];}target[path.at(-1)!]=value;}}};instance.onLoad(query);instance.onShow();return instance;
   }
   return{page,requests,calls,navigation,data,get subscriptions(){return listeners.size;}};
 }
@@ -506,4 +506,30 @@ test('隐藏提醒页解除状态监听，后台完成不更新隐藏页面，�
     await h.reader.revoke({userInitiated:true});assert.equal(page.data.wechat.remainingCount,1);
     page.onShow();await flush();assert.equal(page.data.wechat.remainingCount,0);assert.equal(h.subscribe,0);
   } finally {page.onUnload();}
+});
+
+test('次数后台刷新保留次数、主按钮状态和关闭入口，不产生全卡忙碌切换',async()=>{
+ const h=mock({state:'available',sessionMs:600000,challengeMs:600000});await h.reader.loadForPage();
+ const values:Options[]=[];const off=h.reader.subscribe((state:Options)=>values.push(state));
+ h.advance(300000);await h.reader.loadForPage();off();
+ assert.ok(values.some(v=>v.refreshing));assert.ok(values.every(v=>v.remainingCount===1&&v.canRevoke===true&&v.canChooseTypes===true&&v.busy===false));
+});
+test('用户同步授权优先于旧后台读取，迟到响应不能覆盖新增次数或新nonce',async()=>{
+ const h=mock({state:'available',sessionMs:900000,challengeMs:900000});await h.reader.loadForPage();
+ const request=h.wx.request;let delayed:Options|undefined;
+ h.wx.request=(options:Options)=>{if(options.url.endsWith('/subscription')&&options.method!=='DELETE'){delayed=options;return {abort(){}};}return request(options);};
+ h.advance(300000);const refresh=h.reader.loadForPage();await new Promise(resolve=>setImmediate(resolve));assert.ok(delayed);
+ const work=h.reader.authorize({userInitiated:true});assert.equal(h.subscribe,1,'仍须同步弹出微信原生授权');await work;
+ assert.equal(h.reader.getState().remainingCount,2);
+ delayed!.success({statusCode:200,data:{data:{...safe('available'),remainingCount:1,pendingCount:0,preferencesSupported:true,reminderPreferences:{announcement:true,result:true,correction:true}}}});await refresh;
+ assert.equal(h.reader.getState().remainingCount,2);assert.equal(h.reader.getState().ready,true);assert.equal(h.reader.getState().busy,false);assert.equal(h.reader.getState().error,'');
+});
+
+test('旧后台隐私读取晚于新授权返回时，不重新读取次数或覆盖准备状态',async()=>{
+ const h=mock({state:'available',sessionMs:900000,challengeMs:900000});await h.reader.loadForPage();
+ let privacy:Options|undefined;h.wx.getPrivacySetting=(options:Options)=>{privacy=options;};
+ h.advance(300000);const background=h.reader.loadForPage();assert.ok(privacy);
+ await h.reader.authorize({userInitiated:true});const requests=h.requests.length;
+ privacy!.success({needAuthorization:false});await background;
+ assert.equal(h.requests.length,requests);assert.equal(h.reader.getState().remainingCount,2);assert.equal(h.reader.getState().ready,true);
 });

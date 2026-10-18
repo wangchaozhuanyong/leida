@@ -8,7 +8,7 @@ import {extractCadenceObservations} from './reset-cadence-evidence';
 
 export interface StoredCadenceForecast extends ResetCadenceForecast {recordType:'reset_cadence';sourceIds:string[];inputFingerprint:string;evaluationSample?:boolean;}
 export type CadenceOutcome=ForecastCadenceOutcome;
-export interface CadenceRuntime {id:string;checkedAt:string;nextDueAt?:string;inputsRevision?:string;cadenceModelVersion?:string;cadencePublicProjection?:CadencePublicProjection;cadenceSnapshotId?:string;cadenceSnapshotIds?:Partial<Record<CadenceTarget,string>>;cadenceEvaluationByKind?:Partial<Record<CadenceTarget,CadenceEvaluation>>;}
+export interface CadenceRuntime {referenceSignal?:import('../lib/forecast').ReferencePublicSignal;referenceCadencePublic?:import('../lib/reference-cadence').ReferenceCadencePublic;referenceReview?:import('../lib/reference-cadence').ReferenceCadenceReview;id:string;checkedAt:string;nextDueAt?:string;inputsRevision?:string;cadenceModelVersion?:string;cadencePublicProjection?:CadencePublicProjection;cadenceSnapshotId?:string;cadenceSnapshotIds?:Partial<Record<CadenceTarget,string>>;cadenceEvaluationByKind?:Partial<Record<CadenceTarget,CadenceEvaluation>>;}
 export const CADENCE_TARGETS:CadenceTarget[]=['automatic_reset','banked_reset'];
 export const cadenceNextFixedAt=(timestamp:string)=>new Date((Math.floor(Date.parse(timestamp)/(6*3600_000))+1)*6*3600_000).toISOString();
 /** Publication/correction paths call this in their existing transaction. No schema or read-side writes. */

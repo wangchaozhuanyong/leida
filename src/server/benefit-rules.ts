@@ -1,18 +1,18 @@
 import type { ActionKind, ActionStage, BenefitAction } from '../lib/types';
 
 /** Change only when fact interpretation changes, so unchanged inputs are evaluated once. */
-export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261018-2';
+export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261018-3';
 export interface BenefitClaim {
   kind: ActionKind; stage: ActionStage; eligibility: string; scope: BenefitAction['scope'];
   quote: string; expectedAt?: string; timeNote?: string;
 }
 interface Qualification { label: string; key: string; scope: BenefitAction['scope']; }
 const normalize = (text: string) => text.replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim();
-const banked = /banked\s*(?:resets?|重置)|重置卡|存卡|备用重置|累积(?:重置)?额度/i;
+const banked = /banked\s*(?:resets?|重置)|reset\s+bank|重置卡|存卡|备用重置|累积(?:重置)?额度/i;
 const usage = /(?:usage(?:\s+limits?)?|rate\s+limits?|用量|使用(?:额度|限制|限额|量)).{0,40}(?:reset|重置)|(?:reset|重置).{0,40}(?:usage(?:\s+limits?)?|rate\s+limits?|用量|使用(?:额度|限制|限额|量))/i;
 const globalReset = /\bglobal\s+(?:(?:usage|rate\s+limits?)\s+)?reset\b|全局(?:用量)?重置/i;
 // A short completion can inherit a benefit only through extractReplyClaims' explicit parent.
-const deicticCompletion = /^(?:done\s+and\s+dusted|(?:it|that|this)(?:'s|\s+is)\s+(?:(?:now|already)\s+)?done)[.!]?$/i;
+const deicticCompletion = /^(?:done(?:\s+and\s+dusted)?|(?:it|that|this)(?:'s|\s+is)\s+(?:(?:now|already)\s+)?done)[.!]?$/i;
 const allPaidResetGreeting=/^enjoy\s+reset\s+usage\s+limits\s+for\s+all\s+paid\s+users\s+(?:of|for)\s+(?:Codex\s+and\s+ChatGPT\s+Work|ChatGPT\s+Work\s+and\s+Codex)[.!]?$/i;
 const dayEndDeadline = /\b(?:by|before)\s+(?:the\s+)?(?:end\s+of\s+(?:the\s+)?(?:day|today|tomorrow)|EOD)\b|(?:今日|今天|当日|当天|明天)结束(?:之)?前|日终(?:之)?前/i;
 const excluded = /\b(?:purchase[ds]?|buy|bought|referral|invitation|invite[ds]?|redeem(?:ed|ing)?|carry(?:ing)? over|carried over|my resets?|my account|just you|your account only|inventory|store|stock|option)\b|购买|邀请|推荐奖励|个人结转|私人|仅你|仅该账户|自行使用|主动用卡|商店|库存|已有的重置卡/i;
@@ -91,7 +91,7 @@ export function benefitStage(text: string): ActionStage | undefined {
   if (/\b(?:cancelled|canceled|withdrawn|withdrew|cancel|withdraw)\b|取消|撤回|不再发放/i.test(s)) return 'cancelled';
   if (/\b(?:will|(?:we|i|they)'ll|going to|scheduled to|plan to|should|expect(?:ed)?)\b.{0,80}(?:reset|giv|add|load|credit|grant|land|propagat|complet|be there|be showing)|将(?:会|于)?|计划|预计|安排|承诺|(?:改为|调整为)(?:稍后|之后|以后).{0,12}(?:发放|重置)/i.test(s)) return 'promised';
   if (/\blanding\b.{0,60}(?:\btomorrow\b|\btoday\b|\bsoon\b|\bin\b|\bwithin\b|\bby\b|\d{1,2}(?::\d{2})?\s*[ap]m\b)/i.test(s)) return 'promised';
-  if (/\b(?:are|is|we're)\s+(?:now\s+)?(?:giving|loading|crediting|granting|reset{1,2}ing)|\b(?:loading|rolling out|propagating|in progress)\b|正在|发放中|传播中|加载中/i.test(s)) return 'in_progress';
+  if (/\b(?:are|is|we're)\s+(?:(?:now|once\s+again)\s+)?(?:giving|loading|crediting|granting|reset{1,2}ing)|\b(?:loading|rolling out|propagating|in progress)\b|正在|发放中|传播中|加载中/i.test(s)) return 'in_progress';
   if (deicticCompletion.test(s)) return 'claimed_complete';
   // This exact all-paid announcement describes already reset limits. A bare
   // "Enjoy a reset" or any future landing sentence still has no completion.
@@ -264,6 +264,14 @@ export function benefitTime(text: string, publishedAt: string): Pick<BenefitClai
 /** Finite supported assertions only. Unknown grammar is left for enrichment/generation. */
 export function extractBenefitClaims(text: string, publishedAt: string): BenefitClaim[] {
   if (isTruncatedBenefitText(text)) return [];
+  const clean=normalize(text);
+  // A public Codex salutation plus both explicit delivered benefits establishes
+  // the audience. Do not generalize this to arbitrary 'Done' or personal resets.
+  if(/^Dearest gentle codexer[.!]\s+We did a (?:sneaky )?double reset[.!]/i.test(clean)&&/Not only do you get a full reset on us[.!]\s+But you are also getting one into the reset bank/i.test(clean)&&!isQuestionOrHypothesis(clean)&&!targeted.test(clean)&&!excluded.test(clean)&&!/(?:did not|didn't|haven't|hasn't|will not|won't|never)\b/i.test(clean)) {
+    const usageQuote=text.match(/We did a (?:sneaky )?double reset[.!]\s+Not only do you get a full reset on us[.!]/i)![0];
+    const bankedQuote=text.match(/But you are also getting one into the reset bank[^.!]*[.!]?/i)![0];
+    return [{kind:'automatic_reset',stage:'claimed_complete',scope:'public',eligibility:'Codex用户（原帖未列明具体套餐）',quote:usageQuote},{kind:'banked_reset',stage:'claimed_complete',scope:'public',eligibility:'Codex用户（原帖未列明具体套餐）',quote:bankedQuote}];
+  }
   const clauses = benefitClauses(text);
   const claims: BenefitClaim[] = [];
   for (let index = 0; index < clauses.length; index++) {

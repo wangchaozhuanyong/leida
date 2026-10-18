@@ -256,7 +256,7 @@ export function Home({ data, onWechatReminders, onPoster, onShare, historical, w
       <div className="pub-home-dial"><InstrumentDial outlook={outlook} serverTime={data.serverTime} completion={latest?.action ?? null} forecasts={data.forecasts}/></div>
       <aside className="pub-instrument-summary" aria-label="重置状态与操作">
         <div className="pub-home-state-zone">
-          <StatusTimeline outlook={outlook} serverTime={data.serverTime} completion={latest?.action ?? null} forecasts={data.forecasts}/>
+          <StatusTimeline outlook={outlook} serverTime={data.serverTime} completion={latest?.action ?? null} forecasts={data.forecasts} lastReset={latestCompletedBenefits(data).find(item=>item.action.kind==='automatic_reset')?.action??null}/>
           {outlook.active?.timeNote && <details className="pub-home-time-note"><summary>预告时间说明</summary><p>{outlook.active.timeNote}</p></details>}
           {outlook.active && <ResetOutlookPanel outlook={outlook} serverTime={data.serverTime} instrument />}
           {latestRecord}

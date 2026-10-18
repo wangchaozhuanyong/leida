@@ -23,16 +23,16 @@ export function latestCompletedBenefits(data: PublicData) {
   return completedPublicActions(data)
     .filter(({ action }) => { if (seen.has(action.kind)) return false; seen.add(action.kind); return true; });
 }
-/** The 24-hour display expires from the public completion statement, never from page refresh. */
+/** Elapsed public completion time has no expiry; it is not an account balance. */
 export function completionElapsed(action: Pick<BenefitAction, 'kind' | 'stage' | 'statementAt'> | null | undefined, now: string) {
   if (action?.stage !== 'claimed_complete') return undefined;
   const age = Date.parse(now) - Date.parse(action.statementAt);
-  if (!Number.isFinite(age) || age < 0 || age >= 24 * 3600_000) return undefined;
-  const minutes = Math.floor(age / 60000), hours = Math.floor(minutes / 60), remainder = minutes % 60;
-  const parts: { value: number; unit: string }[] = [];
-  if (hours) parts.push({ value: hours, unit: '小时' });
-  if (remainder) parts.push({ value: remainder, unit: '分钟' });
-  return { parts, label: parts.length ? `${parts.map(part => `${part.value}${part.unit}`).join('')}前` : '刚刚',
+  if (!Number.isFinite(age) || age < 0) return undefined;
+  const seconds = Math.floor(age / 1000), days = Math.floor(seconds / 86400);
+  const parts: {value:number;unit:string}[] = [...(days ? [{value: days, unit: '天'}] : []),
+    {value: Math.floor(seconds % 86400 / 3600), unit: '小时'},
+    {value: Math.floor(seconds % 3600 / 60), unit: '分钟'}, {value: seconds % 60, unit: '秒'}];
+  return { parts, label: parts.map(part => `${part.value}${part.unit}`).join(''),
     lead: action.kind === 'banked_reset' ? '距最近一次确认发放重置卡' : '距最近一次确认重置' };
 }
 export const articleSourceTime = (article: Article) => article.sourcePublishedAt ?? article.publishedAt;

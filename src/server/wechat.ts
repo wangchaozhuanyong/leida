@@ -1,9 +1,11 @@
+import {publicResetOutlook} from '../lib/reset-outlook';
 import { lockTransaction } from '../db';
 import {createCipheriv,createDecipheriv,createHash,randomBytes} from 'node:crypto';
 import {z} from 'zod';
 import {isCloudbaseClient,list,one,put,insert,transaction,type Client,type Table} from '../db';
 import type {Article,Evidence,Job,Notice,Publication,RadarEvent} from '../lib/types';
 import type {WechatSettings,WechatReader,WechatGrant,WechatCredit,WechatDelivery,WechatSubscriptionState,WechatReminderPreferences} from '../lib/wechat';
+import {reminderContentCurrent,reminderStatementAt} from '../lib/reminder-lifecycle';
 import {isHistoricalArticle} from '../lib/history';
 import {DomainError,id} from './domain';
 import {createWechatProvider,WechatServiceError} from './wechat-provider';
@@ -38,7 +40,7 @@ export function assertWechatPublication(publication:Publication,event?:RadarEven
 }
 const fieldSchema=z.object({title:z.string().regex(/^thing\d{1,3}$/),status:z.string().regex(/^(?:thing|phrase)\d{1,3}$/),time:z.string().regex(/^(?:time|date)\d{1,3}$/)}).refine(fields=>new Set(Object.values(fields)).size===3,'模板字段不能重复');
 const publicQuotaActions=(publication:Publication)=>publication.event.actions.filter(action=>action.scope==='public'&&['automatic_reset','banked_reset'].includes(action.kind));
-const isQuotaPublication=(publication:Publication)=>publicQuotaActions(publication).length>0||publication.article.category==='reset'&&publication.event.actions.length===0;
+const isQuotaPublication=(publication:Publication)=>publication.mode!=='news_only'&&publication.article.publicationMode!=='news_only'&&(publicQuotaActions(publication).length>0||publication.article.category==='reset'&&publication.event.actions.length===0);
 const reminderPreferencesSchema=z.object({announcement:z.boolean(),result:z.boolean(),correction:z.boolean()}).strict();
 const reminderTypes=['announcement','result','correction'] as const;
 const reminderPreferencesOf=(reader:WechatReader):WechatReminderPreferences=>({announcement:reader.reminderPreferences?.announcement??true,result:reader.reminderPreferences?.result??true,correction:reader.reminderPreferences?.correction??true});
@@ -47,10 +49,10 @@ const reminderPreferencesOf=(reader:WechatReader):WechatReminderPreferences=>({a
 function reminderType(notice:Notice):keyof WechatReminderPreferences|undefined {
   return notice.categories.includes('correction')?'correction':notice.categories.includes('result')?'result':notice.categories.includes('announcement')?'announcement':undefined;
 }
-function allowsReminder(reader:WechatReader,notice:Notice):boolean {
+function allowsReminder(reader:WechatReader,notice:Notice,statementAt=notice.createdAt):boolean {
   const type=reminderType(notice);if(!type||notice.origin==='admin')return false;
   const enabledAt=reader.reminderEnabledAt?.[type];
-  return reminderPreferencesOf(reader)[type]&&(!enabledAt||Date.parse(notice.createdAt)>Date.parse(enabledAt));
+  return reminderPreferencesOf(reader)[type]&&(!enabledAt||Date.parse(statementAt)>Date.parse(enabledAt));
 }
 export function wechatTemplateData(settings:WechatSettings,notice:Notice,publication?:Publication):Record<string,{value:string}> {
   let fields:WechatSettings['templateFields'];try {fields=fieldSchema.parse(settings.templateFields);}catch {throw new WechatServiceError('模板字段未配置或类型不兼容','configuration');}
@@ -80,6 +82,10 @@ export function createWechatService(dependencies:WechatDependencies={}) {
   const clock=dependencies.clock??Date.now;
   const preparePublicPage=dependencies.preparePublicPage??prepareNotificationPublicPage;
   const timestamp=()=>new Date(clock()).toISOString();
+  async function currentResolutions(client?:Client) {
+    const [events,publications]=await Promise.all([store.list<RadarEvent>('events',client),store.list<Publication>('publications',client)]);
+    return publicResetOutlook({events,publications,articles:[],evidence:[],serverTime:timestamp()}).latestResolutions;
+  }
   function creditsOf(grant?:WechatGrant):WechatCredit[] {
     if(grant?.credits)return grant.credits.map(credit=>({...credit}));
     // Existing single-use records represent at most one real accepted choice.
@@ -291,6 +297,7 @@ export function createWechatService(dependencies:WechatDependencies={}) {
     await store.transaction(async client=>{
       await lock(client,'wechat_config');await lock(client,'wechat_schedule');const active=await config(client);if(!ready(active,'subscription')||active.version!==settings.version)return;
       const [grants,readers,notices,evidence,deliveries]=await Promise.all([store.list<WechatGrant>('wechat_grants',client),store.list<WechatReader>('wechat_readers',client),store.list<Notice>('notices',client),store.list<Evidence>('evidence',client),store.list<WechatDelivery>('wechat_deliveries',client)]);
+      const resolutions=await currentResolutions(client);
       let scheduled=0;
       for(const previous of grants.filter(item=>item.appId===settings.appId&&item.templateId===settings.templateId&&item.status==='available'&&item.acceptedAt)) {
         if(scheduled>=WECHAT_DISPATCH_BATCH_SIZE)break;
@@ -306,7 +313,8 @@ export function createWechatService(dependencies:WechatDependencies={}) {
         for(const notice of eligible) {
           const credit=credits.find(credit=>credit.status==='available'&&Date.parse(notice.createdAt)>Math.max(Date.parse(credit.acceptedAt),resumedAt));if(!credit)continue;
           let pub:Publication;try{pub=await publication(notice.publicationId,client);}catch(error){if(error instanceof DomainError)continue;throw error;}
-          if(!isQuotaPublication(pub))continue;
+          const statementAt=reminderStatementAt(notice,pub),type=reminderType(notice),enabledAt=type?Date.parse(value.reminderEnabledAt?.[type]??''):NaN;if(Date.parse(statementAt)<=Math.max(Date.parse(credit.acceptedAt),resumedAt,Number.isFinite(enabledAt)?enabledAt:0)||Date.parse(statementAt)>clock())continue;
+          if(!isQuotaPublication(pub)||!reminderContentCurrent(notice,pub,await store.one<RadarEvent>('events',pub.eventId,client),timestamp(),resolutions))continue;
           if(!notice.categories.includes('correction')&&isHistoricalArticle(pub.article,evidence))continue;
           const deliveryId=`wxdelivery_${digest(`${notice.id}:${grant.readerId}:${grant.templateId}`)}`;
           const delivery:WechatDelivery={id:deliveryId,readerId:grant.readerId,grantId:grant.id,creditId:credit.id,appId:settings.appId,templateId:settings.templateId,noticeId:notice.id,publicationId:pub.id,semanticKey:notice.semanticKey,status:'queued',createdAt:timestamp(),attempts:0};
@@ -319,7 +327,7 @@ export function createWechatService(dependencies:WechatDependencies={}) {
       // Withdrawals cancel queued sends without manufacturing another consent.
       for(const delivery of deliveries)if(delivery.status==='queued') {
         const notice=notices.find(item=>item.id===delivery.noticeId);let safe=notice?.status==='active';
-        if(safe)try{await publication(delivery.publicationId,client);}catch(error){if(error instanceof DomainError)safe=false;else throw error;}
+        if(safe)try{const pub=await publication(delivery.publicationId,client);safe=reminderContentCurrent(notice!,pub,await store.one<RadarEvent>('events',pub.eventId,client),timestamp(),resolutions);}catch(error){if(error instanceof DomainError)safe=false;else throw error;}
         if(!safe)await finish(delivery,'cancelled','对应内容已撤回或不可分享',undefined,client);
       }
     });
@@ -354,7 +362,8 @@ export function createWechatService(dependencies:WechatDependencies={}) {
     const [value,grant,notice]=await Promise.all([store.one<WechatReader>('wechat_readers',delivery.readerId),store.one<WechatGrant>('wechat_grants',delivery.grantId),store.one<Notice>('notices',delivery.noticeId)]);
     let safe=value?.status==='active'&&value.appId===settings.appId&&delivery.appId===settings.appId&&delivery.templateId===settings.templateId&&grant?.status==='reserved'&&grant.deliveryId===delivery.id&&notice?.status==='active'&&allowsReminder(value,notice);
     let verifiedPublication:Publication|undefined;
-    if(safe)try{verifiedPublication=await publication(delivery.publicationId);if(!isQuotaPublication(verifiedPublication))safe=false;}catch(error){if(error instanceof DomainError)safe=false;else throw error;}
+    if(safe)try{verifiedPublication=await publication(delivery.publicationId);if(!isQuotaPublication(verifiedPublication)||!reminderContentCurrent(notice!,verifiedPublication,await store.one<RadarEvent>('events',verifiedPublication.eventId),timestamp(),await currentResolutions()))safe=false;}catch(error){if(error instanceof DomainError)safe=false;else throw error;}
+    if(safe&&verifiedPublication){const credit=creditsOf(grant!).find(item=>item.id===delivery!.creditId),type=reminderType(notice!),enabledAt=type?Date.parse(value!.reminderEnabledAt?.[type]??''):NaN;if(!credit||Date.parse(reminderStatementAt(notice!,verifiedPublication))<=Math.max(Date.parse(credit.acceptedAt),Number.isFinite(enabledAt)?enabledAt:0))safe=false;}
     if(!safe) {await store.transaction(client=>finish(delivery!,'cancelled','身份、授权、模板或对应内容已失效',undefined,client));return {state:'cancelled'};}
     try {await preparePublicPage(delivery.publicationId);}
     catch {return {state:'deferred',resumeAt:new Date(clock()+5000).toISOString(),reason:'公开页面尚未准备好，稍后再发送'};}
@@ -365,7 +374,8 @@ export function createWechatService(dependencies:WechatDependencies={}) {
     try {claimed=await store.transaction(async client=>{
       await lock(client,'wechat_config');await lock(client,delivery!.readerId);await lock(client,delivery!.grantId);await lock(client,deliveryId);const current=await store.one<WechatDelivery>('wechat_deliveries',deliveryId,client);const currentGrant=await store.one<WechatGrant>('wechat_grants',delivery!.grantId,client);const currentNotice=await store.one<Notice>('notices',delivery!.noticeId,client);const currentReader=await store.one<WechatReader>('wechat_readers',delivery!.readerId,client);
       if(current?.status!=='queued'||currentGrant?.status!=='reserved'||currentGrant.deliveryId!==deliveryId||currentNotice?.status!=='active'||currentReader?.status!=='active')return false;
-      if(!allowsReminder(currentReader,currentNotice)){await finish(current,'cancelled','读者已关闭此类微信提醒',undefined,client);return false;}
+      if(!reminderContentCurrent(currentNotice,verifiedPublication!,await store.one<RadarEvent>('events',verifiedPublication!.eventId,client),timestamp(),await currentResolutions(client))){await finish(current,'cancelled','本轮预告或完成内容已失效',undefined,client);return false;}
+      if(!allowsReminder(currentReader,currentNotice,reminderStatementAt(currentNotice,verifiedPublication!))){await finish(current,'cancelled','读者已关闭此类微信提醒',undefined,client);return false;}
       await publication(current.publicationId,client);
       const currentSettings=await config(client);if(currentSettings.version!==settings.version)throw new WechatServiceError('微信配置已变化，暂缓发送','configuration');
       // The existing configuration lock serializes this check across workers/restarts.

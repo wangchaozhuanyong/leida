@@ -1,3 +1,5 @@
+import {referencePublicSignal,projectReferenceSignal,REFERENCE_SIGNAL_SOURCE} from './reference-reset-source';
+import {buildReferenceCadence,referenceCadenceReplay,publicReferenceCadence,referenceResetPoints,projectReferenceCadence,validatedReferenceReview} from '../lib/reference-cadence';
 import { lockTransaction } from '../db';
 import {createHash} from 'node:crypto';
 import {isCloudbaseClient,pool,list,one,insert,put,transaction,type Client} from '../db';
@@ -51,7 +53,10 @@ export function projectPublicForecastRecords(input:{cases:ForecastCase[];outcome
  const visibleCadenceIds=new Set([...cadenceHistory.map(s=>s.id),...Object.values(runtime?.cadenceSnapshotIds??{}),...(cadenceSnapshot?[cadenceSnapshot.id]:[])]);
  const visibleCadence=(snapshots as unknown as StoredCadenceForecast[]).filter(s=>visibleCadenceIds.has(s.id));
  const cadenceHorizonOutcomes=compact==='home'?undefined:publicCadenceHorizonOutcomes(outcomes,visibleCadence,timestamp);
- return {...base,status:unavailable?'unavailable':'ready',...(unavailable?{reason:readingFailed?'预测信息暂时不可用，稍后会自动更新；公开公告与历史记录仍可查看。':'预测观察处理失败，暂不提供当前实验估计；公开公告与固定历史记录继续保留。'}:{}),cadence:unavailable?undefined:cadence,cadenceByKind:unavailable?undefined:cadenceByKind,cadenceEvaluationByKind:runtime?.cadenceEvaluationByKind,cadenceHistory,cadenceOutcomes:cadenceOutcomes(outcomes).slice(0,12),...(cadenceHorizonOutcomes?{cadenceHorizonOutcomes}:{}),cases:cases.slice().sort((a,b)=>Date.parse(b.signalAt)-Date.parse(a.signalAt)).map(c=>{
+ const completionAt=base.outlook.latestGlobalCompletionAt;
+ const referenceSignal=projectReferenceSignal(runtime?.referenceSignal,sources,timestamp,completionAt);
+ const signalSource=sources.find(source=>source.id===REFERENCE_SIGNAL_SOURCE.id);
+ return {...base,...(referenceSignal?{referenceSignal}:{}),watch:{status:forecastSourceAvailable(signalSource,timestamp)?'none':'unavailable',checkedAt:signalSource?.lastSuccessAt??timestamp},referenceCadence:projectReferenceCadence(unavailable||!sources.some(source=>['tibo-public','reset-archive'].includes(source.id)&&forecastSourceAvailable(source,timestamp))?undefined:runtime?.referenceCadencePublic,publicResetOutlook(facts).latestGlobalCompletionAt??null,timestamp),status:unavailable?'unavailable':'ready',...(unavailable?{reason:readingFailed?'预测信息暂时不可用，稍后会自动更新；公开公告与历史记录仍可查看。':'预测观察处理失败，暂不提供当前实验估计；公开公告与固定历史记录继续保留。'}:{}),cadence:unavailable?undefined:cadence,cadenceByKind:unavailable?undefined:cadenceByKind,cadenceEvaluationByKind:runtime?.cadenceEvaluationByKind,cadenceHistory,cadenceOutcomes:cadenceOutcomes(outcomes).slice(0,12),...(cadenceHorizonOutcomes?{cadenceHorizonOutcomes}:{}),cases:cases.slice().sort((a,b)=>Date.parse(b.signalAt)-Date.parse(a.signalAt)).map(c=>{
   const available=forecastSourceAvailable(sources.find(s=>s.id===c.sourceId),timestamp);
   const projectedCase={...c,coverage:!available?{status:'gap' as const,sourceIds:c.coverage.sourceIds,reason:'信号来源暂停、失效或结构异常，不能据未找到消息标阴性'}:c.coverage},snapshot=snapshots.find(s=>s.id===c.snapshotId);
   const {status}=publicForecastCaseProjection(projectedCase,snapshot,timestamp);
@@ -128,9 +133,16 @@ export async function runForecastCycle(timestamp=iso(),options:{force?:boolean;i
    }
    if(current.status!==status){current={...current,status,updatedAt:timestamp};await put('forecast_cases',current,c);}
   }
+  const referenceFacts={events,articles,publications,evidence:all,serverTime:timestamp};
+  const revisionPublications=publications.filter(p=>p.mode!=='news_only'&&p.article.publicationMode!=='news_only'&&p.event.actions.some(a=>a.kind==='automatic_reset'&&a.scope==='public')).sort((a,b)=>a.id.localeCompare(b.id));
+  const revisionEvidenceIds=new Set(revisionPublications.flatMap(p=>p.event.actions.filter(a=>a.kind==='automatic_reset').flatMap(a=>a.evidenceIds)));
+  const revisionFingerprint=key([revisionPublications.map(p=>[p.id,p.publishedAt,p.event.id,p.event.status,p.event.actions.filter(a=>a.kind==='automatic_reset'),p.article.status]),all.filter(e=>revisionEvidenceIds.has(e.id)).sort((a,b)=>a.id.localeCompare(b.id)).map(e=>[e.id,e.hash,e.collectedAt])]);
+  const reference=buildReferenceCadence(referenceResetPoints(referenceFacts),timestamp,validatedReferenceReview(runtime?.referenceReview),referenceCadenceReplay(referenceFacts,revisionFingerprint));
+  const referenceId=`reference_cadence_${key([reference.modelVersion,reference.inputFingerprint,Math.floor(Date.parse(timestamp)/(6*3600000))])}`;
+  await insert('forecast_snapshots',{...reference,id:referenceId,recordType:'reference_cadence'},c);
   const cadence=await executeResetCadence(c,all,sources,timestamp);
   result.cadenceSnapshots=cadence.snapshots;result.cadenceOutcomes=cadence.outcomes;
-  await put('settings',{id:'forecast_runtime',checkedAt:timestamp,status:'ready',ruleVersion:FORECAST_RULE_VERSION,modelVersion:FORECAST_MODEL_VERSION,cadencePublicProjection:cadence.publicProjection,cadenceSnapshotId:cadence.snapshotId,cadenceSnapshotIds:cadence.snapshotIds,cadenceEvaluationByKind:cadence.evaluationByKind,inputsRevision:inputs?.revision,cadenceModelVersion:cadence.evaluationByKind.automatic_reset?.modelVersion,nextDueAt:cadence.nextDueAt},c);
+  await put('settings',{id:'forecast_runtime',...(validatedReferenceReview(runtime?.referenceReview)?{referenceReview:validatedReferenceReview(runtime?.referenceReview)}:{}),referenceCadencePublic:publicReferenceCadence(reference),referenceSignal:referencePublicSignal(all,sources,timestamp,publicResetOutlook({events,articles,publications,evidence:all,serverTime:timestamp}).latestGlobalCompletionAt),checkedAt:timestamp,status:'ready',ruleVersion:FORECAST_RULE_VERSION,modelVersion:FORECAST_MODEL_VERSION,cadencePublicProjection:cadence.publicProjection,cadenceSnapshotId:cadence.snapshotId,cadenceSnapshotIds:cadence.snapshotIds,cadenceEvaluationByKind:cadence.evaluationByKind,inputsRevision:inputs?.revision,cadenceModelVersion:cadence.evaluationByKind.automatic_reset?.modelVersion,nextDueAt:cadence.nextDueAt},c);
   return result;
  });}catch(error){
   console.error('FORECAST_COMPUTE_FAILED',error instanceof CloudbaseRpcError?error.diagnosticCode:'UNCLASSIFIED');

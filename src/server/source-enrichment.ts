@@ -1,3 +1,4 @@
+import {REFERENCE_RESET_SOURCE,REFERENCE_SOURCES} from './reference-reset-source';
 import { load } from 'cheerio';
 import type { Evidence } from '../lib/types';
 import { hasStandaloneContext, isTruncatedText } from './source-context';
@@ -51,6 +52,13 @@ async function boundedJSON(response:Response):Promise<unknown> {
 /** Pure fetch enrichment: the worker saves returned evidence through createEvidence. */
 export async function enrichKnownEvidence(evidence:Evidence,fetcher:typeof fetch=fetch):Promise<Evidence|undefined> {
  const post=knownPostIdentity(evidence.url);if(!post||evidence.provenance==='manual')return undefined;
+ if(REFERENCE_SOURCES.some(source=>source.id===evidence.sourceId)&&evidence.textOrigin!=='original'){
+  try{
+   const response=await fetcher(`https://api.fxtwitter.com/status/${post.messageId}`,{signal:AbortSignal.timeout(10000),redirect:'error',headers:{Accept:'application/json'}});
+   if(!response.ok){await response.body?.cancel();return undefined;}
+   return parseReferenceOriginal(await boundedJSON(response),evidence);
+  }catch{return undefined;}
+ }
  const currentTime=Date.now(),cached=fetcher===fetch?attempts.get(post.url):undefined;
  if(cached&&currentTime<Math.max(cached.checkedAt+ATTEMPT_INTERVAL_MS,cached.retryAt??0)) {
   const enriched=cached.evidence;
@@ -146,4 +154,19 @@ export async function enrichQuotedResetContext(evidence:Evidence,available:Evide
   const parent:Evidence=existing?{...existing}:{...prototype,text:original.text,textOrigin:'original',contextComplete:hasStandaloneContext(original.text,'reset')};
   return [parent,{...child,parentId:target.messageId,contextComplete:false,collectedAt:new Date().toISOString()}];
  }catch {return [];}
+}
+
+/** Reuse the existing free relay, verifying identity and original timestamp. */
+export function parseReferenceOriginal(value:unknown,evidence:Evidence,collectedAt=new Date().toISOString()):Evidence|undefined {
+ if(!REFERENCE_SOURCES.some(source=>source.id===evidence.sourceId))return;
+ return parseKnownRelayOriginal(value,evidence,collectedAt);
+}
+export function parseKnownRelayOriginal(value:unknown,evidence:Evidence,collectedAt=new Date().toISOString()):Evidence|undefined {
+ if(knownPostIdentity(evidence.url)?.messageId!==evidence.messageId||evidence.provenance==='manual'||!value||typeof value!=='object')return;
+ const data=value as {code?:unknown;tweet?:{id?:unknown;text?:unknown;created_at?:unknown;author?:{screen_name?:unknown;id?:unknown;protected?:unknown};replying_to?:unknown;replying_to_status?:unknown}};
+ const tweet=data.tweet;
+ if(data.code!==200||!tweet||tweet.id!==evidence.messageId||tweet.author?.screen_name!=='thsottiaux'||String(tweet.author.id)!=='1953337039510003712'||tweet.author.protected===true||typeof tweet.text!=='string'||!tweet.text.trim()||tweet.text.length>30000||isTruncatedText(tweet.text)||typeof tweet.created_at!=='string'||Math.abs(Date.parse(tweet.created_at)-Date.parse(evidence.publishedAt))>1000)return;
+ if(!Number.isFinite(Date.parse(tweet.created_at)))return;
+ const parentId=tweet.replying_to==='thsottiaux'&&typeof tweet.replying_to_status==='string'&&/^\d{15,20}$/.test(tweet.replying_to_status)?tweet.replying_to_status:undefined;
+ return {...evidence,text:tweet.text,textOrigin:'original',parentId,contextComplete:!parentId&&hasStandaloneContext(tweet.text,'reset'),collectedAt};
 }

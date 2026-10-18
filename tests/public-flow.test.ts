@@ -80,7 +80,7 @@ test('真实状态海报入口不让较新完成之后的旧未明确预告复�
 test('真实状态海报保留跨越最近完成时间的另一轮安排和较新未知时间预告', async () => {
   const expectedAt = new Date(Date.parse(now) + 3600_000).toISOString();
   for (const next of [
-    action({ id: 'future-round', stage: 'promised', statementAt: before(200), expectedAt }),
+    action({ id: 'future-round', stage: 'promised', statementAt: before(.1), expectedAt }),
     action({ id: 'new-announcement', stage: 'promised', statementAt: before(.1) }),
   ]) {
     const data = fixture([publication('completion', action()), publication('next', next)]);

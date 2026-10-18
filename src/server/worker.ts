@@ -1,3 +1,4 @@
+import {REFERENCE_RESET_SOURCE,REFERENCE_SOURCES} from './reference-reset-source';
 import { lockTransaction } from '../db';
 import { configuredStorageRpc } from './cloudbase/storage-config';
 import { cloudbaseTasks } from './cloudbase/tasks';
@@ -72,6 +73,14 @@ export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichme
   await transaction(async c=>{
     await lockTransaction(c,'radar_scheduler');
     const sources=await list<Source>('sources',c);
+    // Install only alongside an already enabled primary collector. Initial data
+    // is a silent reconciliation; administrator pauses remain authoritative.
+    if(!options.skipSources&&sources.some(source=>source.id==='tibo-public'&&source.enabled&&source.validated))for(const definition of REFERENCE_SOURCES){
+      if(sources.some(source=>source.id===definition.id))continue;
+      const reference={...definition,enabled:true,publicationPaused:true,pauseReason:'structure' as const,nextRunAt:now()};
+      await put('sources',reference,c);sources.push(reference);
+      await audit('worker','source.reference.register',reference.id,'已启用公开数据低频对账；不替代实时原文采集',undefined,{intervalMinutes:definition.intervalMinutes},c);
+    }
     for(const source of options.skipSources?[]:sources) if(sourceCollectionDue(source)) {
       await queueJob('collect',{sourceId:source.id,structureProbe:source.pauseReason==='structure'},c);
       const schedule=sourceCollectionSchedule(source);

@@ -5,9 +5,16 @@ import type {ForecastPublicData} from '@/lib/forecast';
 import {statusTimelineModel,type Completion} from '@/lib/status-timeline';
 export {statusTimelineModel} from '@/lib/status-timeline';
 import {usePublicClock} from './PublicSession';
+import {completionElapsed, completionTime} from './model';
+import {referenceCadenceVisible} from '@/lib/reference-cadence';
 import {NeuralNetworkArt} from './NeuralNetworkArt';
 
-export function StatusTimeline({outlook, serverTime, completion = outlook.latestCompletion, forecasts}: {outlook: ResetOutlook; serverTime: string; completion?: Completion; forecasts?: ForecastPublicData}) {
+function LastResetClock({completion,serverTime}:{completion:Completion;serverTime:string}) {
+  const now=usePublicClock(serverTime),elapsed=completionElapsed(completion,now);
+  return elapsed&&completion?<div className="pub-last-reset-clock"><div><span>上次额度重置</span><time dateTime={completion.statementAt}>{completionTime(completion.statementAt)} · 北京时间</time></div><p aria-label="距上次额度重置已过去">{elapsed.parts.map(part=><span key={part.unit}>{part.value}<small>{part.unit}</small></span>)}</p></div>:null;
+}
+
+export function StatusTimeline({outlook, serverTime, completion = outlook.latestCompletion, forecasts, lastReset}: {outlook: ResetOutlook; serverTime: string; completion?: Completion; forecasts?: ForecastPublicData;lastReset?:Completion}) {
   const now = usePublicClock(serverTime);
   const model = statusTimelineModel(outlook, now, completion, forecasts);
   return <section className={`pub-status-timeline${model.completed ? ' is-completed' : ''}${model.scheduled ? ' is-scheduled' : ''}${model.watching?' is-watching':''}${model.estimating?' is-estimating':''}`} aria-label="公开重置进展">
@@ -23,7 +30,9 @@ export function StatusTimeline({outlook, serverTime, completion = outlook.latest
       </div>
       <NeuralNetworkArt/>
     </div>
-    {model.sourceCredit&&<div className="pub-watch-source">{model.sourceUrl&&<a href={model.sourceUrl} target="_blank" rel="noopener noreferrer">{model.sourceType==='observed'?'查看观察来源 ↗':'查看来源原帖 ↗'}</a>}<a href="https://codex-resets.com/" target="_blank" rel="noopener noreferrer">数据来自 Codex Resets ↗</a></div>}
+    {model.sourceCredit&&<div className="pub-watch-source">{model.sourceUrl&&<a href={model.sourceUrl} target="_blank" rel="noopener noreferrer">{model.sourceType==='observed'?'查看观察来源 ↗':'查看来源原帖 ↗'}</a>}<a href={model.sourceName==='AIPlanWatch'?'https://codex-reset.aiplanwatch.com/':'https://codex-resets.com/'} target="_blank" rel="noopener noreferrer">数据来自 {model.sourceName} ↗</a></div>}
+    {referenceCadenceVisible(forecasts?.referenceCadence,now)&&<div className="pub-historical-probability"><span>历史节奏参考</span><div>{forecasts!.referenceCadence!.horizons.map(p=><span key={p.hours}><small>{p.hours}小时内</small><strong>{Math.round(p.probability*100)}%</strong></span>)}</div><small>至少一次公共额度重置的累计概率，非官方安排</small></div>}
+    <LastResetClock completion={lastReset??(completion?.kind==='automatic_reset'?completion:null)} serverTime={serverTime}/>
     <ol className="pub-timeline-stages" aria-label="公开进展阶段">{model.stages.map((stage, i) => <li key={stage} className={model.currentStage === i ? 'current' : undefined} aria-current={model.currentStage === i ? 'step' : undefined}>{stage}</li>)}</ol>
   </section>;
 }

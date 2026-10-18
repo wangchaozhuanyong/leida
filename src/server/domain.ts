@@ -1,3 +1,4 @@
+import {referenceCompletionClaim} from './reference-reset-source';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { BenefitAction, DraftContent, Evidence, RadarEvent } from '../lib/types';
@@ -58,10 +59,10 @@ export function validateDraft(content: DraftContent, evidence: Evidence[], autom
     if(/free|免费/i.test(quote)&&!/free|免费/i.test(action.eligibility))reasons.push('原文限定免费资格，不能扩大为所有账户');
     if(action.scope==='public'&&/just (?:you|your)|your account only|my account|private|仅你|仅该账户|私人|个人结转/i.test(quote))reasons.push('个人或定向证据不能标记普发');
     if(action.scope==='public'&&/selected|subset|specific\s+(?:users|accounts)|affected\s+(?:users|accounts)|\b\d+[km]?\s+(?:users|accounts)|部分|特定|选定|受(?:故障)?影响|定向补偿/i.test(quote))reasons.push('部分或受影响账户的定向补偿不能标记普发');
-    if (action.kind === 'automatic_reset' && /banked|重置卡|存卡|备用重置/i.test(quote) && !/usage|用量|使用额度/i.test(quote)) reasons.push('重置卡证据不能证明用量已重置');
-    if (action.kind === 'banked_reset' && !/banked|重置卡|存卡|备用重置/i.test(text)) reasons.push('证据未明确指向重置卡');
-    if (action.kind === 'banked_reset' && /usage|用量|使用额度/i.test(quote)&&!/banked|重置卡|存卡|备用重置/i.test(quote)) reasons.push('用量重置声明不能证明重置卡动作');
-    if (!isBenefitText(text)) reasons.push('原文未明确说明福利类型，需补全原承诺');
+    if (action.kind === 'automatic_reset' && /banked|reset\s+bank|重置卡|存卡|备用重置/i.test(quote) && !/usage|用量|使用额度/i.test(quote)) reasons.push('重置卡证据不能证明用量已重置');
+    if (action.kind === 'banked_reset' && !/banked|reset\s+bank|重置卡|存卡|备用重置/i.test(text)) reasons.push('证据未明确指向重置卡');
+    if (action.kind === 'banked_reset' && /usage|用量|使用额度/i.test(quote)&&!/banked|reset\s+bank|重置卡|存卡|备用重置/i.test(quote)) reasons.push('用量重置声明不能证明重置卡动作');
+    if (!isBenefitText(text)&&!actionEvidence.some(e=>e&&referenceCompletionClaim(e))) reasons.push('原文未明确说明福利类型，需补全原承诺');
     let semantics=evidenceBenefitClaims(statement,validCited,!automatic);
     // Explicit human association is retained, but arbitrary citations never unlock automatic replies.
     if(!semantics.length&&!automatic&&!isTruncatedText(statement.text)&&supplemental.length){
