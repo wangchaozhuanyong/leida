@@ -1,4 +1,4 @@
-import {REFERENCE_RESET_SOURCE,REFERENCE_SOURCES,REFERENCE_SIGNAL_SOURCE,REFERENCE_HISTORY_SOURCE,parseReferenceSignals,parseReferenceHistory,parseReferenceLatest} from './reference-reset-source';
+import {REFERENCE_RESET_SOURCE,REFERENCE_SOURCES,REFERENCE_SIGNAL_SOURCE,REFERENCE_HISTORY_SOURCE,parseReferenceSignals,parseReferenceHistory,parseReferenceLatest,referenceContentsURL} from './reference-reset-source';
 import { load } from 'cheerio';
 import { list, one, put, transaction } from '../db';
 import type { Activity, ActivityDefinition, Evidence, Source, SourceHttpCheckpoint } from '../lib/types';
@@ -275,12 +275,16 @@ export async function fetchRecords(source:Source,validationOnly=false,dependenci
  };
  const context=readContext({...dependencies,onRequestEvent,forceFullRead:validationOnly||dependencies.forceFullRead},source);
  if(source.kind==='releases'){const result=await fetchReleasePages(source,dependencies.fetcher??fetch,{...dependencies,onRequestEvent,forceFullRead:validationOnly||dependencies.forceFullRead});releaseCheckpoints.set(source.id,result.scan);sourceReadCheckpoints.set(source,{httpCheckpoints:result.httpCheckpoints??{},unchanged:result.unchanged===true});return result.records;}
- const url=source.kind==='activity'?`${ARCHIVE_ORIGIN}/zh-CN/${challengePath(source.url)}`:source.url;
+ const referenceURL=referenceContentsURL(source);
+ const url=referenceURL??(source.kind==='activity'?`${ARCHIVE_ORIGIN}/zh-CN/${challengePath(source.url)}`:source.url);
  let raw:string;
- try{try{raw=await fetchAllowedURL(url,undefined,context);}catch(error){if(source.kind!=='activity'||!(error instanceof DomainError)||error.message!=='来源请求失败（状态 404）')throw error;raw=await fetchAllowedURL(`${ARCHIVE_ORIGIN}/${challengePath(source.url)}`,undefined,context);}}
- catch(error){if(!(error instanceof SourceUnchanged))throw error;sourceReadCheckpoints.set(source,{httpCheckpoints:context.checkpoints,unchanged:true});return [];}
+ try{try{raw=await fetchAllowedURL(url,referenceURL?'application/vnd.github.raw+json':undefined,context);}catch(error){
+  if(referenceURL&&error instanceof SourceTransientError){raw=await fetchAllowedURL(source.url,undefined,context);}
+  else {if(source.kind!=='activity'||!(error instanceof DomainError)||error.message!=='来源请求失败（状态 404）')throw error;raw=await fetchAllowedURL(`${ARCHIVE_ORIGIN}/${challengePath(source.url)}`,undefined,context);}
+ }}
+ catch(error){if(!(error instanceof SourceUnchanged)){if(referenceURL)console.warn('REFERENCE_SNAPSHOT_UNAVAILABLE',source.id,error instanceof SourceTransientError?'TRANSPORT':error instanceof SourceRateLimitError?'RATE_LIMIT':error instanceof SourceStructureError?'FORMAT':'REQUEST');throw error;}sourceReadCheckpoints.set(source,{httpCheckpoints:context.checkpoints,unchanged:true});return [];}
  sourceReadCheckpoints.set(source,{httpCheckpoints:context.checkpoints,unchanged:false});
- if(REFERENCE_SOURCES.some(item=>item.id===source.id)){try{const value=JSON.parse(raw),time=now();return source.id===REFERENCE_SIGNAL_SOURCE.id?parseReferenceSignals(value,time):source.id===REFERENCE_HISTORY_SOURCE.id?parseReferenceHistory(value,time):parseReferenceLatest(value,time);}catch{throw new SourceStructureError('REFERENCE_SNAPSHOT_INVALID');}}
+ if(REFERENCE_SOURCES.some(item=>item.id===source.id)){try{const value=JSON.parse(raw),time=now();return source.id===REFERENCE_SIGNAL_SOURCE.id?parseReferenceSignals(value,time):source.id===REFERENCE_HISTORY_SOURCE.id?parseReferenceHistory(value,time):parseReferenceLatest(value,time);}catch{console.warn('REFERENCE_SNAPSHOT_UNAVAILABLE',source.id,'FORMAT');throw new SourceStructureError('REFERENCE_SNAPSHOT_INVALID');}}
  if(source.kind==='status')return parseStatus(raw,source);
  if(source.kind==='activity'){
   const $=load(raw);let clockScript='';
