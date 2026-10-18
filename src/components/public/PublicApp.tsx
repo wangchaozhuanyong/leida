@@ -17,7 +17,6 @@ import {ForecastPanel} from './ForecastPanel';
 import {InstrumentDial} from './InstrumentDial';
 import {statusPosterSnapshot} from '@/lib/status-timeline';
 import {StatusTimeline} from './StatusTimeline';
-import {ResetOutlookPanel} from './ResetOutlookPanel';
 import {publicResetOutlook} from '@/lib/reset-outlook';
 import { actionLabels } from '@/lib/labels';
 import { activityDayNumber, activityHomeVisible } from '@/lib/activity-display';
@@ -179,7 +178,7 @@ export default function PublicApp() {
     <div className={`pub-refresh-track${refreshing ? " is-active" : ""}`} role={refreshing ? "status" : undefined} aria-label={refreshing ? "正在更新" : undefined}><span/></div>
     {subpage && <nav className="pub-page-back" aria-label="返回上级"><Link scroll={false} className="pub-back-link" href={backHref}><Icon name="back" />返回</Link></nav>}
     {route === 'home' && <div className="pub-home-heading">
-      <div className="pub-home-atmosphere" aria-hidden="true"><img src="/skin/codex-reset-hero.jpg" alt="" width="1152" height="768" fetchPriority="high" /></div>
+      <div className="pub-home-atmosphere" aria-hidden="true"><img src="/skin/codex-reset-hero.jpg" alt="" width="1672" height="941" fetchPriority="high" /></div>
       <div className="pub-home-heading-copy"><h1><span className="pub-home-heading-topic"><span className="pub-home-heading-product">Codex</span>重置</span><span className="pub-home-heading-accent">一目了然</span></h1><p>不要错过每一次重置。</p></div>
       {!navigationLoading && data && <details className="pub-freshness"><summary><span className={`pub-status-dot${error || sourceStatus(data.sources).warning ? ' is-delayed' : ''}`} />{error ? '连接中断，保留已有资料' : sourceStatus(data.sources).label}<Icon name="info" /></summary><div><p>最近采集成功：<time dateTime={collectedAt}>{collectedAt ? `${briefTime(collectedAt)} · 北京时间` : '暂无记录'}</time></p><p>最新消息发布于：<time dateTime={latestArticle ? articleSourceTime(latestArticle) : undefined}>{latestArticle ? `${briefTime(articleSourceTime(latestArticle))} · 北京时间` : '暂无记录'}</time></p><p>采集成功时间来自最近成功的来源，不代表所有消息已完成核验。待确认消息可在新闻页查看。</p></div></details>}
     </div>}
@@ -258,7 +257,6 @@ export function Home({ data, onWechatReminders, onPoster, onShare, historical, w
         <div className="pub-home-state-zone">
           <StatusTimeline outlook={outlook} serverTime={data.serverTime} completion={latest?.action ?? null} forecasts={data.forecasts} lastReset={latestCompletedBenefits(data).find(item=>item.action.kind==='automatic_reset')?.action??null}/>
           {outlook.active?.timeNote && <details className="pub-home-time-note"><summary>预告时间说明</summary><p>{outlook.active.timeNote}</p></details>}
-          {outlook.active && <ResetOutlookPanel outlook={outlook} serverTime={data.serverTime} instrument />}
           {latestRecord}
           <div className="pub-home-actions">
           <button onClick={onWechatReminders} className="pub-button pub-home-reminder"><Icon name="bell"/><span>微信提醒</span>{wechatEntry === 'unavailable' && <small>待开放</small>}</button>
@@ -429,7 +427,6 @@ export function Settings({notices,read,markRead,storageError,pending,data,codeAv
     </section>
     {storageError&&<p className="pub-warning">{storageError}</p>}
     <section className="pub-card pub-reminder-pending"><div className="pub-section-heading"><h2>微信提醒</h2><Badge tone="muted">小程序内开启</Badge></div><p>请在小程序的提醒页开启微信提醒，每次成功授权增加一次提醒机会。</p><p className="pub-muted">可分别选择重置预告、完成声明和重要更正。每成功发送一条使用一次，未开启的类型不使用次数。</p><WechatEntryGuide publicationId={data?.publications.find(p=>!publicationWithdrawn(data,p))?.id} codeAvailable={codeAvailable}/></section>
-    <section className="pub-card"><TextLink href="/more#privacy">隐私说明</TextLink></section>
   </>;
 }
 function MorePage() {
@@ -513,17 +510,17 @@ function PosterModal({ target, name, blocked:externalBlocked, note, statusDesign
     <div className="pub-dialog-body">
       {statusDesign && <div className="pub-poster-options">
         <div className="pub-poster-styles" role="group" aria-label="海报风格">{statusPosterStyles.map(option => <button key={option.id} type="button" className={`pub-poster-style${style === option.id ? ' is-selected' : ''}`} aria-pressed={style === option.id} disabled={sharing || !!blocked} onClick={() => { if (style !== option.id) { setGenerating(true); setError(''); setStyle(option.id); } }}><span className={`pub-poster-swatch ${option.id}`} aria-hidden="true" /><span>{option.label}</span>{style === option.id && <Icon name="check" />}</button>)}</div>
-        <label className="pub-poster-code-option"><input type="checkbox" checked={includeCode && codeAvailable} disabled={!codeAvailable || sharing || !!blocked} onChange={event => { setGenerating(true); setError(''); setIncludeCode(event.target.checked); }} /><span>带圆形小程序码</span>{!codeAvailable && <small>待接入 · 可保存无圆码版</small>}</label>
+        <label className="pub-poster-code-option"><input type="checkbox" checked={includeCode && codeAvailable} disabled={!codeAvailable || sharing || !!blocked} onChange={event => { setGenerating(true); setError(''); setIncludeCode(event.target.checked); }} /><span>带圆形小程序码</span>{!codeAvailable && <small>默认显示网站二维码</small>}</label>
       </div>}
       <div className="pub-poster-preview" aria-busy={generating}>
         {blocked ? <p className="pub-warning" role="alert">{blocked}</p> : <>
           {preview && <img className="pub-poster-image" src={preview.url} alt={`${name}分享海报：${target.title}`} />}
-          {generating && <div className="pub-poster-loading" role="status"><Icon name="radar" /><p>正在生成{statusDesign ? selectedStyle.label : ''}海报…</p></div>}
+          {generating && <div className="pub-poster-loading" role="status"><span className="pub-loading-bar" aria-hidden="true"/><p>正在生成{statusDesign ? selectedStyle.label : ''}海报…</p></div>}
         </>}
         {error && <div className="pub-warning" role="alert"><p>{error}</p>{!image && !blocked && <button className="pub-text-button" onClick={() => setAttempt(value => value + 1)}>重新生成</button>}</div>}
       </div>
       <div className="pub-share-row"><button className="pub-button" disabled={sharing || generating || !image || !!blocked} onClick={() => void (canShareImage ? shareImage() : onShare())}>{sharing ? '正在打开分享…' : canShareImage ? '转发海报' : '分享此版本链接'}<Icon name="share" /></button><button className="pub-button primary" disabled={generating || !image || !!blocked} onClick={() => image && savePosterImage(image)}>保存海报</button></div>
-      <p className="pub-dialog-note" role="status">{statusDesign ? image?.codeState === 'unavailable' ? '圆码暂时获取失败，本次生成不带码的海报。' : '海报记录生成时的公开状态，所有时间均为北京时间。' : note || (image ? '长按图片可保存，海报与扫码链接固定对应此版本。' : '海报固定使用这一发布版本。')}{!statusDesign && local && '当前为本机预览，手机扫码需正式网站地址。'}</p>
+      <p className="pub-dialog-note" role="status">{statusDesign ? image?.codeState === 'unavailable' ? '小程序码暂时获取失败，本次使用网站二维码。' : '海报记录生成时的公开状态，所有时间均为北京时间。' : note || (image ? '长按图片可保存，海报与扫码链接固定对应此版本。' : '海报固定使用这一发布版本。')}{local && '当前为本机预览，手机扫码需正式网站地址。'}</p>
     </div>
   </dialog>;
 }

@@ -2,11 +2,12 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { StatusPosterStyle } from '@/lib/status-poster-style';
 import type { StatusPosterCode } from './status-poster';
+import QRCode from 'qrcode';
 
 interface DesignedPoster {
   style: StatusPosterStyle; name: string; title: string; interval: string;
   statementAt: string; generatedAt: string; nextNote: string; nextIsForecast: boolean;
-  sourceLabel: string; brand: string; code?: StatusPosterCode; intervalLabel?: string; statementLabel?:string; intervalUnit?:string;
+  sourceLabel: string; brand: string; shareUrl?: string; code?: StatusPosterCode; intervalLabel?: string; statementLabel?:string; intervalUnit?:string;
 }
 const backgrounds = new Map<StatusPosterStyle, string>();
 const escape = (value: string) => value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!));
@@ -34,9 +35,17 @@ export function designedStatusPoster(input: DesignedPoster): string {
   const text = (value: string, x: number, y: number, size: number, color = ink, weight = 400, anchor = 'start', extra = '') => `<text x="${x}" y="${y}" font-size="${size}" fill="${color}" font-weight="${weight}" text-anchor="${anchor}" ${extra}>${escape(value)}</text>`;
   const line = (x1: number, y1: number, x2: number, y2: number) => `<path d="M${x1} ${y1}L${x2} ${y2}" fill="none" stroke="${dark ? '#8c7650' : '#3e4647'}" stroke-width="1.5"/>`;
   const mark = (x: number, y: number, scale = 1) => `<g transform="translate(${x} ${y}) scale(${scale})">${input.brand}</g>`;
-  // Keep the entire provider image inside the white disc. Never crop, distort,
-  // redraw the radial matrix, or substitute a made-up decorative code.
-  const code = (cx: number, cy: number, radius: number) => input.code ? `<g data-poster-code="mini"><circle cx="${cx}" cy="${cy}" r="${radius}" fill="#fff"/><image x="${cx - radius * .70}" y="${cy - radius * .70}" width="${radius * 1.40}" height="${radius * 1.40}" preserveAspectRatio="xMidYMid meet" href="data:${input.code.contentType};base64,${input.code.image.toString('base64')}"/>${text('原文与记录', cx, cy + radius + 36, 27, muted, 400, 'middle')}</g>` : '';
+  // A scan target is part of the composition, never overlaid on the dial or factual text.
+  let websiteCode = '';
+  if(input.shareUrl){
+    const url=new URL(input.shareUrl);
+    if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw new Error('无效的扫码地址');
+    const matrix=QRCode.create(input.shareUrl,{errorCorrectionLevel:'M'}).modules,side=matrix.size+8;
+    let cells='';for(let y=0;y<matrix.size;y++)for(let x=0;x<matrix.size;x++)if(matrix.get(y,x))cells+=`<rect x="${x+4}" y="${y+4}" width="1" height="1"/>`;
+    websiteCode=`<svg x="740" y="1570" width="270" height="270" viewBox="0 0 ${side} ${side}" data-poster-code="website"><rect width="${side}" height="${side}" fill="#fff"/><g fill="#101d2d">${cells}</g></svg>`;
+  }
+  const scan = input.code ? `<g data-poster-code="mini"><rect x="740" y="1570" width="270" height="270" rx="16" fill="#fff"/><image x="754" y="1584" width="242" height="242" preserveAspectRatio="xMidYMid meet" href="data:${input.code.contentType};base64,${input.code.image.toString('base64')}"/></g>` : websiteCode;
+  const footer=scan?`<rect x="0" y="1530" width="1080" height="390" fill="${dark?'#0b0d10':'#faf6ec'}" opacity="1"/>${text('扫码查看最新动态',82,1653,40)}${text(input.sourceLabel,82,1711,fit(input.sourceLabel,28,610),muted)}${text('海报为生成时的快照，实时状态以网站为准',82,1772,24,muted)}${scan}${text(input.code?'小程序码':'网站二维码',875,1876,25,muted,400,'middle')}${text('仅整理公开公告，个人状态以账户显示为准',82,1833,24,muted)}${text(`生成于 ${dateTime(input.generatedAt).date} ${dateTime(input.generatedAt).time} · 北京时间`,82,1880,22,muted)}`:`${text(input.sourceLabel,72,1751,fit(input.sourceLabel,31,930),muted)}${text('仅整理公开公告，个人状态以账户显示为准',72,1800,28,muted)}${text(`生成于 ${dateTime(input.generatedAt).date} ${dateTime(input.generatedAt).time} · 北京时间`,72,1870,25,muted)}`;
   const date = dateTime(input.statementAt), generated = dateTime(input.generatedAt);
   const elapsed = input.interval.match(/^(\d+) (.+)$/);
   const next = input.nextNote === '暂无可靠的下次重置日期' ? '下一次时间待公开确认' : input.nextNote;
@@ -44,26 +53,24 @@ export function designedStatusPoster(input: DesignedPoster): string {
   const nextSize = nextLines.length > 2 ? 30 : 38;
   const qualifier = '仅整理公开公告，个人状态以账户显示为准';
   const interval = dark
-    ? elapsed ? text(elapsed[1], 540, 1000, fit(elapsed[1], 440, 640), 'url(#elapsed-gold)', 700, 'middle', 'font-family="Georgia,Times New Roman,serif"') + text(elapsed[2], 540, 1195, 60, ink, 400, 'middle') : text(input.interval, 540, 942, fit(input.interval,160,730), 'url(#elapsed-gold)', 700, 'middle')
+    ? elapsed ? text(elapsed[1], 540, 948, fit(elapsed[1], 286, 520), 'url(#elapsed-gold)', 700, 'middle', 'font-family="Georgia,Times New Roman,serif"') + text(elapsed[2], 540, 1070, 43, ink, 400, 'middle') : text(input.interval, 540, 920, fit(input.interval,100,510), 'url(#elapsed-gold)', 700, 'middle')
     : elapsed ? text(elapsed[1], 380, 1320, fit(elapsed[1], 460, 316), '#b72f28', 700, 'end', 'font-family="Georgia,Times New Roman,serif"') + text(elapsed[2], 505, 1310, elapsed[2].length > 1 ? 58 : 89, ink, 700, 'end') : text(input.interval, 64, 1190, fit(input.interval,138,455), '#b72f28', 700);
   const content = dark ? `
     ${mark(64, 72)}${text(input.name, 183, 118, fit(input.name, 44, 510))}
     ${line(710, 111, 766, 111)}${text('Codex 用量动态', 1016, 121, 33, ink, 400, 'end')}
     ${text(input.title, 540, 311, fit(input.title, 111, 948), ink, 700, 'middle')}
-    ${text(input.intervalLabel ?? '距该公告', 540, 610, fit(input.intervalLabel??'距该公告',52,390), ink, 400, 'middle')}${interval}${input.intervalUnit?text(input.intervalUnit,540,1050,42,ink,400,'middle'):''}
-    ${code(890, 1248, 158)}
-    ${text(input.statementLabel??'公告时间', 72, 1495, 34, muted)}
-    ${text(date.date, 72, 1556, 59, ink, 600)}${text(`${date.time} · 北京时间`, 72, 1612, 35, muted)}
-    ${line(543, 1472, 543, 1650)}
-    ${nextLines.map((value, i) => text(value, 590, 1526 + i * 47, nextSize, ink, 500)).join('')}
-    ${input.nextIsForecast ? text('北京时间 · 实际完成待确认', 590, 1643, 27, muted) : ''}
-    ${line(72, 1694, 1016, 1694)}${text(input.sourceLabel, 72, 1751, fit(input.sourceLabel, 31, 930), muted)}
-    ${text(qualifier, 72, 1800, 28, muted)}
-    ${text(`生成于 ${generated.date} ${generated.time} · 北京时间`, 72, 1870, 25, muted)}
+    ${text(input.intervalLabel ?? '距该公告', 540, 683, fit(input.intervalLabel??'距该公告',38,420), ink, 400, 'middle')}${interval}${input.intervalUnit?text(input.intervalUnit,540,1050,42,ink,400,'middle'):''}
+
+    ${text(input.statementLabel??'公告时间', 72, 1355, 30, muted)}
+    ${text(date.date, 72, 1410, 48, ink, 600)}${text(`${date.time} · 北京时间`, 72, 1465, 30, muted)}
+    ${line(543, 1330, 543, 1500)}
+    ${nextLines.map((value, i) => text(value, 590, 1375 + i * 42, nextSize, ink, 500)).join('')}
+    ${input.nextIsForecast ? text('北京时间 · 实际完成待确认', 590, 1515, 24, muted) : ''}
+
   ` : `
     ${mark(57, 105)}${text(input.name, 186, 181, fit(input.name, 61, input.code ? 490 : 815), ink, 700)}
     ${text('Codex 用量动态', 64, 260, 43, ink, 400, 'start', 'letter-spacing="7"')}
-    ${code(893, 186, 134)}${line(64, 320, input.code ? 692 : 1015, 320)}
+    ${line(64, 320, input.code ? 692 : 1015, 320)}
     ${text('关注公开公告，追踪用量动态', 64, 371, 28, muted, 400, 'start', 'letter-spacing="6"')}
     ${text(input.title.startsWith('公告称') ? '公告称' : '公开状态', 64, 578, 146, ink, 700)}
     ${text(input.title.replace(/^公告称/, ''), 64, 769, fit(input.title.replace(/^公告称/, ''), 157, 948), ink, 700)}
@@ -77,8 +84,7 @@ export function designedStatusPoster(input: DesignedPoster): string {
     <rect x="48" y="1403" width="978" height="174" rx="0" fill="#faf5e9" opacity=".72"/>
     ${line(64, 1404, 1016, 1404)}${text(input.sourceLabel, 64, 1462, fit(input.sourceLabel, 37, 944), ink, 600)}
     ${text(qualifier, 64, 1516, 29, muted)}
-    <rect x="48" y="1784" width="835" height="82" fill="#faf5e9" opacity=".85"/>
-    ${text(`生成于 ${generated.date} ${generated.time} · 北京时间`, 64, 1838, 27, muted)}
+
   `;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920" role="img" aria-label="${escape(`${input.name}：${input.title}，距该公告 ${input.interval}`)}" data-poster-style="${input.style}"><defs><linearGradient id="elapsed-gold" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#fff1cc"/><stop offset=".45" stop-color="#e3bb71"/><stop offset=".74" stop-color="#f5d99b"/><stop offset="1" stop-color="#ad7835"/></linearGradient></defs><image width="1080" height="1920" preserveAspectRatio="none" href="data:image/png;base64,${backgrounds.get(input.style)}"/><g font-family="Songti SC,STSong,SimSun,serif">${content}</g></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920" role="img" aria-label="${escape(`${input.name}：${input.title}，距该公告 ${input.interval}`)}" data-poster-style="${input.style}"><defs><linearGradient id="elapsed-gold" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#fff1cc"/><stop offset=".45" stop-color="#e3bb71"/><stop offset=".74" stop-color="#f5d99b"/><stop offset="1" stop-color="#ad7835"/></linearGradient></defs><image width="1080" height="1920" preserveAspectRatio="none" href="data:image/png;base64,${backgrounds.get(input.style)}"/><g font-family="Songti SC,STSong,SimSun,serif">${content}${footer}</g></svg>`;
 }

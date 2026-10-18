@@ -198,7 +198,7 @@
 .pub-page-heading { padding: 4px 0 20px; margin-bottom: 24px; }
 .pub-page-heading > .pub-eyebrow { margin: 0 0 8px; }
 .pub-page-intro { color: var(--pub-muted); margin: 0 0 20px; font-size: 14px; }
-.pub-home-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 68px; margin-bottom: 16px; }
+
 .pub-home-heading-copy { min-width: 0; }
 .pub-home-heading-copy h1 { display: block; margin: 0; color: var(--pub-text); font-size: 22px; font-weight: 650; line-height: 1.4; letter-spacing: -.3px; white-space: nowrap; }
 .pub-home-heading-copy p { margin-top: 4px; color: var(--pub-muted); font-size: 12px; line-height: 1.5; white-space: nowrap; }
@@ -320,7 +320,7 @@
   .pub-header-back { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; min-height: 44px; margin-left: -10px; color: #b6c0bc; }
   .pub-page-back { display: none; }
   .pub-context-count { font-size: 11px; padding: 2px 6px; }
-  .pub-home-heading { gap: 12px; min-height: 64px; margin-bottom: 14px; }
+
   .pub-home-heading-copy h1 { font-size: 19px; }
   .pub-home-heading-copy p { font-size: 11px; }
   .pub-freshness > div p { white-space: normal; }

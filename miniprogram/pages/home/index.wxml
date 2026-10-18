@@ -13,11 +13,11 @@
     <view wx:if="{{error}}" class="warning">连接暂时中断，保留最近读取的资料。<button class="text-button" bindtap="retry" loading="{{loading}}">重新连接 →</button></view>
     <view wx:if="{{historical}}" class="warning">当前公告为历史收录，不代表刚刚发放。</view>
     <view class="status-card">
-    <view wx:if="{{timeline}}" class="status-timeline {{timeline.completed ? 'is-completed' : ''}} {{timeline.scheduled ? 'is-scheduled' : ''}} {{timeline.watching ? 'is-watching' : ''}} {{timeline.estimating ? 'is-estimating' : ''}}" aria-label="公开重置进展">
+    <view wx:if="{{timeline}}" class="status-timeline tone-{{timeline.presentation.tone}} {{timeline.completed ? 'is-completed' : ''}} {{timeline.scheduled ? 'is-scheduled' : ''}} {{timeline.watching ? 'is-watching' : ''}} {{timeline.estimating ? 'is-estimating' : ''}}" aria-label="公开重置进展">
       <view class="timeline-main">
         <view class="timeline-copy">
-          <view class="timeline-head">{{timeline.lead}}</view>
-          <view class="timeline-row"><view class="timeline-title {{timeline.title === '等待下一次 Reset' ? 'timeline-waiting' : ''}}"><block wx:if="{{timeline.scheduled && timeline.countdownParts.length}}"><text wx:for="{{timeline.countdownParts}}" wx:key="unit" class="duration-part">{{item.value}}<text class="duration-unit">{{item.unit}}</text></text></block><block wx:else>{{timeline.title}}</block></view></view>
+          <view class="timeline-head"><text>{{timeline.presentation.kind}}</text><text class="state-badge">{{timeline.presentation.badge}}</text></view><view wx:if="{{timeline.scheduled}}" class="timeline-state-name">{{timeline.presentation.heading}}</view><view wx:if="{{timeline.scheduled}}" class="timeline-metric-label">{{timeline.lead}}</view>
+          <view class="timeline-row"><view class="timeline-title {{timeline.title === '等待下一次 Reset' ? 'timeline-waiting' : ''}}"><block wx:if="{{timeline.scheduled && timeline.countdownParts.length}}"><text wx:for="{{timeline.countdownParts}}" wx:key="unit" class="duration-part">{{item.value}}<text class="duration-unit">{{item.unit}}</text></text></block><block wx:else>{{timeline.presentation.heading}}</block></view></view>
           <view class="timeline-date"><view class="timeline-note">{{timeline.note}}</view><text wx:if="{{timeline.scheduled || timeline.overdue || timeline.watching}}" class="timeline-timezone">北京时间</text></view><view wx:if="{{timeline.forecastWindow}}" class="timeline-detail">信号发布时预计：{{timeline.forecastWindow}}</view><view wx:if="{{timeline.observedLabel}}" class="timeline-detail">{{timeline.observedLabel}}</view><view wx:if="{{timeline.chanceLabel}}" class="timeline-detail">{{timeline.chanceLabel}}</view>
           <view wx:if="{{timeline.detail}}" class="timeline-detail">{{timeline.detail}}</view>
         </view>

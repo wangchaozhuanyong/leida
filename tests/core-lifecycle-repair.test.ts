@@ -111,7 +111,7 @@ test('重置卡完成不消除额度信号；同轮安排已完成才屏蔽远�
  assert.equal(statusTimelineModel({status:'completed',lastResolved:resolved},'2026-10-17T22:00:00Z',resolved,{...forecasts,watch:schedule}).scheduled,false);
  const other={...schedule,scheduledReset:{...schedule.scheduledReset,announcedAt:'2026-10-17T17:00:00Z'}};
  const ambiguous=statusTimelineModel({status:'completed',lastResolved:resolved},'2026-10-17T22:00:00Z',resolved,{...forecasts,watch:other});
- assert.equal(ambiguous.scheduled,false,'未关联旧安排保留待核验，不覆盖已确认完成');assert.match(ambiguous.detail,/待确认/);
+ assert.equal(ambiguous.scheduled,false,'未关联旧安排保留待核验，不覆盖已确认完成');assert.equal(ambiguous.detail,'','内部待核验提示不再出现在客户主状态，源数据仍保留');
  assert.equal(other.scheduledReset.scheduledFor,'2026-10-18T04:00:00Z','不改写或关闭源数据中的独立轮次');
  other.scheduledReset.announcedAt='2026-10-17T21:30:00Z';
  assert.equal(statusTimelineModel({status:'completed',lastResolved:resolved},'2026-10-17T22:00:00Z',resolved,{...forecasts,watch:other}).scheduled,true,'完成后新预告可独立展示');

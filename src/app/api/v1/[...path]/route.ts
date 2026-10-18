@@ -48,7 +48,7 @@ export async function GET(request:Request,{params}:{params:Promise<{path:string[
   let code:StatusPosterCode|undefined;
   const codePublication=round.startsWith('state:')?statusPosterSnapshot(data,at).publicationId:round==='waiting'?'':round;
   if(options.includeCode&&codePublication){try{code=await generateWechatCode(codePublication);}catch(error){if(!(error instanceof WechatServiceError))throw error;}}
-  return new Response(currentStatusPosterSvg(data,at,round,options.style,code),{headers:{'Content-Type':'image/svg+xml; charset=utf-8','Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox",'X-Poster-Code':code?'included':options.includeCode?'unavailable':'omitted'}});
+  return new Response(currentStatusPosterSvg(data,at,round,options.style,code,`${requestShareOrigin(request)}/`),{headers:{'Content-Type':'image/svg+xml; charset=utf-8','Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox",'X-Poster-Code':code?'included':options.includeCode?'unavailable':'omitted'}});
  }
  if(kind==='posters'&&id){
   const p=data.publications.find(p=>p.id===id);if(!p)throw Object.assign(new Error('未找到已发布版本'),{status:404});

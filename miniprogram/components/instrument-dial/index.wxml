@@ -4,7 +4,7 @@
     <view class="readout">
       <view class="lead-label"><block wx:if="{{model.bankedCompleted}}"><view>距最近一次确认</view><view>发放重置卡</view></block><block wx:else>{{model.lead}}</block></view>
       <view wx:if="{{model.scheduled}}" class="digits {{model.long ? 'long' : ''}}">{{model.digits}}</view>
-      <view wx:elif="{{model.completed}}" class="elapsed {{model.elapsedLong ? 'long' : ''}}" aria-label="{{model.elapsedLabel}}"><block wx:if="{{model.elapsedParts.length}}"><view wx:for="{{model.elapsedParts}}" wx:key="unit" class="duration"><text>{{item.value}}</text><text class="unit">{{item.unit}}</text></view><text class="unit">前</text></block><block wx:else>刚刚</block></view>
+      <view wx:elif="{{model.completed}}" class="elapsed {{model.elapsedLong ? 'long' : ''}}" aria-label="{{model.elapsedLabel}}"><block wx:if="{{model.elapsedParts.length}}"><view wx:for="{{model.elapsedParts}}" wx:key="unit" class="duration"><text>{{item.value}}</text><text class="unit">{{item.unit}}</text></view></block><block wx:else>刚刚</block></view>
       <view wx:else class="state">{{model.state}}</view>
       <view class="note">{{model.note}}</view>
     </view>
