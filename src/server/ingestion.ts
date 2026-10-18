@@ -1,3 +1,4 @@
+import {REFERENCE_RESET_SOURCE,REFERENCE_SOURCES,REFERENCE_SIGNAL_SOURCE,REFERENCE_HISTORY_SOURCE,parseReferenceSignals,parseReferenceHistory,parseReferenceLatest} from './reference-reset-source';
 import { load } from 'cheerio';
 import { list, one, put, transaction } from '../db';
 import type { Activity, ActivityDefinition, Evidence, Source, SourceHttpCheckpoint } from '../lib/types';
@@ -32,7 +33,7 @@ export const sourceDefinitions:Source[]=[
  {id:'activity-archive',name:'活动公开归档（辅助来源）',kind:'activity',url:'https://codex-resets.com/tibo-28',enabled:false,validated:false,intervalMinutes:30,collectionPolicy:'adaptive',version:1,status:'unconnected'},
  {id:'manual',name:'人工补充原文',kind:'manual',url:'https://codex-resets.com/zh-CN',enabled:false,validated:true,intervalMinutes:15,version:1,status:'paused'},
  {id:'official-releases',name:'Codex 官方稳定版本',kind:'releases',url:'https://api.github.com/repos/openai/codex/releases',enabled:false,validated:false,intervalMinutes:360,collectionPolicy:'adaptive',version:1,status:'unconnected'},
- TIBO_PUBLIC_SOURCE
+ TIBO_PUBLIC_SOURCE, ...REFERENCE_SOURCES
 ];
 export type Incoming=Omit<Evidence,'id'|'hash'|'historical'> & {activityDay?:number};
 const responseCache = new Map<string,{etag?:string;lastModified?:string;body:string}>();
@@ -42,7 +43,7 @@ const sourceReadCheckpoints=new WeakMap<Source,{httpCheckpoints:Record<string,So
 const safeValidator=(value:string|null)=>value&&value.length<=1024&&!/[\r\n]/.test(value)?value:undefined;
 export function sourceReadCheckpoint(source:Source){return sourceReadCheckpoints.get(source);}
 export function incomingFingerprint(records:Incoming[]):string {
- return hash(JSON.stringify(records.map(({collectedAt:_,...record})=>record).sort((a,b)=>a.messageId.localeCompare(b.messageId)||a.sourceId.localeCompare(b.sourceId))));
+ return hash(JSON.stringify(records.map(({collectedAt:_,...record})=>{const proof=record.metadata?.referenceReset;if(record.sourceId===REFERENCE_RESET_SOURCE.id&&proof){const {snapshotAt:__,...stable}=proof;return {...record,metadata:{...record.metadata,referenceReset:stable}};}return record;}).sort((a,b)=>a.messageId.localeCompare(b.messageId)||a.sourceId.localeCompare(b.sourceId))));
 }
 export function hasOpenCodexIncident(records:Incoming[]):boolean {
  const latest=new Map<string,Incoming>();
@@ -279,6 +280,7 @@ export async function fetchRecords(source:Source,validationOnly=false,dependenci
  try{try{raw=await fetchAllowedURL(url,undefined,context);}catch(error){if(source.kind!=='activity'||!(error instanceof DomainError)||error.message!=='来源请求失败（状态 404）')throw error;raw=await fetchAllowedURL(`${ARCHIVE_ORIGIN}/${challengePath(source.url)}`,undefined,context);}}
  catch(error){if(!(error instanceof SourceUnchanged))throw error;sourceReadCheckpoints.set(source,{httpCheckpoints:context.checkpoints,unchanged:true});return [];}
  sourceReadCheckpoints.set(source,{httpCheckpoints:context.checkpoints,unchanged:false});
+ if(REFERENCE_SOURCES.some(item=>item.id===source.id)){try{const value=JSON.parse(raw),time=now();return source.id===REFERENCE_SIGNAL_SOURCE.id?parseReferenceSignals(value,time):source.id===REFERENCE_HISTORY_SOURCE.id?parseReferenceHistory(value,time):parseReferenceLatest(value,time);}catch{throw new SourceStructureError('REFERENCE_SNAPSHOT_INVALID');}}
  if(source.kind==='status')return parseStatus(raw,source);
  if(source.kind==='activity'){
   const $=load(raw);let clockScript='';
@@ -338,7 +340,7 @@ export async function collectSource(sourceId:string,historical=false):Promise<{s
  for(const raw of unchanged?[]:records){
   const {activityDay,...incoming}=raw;const definition=incoming.metadata?.activity;
   const activityAllowed=definition?await establishActivity(definition):true;
-  const result=await createEvidence({...incoming,historical:isHistoricalRecord(incoming.publishedAt,historical)});
+  const result=await createEvidence({...incoming,historical:isHistoricalRecord(incoming.publishedAt,historical)||REFERENCE_SOURCES.some(item=>item.id===source.id)&&!source.lastSuccessAt});
   if(result.created&&result.candidate){
    created++;
    if(definition&&(!activityAllowed||activityDay&&activityDay<=definition.days))await transaction(async c=>{
@@ -362,7 +364,7 @@ export async function collectSource(sourceId:string,historical=false):Promise<{s
    const updated:Source={...current,...schedule,hasActiveIncident,validated:waiting?current.validated:true,publicationPaused:waiting?current.publicationPaused:false,pauseReason:waiting?current.pauseReason:undefined,consecutiveFailures:waiting?current.consecutiveFailures:0,status:current.enabled?'healthy':'paused',error:waiting?current.error:undefined,lastSuccessAt:waiting?current.lastSuccessAt:time,cursor,releaseScan:scan??current.releaseScan,timelineScan:timeline?.scan??current.timelineScan,httpCheckpoints:read?.httpCheckpoints??current.httpCheckpoints,collectionFingerprint:read?.unchanged?current.collectionFingerprint:fingerprint,version:current.version+1};
    await put('sources',{...updated,nextRunAt:sourceNextCollectionAt(updated)},c);
   }
-  if(!unchanged||healthChanged)await audit('worker','source.collect',sourceId,`读取 ${records.length} 条，新增 ${created} 条；${timeline?.interrupted?'已保留成功读取的部分，后续读取等待恢复':'保留旧条目回看以发现编辑'}`,undefined,{seen:records.length,created,historical,releaseScan:scan,partial:!!timeline?.interrupted},c);
+  if(!unchanged||healthChanged)await audit('worker','source.collect',sourceId,`读取 ${records.length} 条，新增 ${created} 条；${timeline?.interrupted?'已保留成功读取的部分，后续读取等待恢复':'保留旧条目回看以发现编辑'}`,undefined,{seen:records.length,created,historical,pipeline:{transportComplete:!timeline?.interrupted,evidenceStored:created,classification:'candidate_queue',publication:'separate_audit',notification:'separate_delivery_records'},releaseScan:scan,partial:!!timeline?.interrupted},c);
  });
  if(timeline?.interrupted)throw timelineError(timeline.interrupted);
  return {seen:records.length,created,healthChanged};

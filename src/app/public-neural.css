@@ -455,3 +455,7 @@ html:has(.public-surface) body { background: #f2f5fb; color: #14263e; }
 .public-surface .pub-share-entry .pub-feature-action{display:flex;align-items:center;gap:4px}.public-surface .pub-feature-action .pub-share-entry-arrow{display:inline-block;width:23px;height:23px}.public-surface .pub-feature-action .pub-share-orbit,.public-surface .pub-feature-action .pub-share-rail{display:none}
 
 .public-surface .pub-dial-readout strong.pub-dial-countdown{font-size:clamp(20px,2.2vw,32px);letter-spacing:-.6px;white-space:nowrap}@media(min-width:701px){.public-surface .pub-home-atmosphere img{object-fit:contain;object-position:center}.public-surface .pub-home-atmosphere{background:radial-gradient(ellipse,#e7f0f9 40%,#f2f5fb 78%)}}
+
+.pub-last-reset-clock{margin:18px 0 4px;padding-top:16px;border-top:1px solid #e1e8f3}.pub-last-reset-clock>div{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;font-size:11px;color:#6b7d99}.pub-last-reset-clock p{display:flex;align-items:baseline;gap:6px;margin:8px 0 0;font-size:25px;font-weight:600;color:#18335c;font-variant-numeric:tabular-nums}.pub-last-reset-clock small{font-size:12px;font-weight:400;margin-left:2px}
+
+.pub-historical-probability{margin-top:16px;color:#687c9c;font-size:12px}.pub-historical-probability>div{display:flex;gap:24px;margin:8px 0}.pub-historical-probability>div span{display:grid;gap:3px}.pub-historical-probability strong{color:#18335c;font-size:22px;font-variant-numeric:tabular-nums}

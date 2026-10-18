@@ -7,6 +7,10 @@ const dayMs = 86400000;
 const actionLabels = { automatic_reset: '用量重置', banked_reset: '重置卡' };
 const preferenceDefaults = { announcement: true, result: true, activity: false, correction: true };
 const validTime = value => !!value && Number.isFinite(Date.parse(value));
+function referenceCadenceView(value,now) {
+ if(!value||value.modelVersion!=='conditional-empirical-global-20261018-1'||value.status!=='ready'||!validTime(value.generatedAt)||!validTime(value.validUntil)||Date.parse(value.generatedAt)>Date.parse(now)||Date.parse(value.validUntil)<=Date.parse(now)||value.sampleCount<20||value.comparableCount<10||!Array.isArray(value.horizons)||value.horizons.length!==3||!value.horizons.every((p,i)=>p.hours===[24,48,72][i]&&typeof p.probability==='number'&&Number.isFinite(p.probability)&&p.probability>=0&&p.probability<=1&&(i===0||p.probability>=value.horizons[i-1].probability)))return null;
+ return value.horizons.map(p=>({hours:p.hours,label:Math.round(p.probability*100)+'%'}));
+}
 function sourceStatus(sources) {
   const automated=sources.filter(s=>s.id!=='manual');
   if(!automated.length)return {label:'自动更新暂未启用',warning:true};
@@ -51,16 +55,16 @@ function latestCompletedBenefits(data) {
   return completedBenefits(data)
     .filter(({ action }) => { if (seen.has(action.kind)) return false; seen.add(action.kind); return true; });
 }
-/** Refreshing or reopening the page never restarts the original 24-hour result window. */
+/** Elapsed public completion time has no expiry; it is not an account balance. */
 function completionElapsed(action, now) {
-  if (!action || action.stage !== 'claimed_complete') return null;
+  if (action?.stage !== 'claimed_complete') return undefined;
   const age = Date.parse(now) - Date.parse(action.statementAt);
-  if (!Number.isFinite(age) || age < 0 || age >= dayMs) return null;
-  const minutes = Math.floor(age / 60000), hours = Math.floor(minutes / 60), remainder = minutes % 60;
-  const parts = [];
-  if (hours) parts.push({ value: hours, unit: '小时' });
-  if (remainder) parts.push({ value: remainder, unit: '分钟' });
-  return { parts, label: parts.length ? `${parts.map(part => `${part.value}${part.unit}`).join('')}前` : '刚刚',
+  if (!Number.isFinite(age) || age < 0) return undefined;
+  const seconds = Math.floor(age / 1000), days = Math.floor(seconds / 86400);
+  const parts = [...(days ? [{value: days, unit: '天'}] : []),
+    {value: Math.floor(seconds % 86400 / 3600), unit: '小时'},
+    {value: Math.floor(seconds % 3600 / 60), unit: '分钟'}, {value: seconds % 60, unit: '秒'}];
+  return { parts, label: parts.map(part => `${part.value}${part.unit}`).join(''),
     lead: action.kind === 'banked_reset' ? '距最近一次确认发放重置卡' : '距最近一次确认重置' };
 }
 /** @param {Article} article */
@@ -156,15 +160,21 @@ function resetOutlookModel(data) {
     const lastResolved = validOutlookAction(supplied.lastResolved) && ['claimed_complete', 'cancelled'].includes(supplied.lastResolved.stage) && validTime(supplied.lastResolved.resolvedAt) ? supplied.lastResolved : null;
     const active = ['scheduled', 'announced', 'in_progress', 'overdue'].includes(supplied.status) && validOutlookAction(supplied.active) && ['promised', 'in_progress'].includes(supplied.active.stage) ? supplied.active : null;
     return { status: active ? activeOutlookStatus(active, data.serverTime) : ['completed', 'cancelled'].includes(supplied.status) ? supplied.status : 'monitoring', active, latestCompletion, lastResolved,
-      evidenceCutoffAt: validTime(supplied.evidenceCutoffAt) ? supplied.evidenceCutoffAt : undefined };
+      ...(supplied.latestResolutions?{latestResolutions:Object.fromEntries(['automatic_reset','banked_reset'].filter(kind=>validOutlookAction(supplied.latestResolutions[kind])&&['claimed_complete','cancelled'].includes(supplied.latestResolutions[kind].stage)).map(kind=>[kind,supplied.latestResolutions[kind]]))}:{}),
+      ...(Array.isArray(supplied.pendingReview)?{pendingReview:supplied.pendingReview.filter(validOutlookAction)}:{}),
+      ...(validTime(supplied.latestGlobalCompletionAt)?{latestGlobalCompletionAt:supplied.latestGlobalCompletionAt}:{}),evidenceCutoffAt: validTime(supplied.evidenceCutoffAt) ? supplied.evidenceCutoffAt : undefined };
   }
   // Old API versions can still display published announcements, never cadence or cases.
   const now = Date.parse(data.serverTime), actions = publicActions(data);
   const facts = actions.filter(item => validTime(item.action.statementAt) && Date.parse(item.action.statementAt) <= now && validTime(item.publication.publishedAt) && Date.parse(item.publication.publishedAt) <= now).sort((a, b) => Date.parse(b.action.statementAt) - Date.parse(a.action.statementAt));
   const completed = facts.find(item => item.action.stage === 'claimed_complete');
   const resolved = facts.find(item => ['claimed_complete', 'cancelled'].includes(item.action.stage));
-  const pending = upcomingActions(data).find(item => !resolved || Date.parse(item.action.statementAt) >= Date.parse(resolved.action.statementAt) || Date.parse(item.action.expectedAt || '') >= Date.parse(resolved.action.statementAt));
-  return { ...empty, status: pending ? activeOutlookStatus(pending.action, data.serverTime) : resolved ? resolved.action.stage === 'claimed_complete' ? 'completed' : 'cancelled' : 'monitoring', active: pending ? outlookAction(pending) : null, latestCompletion: completed ? outlookAction(completed) : null, lastResolved: resolved ? { ...outlookAction(resolved), resolvedAt: resolved.action.statementAt } : null };
+  const globalCompleted=facts.find(item=>item.action.kind==='automatic_reset'&&item.action.stage==='claimed_complete');
+  const latestResolutions={};
+  facts.filter(item=>['claimed_complete','cancelled'].includes(item.action.stage)).forEach(item=>{latestResolutions[item.action.kind]??={...outlookAction(item),resolvedAt:item.action.statementAt};});
+  const pendingAll=upcomingActions(data),needsReview=item=>!!latestResolutions[item.action.kind]&&Date.parse(latestResolutions[item.action.kind].statementAt)>Date.parse(item.action.statementAt);
+  const pendingReview=pendingAll.filter(needsReview).map(outlookAction),pending=pendingAll.find(item=>!needsReview(item)&&(!resolved||Date.parse(item.action.statementAt)>=Date.parse(resolved.action.statementAt)||Date.parse(item.action.expectedAt||'')>=Date.parse(resolved.action.statementAt)));
+  return { ...empty,...(Object.keys(latestResolutions).length?{latestResolutions}:{}),...(pendingReview.length?{pendingReview}:{}),...(globalCompleted?{latestGlobalCompletionAt:globalCompleted.action.statementAt}:{}), status: pending ? activeOutlookStatus(pending.action, data.serverTime) : resolved ? resolved.action.stage === 'claimed_complete' ? 'completed' : 'cancelled' : 'monitoring', active: pending ? outlookAction(pending) : null, latestCompletion: completed ? outlookAction(completed) : null, lastResolved: resolved ? { ...outlookAction(resolved), resolvedAt: resolved.action.statementAt } : null };
 }
 /** @param {BenefitAction} action @param {string} now */
 const stageText = (action, now) => ['promised', 'in_progress'].includes(action.stage) && announcementCountdown(action, now).status === 'expired' ? '已过预计时间 · 等待确认' : ({ promised: '发放预告', in_progress: '进行中', claimed_complete: '公告称已完成', cancelled: '已取消' }[action.stage]);
@@ -427,4 +437,4 @@ function forecastOutcomeModel(snapshot, data) {
   });
   return { available: true, entries, message: entries.length ? '按后续观测时间排列，最新记录在前。' : '尚无已关联的后续记录；不代表没有公告或不会发放。', note };
 }
-module.exports = { publicArticleSummary, publicArticleContent, sourceStatus, actionLabels, recentCompletedBenefits, preferenceDefaults, dateKey, displayTime, elapsed, completionTime, latestCompletedBenefits, completionElapsed, articleSourceTime, sortedArticles, isNewsOnly, currentPublication, statePublication, publicationSourceTime, sortedPublications, sortedStatePublications, publicActions, isHistoricalArticle, upcomingActions, announcementCountdown, resetOutlookModel, stageText, calendarDays, safeUrl, sharePath, publicationWithdrawn, publicationCard, calendarModel, noticeModel, resolveDetail, activityDayNumber, activityHomeVisible, activityModel, validateForecastSnapshot, validateForecastPublicData, validateResetWatch, activeResetWatch, activeResetSchedule, resetWatchWindow, probabilityText, forecastPath, forecastSnapshotModel, currentForecast, forecastReferenceModel, forecastOutcomeModel };
+module.exports = {referenceCadenceView, publicArticleSummary, publicArticleContent, sourceStatus, actionLabels, recentCompletedBenefits, preferenceDefaults, dateKey, displayTime, elapsed, completionTime, latestCompletedBenefits, completionElapsed, articleSourceTime, sortedArticles, isNewsOnly, currentPublication, statePublication, publicationSourceTime, sortedPublications, sortedStatePublications, publicActions, isHistoricalArticle, upcomingActions, announcementCountdown, resetOutlookModel, stageText, calendarDays, safeUrl, sharePath, publicationWithdrawn, publicationCard, calendarModel, noticeModel, resolveDetail, activityDayNumber, activityHomeVisible, activityModel, validateForecastSnapshot, validateForecastPublicData, validateResetWatch, activeResetWatch, activeResetSchedule, resetWatchWindow, probabilityText, forecastPath, forecastSnapshotModel, currentForecast, forecastReferenceModel, forecastOutcomeModel };

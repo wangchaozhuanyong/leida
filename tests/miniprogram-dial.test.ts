@@ -25,13 +25,13 @@ test('表盘绘制使用公开预计时刻，过期时不画完成标记',()=>{
   assert.equal(calls.filter(c=>c.type==='arc').length,6);
   calls.length=0;drawDial(ctx,320,dialModel({active,status:'overdue'},active.expectedAt));assert.equal(calls.filter(c=>c.type==='arc').length,4);
 });
-test('完成结果显示真实小时分钟，满24小时恢复等待；新预告始终优先',()=>{
+test('完成结果持续显示秒计时，非法时间不展示；新预告独立显示',()=>{
   const completion={kind:'automatic_reset',stage:'claimed_complete',statementAt:'2026-10-12T01:45:00Z'};
   const dial=dialModel({status:'completed',latestCompletion:completion},now);
-  assert.equal(dial.completed,true);assert.equal(dial.elapsedLabel,'2小时15分钟前');assert.equal(dial.lead,'距最近一次确认重置');assert.equal(dial.scheduled,false);
+  assert.equal(dial.completed,true);assert.equal(dial.elapsedLabel,'2小时15分钟0秒');assert.equal(dial.lead,'距最近一次确认重置');assert.equal(dial.scheduled,false);
   const card=dialModel({status:'completed',latestCompletion:{...completion,kind:'banked_reset',statementAt:'2026-10-12T03:25:00Z'}},now);
-  assert.equal(card.elapsedLabel,'35分钟前');assert.equal(card.bankedCompleted,true);
-  for(const statementAt of ['2026-10-11T04:00:00Z','2026-10-12T04:00:01Z','invalid']){
+  assert.equal(card.elapsedLabel,'0小时35分钟0秒');assert.equal(card.bankedCompleted,true);
+  for(const statementAt of ['2026-10-12T04:00:01Z','invalid']){
     const expired=dialModel({status:'completed',latestCompletion:{...completion,statementAt}},now);
     assert.equal(expired.completed,false);assert.equal(expired.state,'等待预告');
   }

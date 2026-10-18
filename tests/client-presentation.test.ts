@@ -54,7 +54,7 @@ test('详情只展示一份重复来源，动作独有的不同原文仍可达',
 test('等待期间完成公告前置，明确预告才进入倒计时布局',()=>{
   const data=fixture();
   const render=()=>renderToStaticMarkup(createElement(Home,{data,historical:false,onWechatReminders(){},onPoster(){},onShare:async()=>{}}));
-  const idle=render();assert.match(idle,/pub-instrument-layout is-idle/);assert.doesNotMatch(idle,/等待下一次预告/);
+  const idle=render();assert.match(idle,/pub-instrument-layout is-idle/);assert.match(idle,/上次额度重置/);
   assert.ok(idle.indexOf('最近完成公告')<idle.indexOf('查看最近公告'));
   assert.ok(idle.indexOf('pub-home-completions')<idle.indexOf('pub-home-actions'));
   const pending=structuredClone(publication);pending.id='v2';pending.article.id='article2';pending.article.publicationId='v2';pending.event.id='event2';pending.eventId='event2';pending.event.publicationId='v2';
@@ -77,7 +77,7 @@ test('依据入口保留真实原文片段，待开放提醒不承诺可订阅',
   const html=renderToStaticMarkup(createElement(SearchParamsContext.Provider,{value:new URLSearchParams()},createElement(EventPage,{data,id:'event',onPoster(){},onShare:async()=>{}})));
   assert.match(html,/完成声明的实际原文。/);assert.doesNotMatch(html,/来源1 ·/);
   const home=renderToStaticMarkup(createElement(Home,{data,historical:false,wechatEntry:'unavailable',onWechatReminders(){},onPoster(){},onShare:async()=>{}}));
-  assert.match(home,/待开放/);assert.match(home,/距最近一次确认重置/);assert.match(home,/1小时前/);assert.doesNotMatch(home,/去微信订阅/);
+  assert.match(home,/待开放/);assert.match(home,/距最近一次确认重置/);assert.match(home,/1小时0分钟0秒/);assert.doesNotMatch(home,/去微信订阅/);
 });
 
 test('站内信加载失败只影响信箱内容，提醒与隐私入口仍可见且不冒充空信箱',()=>{

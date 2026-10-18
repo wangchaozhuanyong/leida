@@ -26,8 +26,8 @@ test('最近完成按类型独立保留，原文时间排序，不以本站重�
  const data=fixture([old,r,c]),before=structuredClone(data);
  const rows=latestCompletedBenefits(data);
  assert.deepEqual(rows.map(row=>row.action.id),['action-card','action-reset']);
- assert.equal(completionElapsed(rows[0].action,now)?.label,'35分钟前');
- assert.equal(completionElapsed(rows[1].action,now)?.label,'2小时53分钟前');
+ assert.equal(completionElapsed(rows[0].action,now)?.label,'0小时35分钟0秒');
+ assert.equal(completionElapsed(rows[1].action,now)?.label,'2小时53分钟53秒');
  assert.deepEqual(data,before,'展示选择不修改业务记录');
 });
 test('未来、无效、未完成、个人、新闻以及撤回记录均不能充当完成依据',()=>{
@@ -43,10 +43,10 @@ test('未来、无效、未完成、个人、新闻以及撤回记录均不能�
  assert.deepEqual(latestCompletedBenefits({...data,serverTime:'invalid'}),[]);
  unpublished.publishedAt='invalid';assert.equal(latestCompletedBenefits(data).length,1);
 });
-test('24小时展示从公开声明起算；之后仍保留两类完成记录及正确原文链接',()=>{
+test('完成后主状态等待下一轮，持续保留上次重置计时和完成记录',()=>{
  const data=fixture([reset(),card()],'2026-10-14T08:00:00.000Z');
  const html=renderToStaticMarkup(createElement(Home,{data,historical:false,onWechatReminders:()=>{},onPoster:()=>{},onShare:async()=>{}}));
- assert.match(html,/等待预告/);assert.doesNotMatch(html,/is-completed/);
+ assert.match(html,/等待下一次 Reset/);assert.match(html,/pub-last-reset-clock/);assert.match(html,/上次额度重置/);
  assert.match(html,/公告称已重置用量/);assert.match(html,/公告称已发放重置卡/);
  assert.match(html,/href="\/events\/event-reset"/);assert.match(html,/href="\/events\/event-card"/);
  assert.match(html,/2026\/10\/13 13:06/);assert.match(html,/2026\/10\/13 15:25/);
@@ -57,17 +57,17 @@ test('日期包含年份，跨年和零点按北京时间显示',()=>{
  assert.equal(completionTime('2026-12-31T16:00:00Z'),'2027/01/01 00:00');
  assert.equal(completionTime('invalid'),'暂无记录');
 });
-test('刷新后的服务器时间延续原公告计时，整小时不显示零分钟',()=>{
+test('服务器时间延续原公告秒计时，保留稳定单位',()=>{
  const action=reset().event.actions[0];
- assert.equal(completionElapsed({...action,statementAt:'2026-10-13T06:00:00Z'},now)?.label,'2小时前');
- assert.equal(completionElapsed({...action,statementAt:'2026-10-13T07:59:30Z'},now)?.label,'刚刚');
- assert.equal(completionElapsed(action,'2026-10-13T09:00:00Z')?.label,'3小时53分钟前');
+ assert.equal(completionElapsed({...action,statementAt:'2026-10-13T06:00:00Z'},now)?.label,'2小时0分钟0秒');
+ assert.equal(completionElapsed({...action,statementAt:'2026-10-13T07:59:30Z'},now)?.label,'0小时0分钟30秒');
+ assert.equal(completionElapsed(action,'2026-10-13T09:00:00Z')?.label,'3小时53分钟53秒');
  assert.equal(completionElapsed({...action,stage:'promised'},now),undefined);
  assert.equal(completionElapsed(action,'invalid'),undefined);
 });
-test('页面打开期间以服务器时钟推进，跨过24小时边界即停止展示完成时长',()=>{
+test('以服务器时钟推进，跨过24小时仍持续秒计时',()=>{
  const action=reset().event.actions[0],baseline='2026-10-14T05:06:05.031Z';
- assert.equal(completionElapsed(action,announcementClock(baseline,0))?.label,'23小时59分钟前');
- assert.equal(completionElapsed(action,announcementClock(baseline,1000)),undefined);
- assert.equal(completionElapsed(action,announcementClock(baseline,2000)),undefined);
+ assert.equal(completionElapsed(action,announcementClock(baseline,0))?.label,'23小时59分钟59秒');
+ assert.equal(completionElapsed(action,announcementClock(baseline,1000))?.label,'1天0小时0分钟0秒');
+ assert.equal(completionElapsed(action,announcementClock(baseline,2000))?.label,'1天0小时0分钟1秒');
 });

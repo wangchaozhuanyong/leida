@@ -50,7 +50,7 @@ function home(data: PublicData, name = 'home'): NativePage {
     return module.exports;
   }
   load(resolve(root, `miniprogram/pages/${name}/index.js`));
-  const page = { ...definition, data: structuredClone(definition.data), wechatCalls, setData(patch: Record<string, unknown>) { Object.assign(this.data, patch); } } as NativePage;
+  const page = { ...definition, data: structuredClone(definition.data), wechatCalls, setData(patch: Record<string, unknown>) { for(const [key,value] of Object.entries(patch)){const path=key.split('.');let target:any=this.data;for(const part of path.slice(0,-1)){target[part]??={};target=target[part];}target[path.at(-1)!]=value;} } } as NativePage;
   page.onLoad({}); page.onShow(); return page;
 }
 

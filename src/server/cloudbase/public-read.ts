@@ -1,3 +1,4 @@
+import {validatedReferenceReview} from '../../lib/reference-cadence';
 import type { PublicData, Source } from '../../lib/types';
 import type { PublicReadOptions, PublicReadEnvelope, PublicPage } from '../../lib/public-read';
 import type { ForecastCase, ForecastOutcome, ForecastSnapshot } from '../../lib/forecast';
@@ -33,7 +34,7 @@ function validVersion(value:unknown):asserts value is VersionData {
 export function cloudbasePublicVersion(value:unknown,timestamp:string) {
   validVersion(value);
   const expired=(time:string)=>Date.parse(time)<=Date.parse(timestamp);
-  const settings=value.settings.map(p=>p.id==='site'?p:{id:p.id??undefined,status:p.status??undefined,cadenceSnapshotId:p.cadenceSnapshotId??undefined,cadenceSnapshotIds:p.cadenceSnapshotIds??undefined,cadenceEvaluationByKind:p.cadenceEvaluationByKind??undefined,cadenceProjectionDigest:p.cadenceProjectionDigest??undefined});
+  const settings=value.settings.map(p=>p.id==='site'?p:{id:p.id??undefined,status:p.status??undefined,cadenceSnapshotId:p.cadenceSnapshotId??undefined,cadenceSnapshotIds:p.cadenceSnapshotIds??undefined,cadenceEvaluationByKind:p.cadenceEvaluationByKind??undefined,cadenceProjectionDigest:p.cadenceProjectionDigest??undefined,...(p.referenceSignal?{referenceSignal:p.referenceSignal}:{}),...(p.referenceCadencePublic?{referenceCadencePublic:p.referenceCadencePublic,referenceExpired:expired(String((p.referenceCadencePublic as {validUntil?:unknown}).validUntil??''))}:{})});
   const parts:unknown[]=[...value.digests,settings,value.deadlines.map(row=>[row.id,row.action,expired(row.deadline)]),value.cases.map(row=>[row.id,row.digest,expired(row.w24),expired(row.w48)]),value.snapshots.map(row=>[row.id,expired(row.until),Date.parse(row.generated)>Date.parse(timestamp)]),value.outcomeDigest];
   return finishPublicVersion(parts,value.sources,timestamp);
 }
@@ -107,7 +108,8 @@ function compatibilityRuntime(value:unknown,timestamp:string):{runtime:Compatibl
  if(!evaluation?.automatic_reset||!evaluation.banked_reset)throw new CadenceReadError('EVALUATION_INVALID');
  let cadenceEvaluationByKind:CompatibleRuntime['cadenceEvaluationByKind'];
  try{cadenceEvaluationByKind={automatic_reset:publicCadenceEvaluation(evaluation.automatic_reset),banked_reset:publicCadenceEvaluation(evaluation.banked_reset)};}catch{throw new CadenceReadError('EVALUATION_INVALID');}
- const runtime:CompatibleRuntime={id:'forecast_runtime',status:'ready',cadenceSnapshotId:ids.automatic_reset,cadenceSnapshotIds:{automatic_reset:ids.automatic_reset,banked_reset:ids.banked_reset},cadenceEvaluationByKind,cadenceProjectionDigest:projection.digest};
+ const publicSignal=row.referenceSignal?{id:row.referenceSignal.id,text:row.referenceSignal.text,publishedAt:row.referenceSignal.publishedAt,recordedAt:row.referenceSignal.recordedAt,sourceUrl:row.referenceSignal.sourceUrl,sourceName:row.referenceSignal.sourceName}:undefined;
+ const runtime:CompatibleRuntime={id:'forecast_runtime',status:'ready',...(validatedReferenceReview(row.referenceReview)?{referenceReview:validatedReferenceReview(row.referenceReview)}:{}),...(publicSignal?{referenceSignal:publicSignal}:{}),...(row.referenceCadencePublic?{referenceCadencePublic:row.referenceCadencePublic}:{}),cadenceSnapshotId:ids.automatic_reset,cadenceSnapshotIds:{automatic_reset:ids.automatic_reset,banked_reset:ids.banked_reset},cadenceEvaluationByKind,cadenceProjectionDigest:projection.digest};
  return {runtime,projection};
 }
 /** Existing backend-only fixed-row read. Never list settings, commit, lease, or read credentials. */

@@ -121,3 +121,7 @@
 @media(max-width:350px){.home-heading{height:278px}.home-heading-title{font-size:30px}.home-heading-accent{font-size:24px}.is-scheduled .timeline-title{font-size:32px}.duration-unit{font-size:14px}.home-page .share-entry,.home-page .activity-entry{padding:16px;gap:12px}.home-page .share-entry-posters{width:68px;transform:scale(.85);transform-origin:right center}.home-page .share-entry-title,.home-page .activity-title{font-size:16px}}
 
 .share-entry .feature-action{display:flex;align-items:center;gap:4px}.feature-arrow{width:24px;height:24px;display:block}
+
+.last-reset-clock{margin:18px 0 4px;padding:16px 0 0;border-top:1px solid #e1e8f3}.last-reset-caption{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;font-size:11px;color:#6b7d99}.last-reset-duration{margin-top:8px;font-size:23px;line-height:1.5;font-weight:600;color:#18335c;font-variant-numeric:tabular-nums;letter-spacing:.2px}
+
+.historical-probability{margin-top:16px}.historical-probability-values{display:flex;gap:24px;margin:8px 0;color:#18335c;font-size:22px;font-variant-numeric:tabular-nums}

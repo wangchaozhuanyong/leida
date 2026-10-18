@@ -26,17 +26,18 @@ const completion={...active,stage:'claimed_complete' as const,statementAt:'2026-
 test('最近公开完成显示小时和分钟，发卡保持独立名称',()=>{
  for(const [kind,lead] of [['automatic_reset','距最近一次确认重置'],['banked_reset','距最近一次确认发放重置卡']] as const){
   const html=render({status:'completed',latestCompletion:{...completion,kind}});
-  assert.match(html,new RegExp(`${lead}：2小时15分钟前`));
+  assert.match(html,new RegExp(`${lead}：2小时15分钟0秒`));
   assert.match(html,/is-completed/);assert.doesNotMatch(html,/等待预告|03:20/);
  }
  const justNow=render({status:'completed',latestCompletion:{...completion,statementAt:now}});
- assert.match(justNow,/距最近一次确认重置：刚刚/);
+ assert.match(justNow,/距最近一次确认重置：0小时0分钟0秒/);
 });
 test('24小时边界按原文时间，未来或无效时间不显示完成',()=>{
  const at=(age:number)=>new Date(Date.parse(now)-age).toISOString();
  const html=render({status:'completed',latestCompletion:{...completion,statementAt:at(24*3600_000-1)}});
- assert.match(html,/23小时59分钟前/);
- for(const statementAt of [at(24*3600_000),at(25*3600_000),at(-1),'invalid']){
+ assert.match(html,/23小时59分钟59秒/);
+ assert.match(render({status:'completed',latestCompletion:{...completion,statementAt:at(25*3600_000)}}),/1天1小时0分钟0秒/);
+ for(const statementAt of [at(-1),'invalid']){
   assert.match(render({status:'completed',latestCompletion:{...completion,statementAt}}),/等待预告/);
  }
 });

@@ -1,3 +1,4 @@
+import {referenceCompletionClaim} from './reference-reset-source';
 import type { Evidence } from '../lib/types';
 import { extractBenefitClaims, extractReplyClaims, hasDayEndDeadline, isTruncatedBenefitText, type BenefitClaim } from './benefit-rules';
 
@@ -40,8 +41,9 @@ export function hasCompleteContext(evidence: Evidence, cited: Evidence[], allowM
   }
   // An archive description never becomes original evidence because an old flag says complete.
   if (evidence.textOrigin === 'archive_excerpt') return false;
-  if (campaignClaim(evidence,cited) || isCampaignRule(evidence)) return true;
-  if (evidence.contextComplete && (evidence.textOrigin === 'structured' || hasStandaloneContext(evidence.text,'reset') || hasStandaloneContext(evidence.text,'product'))) return true;
+  if (referenceCompletionClaim(evidence)||campaignClaim(evidence,cited) || isCampaignRule(evidence)) return true;
+  const relayOriginal=evidence.sourceId==='tibo-public'&&evidence.metadata?.sourceGroup==='fxembed:thsottiaux'&&evidence.textOrigin==='original'&&/^https:\/\/x\.com\/thsottiaux\/status\/\d{15,20}$/.test(evidence.url)&&/^\d{15,20}$/.test(evidence.messageId)&&evidence.url.endsWith('/'+evidence.messageId)&&Math.abs(Number((BigInt(evidence.messageId)>>22n)+1288834974657n)-Date.parse(evidence.publishedAt))<=1000;
+  if ((evidence.contextComplete || relayOriginal) && (evidence.textOrigin === 'structured' && evidence.contextComplete || hasStandaloneContext(evidence.text,'reset') || hasStandaloneContext(evidence.text,'product'))) return true;
   const next = new Set(visited).add(evidence.id);
   const parent = selectOriginal(cited.filter(e => isExplicitParent(evidence, e, allowManual)));
   return Boolean(parent && hasCompleteContext(parent, cited, allowManual, next));
@@ -160,6 +162,8 @@ export function campaignClaim(item:Evidence,all:Evidence[]):BenefitClaim|undefin
   return {kind:'automatic_reset',stage:processed?'claimed_complete':'promised',scope:'public',eligibility:'活动中的Codex/Work用户（原帖未列明具体套餐及到账资格）',quote:processed?processed[1]:item.text};
 }
 export function directEvidenceBenefitClaims(item:Evidence,all:Evidence[]):BenefitClaim[] {
+  const reference=referenceCompletionClaim(item);
+  if(reference)return [reference];
   const direct=extractBenefitClaims(item.text,item.publishedAt);
   const campaign=campaignClaim(item,all);
   return direct.length?direct:campaign?[campaign]:[];

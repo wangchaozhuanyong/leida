@@ -1,7 +1,7 @@
 const { createPage } = require('../../utils/page');
 const { noticeModel } = require('../../utils/model');
 // Bundled client version; keep this aligned with the development-tool upload.
-const buildVersion = '1.0.30';
+const buildVersion = '1.0.32';
 Page(createPage((data, query, page, app) => {
   const stored=app.preferences.snapshot(),notices=data?noticeModel(data,stored.preferences,stored.read):[];
   return { notices:notices.slice(0,3),unread:notices.filter(n=>!n.read).length,storageError:stored.error };
@@ -13,7 +13,7 @@ Page(createPage((data, query, page, app) => {
       if(channel)this.setData({clientVersion:`${buildVersion} · ${channel}`});
     }catch(_){ /* Version information is optional and never blocks settings. */ }
   },
-  show(){const reader=getApp().wechat;if(reader){this._wechatUnsubscribe=reader.subscribe(state=>this.setData({wechat:state}));void this.loadWechat();}},
+  show(){const reader=getApp().wechat;if(reader){this._wechatUnsubscribe=reader.subscribe(state=>{const patch={};for(const key of Object.keys(state))if(JSON.stringify(this.data.wechat?.[key])!==JSON.stringify(state[key]))patch['wechat.'+key]=state[key];if(Object.keys(patch).length)this.setData(patch);});void this.loadWechat();}},
   hide(){if(this._wechatUnsubscribe)this._wechatUnsubscribe();this._wechatUnsubscribe=null;clearTimeout(this._wechatRefreshTimer);this._wechatRefreshTimer=null;},
   unload(){if(this._wechatUnsubscribe)this._wechatUnsubscribe();this._wechatUnsubscribe=null;clearTimeout(this._wechatRefreshTimer);this._wechatRefreshTimer=null;},
   methods: {

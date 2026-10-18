@@ -26,6 +26,8 @@ Page(createPage((data, query, page, app) => {
   const posterDescription = '选择黑金或水墨，分享当前公开状态';
   return {
     name: data.site.name || '模钥重置雷达',
+    historicalProbability: m.referenceCadenceView(data.forecasts?.referenceCadence,data.serverTime),
+    lastReset: completed.find(item=>item.action.kind==='automatic_reset') ? {time:m.completionTime(completed.find(item=>item.action.kind==='automatic_reset').action.statementAt),elapsed:m.completionElapsed(completed.find(item=>item.action.kind==='automatic_reset').action,data.serverTime).label} : null,
     latest: latest ? { title: latest.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', elapsed: m.elapsed(latest.statementAt, data.serverTime), time: m.completionTime(latest.statementAt), eligibility: latestAction.eligibility, path: pathFor(latest) } : null,
     completions: m.recentCompletedBenefits(data).map(item => ({ id:item.action.id, kind: item.action.kind, title: item.action.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', label: item.action.kind === 'banked_reset' ? '重置卡发放' : '用量重置', time: m.completionTime(item.action.statementAt), shortTime: completionDate(item.action.statementAt, data.serverTime), path: pathFor({ publicationId: item.publication.id }) })),
     evidencePath: pathFor(pending || latest) || '/pages/announcements/index',
@@ -51,7 +53,7 @@ Page(createPage((data, query, page, app) => {
   toggleFreshness() { this.setData({ freshnessOpen: !this.data.freshnessOpen }); },
   openPoster() { if (this.data.connected) wx.navigateTo({ url:'/pages/poster/index' }); },
   syncCountdown() {
-    if (!(this.data.pending && this.data.pending.counting) && !(this.data.timeline && (this.data.timeline.completed || this.data.timeline.scheduled))) { this.stopCountdown(); return; }
+    if (!this.data.lastReset && !(this.data.pending && this.data.pending.counting) && !(this.data.timeline && (this.data.timeline.completed || this.data.timeline.scheduled))) { this.stopCountdown(); return; }
     if (!this._countdownTimer) this._countdownTimer = setInterval(() => this.tickCountdown(), 1000);
   },
   tickCountdown() {
@@ -60,6 +62,8 @@ Page(createPage((data, query, page, app) => {
     const now=new Date(Date.parse(state.data.serverTime)+Math.max(0,Date.now()-state.receivedAt)).toISOString();
     const outlook=m.resetOutlookModel(state.data),completed=m.latestCompletedBenefits(state.data)[0];
     const timeline=statusTimelineModel(outlook,now,completed?.action||null,state.data.forecasts);
+    const reset=m.latestCompletedBenefits(state.data).find(item=>item.action.kind==='automatic_reset');
+    if(reset&&this.data.lastReset){const elapsed=m.completionElapsed(reset.action,now)?.label;if(elapsed&&elapsed!==this.data.lastReset.elapsed)this.setData({'lastReset.elapsed':elapsed});}
     // Only the clock region crosses the native bridge; lists and page layout stay untouched.
     if(JSON.stringify(timeline)!==JSON.stringify(this.data.timeline))this.setData({timeline});
     if(outlook.active && this.data.pending){
@@ -75,6 +79,7 @@ Page(createPage((data, query, page, app) => {
     if (!forecasts) { this.stopForecastExpiry(); return; }
     const now=Date.parse(state.data.serverTime)+Math.max(0,Date.now()-state.receivedAt);
     const dates=[];
+    if(forecasts.referenceCadence?.status==='ready')dates.push(forecasts.referenceCadence.validUntil);
     if (forecasts.watch && forecasts.watch.status==='active' && forecasts.watch.signal) dates.push(forecasts.watch.signal.expiresAt);
     const next=dates.map(Date.parse).filter(at=>Number.isFinite(at)&&at>now).sort((a,b)=>a-b)[0];
     if (!next) { this.stopForecastExpiry(); return; }
@@ -90,6 +95,8 @@ Page(createPage((data, query, page, app) => {
     const outlook=m.resetOutlookModel(state.data),completed=m.latestCompletedBenefits(state.data)[0];
     const timeline=statusTimelineModel(outlook,now,completed?.action||null,state.data.forecasts);
     const patch={};
+    const historicalProbability=m.referenceCadenceView(state.data.forecasts?.referenceCadence,now);
+    if(JSON.stringify(historicalProbability)!==JSON.stringify(this.data.historicalProbability))patch.historicalProbability=historicalProbability;
     if(JSON.stringify(timeline)!==JSON.stringify(this.data.timeline))patch.timeline=timeline;
     if(Object.keys(patch).length)this.setData(patch);
     this.syncCountdown();this.syncForecastExpiry();
@@ -99,7 +106,7 @@ Page(createPage((data, query, page, app) => {
     const url=this.data.timeline && this.data.timeline.sourceUrl;
     if(typeof url==='string' && url.startsWith('https://') && !!m.safeUrl(url))wx.setClipboardData({data:url,fail(){wx.showToast({title:'复制失败，请稍后重试',icon:'none'});}});
   },
-  copyWatchProvider() { wx.setClipboardData({data:'https://codex-resets.com/',fail(){wx.showToast({title:'复制失败，请稍后重试',icon:'none'});}}); },
+  copyWatchProvider() { wx.setClipboardData({data:this.data.timeline?.sourceName==='AIPlanWatch'?'https://codex-reset.aiplanwatch.com/':'https://codex-resets.com/',fail(){wx.showToast({title:'复制失败，请稍后重试',icon:'none'});}}); },
   openWechatSettings() { wx.switchTab({ url: '/pages/settings/index' }); },
   openDay(event) { wx.navigateTo({ url: `/pages/schedule/index?date=${event.currentTarget.dataset.date}` }); },
   onShareAppMessage() { return { title: this.data.shareTitle || '模钥重置雷达', path: this.data.sharePath || '/pages/home/index' }; }

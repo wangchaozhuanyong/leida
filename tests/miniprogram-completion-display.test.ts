@@ -30,7 +30,7 @@ function nativeHome(data:PublicData) {
   return module.exports;
  }
  load(resolve(root,'miniprogram/pages/home/index.js'));
- const page={...definition,data:structuredClone(definition.data),setData(patch:object){Object.assign(this.data,patch);}};
+ const page={...definition,data:structuredClone(definition.data),setData(patch:object){for(const [key,value] of Object.entries(patch)){const path=key.split('.');let target:any=this.data;for(const part of path.slice(0,-1)){target[part]??={};target=target[part];}target[path.at(-1)!]=value;}}};
  page.onLoad({});page.onShow();
  return {page,timers,advance(ms:number){advance+=ms;[...timers.values()].forEach(fn=>fn());},refresh(){listener(state());}};
 }
@@ -74,23 +74,23 @@ test('未来、个人、仅新闻、撤回和未完成公告不作为小程序�
   assert.deepEqual(mini.latestCompletedBenefits(fixture([reset,p])).map((row:any)=>row.action.id),['action-reset']);
  }
 });
-test('真实原生首页打开期间跨24小时自动恢复等待，并停止计时器且保留两条记录',()=>{
+test('跨24小时主状态恢复等待，秒计时持续推进',()=>{
  const data=fixture([publication('reset','automatic_reset','2026-10-12T08:00:01Z'),publication('card','banked_reset','2026-10-10T04:00:00Z')]);
  const h=nativeHome(data);
  assert.equal(h.page.data.timeline.completed,true);assert.equal(h.timers.size,1);assert.equal(h.page.data.completions.length,2);
  h.advance(1000);
- assert.equal(h.page.data.timeline.completed,false);assert.equal(h.page.data.timeline.title,'等待下一次 Reset');assert.equal(h.timers.size,0);assert.equal(h.page.data.completions.length,2);
+ assert.equal(h.page.data.timeline.completed,false);assert.equal(h.page.data.timeline.title,'等待下一次 Reset');assert.equal(h.timers.size,1);assert.equal(h.page.data.lastReset.elapsed,'1天0小时0分钟0秒');assert.equal(h.page.data.completions.length,2);
  assert.equal(h.page.data.completions[0].time,'2026/10/12 16:00');
  h.refresh();assert.equal(h.page.data.timeline.completed,false,'刷新不重开24小时');
  h.page.onUnload();assert.equal(h.timers.size,0);
 });
 test('最近发卡与重置独立计时，分享原文绑定最近完成；隐藏页面停止并在显示时恢复',()=>{
  const h=nativeHome(fixture([publication('reset','automatic_reset','2026-10-13T05:45:00Z'),publication('card','banked_reset','2026-10-13T07:25:00Z')]));
- assert.match(h.page.data.timeline.note,/^35分钟前/);assert.equal(h.page.data.timeline.title,'已确认发放重置卡');
+ assert.match(h.page.data.lastReset.elapsed,/2小时15分钟0秒/);assert.equal(h.page.data.timeline.title,'已确认发放重置卡');
  assert.equal(h.page.data.completions[1].time,'2026/10/13 13:45');
  assert.equal(h.page.onShareAppMessage().path,'/pages/detail/index?publicationId=card');
  h.page.onHide();assert.equal(h.timers.size,0);
- h.advance(60000);h.page.onShow();assert.match(h.page.data.timeline.note,/^36分钟前/);assert.equal(h.timers.size,1);
+ h.advance(60000);h.page.onShow();assert.match(h.page.data.lastReset.elapsed,/2小时16分钟0秒/);assert.equal(h.timers.size,1);
  h.page.onUnload();assert.equal(h.timers.size,0);
 });
 test('首页公告入口有预告时对应当前轮次，无预告时对应最近完成，无记录时进入历史',()=>{
@@ -115,4 +115,13 @@ test('首页紧凑完成记录使用北京时间，跨年保留年份且不冒�
  assert.equal(h.page.data.completions[1].label,'重置卡发放');
  assert.equal(h.page.data.completions[1].shortTime,'2025年12月31日 15:25');
  assert.equal(h.page.data.completions[0].title,'公告称已重置用量');h.page.onUnload();
+});
+
+test('首页每秒只更新经过时长字段，不跨原生桥重发列表、整张状态卡或正文',()=>{
+ const h=nativeHome(fixture([publication('reset','automatic_reset','2026-10-13T05:45:00Z')]));
+ const changes:Record<string,unknown>[]=[],original=h.page.setData.bind(h.page),before=h.page.data.completions;
+ h.page.setData=(patch:Record<string,unknown>)=>{changes.push(patch);original(patch);};
+ h.advance(1000);
+ assert.ok(changes.some(p=>'lastReset.elapsed'in p));assert.ok(changes.every(p=>Object.keys(p).every(key=>key==='lastReset.elapsed')));
+ assert.equal(h.page.data.completions,before);assert.equal(h.page.data.lastReset.elapsed,'2小时15分钟1秒');h.page.onUnload();
 });

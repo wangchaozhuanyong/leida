@@ -20,8 +20,8 @@ function statusPosterInput(data){
   return {name:data.site.name||'模钥重置雷达',round:statusTimelineRevision(model),publicationId,generatedAt:now,
     title:model.scheduled?(model.kind==='banked_reset'?'重置卡发放预告':'用量重置预告'):model.completed?(model.kind==='banked_reset'?'公告称已发放重置卡':'公告称已重置用量'):model.title,
     label:model.completed?'距该公告':model.scheduled?model.lead:'当前公开状态',value,unit,date:date.date,time:date.time,generated:`${generated.date} ${generated.time}`,statementAt:model.statementAt,statementLabel:model.watching?'信号时间':'公告时间',
-    nextNote:model.watching?`发布时预计：${model.forecastWindow}${model.chanceLabel?` · ${model.chanceLabel}`:''}`:model.scheduled?model.note.replace(/ (\d{2}:\d{2})$/,'\n$1'):model.note,
-    sourceLabel:model.sourceCredit?model.sourceType==='observed'?'来源：Codex Resets 观察记录':'来源：Codex Resets · Tibo 公开动态':model.completed?'依据：所选公开完成公告':'依据：当前公开状态',
+    nextNote:model.watching?(model.forecastWindow?`发布时预计：${model.forecastWindow}${model.chanceLabel?` · ${model.chanceLabel}`:''}`:'公开信号记录，尚无明确发放时间。'):model.scheduled?model.note.replace(/ (\d{2}:\d{2})$/,'\n$1'):model.note,
+    sourceLabel:model.sourceCredit?model.sourceType==='observed'?`来源：${model.sourceName} 观察记录`:`来源：${model.sourceName} · Tibo 公开动态`:model.completed?'依据：所选公开完成公告':'依据：当前公开状态',
     validUntil:model.scheduled?model.expectedAt:model.watching?model.expiresAt:model.completed?new Date(Date.parse(model.statementAt)+24*3600_000).toISOString():'',
   };
 }

@@ -10,12 +10,12 @@ function privacyRequired(wxApi){
 /** Opening the reminder page may connect its reader; only an explicit tap may subscribe. */
 function createWechatReader({wxApi,config,now=()=>Date.now()}){
   const request=createWechatTransport(wxApi,config),listeners=new Set();
-  let lastConnectedCheck=-Infinity;
-  let session,challenge,confirmation,pending,state={safe:null,busy:false,ready:false,error:'',privacyNeeded:false,preferencesMessage:'',preferencesUncertain:false};
+  let lastConnectedCheck=-Infinity, generation=0;
+  let session,challenge,confirmation,pending,state={safe:null,busy:false,refreshing:false,ready:false,error:'',privacyNeeded:false,preferencesMessage:'',preferencesUncertain:false};
   const emit=patch=>{state={...state,...patch};listeners.forEach(fn=>fn(view()));};
   const sessionValid=()=>!!session&&Date.parse(session.expiresAt)>now();
   const challengeValid=(margin=0)=>sessionValid()&&!!challenge&&Date.parse(challenge.expiresAt)>now()+margin&&challenge.templateId===state.safe?.templateId;
-  function view(){const remainingCount=state.safe?(state.safe.remainingCount??(['available','reserved'].includes(state.safe.state)?1:0)):null;const preferences=reminderPreferences(state.safe?.reminderPreferences);return{...state,reminderPreferences:preferences,allTypesOff:!!state.safe&&reminderKeys.every(key=>!preferences[key]),canChooseTypes:!!state.safe?.preferencesSupported&&!state.busy&&!state.privacyNeeded&&!state.preferencesUncertain,ready:state.ready&&challengeValid(),remainingCount,confirmNeeded:!!confirmation,label:state.safe?labels[state.safe.state]:'加载中',canPrepare:!state.busy&&!state.ready,canRevoke:!state.busy&&!!state.safe&&(remainingCount>0||state.safe.state==='unknown')};}
+  function view(){const remainingCount=state.safe?(state.safe.remainingCount??(['available','reserved'].includes(state.safe.state)?1:0)):null;const preferences=reminderPreferences(state.safe?.reminderPreferences);return{...state,reminderPreferences:preferences,allTypesOff:!!state.safe&&reminderKeys.every(key=>!preferences[key]),canChooseTypes:!!state.safe?.preferencesSupported&&!state.busy&&!state.privacyNeeded&&!state.preferencesUncertain,ready:state.ready&&challengeValid(),remainingCount,confirmNeeded:!!confirmation,label:state.safe?labels[state.safe.state]:'加载中',canPrepare:!state.busy&&!state.ready,canRevoke:!!state.safe&&(remainingCount>0||state.safe.state==='unknown')};}
   async function login(){
     if(session&&Date.parse(session.expiresAt)>now())return;
     session=undefined;challenge=undefined;
@@ -23,14 +23,14 @@ function createWechatReader({wxApi,config,now=()=>Date.now()}){
     const code=await new Promise((resolve,reject)=>wxApi.login({timeout:10000,success(result){result&&typeof result.code==='string'&&result.code?resolve(result.code):reject(new Error('微信登录暂时不可用，请重试。'));},fail(){reject(new Error('微信登录暂时不可用，请重试。'));}}));
     const result=await request('/api/wechat/login',{method:'POST',data:{code}}).promise;session=result.data;
   }
-  async function rpc(path,options={}){const result=await request(path,{...options,sessionToken:session&&session.sessionToken}).promise;return result.data;}
-  function failed(error){if(error.status===401){session=undefined;challenge=undefined;}emit({busy:false,ready:false,error:error.message||'微信提醒暂时无法读取。'});}
-  function action(work,userInitiated,connectedOnly=false){
+  async function rpc(path,options={}){const version=generation,result=await request(path,{...options,sessionToken:session&&session.sessionToken}).promise;if(version!==generation){const stale=new Error('旧读取已失效');stale.obsolete=true;throw stale;}return result.data;}
+  function failed(error){if(error.obsolete)return;if(error.status===401){session=undefined;challenge=undefined;}emit({busy:false,ready:false,error:error.message||'微信提醒暂时无法读取。'});}
+  function action(work,userInitiated,connectedOnly=false,background=false){
     if(!userInitiated){emit({error:'请点击微信提醒按钮后操作。'});return Promise.resolve();}
-    if(pending)return pending;
+    if(pending)return !background&&state.refreshing?pending.then(()=>action(work,userInitiated,connectedOnly,background)):pending;
     const problem=configurationError(config);if(problem){emit({error:problem});return Promise.resolve();}
-    emit({busy:!connectedOnly,error:'',privacyNeeded:false});
-    const promise=(async()=>{try{if(await privacyRequired(wxApi)){emit({busy:false,privacyNeeded:true,error:'请先阅读并同意隐私指引。'});return;}if(!connectedOnly)await login();await work();}catch(error){failed(error);}finally{emit({busy:false});}})();
+    const version=generation;emit(background?{busy:!state.safe,refreshing:!!state.safe,error:''}:{busy:true,error:'',privacyNeeded:false});
+    const promise=(async()=>{try{const privacy=await privacyRequired(wxApi);if(version!==generation)return;if(privacy){emit({busy:false,privacyNeeded:true,error:'请先阅读并同意隐私指引。'});return;}if(!connectedOnly)await login();if(version!==generation)return;await work();}catch(error){if(version===generation)failed(error);}finally{if(version===generation)emit({refreshing:false,busy:false});}})();
     pending=promise;promise.finally(()=>{if(pending===promise)pending=undefined;});return promise;
   }
   function displayState(safe){
@@ -43,7 +43,7 @@ function createWechatReader({wxApi,config,now=()=>Date.now()}){
     if(blocked)challenge=undefined;
     emit({safe,preferencesUncertain:false,preferencesMessage:'',...patch,...(blocked?{ready:false}:{})});
   }
-  async function refreshWork(){const safe=displayState(safeState(await rpc('/api/wechat/subscription')));lastConnectedCheck=now();challenge=undefined;acceptState(safe,{ready:false});return safe;}
+  async function refreshWork(){const safe=displayState(safeState(await rpc('/api/wechat/subscription')));lastConnectedCheck=now();acceptState(safe);return safe;}
   async function prime(safe){
     if(!safe.configured||!safe.enabled)return;
     const result=await rpc('/api/wechat/subscription/challenge',{method:'POST'});
@@ -72,7 +72,7 @@ function createWechatReader({wxApi,config,now=()=>Date.now()}){
         const prepared=challenge,safe=refresh?await refreshWork():state.safe;
         if(safe.configured&&safe.enabled&&!['unknown','revoked'].includes(safe.state)&&prepared&&prepared.templateId===safe.templateId&&Date.parse(prepared.expiresAt)>now()+30000){challenge=prepared;emit({ready:true});}
         else await prime(safe);
-      },true);
+      },true,false,true);
     },
     nextRefreshDelay(){
       if(state.error||state.privacyNeeded||confirmation||!session)return 300000;
@@ -81,7 +81,7 @@ function createWechatReader({wxApi,config,now=()=>Date.now()}){
     },
     prepare({userInitiated=false}={}){return action(async()=>{if(confirmation){await confirmChoice();return;}await prime(await refreshWork());},userInitiated);},
     refresh({userInitiated=false}={}){return action(refreshWork,userInitiated);},
-    refreshConnected(){if(now()-lastConnectedCheck<300000||!session||Date.parse(session.expiresAt)<=now()||pending)return Promise.resolve();lastConnectedCheck=now();return action(async()=>{const prepared=challenge,safe=await refreshWork();if(confirmation||safe.state==='revoked')return;if(safe.state!=='unknown'&&prepared&&Date.parse(prepared.expiresAt)>now()&&prepared.templateId===safe.templateId){challenge=prepared;emit({ready:true});}else await prime(safe);},true,true);},
+    refreshConnected(){if(now()-lastConnectedCheck<300000||!session||Date.parse(session.expiresAt)<=now()||pending)return Promise.resolve();lastConnectedCheck=now();return action(async()=>{const prepared=challenge,safe=await refreshWork();if(confirmation||safe.state==='revoked')return;if(safe.state!=='unknown'&&prepared&&Date.parse(prepared.expiresAt)>now()&&prepared.templateId===safe.templateId){challenge=prepared;emit({ready:true});}else await prime(safe);},true,true,true);},
     retryConfirmation({userInitiated=false}={}){return action(confirmChoice,userInitiated);},
     savePreferences(preferences,{userInitiated=false}={}){
       return action(async()=>{
@@ -104,14 +104,14 @@ function createWechatReader({wxApi,config,now=()=>Date.now()}){
       if(!userInitiated||!challenge||state.busy){emit({error:'请先点击开启微信提醒，准备本次订阅。'});return Promise.resolve();}
       if(Date.parse(challenge.expiresAt)<=now()){challenge=undefined;emit({ready:false,error:'本次订阅准备已过期，请重新开启。'});return Promise.resolve();}
       if(typeof wxApi.requestSubscribeMessage!=='function'){emit({error:'当前微信不支持订阅消息，请更新微信。'});return Promise.resolve();}
-      const selected=challenge;challenge=undefined;emit({busy:true,ready:false,error:''});
+      const selected=challenge;++generation;challenge=undefined;emit({busy:true,refreshing:false,ready:false,error:''});
       // Invoke authorization synchronously in this tap, before any network await.
       const choice=new Promise((resolve,reject)=>wxApi.requestSubscribeMessage({tmplIds:[selected.templateId],success(result){const value=result&&result[selected.templateId];['accept','reject','ban','filter'].includes(value)?resolve(value):reject(new Error('微信未返回明确订阅选择，请重新准备。'));},fail(){reject(new Error('微信订阅未完成，请稍后重新准备。'));}}));
       const work=(async()=>{let chosen=false;try{const result=await choice;chosen=true;confirmation={nonce:selected.nonce,templateId:selected.templateId,result};await confirmChoice();}
         catch(error){if(chosen&&error.status!==401)emit({error:'这次提醒次数尚未确认，请点击重试。'});else failed(error);}finally{emit({busy:false});}})();
       pending=work;work.finally(()=>{if(pending===work)pending=undefined;});return work;
     },
-    clearSession(){session=undefined;challenge=undefined;confirmation=undefined;emit({safe:null,ready:false,error:'',privacyNeeded:false,preferencesMessage:'',preferencesUncertain:false});}
+    clearSession(){++generation;session=undefined;challenge=undefined;confirmation=undefined;emit({safe:null,busy:false,refreshing:false,ready:false,error:'',privacyNeeded:false,preferencesMessage:'',preferencesUncertain:false});}
   };
 }
 module.exports={privacyRequired,createWechatReader};

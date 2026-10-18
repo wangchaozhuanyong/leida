@@ -510,8 +510,8 @@ test('额度模板拒绝纯活动、产品和仅私有福利，不消耗可用�
 test('真实发送路径的替身使用thing1、thing3、time5及对应发布版本，不读取公告标题作额度类型',async()=>{
   const f=await fixture();await f.configure({templateFields:{title:'thing1',status:'thing3',time:'time5'}});
   f.publication.event.actions=[{id:'public-reset',kind:'automatic_reset',stage:'promised',scope:'public',eligibility:'以公开来源为准',evidenceIds:['ev'],statementAt:new Date(f.now()).toISOString()}];
-  await f.store.put('publications',f.publication);
-  const session=await f.login();await f.accept(session.sessionToken);await f.notice({categories:['announcement'],title:'不应发送到额度类型的长标题'});
+  await f.store.put('publications',f.publication);await f.store.put('events',f.publication.event);
+  const session=await f.login();await f.accept(session.sessionToken);f.advance(1000);f.publication.event.actions[0].statementAt=new Date(f.now()).toISOString();await f.store.put('publications',f.publication);await f.store.put('events',f.publication.event);await f.notice({categories:['announcement'],title:'不应发送到额度类型的长标题'});
   const jobs=await f.queued();assert.equal(jobs.length,1);assert.equal((await f.service.processWechatJob(jobs[0])).state,'sent');
   const body=f.calls.find(call=>call.url.includes('subscribe/send'))!.body!;
   assert.deepEqual(body.data,{thing1:{value:'编程套餐额度'},thing3:{value:'已公布计划'},time5:{value:'2026-10-10 10:00'}});
@@ -707,4 +707,54 @@ test('管理员站内信不会预留微信授权或排入微信发送任务',asy
   await f.store.put('notices',{id:'manual-inbox',eventId:'',publicationId:'',semanticKey:'manual-inbox',origin:'admin',title:'隔离站内信',summary:'隔离正文',body:'隔离正文',categories:['system'],status:'active',createdAt:new Date(f.now()).toISOString()} satisfies Notice);
   await f.service.scheduleWechatDeliveries();assert.equal((await f.queued()).length,0);assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).state,'available');
   assert.equal(f.calls.filter(call=>call.url.includes('subscribe/send')).length,0);
+});
+
+test('已排队预告在同轮完成后取消且退回未使用次数，不调用微信发送',async()=>{
+ const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);f.advance(1000);
+ f.publication.event.actions=[{id:'live-round',kind:'automatic_reset',stage:'promised',scope:'public',eligibility:'所有用户',evidenceIds:['ev'],statementAt:new Date(f.now()).toISOString(),expectedAt:new Date(f.now()+3600000).toISOString()}];
+ await f.store.put('publications',f.publication);await f.store.put('events',f.publication.event);
+ await f.notice({categories:['announcement']});const jobs=await f.queued();assert.equal(jobs.length,1);
+ const completed=structuredClone(f.publication.event);completed.actions[0].stage='claimed_complete';completed.actions[0].statementAt=new Date(f.now()+1000).toISOString();await f.store.put('events',completed);
+ assert.equal((await f.service.processWechatJob(jobs[0])).state,'cancelled');
+ assert.equal(f.calls.filter(c=>c.url.includes('subscribe/send')).length,0);assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,1);
+});
+test('迟到发布不能把订阅前的预告作为新消息发送；预计时间已过也不入队',async()=>{
+ const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);
+ f.publication.event.actions=[{id:'late-round',kind:'automatic_reset',stage:'promised',scope:'public',eligibility:'所有用户',evidenceIds:['ev'],statementAt:new Date(f.now()-60000).toISOString(),expectedAt:new Date(f.now()+3600000).toISOString()}];
+ await f.store.put('publications',f.publication);await f.store.put('events',f.publication.event);await f.notice({categories:['announcement']});
+ assert.equal((await f.queued()).length,0);
+ f.publication.event.actions[0].statementAt=new Date(f.now()+1000).toISOString();f.publication.event.actions[0].expectedAt=new Date(f.now()+2000).toISOString();f.advance(3000);
+ await f.store.put('publications',f.publication);await f.store.put('events',f.publication.event);await f.notice({categories:['announcement']});assert.equal((await f.queued()).length,0);
+});
+
+test('重新开启某类型不补发关闭期间发布、后来才处理的原帖',async()=>{
+ const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);f.advance(1000);
+ f.publication.event.actions=[{id:'type-round',kind:'automatic_reset',stage:'promised',scope:'public',eligibility:'所有用户',evidenceIds:['ev'],statementAt:new Date(f.now()).toISOString(),expectedAt:new Date(f.now()+3600000).toISOString()}];
+ await f.store.put('publications',f.publication);await f.store.put('events',f.publication.event);
+ await f.service.saveWechatReminderPreferences(session.sessionToken,{announcement:false,result:true,correction:true});f.advance(1000);
+ await f.service.saveWechatReminderPreferences(session.sessionToken,{announcement:true,result:true,correction:true});await f.notice({categories:['announcement']});
+ assert.equal((await f.queued()).length,0);assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,1);
+});
+
+
+test('跨事件新完成在入队和最终发送前都拦截旧预告，并退回未尝试的次数',async()=>{
+ for(const finishBeforeQueue of [true,false]){
+  let publishDone:()=>Promise<void>=async()=>{};
+  const f=await fixture({beforeToken:async()=>{if(!finishBeforeQueue)await publishDone();}});
+  const session=await f.login();await f.accept(session.sessionToken);f.advance(1000);
+  const statementAt=new Date(f.now()).toISOString();
+  const action:RadarEvent['actions'][number]={id:'pending-action',kind:'automatic_reset',stage:'promised',scope:'public',eligibility:'公开用户',evidenceIds:['ev'],statementAt,expectedAt:new Date(f.now()+3600000).toISOString()};
+  const event={...f.event,actions:[action]},publication={...f.publication,event,publishedAt:statementAt};
+  await f.store.put('events',event);await f.store.put('publications',publication);
+  await f.notice({categories:['announcement']});
+  publishDone=async()=>{f.advance(1000);const at=new Date(f.now()).toISOString(),id='new-completion';
+   const nextEvent={...event,id,publicationId:'new-completion-pub',actions:[{...action,id:'new-completion-action',stage:'claimed_complete' as const,statementAt:at,expectedAt:undefined}]};
+   await f.store.put('events',nextEvent);await f.store.put('publications',{...publication,id:nextEvent.publicationId,eventId:id,event:nextEvent,publishedAt:at});
+  };
+  if(finishBeforeQueue)await publishDone();
+  const jobs=await f.queued();
+  if(finishBeforeQueue)assert.equal(jobs.length,0);else {assert.equal(jobs.length,1);assert.equal((await f.service.processWechatJob(jobs[0])).state,'cancelled');}
+  assert.equal(f.calls.filter(call=>call.url.includes('/message/subscribe/send')).length,0);
+  assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,1);
+ }
 });

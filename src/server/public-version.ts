@@ -7,7 +7,7 @@ import {getPublicForecast} from './forecast';
 import {readPublicFacts} from './public-read';
 import {publicCached} from './public-cache';
 import {configuredPublicRpc} from './cloudbase/public-config';
-import {getResetWatch,resetWatchVersion} from './reset-watch';
+import {resetWatchVersion} from './reset-watch';
 
 interface RevisionParts {
   publicationCount: number;
@@ -57,12 +57,12 @@ async function getStoredPublicVersion(): Promise<string> {
     });
     const now=new Date().toISOString();
     const forecasts=await getPublicForecast(c,now,await readPublicFacts(c,now),true);
-    return revision({ publicationCount: publications.rows[0].count, publicationKey: publications.rows[0].key,
+    const base=revision({ publicationCount: publications.rows[0].count, publicationKey: publications.rows[0].key,
       siteVersion: site.rows[0]?.version ?? 1, activities: activities.rows, sources, forecasts:forecastRevision(forecasts) });
+    return forecasts.watch?resetWatchVersion(base,forecasts.watch,now):base;
   }));
 }
 
 export async function getPublicVersion(): Promise<string> {
- const [base,watch]=await Promise.all([getStoredPublicVersion(),getResetWatch()]);
- return resetWatchVersion(base,watch,new Date().toISOString());
+ return getStoredPublicVersion();
 }

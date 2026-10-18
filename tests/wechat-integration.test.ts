@@ -108,11 +108,11 @@ test('真实隔离库：微信身份、一次性授权、任务派发和安全�
     assert.equal(state.state, 'available');
     return challenge;
   }
-  async function publishedFixture() {
-    const suffix = `${tag}-${++sequence}`, stamp = at();
-    const evidence: Evidence = { id: `synthetic-wechat-evidence-${suffix}`, sourceId: 'synthetic-wechat-isolated-qa', messageId: suffix, url: `https://example.invalid/synthetic-wechat/${suffix}`, text: '[隔离合成样例] We have reset all usage limits for all accounts.', hash: createHash('sha256').update(suffix).digest('hex'), publishedAt: stamp, collectedAt: stamp, contextComplete: true, historical: false, provenance: 'official' };
+  async function publishedFixture(statementAt?:string) {
+    const suffix = `${tag}-${++sequence}`, stamp = at(), originalAt = statementAt ?? stamp;
+    const evidence: Evidence = { id: `synthetic-wechat-evidence-${suffix}`, sourceId: 'synthetic-wechat-isolated-qa', messageId: suffix, url: `https://example.invalid/synthetic-wechat/${suffix}`, text: '[隔离合成样例] We have reset all usage limits for all accounts.', hash: createHash('sha256').update(suffix).digest('hex'), publishedAt: originalAt, collectedAt: stamp, contextComplete: true, historical: false, provenance: 'official' };
     const publicationId = `synthetic-wechat-publication-${suffix}`;
-    const event: RadarEvent = { id: `synthetic-wechat-event-${suffix}`, title: '[隔离合成样例] 公告称完成', version: 1, status: 'published', evidenceIds: [evidence.id], publicationId, updatedAt: stamp, actions: [{ id: `synthetic-action-${suffix}`, kind: 'automatic_reset', stage: 'claimed_complete', scope: 'public', eligibility: '隔离合成样例账户', evidenceIds: [evidence.id], evidenceQuote: evidence.text, statementAt: stamp }] };
+    const event: RadarEvent = { id: `synthetic-wechat-event-${suffix}`, title: '[隔离合成样例] 公告称完成', version: 1, status: 'published', evidenceIds: [evidence.id], publicationId, updatedAt: stamp, actions: [{ id: `synthetic-action-${suffix}`, kind: 'automatic_reset', stage: 'claimed_complete', scope: 'public', eligibility: '隔离合成样例账户', evidenceIds: [evidence.id], evidenceQuote: evidence.text, statementAt: originalAt }] };
     const article: Article = { id: `synthetic-wechat-article-${suffix}`, eventId: event.id, title: '[隔离合成样例] 公告称完成', summary: '仅用于隔离数据库验收，不是真实发放消息。', translation: '合成样例原文的中文说明。', category: 'reset', version: 1, status: 'published', publicationId, evidenceIds: [evidence.id], publishedAt: stamp, sourcePublishedAt: stamp, updatedAt: stamp, historical: false, publicationMode: 'state_change', contentOrigin: 'template' };
     const publication: Publication = { id: publicationId, eventId: event.id, articleId: article.id, event, article, cutoffAt: stamp, publishedAt: stamp, reason: '隔离合成样例，仅验证持久化' };
     await transaction(async client => { await insert('evidence', evidence, client); await put('events', event, client); await put('articles', article, client); await insert('publications', publication, client); });
@@ -122,6 +122,9 @@ test('真实隔离库：微信身份、一次性授权、任务派发和安全�
     // Each scenario owns one active reader. Cancelled deliveries now preserve
     // unused credits, so previous scenarios must explicitly revoke their reader.
     for(const [previousId,sessionToken] of ownedSessions)if(previousId!==readerId)await service.revokeWechatSubscription(sessionToken);
+    // This fixture represents a new original announcement after consent. A later
+    // notice processing timestamp must not make an earlier statement eligible.
+    clock = Math.max(Date.now(), clock + 1);
     const fixture = await publishedFixture();
     clock = Math.max(Date.now(), clock + 1);
     const notice: Notice = { id: `synthetic-wechat-notice-${tag}-${++sequence}`, eventId: fixture.event.id, publicationId: fixture.publication.id, semanticKey: `synthetic-fact-${tag}-${sequence}`, title: '[隔离合成样例] 用量重置结果', summary: '合成公告，不代表真实发放。', categories: ['result'], status: 'active', createdAt: at() };
@@ -167,6 +170,20 @@ test('真实隔离库：微信身份、一次性授权、任务派发和安全�
       const fixture = await publishedFixture(), code = await service.generateWechatCode(fixture.publication.id);
       assert.equal(code.contentType, 'image/png');
       assert.equal((await sharp(code.image).metadata()).width, 2, '返回的图片必须真正可解码');
+    });
+    await t.test('授权前原文在授权后才入库和发布，不补发且不占用次数', async () => {
+      const reader = await identity();
+      await accept(reader.session.sessionToken);
+      const fixture = await publishedFixture(new Date(clock - 60_000).toISOString());
+      clock = Math.max(Date.now(), clock + 1);
+      const notice:Notice={id:`synthetic-late-notice-${tag}-${++sequence}`,eventId:fixture.event.id,publicationId:fixture.publication.id,semanticKey:`synthetic-late-fact-${tag}-${sequence}`,title:'授权前完成消息的延迟处理',summary:'隔离样例',categories:['result'],status:'active',createdAt:at()};
+      await insert('notices',notice);
+      const before=sendCount();
+      await service.scheduleWechatDeliveries();
+      assert.equal((await list<WechatDelivery>('wechat_deliveries')).some(item=>item.readerId===reader.reader.id&&item.noticeId===notice.id),false);
+      assert.equal((await service.wechatSubscriptionState(reader.session.sessionToken)).remainingCount,1);
+      assert.equal(sendCount(),before);
+      await service.revokeWechatSubscription(reader.session.sessionToken);
     });
     await t.test('真实grant→notice→schedule→runOne仅发送一次，并保留固定版本', async () => {
       await accept(initial!.session.sessionToken);

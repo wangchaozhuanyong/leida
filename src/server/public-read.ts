@@ -10,7 +10,7 @@ import { hash } from './domain';
 import {forecastSourceAvailable} from '../lib/forecast';
 import { publicCached } from './public-cache';
 import { configuredPublicRpc } from './cloudbase/public-config';
-import {getResetWatch,resetWatchVersion,withResetWatchEnvelope} from './reset-watch';
+import {resetWatchVersion} from './reset-watch';
 
 const views: PublicView[] = ['home', 'history', 'news', 'detail', 'activity', 'notices', 'methodology', 'state', 'calendar'];
 const fail = () => { throw Object.assign(new Error('公开读取参数无效，请重新打开页面'), { status: 400 }); };
@@ -58,7 +58,7 @@ export async function readPublicVersion(client: Client, timestamp = new Date().t
     parts.push(result.rows[0].digest);
   }
   const settings = await client.query("SELECT payload FROM radar_settings WHERE id IN ('site','forecast_runtime') ORDER BY id");
-  parts.push(settings.rows.map(row => { const p = row.payload; return p.id === 'site' ? p : { id: p.id, status: p.status, cadenceSnapshotId: p.cadenceSnapshotId, cadenceSnapshotIds:p.cadenceSnapshotIds,cadenceEvaluationByKind:p.cadenceEvaluationByKind }; }));
+  parts.push(settings.rows.map(row => { const p = row.payload; return p.id === 'site' ? p : { id: p.id, status: p.status, cadenceSnapshotId: p.cadenceSnapshotId, cadenceSnapshotIds:p.cadenceSnapshotIds,cadenceEvaluationByKind:p.cadenceEvaluationByKind,...(p.referenceSignal?{referenceSignal:p.referenceSignal}:{}),...(p.referenceCadencePublic?{referenceCadencePublic:p.referenceCadencePublic,referenceExpired:Date.parse(p.referenceCadencePublic.validUntil)<=Date.parse(timestamp)}:{}) }; }));
   // Deadlines and source health can change without a new publication row.
   const deadlines = await client.query("SELECT payload->>'id' AS id, a->>'id' AS action, a->>'expectedAt' AS deadline FROM radar_events CROSS JOIN LATERAL jsonb_array_elements(payload->'actions') a WHERE a->>'expectedAt' IS NOT NULL ORDER BY id, action");
   parts.push(deadlines.rows.map(row => [row.id, row.action, Date.parse(row.deadline) <= Date.parse(timestamp)]));
@@ -81,7 +81,7 @@ const getStoredLightPublicVersion = async () => {
 };
 
 export async function getLightPublicVersion() {
-  const [state, watch] = await Promise.all([getStoredLightPublicVersion(), getResetWatch()]);
+  const state=await getStoredLightPublicVersion(),watch=undefined;
   const now = new Date().toISOString();
   return {version: resetWatchVersion(state.version, watch, now), contentVersion: resetWatchVersion(state.contentVersion, watch, now)};
 }
@@ -190,8 +190,9 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
   return { ...result, data: { ...result.data, serverTime: new Date().toISOString() } };
 }
 
-/** Attach a bounded independent observation after the consistent database read. */
+/** Facts and public observations come from the same persisted worker result. */
 export async function getPublicRead(options: PublicReadOptions): Promise<PublicReadEnvelope> {
-  const [result, watch] = await Promise.all([getStoredPublicRead(options), getResetWatch()]);
-  return withResetWatchEnvelope(result, watch, new Date().toISOString());
+  const result=await getStoredPublicRead(options);
+  const now=new Date().toISOString();
+  return {...result,data:{...result.data,serverTime:now},version:resetWatchVersion(result.version,undefined,now),contentVersion:resetWatchVersion(result.contentVersion,undefined,now)};
 }
