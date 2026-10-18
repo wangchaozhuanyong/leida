@@ -16,7 +16,7 @@ import { audit, createEvidence, publishCandidate, queueJob, defaultSite, publish
 import { isHistoricalContent } from '../lib/history';
 import {processWechatJob,scheduleWechatDeliveries} from './wechat';
 import {runForecastCycle} from './forecast';
-import {createWorkerCadence,safeWorkerFailure,type WorkerPhase} from './worker-timing';
+import {createWorkerCadence,retrySchedulingConflict,safeWorkerFailure,type WorkerPhase} from './worker-timing';
 import {sourceCollectionSchedule,sourceNextCollectionAt,verifiedCollectionWindow} from './source-collection-policy';
 
 const MAX_ACTIVE_GENERATION = 10;
@@ -90,7 +90,7 @@ export function generationCandidateOrder(candidates:Candidate[],evidence:Evidenc
 }
 export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichment?:boolean;skipGeneration?:boolean;skipSources?:boolean}={}):Promise<void> {
   const allowTemplates=options.allowTemplates!==false;
-  await transaction(async c=>{
+  await retrySchedulingConflict(()=>transaction(async c=>{
     await lockTransaction(c,'radar_scheduler');
     const sources=await list<Source>('sources',c);
     // Install only alongside an already enabled primary collector. Initial data
@@ -201,7 +201,7 @@ export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichme
       active++;
       if(historical)historicalActive++;
     }
-  });
+  }));
 }
 export async function claimJob():Promise<Job|undefined> {
   const rpc=configuredStorageRpc();if(rpc)return cloudbaseTasks(rpc).claim();

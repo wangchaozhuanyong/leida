@@ -4,6 +4,15 @@ export const WORKER_HEARTBEAT_MS = 60_000;
 const intervals = { sources: 60_000, generation: 5*60_000, wechat: 30_000, forecast: 60_000 };
 type Maintenance = keyof typeof intervals;
 
+/** Only the scheduler's database-only transaction may replay a definite rollback.
+ * Unknown responses may already have committed and must never be retried here. */
+export async function retrySchedulingConflict(work:()=>Promise<void>):Promise<void> {
+  for(let attempt=0;;attempt++) {
+    try { await work();return; }
+    catch(error) { if(attempt>=1 || !(error instanceof CloudbaseRpcError) || error.kind!=='conflict')throw error; }
+  }
+}
+
 /** Local cadence only; database leases and read-set validation remain authoritative. */
 export function createWorkerCadence(clock = Date.now) {
   const due = new Map<Maintenance, number>();
