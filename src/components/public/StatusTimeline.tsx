@@ -17,11 +17,11 @@ function LastResetClock({completion,serverTime}:{completion:Completion;serverTim
 export function StatusTimeline({outlook, serverTime, completion = outlook.latestCompletion, forecasts, lastReset}: {outlook: ResetOutlook; serverTime: string; completion?: Completion; forecasts?: ForecastPublicData;lastReset?:Completion}) {
   const now = usePublicClock(serverTime);
   const model = statusTimelineModel(outlook, now, completion, forecasts);
-  return <section className={`pub-status-timeline${model.completed ? ' is-completed' : ''}${model.scheduled ? ' is-scheduled' : ''}${model.watching?' is-watching':''}${model.estimating?' is-estimating':''}`} aria-label="公开重置进展">
+  return <section className={`pub-status-timeline tone-${model.presentation.tone}${model.completed ? ' is-completed' : ''}${model.scheduled ? ' is-scheduled' : ''}${model.watching?' is-watching':''}${model.estimating?' is-estimating':''}`} aria-label="公开重置进展">
     <div className="pub-timeline-overview">
       <div className="pub-timeline-copy">
-        <div className="pub-timeline-head">{model.lead}</div>
-        <div className="pub-timeline-row"><h1 className={model.title==='等待下一次 Reset'?'pub-timeline-waiting':undefined}>{model.scheduled && model.countdownParts.length ? model.countdownParts.map(part => <span className="pub-duration-part" key={part.unit}>{part.value}<small>{part.unit}</small></span>) : model.title}</h1></div>
+        <div className="pub-timeline-head"><span>{model.presentation.kind}</span><span className="pub-state-badge">{model.presentation.badge}</span></div>{model.scheduled&&<h2 className="pub-timeline-state-name">{model.presentation.heading}</h2>}{model.scheduled&&<p className="pub-timeline-metric-label">{model.lead}</p>}
+        <div className="pub-timeline-row"><h1 className={model.title==='等待下一次 Reset'?'pub-timeline-waiting':undefined}>{model.scheduled && model.countdownParts.length ? model.countdownParts.map(part => <span className="pub-duration-part" key={part.unit}>{part.value}<small>{part.unit}</small></span>) : model.presentation.heading}</h1></div>
         <div className="pub-timeline-date"><p className="pub-timeline-note">{model.note}</p>{(model.scheduled||model.overdue||model.watching)&&<span className="pub-timeline-timezone">北京时间</span>}</div>
         {model.forecastWindow&&<p className="pub-timeline-detail">信号发布时预计：{model.forecastWindow}</p>}
         {model.observedLabel&&<p className="pub-timeline-detail">{model.observedLabel}</p>}

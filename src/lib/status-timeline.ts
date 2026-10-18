@@ -17,7 +17,7 @@ export function countdownParts(expectedAt:string, now:string): {value:number;uni
 }
 
 /** Only the current evidenced stage is marked; the line is not a history of inferred steps. */
-export function statusTimelineModel(outlook: ResetOutlook, now: string, completion: Completion = outlook.latestCompletion, forecasts?: ForecastPublicData) {
+function resolveStatusTimeline(outlook: ResetOutlook, now: string, completion: Completion = outlook.latestCompletion, forecasts?: ForecastPublicData) {
   const resolvedAt=outlook.lastResolved?.kind==='automatic_reset'?(outlook.lastResolved.resolvedAt??outlook.lastResolved.statementAt):outlook.latestGlobalCompletionAt??(completion?.kind==='automatic_reset'?completion.statementAt:undefined);
   const candidate=activeResetSchedule(forecasts?.watch,now);
   const resolution=candidate?(outlook.latestResolutions?.[candidate.kind]??(outlook.lastResolved?.kind===candidate.kind?outlook.lastResolved:undefined)??(completion?.kind===candidate.kind?completion:undefined)):undefined;
@@ -35,14 +35,13 @@ export function statusTimelineModel(outlook: ResetOutlook, now: string, completi
   const deadlineNote=active?.timeNote??'';
   const timing=/(?:日终|最晚|之前|以内|截止|\bby\b|\bwithin\b)/i.test(deadlineNote)?'deadline':/^原文近似时间/.test(deadlineNote)?'approximate':'point';
   const timingLabel=timing==='deadline'?'预计最晚':timing==='approximate'?'预计约':'预计';
-  const reviewNote=outlook.pendingReview?.length||candidate&&sameResolved&&(!outlook.lastResolved?.announcedAt||Date.parse(candidate.announcedAt)!==Date.parse(outlook.lastResolved.announcedAt))?'较早的安排仍待确认，保留在历史消息中。':'';
   const base = {
-    sourceName:'Codex Resets',watching:false,estimating:false,detail:overdue?'预计时间已到，等待公开完成确认。':scheduled?'预计时间仅供参考，以实际发放为主。':reviewNote,sourceUrl:remote?.sourceUrl??'',sourceType:remote?.sourceType??'x_post',sourceCredit:!!remote,sourceId:remote?.id??'',forecastWindow:'',chanceLabel:'',observedLabel:'',expiresAt:'',
+    sourceName:'Codex Resets',watching:false,estimating:false,detail:overdue?'预计时间已到，等待公开完成确认。':scheduled?'预计时间仅供参考，以实际发放为主。':'',sourceUrl:remote?.sourceUrl??'',sourceType:remote?.sourceType??'x_post',sourceCredit:!!remote,sourceId:remote?.id??'',forecastWindow:'',chanceLabel:'',observedLabel:'',expiresAt:'',
     publicationId:active?.publicationId??'',statementAt:active?.statementAt??(completed?completion?.statementAt??'':''),expectedAt:active?.expectedAt??'',kind:(active??completion)?.kind??'automatic_reset',
     scheduled, overdue, countdownParts: duration, completed: !!completed,
     lead: scheduled ? timing==='deadline'?'距离预计最晚时间':timing==='approximate'?'距离预计时间（约）':'距离预计安排时间' : completed ? '公开完成声明' : outlook.status === 'cancelled' ? '上轮安排已取消' : '公开动态追踪',
     title: scheduled ? duration.length ? duration.map(part => `${part.value}${part.unit}`).join('') : '不足1分钟' : overdue ? '等待确认' : active ? active.stage === 'in_progress' ? banked ? '发卡进行中' : '重置进行中' : '时间待明确' : completed ? banked ? '已确认发放重置卡' : '已确认重置' : '等待下一次 Reset',
-    note: scheduled || overdue ? `${overdue ? '原'+timingLabel : timingLabel} ${beijing(active!.expectedAt!)}${timing==='deadline'?' 前':timing==='approximate'?' 左右':''}` : active ? '有明确安排后，自动更新' : completed ? '本轮已有公开完成声明，等待下一次预告' : forecasts?.status==='unavailable'||forecasts?.watch?.status==='unavailable'?'信号来源暂不可用，恢复后自动检查':'有新的重置信号后更新',
+    note: scheduled || overdue ? `${overdue ? '原'+timingLabel : timingLabel} ${beijing(active!.expectedAt!)}${timing==='deadline'?' 前':timing==='approximate'?' 左右':''}` : active ? active.stage==='in_progress'?'公开消息称已开始，完成情况等待后续声明。':'已公布相关安排，具体时间仍待说明。' : completed ? '本轮已有公开完成声明，等待下一次预告' : forecasts?.status==='unavailable'||forecasts?.watch?.status==='unavailable'?'信号来源暂不可用，恢复后自动检查':'有新的重置信号后更新',
     currentStage: overdue ? -1 : active ? active.stage === 'in_progress' ? 1 : 0 : completed ? 2 : -1,
     stages: ['公开预告', banked ? '发卡进行' : '重置进行', '完成确认'],
   };
@@ -53,6 +52,23 @@ export function statusTimelineModel(outlook: ResetOutlook, now: string, completi
   return base;
 }
 
+
+/** Presentation only: use the resolved event state, never infer a new prediction or type. */
+function statusPresentation(model:ReturnType<typeof resolveStatusTimeline>) {
+  const kind=model.kind==='banked_reset'?'重置卡':'额度重置';
+  if(model.watching)return {tone:model.forecastWindow?'purple':'blue',badge:model.forecastWindow?'信号推测':'信号观察',heading:'发现重置相关信号',kind:'公开线索'};
+  if(model.scheduled)return {tone:'blue',badge:'时间已公布',heading:model.kind==='banked_reset'?'预计发放重置卡':'预计额度重置',kind};
+  if(model.overdue)return {tone:'amber',badge:'等待确认',heading:'预计时间已到，等待确认',kind};
+  if(model.completed)return {tone:'green',badge:'公开完成',heading:model.kind==='banked_reset'?'重置卡发放已确认':'额度重置已确认',kind};
+  if(model.currentStage===1)return {tone:'green',badge:'进行中',heading:model.kind==='banked_reset'?'重置卡发放进行中':'额度重置进行中',kind};
+  if(model.currentStage===0)return {tone:'blue',badge:'已预告',heading:model.kind==='banked_reset'?'已预告发放重置卡':'已预告额度重置',kind};
+  if(model.lead==='上轮安排已取消')return {tone:'muted',badge:'已取消',heading:'本轮安排已取消',kind:'公开动态'};
+  return {tone:'muted',badge:'等待新消息',heading:'等待下一次 Reset',kind:'公开动态追踪'};
+}
+export function statusTimelineModel(outlook:ResetOutlook,now:string,completion:Completion=outlook.latestCompletion,forecasts?:ForecastPublicData) {
+  const model=resolveStatusTimeline(outlook,now,completion,forecasts);
+  return {...model,presentation:statusPresentation(model)};
+}
 
 /** Stable during a countdown; changes on state, source, round or expiry transitions. */
 export function statusTimelineRevision(model:ReturnType<typeof statusTimelineModel>):string {

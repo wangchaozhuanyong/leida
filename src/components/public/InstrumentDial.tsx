@@ -45,7 +45,7 @@ export function InstrumentDial({outlook, serverTime, completion = outlook.latest
       <p className={bankedCompletion ? 'pub-dial-banked-lead' : undefined}>{bankedCompletion ? <><span>距最近一次确认</span><span>发放重置卡</span></> : lead}</p>
       {digits ? <strong className="pub-dial-countdown">{digits}</strong> : completed ?
         <strong className={`pub-dial-elapsed${longElapsed ? ' is-long' : ''}`} aria-label={completed.label}>
-          {completed.parts.length ? <>{completed.parts.map(part => <span className="pub-dial-duration" key={part.unit}><span>{part.value}</span><small>{part.unit}</small></span>)}<small>前</small></> : '刚刚'}
+          {completed.parts.length ? <>{completed.parts.map(part => <span className="pub-dial-duration" key={part.unit}><span>{part.value}</span><small>{part.unit}</small></span>)}</> : '刚刚'}
         </strong> : <strong className="pub-dial-state">{state}</strong>}
       <span>{reference||scheduled?timeline.note : completed ? '以公开完成公告为准' : countdown?.status==='expired'?'已过预计时间，待公开确认':active?'有明确安排后，自动更新':forecasts?timeline.note:'暂无下一次明确时间'}</span>
       {(reference||scheduled)&&<span className="pub-dial-reference-note">{timeline.detail}</span>}

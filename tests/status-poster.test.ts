@@ -183,7 +183,7 @@ test('模板切换保留发布目标和动作，无圆码版不请求微信，�
 });
 
 for (const { id: style } of statusPosterStyles) {
-  test(`${style} 动态模板使用真实状态和北京时间，无码时不绘制假码`, async () => {
+  test(`${style} 动态模板使用真实状态和北京时间，默认网站二维码可解码`, async () => {
     const selected = publication();
     const svg = statusPosterSvg(input({ style, publication: selected }));
     assert.match(svg, new RegExp(`data-poster-style="${style}"`));
@@ -194,7 +194,9 @@ for (const { id: style } of statusPosterStyles) {
     assert.match(svg, /下一次时间待公开确认/);
     assert.match(svg, /个人状态以账户显示为准/);
     assert.match(svg, /依据：所选公开公告/);
-    assert.doesNotMatch(svg, /圆码示意|扫码|二维码|设计样张|data-poster-code/);
+    assert.doesNotMatch(svg, /圆码示意|设计样张|data-poster-code="mini"/);
+    assert.match(svg, /data-poster-code="website"/);
+    assert.equal((await decodedPoster(svg)).url, input({style}).shareUrl);
     const png = await rasterize(Buffer.from(svg)).png().toBuffer();
     assert.equal(png.readUInt32BE(16), 1080); assert.equal(png.readUInt32BE(20), 1920);
     const future = statusPosterSvg(input({ style, nextAction: announcement({ expectedAt: '2026-10-11T03:30:00Z' }) }));
