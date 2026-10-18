@@ -11,7 +11,7 @@ function canvasNode(page){return new Promise((resolve,reject)=>{
 });}
 Page(createPage((data, query, page) => data && !page.sceneLoading && !page.sceneError && query.publicationId ? { detail: m.resolveDetail(data, query) } : { detail:null }, {
   view:query=>query.publicationId?({view:'detail',entity:'publications',id:query.publicationId}):({view:'home'}),
-  data: { detail: null,sceneLoading:false,sceneError:'',sceneCanRetry:false,posterBusy:false,posterSaving:false,posterError:'',posterPreview:'',posterReady:false,posterPrivacyNeeded:false,bodyOpen:false,evidenceOpen:false,posterTheme:'precision' },
+  data: { detail: null,sceneLoading:false,sceneError:'',sceneCanRetry:false,posterBusy:false,posterSaving:false,posterError:'',posterPreview:'',posterReady:false,posterPrivacyNeeded:false,bodyOpen:false,evidenceOpen:false,progressOpen:false,posterTheme:'precision' },
   load(query){this._wantPoster=query.poster==='1';if(query.scene){this._params={};try{const scene=decodeURIComponent(query.scene).toLowerCase();if(!/^[a-f0-9]{32}$/.test(scene))throw new Error();this._scene=scene;this.setData({sceneLoading:true,sceneCanRetry:true});}catch(_){this.setData({sceneError:'这个小程序码场景无效，请返回公开公告。'});}}
     else if(!query.publicationId)this.setData({sceneError:'缺少指定发布版本，请返回公开公告。'});},
   show(){this._active=true;this.setData({posterBusy:false});if(this._scene&&!this._sceneResolved)void this.resolveScene();this.maybeGeneratePoster();},hide(){stopPage(this);},unload(){stopPage(this);this.clearPosters();this._codeData=null;},
@@ -27,7 +27,7 @@ Page(createPage((data, query, page) => data && !page.sceneLoading && !page.scene
       for(const artifact of Object.values(this._posterCache||{}))if(typeof wx.getFileSystemManager==='function')wx.getFileSystemManager().unlink({filePath:artifact.tempFilePath,success(){},fail(){}});
       this._posterCache={};this._posterArtifact=null;
     },
-    toggleSection(event){const key=event.currentTarget.dataset.section;if(['bodyOpen','evidenceOpen'].includes(key))this.setData({[key]:!this.data[key]});},
+    toggleSection(event){const key=event.currentTarget.dataset.section;if(['bodyOpen','evidenceOpen','progressOpen'].includes(key))this.setData({[key]:!this.data[key]});},
     maybeGeneratePoster(){if(this._active&&this._wantPoster&&this.data.detail&&this.data.detail.canShare){this._wantPoster=false;void this.generatePoster();}},
     selectPosterTheme(event){
       const theme=event.currentTarget.dataset.theme;

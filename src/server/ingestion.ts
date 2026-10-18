@@ -54,10 +54,11 @@ export function hasOpenCodexIncident(records:Incoming[]):boolean {
  }
  return [...latest.values()].some(record=>!['resolved','postmortem','completed'].includes(record.metadata!.status!));
 }
-function timelineError(error:TiboTimelineError):DomainError {
+export function timelineError(error:TiboTimelineError):DomainError {
  if(error.failureKind==='structure')return new SourceStructureError(error.message);
  if(error.failureKind==='rate_limit'&&error.retryAt)return new SourceRateLimitError(error.retryAt,error.message);
  if(error.failureKind==='configuration')return new SourceConfigurationError(error.message);
+ if(error.failureKind==='transient')return new SourceTransientError(error.message);
  return error;
 }
 export const RELEASE_PAGE_SIZE=5;

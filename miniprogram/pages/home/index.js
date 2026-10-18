@@ -1,5 +1,7 @@
 const { createPage } = require('../../utils/page');
 const m = require('../../utils/model');
+const { resetStateCards } = require('../../utils/reset-state-cards');
+const { dialModel } = require('../../utils/dial');
 const { statusTimelineModel } = require('../../utils/status-timeline');
 function completionDate(value, now) {
   const full = m.completionTime(value);
@@ -9,6 +11,10 @@ function completionDate(value, now) {
 }
 Page(createPage((data, query, page, app) => {
   if (!data) return { name: '模钥重置雷达', latest: null, completions: [], pending: null, forecast: null, recent: [], activity: null, sharePath: '', timeline: null, posterPath: '', posterDescription: '' };
+  const states = resetStateCards(data);
+  const selectedResetKind=page.selectedResetKind||'automatic_reset';
+  const selectedOutlook=m.resetOutlookModel(data,selectedResetKind);
+  const dial=dialModel(selectedOutlook,data.serverTime,selectedOutlook.latestCompletion,states.cards.find(card=>card.kind===selectedResetKind));
   const outlook = m.resetOutlookModel(data), completed = m.latestCompletedBenefits(data), latestItem = completed[0], pending = outlook.active;
   const latestPublication = latestItem && latestItem.publication;
   const latestAction = latestItem && latestItem.action;
@@ -26,8 +32,9 @@ Page(createPage((data, query, page, app) => {
   const posterDescription = '选择黑金或水墨，分享当前公开状态';
   return {
     name: data.site.name || '模钥重置雷达',
+    dial,resetCards:states.cards,untypedSignal:states.untyped,stateWarning:states.sourceWarning,signalExpiredNote:states.expiredNote,lastCard:states.lastCard,selectedResetKind:page.selectedResetKind||'automatic_reset',
     historicalProbability: m.referenceCadenceView(data.forecasts?.referenceCadence,data.serverTime),
-    lastReset: completed.find(item=>item.action.kind==='automatic_reset') ? {time:m.completionTime(completed.find(item=>item.action.kind==='automatic_reset').action.statementAt),elapsed:m.completionElapsed(completed.find(item=>item.action.kind==='automatic_reset').action,data.serverTime).label} : null,
+    lastReset: states.lastReset,
     latest: latest ? { title: latest.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', elapsed: m.elapsed(latest.statementAt, data.serverTime), time: m.completionTime(latest.statementAt), eligibility: latestAction.eligibility, path: pathFor(latest) } : null,
     completions: m.recentCompletedBenefits(data).map(item => ({ id:item.action.id, kind: item.action.kind, title: item.action.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', label: item.action.kind === 'banked_reset' ? '重置卡发放' : '用量重置', time: m.completionTime(item.action.statementAt), shortTime: completionDate(item.action.statementAt, data.serverTime), path: pathFor({ publicationId: item.publication.id }) })),
     evidencePath: pathFor(pending || latest) || '/pages/announcements/index',
@@ -39,7 +46,7 @@ Page(createPage((data, query, page, app) => {
     collectedAt: m.displayTime(recentSuccess), latestSourceTime: latestArticle ? m.displayTime(m.articleSourceTime(latestArticle)) : '暂无记录',
     waitingText: outlook.status === 'completed' ? '本次已有公开完成声明，等待下一次预告。' : outlook.status === 'cancelled' ? '本次安排已取消，等待下一次预告。' : '等待下一次预告，暂无新的时间依据。',
     activity: activity ? { title: activity.title, rules: activity.rules, phase: m.activityModel(data, activity.id).phase, entries: activity.items.length, path: `/pages/activity/index?id=${encodeURIComponent(activity.id)}` } : null,
-    recent: m.sortedArticles(data.articles).map(article => data.publications.find(item => item.id === article.publicationId)).filter(Boolean).slice(0, 3).map(item => m.publicationCard(data, item)),
+    recent: m.homeNewsGroups(data).map(group=>group.latest).map(item => m.publicationCard(data, item)),
     recentDays: m.calendarModel(data).recentDays, sharePath: pathFor(shareTarget), shareTitle: pendingPublication ? pendingPublication.article.title : latestPublication ? latestPublication.article.title : data.site.name,
     shareLabel: '分享这条公告给朋友',
     historical: data.articles.length > 0 && data.articles.every(article => m.isHistoricalArticle(article, data.evidence))
@@ -53,7 +60,7 @@ Page(createPage((data, query, page, app) => {
   toggleFreshness() { this.setData({ freshnessOpen: !this.data.freshnessOpen }); },
   openPoster() { if (this.data.connected) wx.navigateTo({ url:'/pages/poster/index' }); },
   syncCountdown() {
-    if (!this.data.lastReset && !(this.data.pending && this.data.pending.counting) && !(this.data.timeline && (this.data.timeline.completed || this.data.timeline.scheduled))) { this.stopCountdown(); return; }
+    if (!this.data.dial?.completed && !this.data.lastReset && !this.data.resetCards?.some(card=>['scheduled','revised','completed'].includes(card.state)) && !(this.data.pending && this.data.pending.counting) && !(this.data.timeline && (this.data.timeline.completed || this.data.timeline.scheduled))) { this.stopCountdown(); return; }
     if (!this._countdownTimer) this._countdownTimer = setInterval(() => this.tickCountdown(), 1000);
   },
   tickCountdown() {
@@ -70,6 +77,7 @@ Page(createPage((data, query, page, app) => {
       const count=m.announcementCountdown(outlook.active,now);
       if(count.label!==this.data.pending.countdown)this.setData({pending:{...this.data.pending,countdown:count.label,counting:count.status==='upcoming'}});
     }
+    const cardPatch=this.resetCardsPatch(state.data,now);if(Object.keys(cardPatch).length)this.setData(cardPatch);
     this.syncCountdown();
   },
   stopCountdown() { if (this._countdownTimer) clearInterval(this._countdownTimer); this._countdownTimer = null; },
@@ -98,10 +106,29 @@ Page(createPage((data, query, page, app) => {
     const historicalProbability=m.referenceCadenceView(state.data.forecasts?.referenceCadence,now);
     if(JSON.stringify(historicalProbability)!==JSON.stringify(this.data.historicalProbability))patch.historicalProbability=historicalProbability;
     if(JSON.stringify(timeline)!==JSON.stringify(this.data.timeline))patch.timeline=timeline;
+    Object.assign(patch,this.resetCardsPatch(state.data,now));
     if(Object.keys(patch).length)this.setData(patch);
     this.syncCountdown();this.syncForecastExpiry();
   },
   stopForecastExpiry() { if(this._forecastExpiryTimer)clearTimeout(this._forecastExpiryTimer);this._forecastExpiryTimer=null;this._forecastExpiryAt=null; },
+  resetCardsPatch(data, now) {
+    const states=resetStateCards(data,now),patch={};
+    for(const [key,value] of Object.entries({resetCards:states.cards,untypedSignal:states.untyped,stateWarning:states.sourceWarning,signalExpiredNote:states.expiredNote}))if(JSON.stringify(this.data[key])!==JSON.stringify(value))patch[key]=value;
+    const selected=this.data.selectedResetKind||'automatic_reset',outlook=m.resetOutlookModel(data,selected);
+    const dial=dialModel(outlook,now,outlook.latestCompletion,states.cards.find(card=>card.kind===selected));
+    if(!this.data.dial)patch.dial=dial;
+    else for(const [key,value] of Object.entries(dial))if(JSON.stringify(value)!==JSON.stringify(this.data.dial[key]))patch['dial.'+key]=value;
+    return patch;
+  },
+  selectResetKind(event) { const kind=event.currentTarget.dataset.kind;if(['automatic_reset','banked_reset'].includes(kind)){this.setData({selectedResetKind:kind,expandedSourceKind:''});this.tickCountdown();this.syncCountdown();} },
+  openStatusEvidence(event) {
+    const kind=event.currentTarget.dataset.kind,card=kind==='untyped'?this.data.untypedSignal:this.data.resetCards.find(item=>item.kind===kind);
+    if(!card)return;
+    if(card.sourceName){this.setData({expandedSourceKind:this.data.expandedSourceKind===kind?'':kind});return;}
+    if(card.publicationId)wx.navigateTo({url:'/pages/detail/index?publicationId='+encodeURIComponent(card.publicationId)});
+    else wx.switchTab({url:'/pages/news/index'});
+  },
+  copyStatusSource(event) { const url=event.currentTarget.dataset.url;if(typeof url==='string'&&url.startsWith('https://')&&m.safeUrl(url))wx.setClipboardData({data:url,fail(){wx.showToast({title:'复制失败，请稍后重试',icon:'none'});}}); },
   copyWatchSource() {
     const url=this.data.timeline && this.data.timeline.sourceUrl;
     if(typeof url==='string' && url.startsWith('https://') && !!m.safeUrl(url))wx.setClipboardData({data:url,fail(){wx.showToast({title:'复制失败，请稍后重试',icon:'none'});}});

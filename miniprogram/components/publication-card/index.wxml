@@ -1,6 +1,7 @@
 <view class="card publication-card">
   <view class="row wrap"><text class="badge {{item.tone}}">{{item.historical ? '历史收录 · ' : ''}}{{item.label}}</text><text class="time">{{item.time}}</text></view>
   <view class="announcement-title">{{item.title}}</view><view class="prose publication-summary">{{item.summary}}</view>
-  <view wx:if="{{item.reviewStatus}}" class="publication-context"><text class="context-label">{{item.reviewStatus === "pending" ? "待确认" : "定向跟踪"}}</text><view>{{item.reviewReasons}}</view></view>
+  <view wx:if="{{item.reviewStatus}}" class="publication-context"><view>{{item.reviewReasons}}</view></view>
   <view class="row publication-footer"><view class="small muted grow">{{item.note}}</view><button class="text-button" bindtap="open">查看详情 →</button></view>
+  <view wx:if="{{item.updates.length}}" class="news-progress"><button class="text-button" bindtap="toggleProgress" aria-expanded="{{progressOpen}}">{{progressOpen ? '收起其他进展' : '查看其他进展'}} · {{item.updates.length}}条</button><view wx:if="{{progressOpen}}"><button wx:for="{{item.updates}}" wx:for-item="update" wx:key="id" class="progress-row" data-path="{{update.path}}" bindtap="openStep"><text class="small muted">{{update.time}}</text><text>{{update.title}}</text></button></view></view>
 </view>

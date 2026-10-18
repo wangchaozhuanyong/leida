@@ -158,7 +158,7 @@
 .pub-record-time > span { white-space: nowrap; }
 .pub-instrument-dial.is-completed { container-type: inline-size; }
 .pub-instrument-dial.is-completed .pub-dial-rim { stroke: #b39151; }
-.pub-instrument-dial.is-completed .pub-dial-readout { inset-inline: 10%; gap: 12px; }
+.pub-instrument-dial.is-completed .pub-dial-readout { gap: 12px; }
 .pub-instrument-dial.is-completed .pub-dial-readout p { max-width: 90%; line-height: 1.5; font-size: clamp(12px, 4.4cqi, 19px); letter-spacing: 0; }
 .pub-dial-readout strong.pub-dial-elapsed { display: flex; justify-content: center; align-items: baseline; gap: 5px; font-size: clamp(32px, 18cqi, 72px); letter-spacing: -1px; white-space: nowrap; }
 .pub-dial-readout strong.pub-dial-elapsed.is-long { font-size: clamp(28px, 14cqi, 60px); }
@@ -398,7 +398,6 @@
 .pub-home-dial{min-width:0;width:100%}
 .pub-status-timeline,.pub-home-time-note,.pub-evidence-mobile{display:none}
 @media(max-width:700px){
-  .pub-home-dial{display:none}
   .pub-instrument-layout,.pub-instrument-layout.is-idle{gap:0;min-height:0}
   .pub-status-timeline{display:block;width:100%;min-height:140px;box-sizing:border-box;padding:13px 15px 11px;border:1px solid #39483e;border-radius:12px;background:linear-gradient(115deg,#1b2822,#111c1b)}
   .pub-timeline-head{display:flex;justify-content:space-between;align-items:center;gap:9px;color:#acb8ac;font-size:10px;line-height:16px;letter-spacing:.7px}

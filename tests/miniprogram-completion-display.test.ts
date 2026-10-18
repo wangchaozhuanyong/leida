@@ -122,6 +122,22 @@ test('首页每秒只更新经过时长字段，不跨原生桥重发列表、�
  const changes:Record<string,unknown>[]=[],original=h.page.setData.bind(h.page),before=h.page.data.completions;
  h.page.setData=(patch:Record<string,unknown>)=>{changes.push(patch);original(patch);};
  h.advance(1000);
- assert.ok(changes.some(p=>'lastReset.elapsed'in p));assert.ok(changes.every(p=>Object.keys(p).every(key=>key==='lastReset.elapsed')));
+ assert.ok(changes.some(p=>'lastReset.elapsed'in p));assert.ok(changes.every(p=>Object.keys(p).every(key=>['lastReset.elapsed','dial.elapsedLabel','dial.elapsedClock','dial.accessible'].includes(key))));
  assert.equal(h.page.data.completions,before);assert.equal(h.page.data.lastReset.elapsed,'2小时15分钟1秒');h.page.onUnload();
+});
+
+
+test('原生首页两类表盘与状态卡同步切换，跨天拆分并持续计秒',()=>{
+ const h=nativeHome(fixture([publication('reset','automatic_reset','2026-10-11T19:14:52Z'),publication('card','banked_reset','2026-10-13T07:25:00Z')]));
+ assert.equal(h.page.data.dial.category,'额度重置');assert.equal(h.page.data.dial.elapsedDays,1);
+ assert.deepEqual(JSON.parse(JSON.stringify(h.page.data.dial.elapsedClock)),[{value:'12',unit:'小时'},{value:'45',unit:'分钟'},{value:'08',unit:'秒'}]);
+ h.page.selectResetKind({currentTarget:{dataset:{kind:'banked_reset'}}});
+ assert.equal(h.page.data.dial.category,'重置卡');assert.equal(h.page.data.dial.bankedCompleted,true);assert.equal(h.page.data.dial.elapsedDays,0);
+ h.advance(1000);assert.equal(h.page.data.dial.elapsedClock[2].value,'01');
+ assert.equal(h.page.data.lastReset.elapsed,'1天12小时45分钟9秒');
+ h.page.onHide();h.advance(60000);h.page.onShow();
+ assert.equal(h.page.data.selectedResetKind,'banked_reset');assert.equal(h.page.data.dial.category,'重置卡');
+ assert.deepEqual(JSON.parse(JSON.stringify(h.page.data.dial.elapsedClock)),[{value:'00',unit:'小时'},{value:'36',unit:'分钟'},{value:'01',unit:'秒'}]);
+ assert.equal(h.page.data.lastReset.elapsed,'1天12小时46分钟9秒','返回首页后两类时钟仍独立');
+ h.page.onUnload();assert.equal(h.timers.size,0);
 });

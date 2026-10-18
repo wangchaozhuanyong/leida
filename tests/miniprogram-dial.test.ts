@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
+import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
 const require=createRequire(import.meta.url);
 const {dialModel,drawDial}=require('../miniprogram/utils/dial.js');
 const now='2026-10-12T04:00:00Z';
@@ -42,4 +44,22 @@ test('完成结果持续显示秒计时，非法时间不展示；新预告独�
     else if(expectedAt===undefined)assert.equal(announced.state,'时间待明确');
     else assert.equal(announced.digits,'03:20');
   }
+});
+
+
+test('原生表盘秒数字变化不重绘静态画布，安排变化后才重新绘制刻度和时间标记',()=>{
+ let definition:any,queries=0;
+ const ctx=new Proxy({}, {get(){return()=>{};},set(){return true;}}),canvas={width:0,height:0,getContext:()=>ctx};
+ const wx={getWindowInfo:()=>({pixelRatio:1}),createSelectorQuery(){queries++;return {in(){return this;},select(){return this;},fields(_options:unknown,done:(value:unknown)=>void){done({node:canvas,width:320});return this;},exec(){}};}};
+ runInNewContext(readFileSync('miniprogram/components/instrument-dial/index.js','utf8'),{Component:(value:any)=>{definition=value;},wx,require:()=>({drawDial})});
+ const completion={kind:'automatic_reset',stage:'claimed_complete',statementAt:'2026-10-12T01:45:00Z'};
+ const instance={...definition.methods,data:{model:dialModel({latestCompletion:completion},now)},_alive:true,_drawing:false,_drawKey:undefined};
+ instance.draw();assert.equal(queries,1);
+ instance.data.model=dialModel({latestCompletion:completion},'2026-10-12T04:00:01Z');instance.draw();assert.equal(queries,1);
+ instance.data.model=dialModel({active,status:'scheduled'},now);instance.draw();assert.equal(queries,2);
+ // WeChat may discard the canvas bitmap while its cached page is hidden.
+ // Returning to the page must repaint even when only the elapsed text changed.
+ definition.pageLifetimes.show.call(instance);assert.equal(queries,3);
+ instance.draw();assert.equal(queries,3);
+ definition.pageLifetimes.resize.call(instance);assert.equal(queries,4);
 });

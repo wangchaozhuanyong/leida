@@ -4,9 +4,10 @@ import type { PublicReadOptions, PublicReadEnvelope, PublicPage } from '../../li
 import type { ForecastCase, ForecastOutcome, ForecastSnapshot } from '../../lib/forecast';
 import type { StoredCadenceForecast, CadenceRuntime } from '../reset-cadence-runtime';
 import { projectPublicHistory } from '../../lib/history';
+import { homeNewsGroups } from '../../lib/public-feed';
 import { publicResetOutlook } from '../../lib/reset-outlook';
 import { publicActions, recentCompletedBenefits } from '../../lib/public-facts';
-import { parsePublicRead, decodeCursor, encodePublicCursor, finishPublicVersion } from '../public-read';
+import { parsePublicRead, decodeCursor, encodePublicCursor, finishPublicVersion, paginatePublicNews } from '../public-read';
 import { projectPublicForecastRecords } from '../forecast';
 import { createPublicCache } from '../public-cache';
 import { publicRevision } from '../public-version';
@@ -59,17 +60,20 @@ function response(bundle:Bundle,options:PublicReadOptions|{view:'legacy'},timest
   const facts=projectPublicHistory({events:bundle.events,articles:bundle.articles,publications:bundle.publications,evidence:bundle.evidence,activities:bundle.activities,notices:bundle.notices,site:bundle.site??{name:'模钥重置雷达',description:options.view==='legacy'?'跟踪公开重置公告与重置卡动态':'',autoPublish:options.view==='legacy',version:1},sources:state.sources,serverTime:timestamp});
   const selected=new Set<string>();
   let data:PublicData={...facts};
-  const page=options.view==='legacy'?undefined:pageFrom(bundle,options);
+  const news=options.view==='news'?paginatePublicNews(facts,options):undefined;
+  const page=news?.page??(options.view==='legacy'?undefined:pageFrom(bundle,options));
   if(options.view==='home'||options.view==='methodology'){
     const outlook=publicResetOutlook(facts);
+      for (const lane of Object.values(outlook.byKind ?? {})) for (const round of [lane.active,lane.latestCompletion,lane.lastResolved]) if (round) selected.add(round.publicationId);
     for(const id of [outlook.active?.publicationId,outlook.latestCompletion?.publicationId,outlook.lastResolved?.publicationId])if(id)selected.add(id);
     const actions=publicActions(facts).sort((a,b)=>Date.parse(b.action.statementAt)-Date.parse(a.action.statementAt));
     recentCompletedBenefits(facts).forEach(item=>selected.add(item.publication.id));
     for(const kind of ['automatic_reset','banked_reset'] as const){const item=actions.find(item=>item.action.kind===kind&&item.action.stage==='claimed_complete'&&Date.parse(item.action.statementAt)<=Date.parse(timestamp)&&Date.parse(item.publication.publishedAt)<=Date.parse(timestamp));if(item)selected.add(item.publication.id);}
-    facts.articles.slice().sort((a,b)=>Date.parse(b.sourcePublishedAt||b.publishedAt)-Date.parse(a.sourcePublishedAt||a.publishedAt)).slice(0,3).forEach(a=>selected.add(a.publicationId));
-  }else if(options.view==='calendar')publicActions(facts).forEach(item=>selected.add(item.publication.id));
+    homeNewsGroups(facts).forEach(group=>selected.add(group.latest.id));
+  }else if(news)news.selected.forEach(id=>selected.add(id));
+  else if(options.view==='calendar')publicActions(facts).forEach(item=>selected.add(item.publication.id));
   else facts.publications.forEach(p=>selected.add(p.id));
-  if(options.view==='home'||options.view==='methodology'||options.view==='calendar'){
+  if(options.view==='home'||options.view==='methodology'||options.view==='calendar'||options.view==='news'){
     const publications=facts.publications.filter(p=>selected.has(p.id));
     const eventIds=new Set(publications.map(p=>p.eventId)),articleIds=new Set(publications.map(p=>p.articleId));
     const evidenceIds=new Set(publications.flatMap(p=>[...p.article.evidenceIds,...p.event.evidenceIds,...p.event.actions.flatMap(a=>a.evidenceIds),...(p.article.contextEvidenceIds??[])]));
@@ -175,7 +179,7 @@ function factory(rpc:CloudbaseRpc,clock:()=>string) {
   const cache=createPublicCache();
   async function read(options:PublicReadOptions):Promise<PublicReadEnvelope> {
     const parsed=optionsForRpc(options),key=JSON.stringify(parsed);
-    const result=await cache(key,async()=>{const now=clock(),bundle=await compatibleBundle(rpc,parsed,now);return response(bundle,options,now);});
+    const result=await cache(key,async()=>{const now=clock(),bundle=await compatibleBundle(rpc,options.view==='news'?{view:'calendar'}:parsed,now);return response(bundle,options,now);});
     return {...result,data:{...result.data,serverTime:clock()}};
   }
   return {read,version:()=>cache('version',async()=>{const state=cloudbasePublicVersion((await supplementLegacyProjection(rpc,await rpc.call<VersionData>('radar_cb_public_version'),clock())).version,clock());return {version:state.version,contentVersion:state.contentVersion};}),

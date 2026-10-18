@@ -551,7 +551,7 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   // Bundled client source version. Backend-only releases must not relabel an installed client.
-  const buildVersion='1.0.36';
+  const buildVersion='1.0.37';
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);assert.equal(news.data.navigationTitle,'动态 · 共42篇');news.onUnload();
   const records=h.page('announcements');assert.equal(records.data.navigationTitle,'重置记录');records.onUnload();
@@ -726,7 +726,7 @@ test('动态更新后恢复仍存在的阅读条目；已撤回锚点选择下�
   const h=nativeHarness(fixture(),{wxApi:{
     pageScrollTo(options:{scrollTop:number}){scrolls.push(options.scrollTop);},
     createSelectorQuery(){return{in(){return this;},selectAll(){return this;},boundingClientRect(){return this;},selectViewport(){return this;},scrollOffset(){return this;},exec(fn:(v:unknown)=>void){
-      measurements++;fn([[{dataset:{readingId:'pub-done'},top:measurements%2?-40:60,bottom:160},{dataset:{readingId:'pub-promise'},top:measurements%2?180:100,bottom:380}],{scrollTop:240}]);
+      measurements++;fn([[{dataset:{readingId:'event:done'},top:measurements%2?-40:60,bottom:160},{dataset:{readingId:'event:promise'},top:measurements%2?180:100,bottom:380}],{scrollTop:240}]);
     }};}
   }});
   const page=h.page('news');
@@ -747,7 +747,7 @@ test('观察记录缓存返回不制造遮罩，迟到请求不改变当前页�
   page.onUnload();assert.equal(h.subscriptions,0);assert.equal(page.data.navigationLoading,false);
 });
 
-test('待确认及定向跟踪在原生列表和详情保留原因，不增加福利次数；损坏标记拒绝载入',()=>{
+test('待确认及定向跟踪显示用户说明，核验原因留在来源中，不增加福利次数',()=>{
  for(const reviewStatus of ['pending','targeted_update'] as const){
   const data=fixture(),before=mini.publicActions(data).length;
   const p=addRound(data,'review-'+reviewStatus,[]);
@@ -755,7 +755,7 @@ test('待确认及定向跟踪在原生列表和详情保留原因，不增加�
   Object.assign(data.articles.find(a=>a.id===p.articleId)!,p.article);
   assert.equal(validateBootstrap(data),true);
   assert.equal(mini.publicationCard(data,p).reviewStatus,reviewStatus);
-  const detail=mini.resolveDetail(data,{publicationId:p.id});assert.equal(detail.reviewStatus,reviewStatus);assert.match(detail.reviewReasons,/原文核对/);assert.deepEqual(detail.actions,[]);
+  const detail=mini.resolveDetail(data,{publicationId:p.id});assert.equal(detail.reviewStatus,reviewStatus);assert.match(detail.reviewReasons,/后续公告|适用范围/);assert.ok(detail.sourceNotes.includes('资格或轮次等待原文核对'));assert.doesNotMatch(mini.publicationCard(data,p).reviewReasons,/原文核对/);assert.deepEqual(detail.actions,[]);
   assert.equal(mini.publicActions(data).length,before);
   const broken=structuredClone(data);(broken.articles.find(a=>a.id===p.articleId)! as unknown as {reviewReasons:unknown}).reviewReasons='wrong-shape';assert.equal(validateBootstrap(broken),false);
  }

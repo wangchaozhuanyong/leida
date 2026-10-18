@@ -1,3 +1,4 @@
+import {CloudbaseRpcError} from './cloudbase/rpc';
 export const WORKER_IDLE_MS = 15_000;
 export const WORKER_HEARTBEAT_MS = 60_000;
 const intervals = { sources: 60_000, generation: 5*60_000, wechat: 30_000, forecast: 60_000 };
@@ -63,4 +64,21 @@ export function createWorkerHeartbeat(write: (error?: string, processedAt?: stri
     flush,
     settled: () => pending ?? Promise.resolve(),
   };
+}
+
+/** Fixed phase names and allowlisted codes only. Never log provider messages or payloads. */
+const workerPhases=['cycle','history_backfill','source_schedule','input_read','generation_schedule','wechat_schedule','forecast','claim','job_generate','job_collect','job_wechat','job_result','job_failure_write','heartbeat'] as const;
+export type WorkerPhase=typeof workerPhases[number];
+export function safeWorkerFailure(error:unknown,phase:WorkerPhase):string {
+  const stage=workerPhases.includes(phase)?phase:'cycle';
+  if(error instanceof CloudbaseRpcError)return `${stage}:${error.diagnosticCode}`;
+  const codes=new Set(['40001','40P01','53300','57P01','57P02','57P03','08000','08001','08003','08004','08006','08007','08P01','ECONNRESET','ECONNREFUSED','ETIMEDOUT','ENOTFOUND','EAI_AGAIN','UND_ERR_CONNECT_TIMEOUT','UND_ERR_HEADERS_TIMEOUT','UND_ERR_SOCKET']);
+  let value:unknown=error;
+  for(let depth=0;depth<3&&value&&typeof value==='object';depth++){
+    const item=value as {code?:unknown;name?:unknown;cause?:unknown};
+    if(typeof item.code==='string'&&codes.has(item.code))return `${stage}:${item.code}`;
+    if(item.name==='AbortError'||item.name==='TimeoutError')return `${stage}:REQUEST_TIMEOUT`;
+    value=item.cause;
+  }
+  return `${stage}:UNCLASSIFIED`;
 }

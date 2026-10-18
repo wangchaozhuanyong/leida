@@ -3,6 +3,7 @@
 /** @typedef {import('../../src/lib/types').BenefitAction} BenefitAction */
 /** @typedef {import('../../src/lib/types').Article} Article */
 /** @typedef {import('../../src/lib/types').RadarEvent} RadarEvent */
+const {publicNewsGroups, homeNewsGroups} = require('./public-feed');
 const dayMs = 86400000;
 const actionLabels = { automatic_reset: '用量重置', banked_reset: '重置卡' };
 const preferenceDefaults = { announcement: true, result: true, activity: false, correction: true };
@@ -141,8 +142,10 @@ function validOutlookAction(value) {
     && ['automatic_reset', 'banked_reset'].includes(value.kind) && ['promised', 'in_progress', 'claimed_complete', 'cancelled'].includes(value.stage)
     && validTime(value.statementAt) && (value.expectedAt === undefined || validTime(value.expectedAt)) && (value.timeNote === undefined || typeof value.timeNote === 'string');
 }
-function outlookAction(item) {
+function outlookAction(item, data) {
+  const previous = data?.publications.filter(p=>p.eventId===item.event.id && p.id!==item.publication.id && !isNewsOnly(p) && Date.parse(p.publishedAt)<Date.parse(item.publication.publishedAt)).sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt)).flatMap(p=>p.event.actions.filter(a=>a.id===item.action.id&&a.kind===item.action.kind&&a.scope==='public'&&['promised','in_progress'].includes(a.stage)&&validTime(a.expectedAt)))[0];
   return { actionId: item.action.id, eventId: item.event.id, publicationId: item.publication.id, kind: item.action.kind, stage: item.action.stage, statementAt: item.action.statementAt,
+    ...(previous?.expectedAt && item.action.expectedAt && Date.parse(previous.expectedAt)!==Date.parse(item.action.expectedAt) ? {previousExpectedAt:previous.expectedAt} : {}),
     ...(validTime(item.action.expectedAt) ? { expectedAt: item.action.expectedAt } : {}), ...(item.action.timeNote ? { timeNote: item.action.timeNote } : {}) };
 }
 function activeOutlookStatus(action, now) {
@@ -150,31 +153,32 @@ function activeOutlookStatus(action, now) {
   return countdown.status === 'expired' ? 'overdue' : action.stage === 'in_progress' ? 'in_progress' : countdown.status === 'upcoming' ? 'scheduled' : 'announced';
 }
 /** The server projection is authoritative; historical experiments never drive the next deadline. */
-function resetOutlookModel(data) {
+function resetOutlookModel(data, kind) {
   const empty = { status: 'monitoring', active: null, latestCompletion: null, lastResolved: null };
   if (!data || !validTime(data.serverTime)) return empty;
-  const supplied = data.forecasts && data.forecasts.outlook;
+  const supplied = kind ? data.forecasts?.outlook?.byKind?.[kind] : data.forecasts && data.forecasts.outlook;
   if (supplied !== undefined) {
     if (!supplied || !['scheduled', 'announced', 'in_progress', 'overdue', 'completed', 'cancelled', 'monitoring'].includes(supplied.status)) return empty;
-    const latestCompletion = validOutlookAction(supplied.latestCompletion) && supplied.latestCompletion.stage === 'claimed_complete' ? supplied.latestCompletion : null;
-    const lastResolved = validOutlookAction(supplied.lastResolved) && ['claimed_complete', 'cancelled'].includes(supplied.lastResolved.stage) && validTime(supplied.lastResolved.resolvedAt) ? supplied.lastResolved : null;
-    const active = ['scheduled', 'announced', 'in_progress', 'overdue'].includes(supplied.status) && validOutlookAction(supplied.active) && ['promised', 'in_progress'].includes(supplied.active.stage) ? supplied.active : null;
+    const matchesKind=value=>!kind||value?.kind===kind;
+    const latestCompletion = matchesKind(supplied.latestCompletion) && validOutlookAction(supplied.latestCompletion) && supplied.latestCompletion.stage === 'claimed_complete' ? supplied.latestCompletion : null;
+    const lastResolved = matchesKind(supplied.lastResolved) && validOutlookAction(supplied.lastResolved) && ['claimed_complete', 'cancelled'].includes(supplied.lastResolved.stage) && validTime(supplied.lastResolved.resolvedAt) ? supplied.lastResolved : null;
+    const active = ['scheduled', 'announced', 'in_progress', 'overdue'].includes(supplied.status) && matchesKind(supplied.active) && validOutlookAction(supplied.active) && ['promised', 'in_progress'].includes(supplied.active.stage) ? supplied.active : null;
     return { status: active ? activeOutlookStatus(active, data.serverTime) : ['completed', 'cancelled'].includes(supplied.status) ? supplied.status : 'monitoring', active, latestCompletion, lastResolved,
       ...(supplied.latestResolutions?{latestResolutions:Object.fromEntries(['automatic_reset','banked_reset'].filter(kind=>validOutlookAction(supplied.latestResolutions[kind])&&['claimed_complete','cancelled'].includes(supplied.latestResolutions[kind].stage)).map(kind=>[kind,supplied.latestResolutions[kind]]))}:{}),
       ...(Array.isArray(supplied.pendingReview)?{pendingReview:supplied.pendingReview.filter(validOutlookAction)}:{}),
       ...(validTime(supplied.latestGlobalCompletionAt)?{latestGlobalCompletionAt:supplied.latestGlobalCompletionAt}:{}),evidenceCutoffAt: validTime(supplied.evidenceCutoffAt) ? supplied.evidenceCutoffAt : undefined };
   }
   // Old API versions can still display published announcements, never cadence or cases.
-  const now = Date.parse(data.serverTime), actions = publicActions(data);
+  const now = Date.parse(data.serverTime), actions = publicActions(data).filter(item=>!kind||item.action.kind===kind);
   const facts = actions.filter(item => validTime(item.action.statementAt) && Date.parse(item.action.statementAt) <= now && validTime(item.publication.publishedAt) && Date.parse(item.publication.publishedAt) <= now).sort((a, b) => Date.parse(b.action.statementAt) - Date.parse(a.action.statementAt));
   const completed = facts.find(item => item.action.stage === 'claimed_complete');
   const resolved = facts.find(item => ['claimed_complete', 'cancelled'].includes(item.action.stage));
   const globalCompleted=facts.find(item=>item.action.kind==='automatic_reset'&&item.action.stage==='claimed_complete');
   const latestResolutions={};
   facts.filter(item=>['claimed_complete','cancelled'].includes(item.action.stage)).forEach(item=>{latestResolutions[item.action.kind]??={...outlookAction(item),resolvedAt:item.action.statementAt};});
-  const pendingAll=upcomingActions(data),needsReview=item=>!!latestResolutions[item.action.kind]&&Date.parse(latestResolutions[item.action.kind].statementAt)>Date.parse(item.action.statementAt);
-  const pendingReview=pendingAll.filter(needsReview).map(outlookAction),pending=pendingAll.find(item=>!needsReview(item)&&(!resolved||Date.parse(item.action.statementAt)>=Date.parse(resolved.action.statementAt)||Date.parse(item.action.expectedAt||'')>=Date.parse(resolved.action.statementAt)));
-  return { ...empty,...(Object.keys(latestResolutions).length?{latestResolutions}:{}),...(pendingReview.length?{pendingReview}:{}),...(globalCompleted?{latestGlobalCompletionAt:globalCompleted.action.statementAt}:{}), status: pending ? activeOutlookStatus(pending.action, data.serverTime) : resolved ? resolved.action.stage === 'claimed_complete' ? 'completed' : 'cancelled' : 'monitoring', active: pending ? outlookAction(pending) : null, latestCompletion: completed ? outlookAction(completed) : null, lastResolved: resolved ? { ...outlookAction(resolved), resolvedAt: resolved.action.statementAt } : null };
+  const pendingAll=upcomingActions(data).filter(item=>!kind||item.action.kind===kind),needsReview=item=>!!latestResolutions[item.action.kind]&&Date.parse(latestResolutions[item.action.kind].statementAt)>Date.parse(item.action.statementAt);
+  const pendingReview=pendingAll.filter(needsReview).map(item=>outlookAction(item,data)),pending=pendingAll.find(item=>!needsReview(item)&&(!resolved||Date.parse(item.action.statementAt)>=Date.parse(resolved.action.statementAt)||Date.parse(item.action.expectedAt||'')>=Date.parse(resolved.action.statementAt)));
+  return { ...empty,...(Object.keys(latestResolutions).length?{latestResolutions}:{}),...(pendingReview.length?{pendingReview}:{}),...(globalCompleted?{latestGlobalCompletionAt:globalCompleted.action.statementAt}:{}), status: pending ? activeOutlookStatus(pending.action, data.serverTime) : resolved ? resolved.action.stage === 'claimed_complete' ? 'completed' : 'cancelled' : 'monitoring', active: pending ? outlookAction(pending, data) : null, latestCompletion: completed ? outlookAction(completed) : null, lastResolved: resolved ? { ...outlookAction(resolved), resolvedAt: resolved.action.statementAt } : null };
 }
 /** @param {BenefitAction} action @param {string} now */
 const stageText = (action, now) => ['promised', 'in_progress'].includes(action.stage) && announcementCountdown(action, now).status === 'expired' ? '已过预计时间 · 等待确认' : ({ promised: '发放预告', in_progress: '进行中', claimed_complete: '公告称已完成', cancelled: '已取消' }[action.stage]);
@@ -201,10 +205,10 @@ function publicationCard(data, publication) {
   const withdrawn = publicationWithdrawn(data, publication);
   const kinds = [...new Set(actions.map(action => actionLabels[action.kind]))].join('＋');
   return {
-    id: publication.id, path: sharePath(publication), title: publication.article.title, summary: publicArticleSummary(publication.article), reviewStatus: publication.article.reviewStatus || '', reviewReasons: (publication.article.reviewReasons || []).join('').replace('活动简写已收录；套餐资格和具体发放安排仍需后续声明核对。', '适用套餐和具体发放时间尚未明确，请以发布方后续公告为准。'),
+    id: publication.id, path: sharePath(publication), title: publication.article.title, summary: publicArticleSummary(publication.article), reviewStatus: publication.article.reviewStatus || '', reviewReasons: publicReviewMessage(publication.article),
     time: displayTime(publicationSourceTime(publication)), historical: isHistoricalArticle(publication.article, data.evidence),
     label: withdrawn ? '已撤回' : isNewsOnly(publication) ? '来源消息' : kinds || (publication.article.category === 'activity' ? '活动动态' : '产品更新'),
-    note: withdrawn ? '已撤回，不能作为当前发放依据' : isNewsOnly(publication) ? '仅新闻收录，不改变发放状态' : '公开公告',
+    note: withdrawn ? '已撤回，不能作为当前发放依据' : isNewsOnly(publication) ? '具体安排以发布方公告为准' : '公开公告',
     tone: withdrawn ? 'muted' : actions.some(action => action.kind === 'banked_reset') ? 'purple' : 'cyan', withdrawn
   };
 }
@@ -224,18 +228,41 @@ function calendarModel(data, selected) {
 }
 /** @param {PublicData} data @param {typeof preferenceDefaults} preferences @param {string[]} read */
 function noticeModel(data, preferences, read) {
-  return data.notices.filter(notice => notice.status === 'active' && (notice.origin === 'admin' || notice.categories.some(category => ['announcement','result','correction'].includes(category)))).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).map(notice => ({ ...notice, time: displayTime(notice.createdAt), read: read.includes(notice.id), path: data.publications.some(item => item.id === notice.publicationId) ? `/pages/detail/index?publicationId=${encodeURIComponent(notice.publicationId)}` : '', missing: notice.origin !== 'admin' && !data.publications.some(item => item.id === notice.publicationId) }));
+  return data.notices.filter(notice => notice.status === 'active' && (notice.origin === 'admin' || notice.categories.some(category => ['announcement','result','correction'].includes(category)))).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).map(notice => ({ ...notice, summary:publicNoticeSummary(notice, data.publications), time: displayTime(notice.createdAt), read: read.includes(notice.id), path: data.publications.some(item => item.id === notice.publicationId) ? `/pages/detail/index?publicationId=${encodeURIComponent(notice.publicationId)}` : '', missing: notice.origin !== 'admin' && !data.publications.some(item => item.id === notice.publicationId) }));
 }
 /** Public reading copy; ingestion metadata remains unchanged in the stored article. */
 function publicArticleSummary(article) {
   if (article.contentOrigin !== 'template' || article.manualFields?.includes('summary')) return article.summary;
   return article.summary
+    .replace(/^AIPlanWatch 将对应原帖记录为公共额度重置；原帖仅为简短完成表达，福利类型采用参考项目分类，未虚构回复关系。/, 'AIPlanWatch 已收录本次额度重置完成消息。')
+    .replace(/原文承诺日终前完成，预计最晚时间已换算为北京时间（UTC\+8）；(?:按原文PST字面UTC-8换算，未自行改用当地夏令时；)?这是公告预计时间，仍待实际确认。/g, '预计时间仅供参考，以实际发放为准。')
+    .replace(/（依据 AIPlanWatch 分类，适用套餐以原公告为准）/g, '（适用套餐暂未明确）')
+    .replace(/(?:原文近似时间：约略预计时刻，并非最晚截止，未给出误差范围；|原文预计时刻：并非最晚截止；)?按原文(?:PST|PDT)字面UTC-(?:7|8)换算，未自行改用当地夏令时；这是公告预计时间，仍待实际确认。/g, '预计时间仅供参考，以实际发放为准。')
+    .replace(/原文预计时间：[^\n]*?；日期、精度或时区尚不明确，未生成精确截止。/g, '具体发放时间暂未明确。')
+    .replace(/已换算为北京时间（UTC\+8）/g, '北京时间')
     .replace(/^已保存公开来源消息。活动简写已收录；套餐资格和具体发放安排仍需后续声明核对。此条不计入已重置、已发卡或预测准确率；请查看原文依据。$/, '发布方提及后续活动，具体安排仍待明确。')
     .replace('已保存发布说明；完整中文改动会在智能服务可用后自动补充。', '更新细节请查看官方发布说明。')
     .replace(/^公开归档收录(?:产品动态|消息)：[“「]([\s\S]*?)[”」]。此条仅作(?:产品)?消息记录，完整细节请查看原文。$/, '$1')
-    .replace(/^根据(?:公开归档保存的原帖|公开原文)，/, '')
+    .replace(/根据(?:公开归档保存的原帖|公开原文)，/g, '')
     .replace(/\s*原文发布时间：[^。\n]*。这是中文事实摘要，/g, ' ')
     .trim();
+}
+
+/** Uncertain evidence stays uncertain, without publishing reviewer work notes. */
+function publicReviewMessage(article) {
+  return article.reviewStatus === 'pending' ? '这条消息尚不能确认重置或发卡，请等待后续公告。'
+    : article.reviewStatus === 'targeted_update' ? '仅涉及部分账户，具体适用范围请查看原文。' : '';
+}
+function publicSourceNotes(article, actions = []) {
+  const reference = article.summary.match(/^AIPlanWatch 将对应原帖记录为公共额度重置；[^。]*。/)?.[0];
+  return [...new Set([...(reference ? [reference] : []), ...(article.reviewReasons ?? []), ...actions.map(action => action.timeNote).filter(note => !!note)])];
+}
+function publicEligibility(action) {
+  return action.eligibility.replace(/^公开额度重置（依据 AIPlanWatch 分类，适用套餐以原公告为准）$/, '暂未明确').trim() || '暂未明确';
+}
+function publicNoticeSummary(notice, publications = []) {
+  const publication = publications.find(p => p.id === notice.publicationId);
+  return notice.origin === 'admin' || !publication ? notice.summary : publicArticleSummary({...publication.article, summary:notice.summary});
 }
 function publicArticleContent(article) {
   const translation = article.translation?.trim() || '', summary = publicArticleSummary(article).trim() || translation;
@@ -264,13 +291,15 @@ function resolveDetail(data, query) {
     seenSources.add(key); return true;
   });
   return {
-    missing: false, publicationId: publication.id, title: publication.article.title, ...publicArticleContent(publication.article), reviewStatus: publication.article.reviewStatus || '', reviewReasons: (publication.article.reviewReasons || []).join('').replace('活动简写已收录；套餐资格和具体发放安排仍需后续声明核对。', '适用套餐和具体发放时间尚未明确，请以发布方后续公告为准。'),
+    missing: false, publicationId: publication.id, title: publication.article.title, ...publicArticleContent(publication.article), reviewStatus: publication.article.reviewStatus || '', reviewReasons: publicReviewMessage(publication.article),
     time: displayTime(articleSourceTime(publication.article)),
     historical: isHistoricalArticle(publication.article, data.evidence), newsOnly, withdrawn, merged, isOld,
     version: newsOnly ? publication.article.version : publication.event.version, cutoff: displayTime(publication.cutoffAt), publishedAt: displayTime(publication.publishedAt),
     canShare: !withdrawn && !merged, mergePath: targetPublication ? sharePath(targetPublication) : '', latestPath: !merged && isOld && current ? sharePath(current) : '',
-    actions: newsOnly ? [] : publication.event.actions.map(action => ({ id: action.id, label: actionLabels[action.kind], stage: stageText(action, isOld || merged ? publication.cutoffAt : data.serverTime), eligibility: action.eligibility, scope: { public: '普发', targeted: '定向', private: '私人' }[action.scope], expectedAt: action.expectedAt ? displayTime(action.expectedAt) : action.timeNote || '尚未明确时间', quote: action.evidenceQuote || '' })),
-    evidence: evidence.map(item => ({ id: item.id, label: { official: '官方原文', archive: '第三方收录', manual: '补充来源' }[item.provenance], text: item.text, origin: item.textOrigin === 'archive_excerpt' ? '仅收录原文片段' : item.textOrigin === 'structured' ? '来源摘要' : '', complete: item.contextComplete, time: displayTime(item.publishedAt), url: safeUrl(item.url) || '' }))
+    actions: newsOnly ? [] : publication.event.actions.map(action => ({ id: action.id, label: actionLabels[action.kind], stage: stageText(action, isOld || merged ? publication.cutoffAt : data.serverTime), eligibility: publicEligibility(action), scope: { public: '普发', targeted: '定向', private: '私人' }[action.scope], expectedAt: action.expectedAt ? displayTime(action.expectedAt) : '暂未明确', quote: action.evidenceQuote || '' })),
+    sourceNotes: publicSourceNotes(publication.article, newsOnly ? [] : publication.event.actions),
+    updates: (publicNewsGroups(data).find(group=>group.updates.some(p=>p.id===publication.id))?.updates || []).filter(p=>p.id!==publication.id).map(p=>({id:p.id,title:p.article.title,time:displayTime(publicationSourceTime(p)),path:sharePath(p)})),
+    evidence: evidence.map(item => ({ id: item.id, name: (data.sources.find(source=>source.id===item.sourceId)?.name || '原文记录').replace('（辅助来源）','').replace('（免费）',''), label: { official: '官方原文', archive: '第三方收录', manual: '补充来源' }[item.provenance], text: item.text, origin: item.textOrigin === 'archive_excerpt' ? '仅收录原文片段' : item.textOrigin === 'structured' ? '来源摘要' : '', complete: item.contextComplete, time: displayTime(item.publishedAt), url: safeUrl(item.url) || '' }))
   };
 }
 /** Count calendar dates in the configured zone, without assuming every device has Intl. */
@@ -437,4 +466,4 @@ function forecastOutcomeModel(snapshot, data) {
   });
   return { available: true, entries, message: entries.length ? '按后续观测时间排列，最新记录在前。' : '尚无已关联的后续记录；不代表没有公告或不会发放。', note };
 }
-module.exports = {referenceCadenceView, publicArticleSummary, publicArticleContent, sourceStatus, actionLabels, recentCompletedBenefits, preferenceDefaults, dateKey, displayTime, elapsed, completionTime, latestCompletedBenefits, completionElapsed, articleSourceTime, sortedArticles, isNewsOnly, currentPublication, statePublication, publicationSourceTime, sortedPublications, sortedStatePublications, publicActions, isHistoricalArticle, upcomingActions, announcementCountdown, resetOutlookModel, stageText, calendarDays, safeUrl, sharePath, publicationWithdrawn, publicationCard, calendarModel, noticeModel, resolveDetail, activityDayNumber, activityHomeVisible, activityModel, validateForecastSnapshot, validateForecastPublicData, validateResetWatch, activeResetWatch, activeResetSchedule, resetWatchWindow, probabilityText, forecastPath, forecastSnapshotModel, currentForecast, forecastReferenceModel, forecastOutcomeModel };
+module.exports = { publicNewsGroups, homeNewsGroups, publicSourceNotes, publicEligibility, publicReviewMessage, publicNoticeSummary,referenceCadenceView, publicArticleSummary, publicArticleContent, sourceStatus, actionLabels, recentCompletedBenefits, preferenceDefaults, dateKey, displayTime, elapsed, completionTime, latestCompletedBenefits, completionElapsed, articleSourceTime, sortedArticles, isNewsOnly, currentPublication, statePublication, publicationSourceTime, sortedPublications, sortedStatePublications, publicActions, isHistoricalArticle, upcomingActions, announcementCountdown, resetOutlookModel, stageText, calendarDays, safeUrl, sharePath, publicationWithdrawn, publicationCard, calendarModel, noticeModel, resolveDetail, activityDayNumber, activityHomeVisible, activityModel, validateForecastSnapshot, validateForecastPublicData, validateResetWatch, activeResetWatch, activeResetSchedule, resetWatchWindow, probabilityText, forecastPath, forecastSnapshotModel, currentForecast, forecastReferenceModel, forecastOutcomeModel };

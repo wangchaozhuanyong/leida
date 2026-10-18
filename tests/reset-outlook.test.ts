@@ -68,7 +68,7 @@ test('没有时间的预告不猜小时；没有新证据不能生成下一轮�
  const data=fixture(publication('promised',{expectedAt:undefined}));
  assert.equal(publicResetOutlook(data).status,'announced');
  const empty={...data,events:[],articles:[],publications:[],forecasts:{status:'ready' as const,ruleVersion:'test',modelVersion:'test',generatedAt:data.serverTime,cases:[],reference:referenceForecast()}};
- assert.deepEqual(publicResetOutlook(empty),{status:'monitoring'});
+ assert.deepEqual(publicResetOutlook(empty),{status:'monitoring',byKind:{automatic_reset:{status:'monitoring'},banked_reset:{status:'monitoring'}}});
 });
 
 test('较早未关联预告不能遮住新完成；保留旧事件原状态而不猜同轮',()=>{
@@ -116,7 +116,7 @@ test('私人、定向、仅新闻、撤回、未来预告均不进入公共预�
  const withdrawn=publication();withdrawn.event.status='withdrawn';cases.push(withdrawn);
  const future=publication();future.publishedAt='2026-10-12T00:00:00Z';cases.push(future);
  const invalid=publication();invalid.publishedAt='无效时间';cases.push(invalid);
- for(const p of cases)assert.deepEqual(publicResetOutlook(fixture(p)),{status:'monitoring'});
+ for(const p of cases)assert.deepEqual(publicResetOutlook(fixture(p)),{status:'monitoring',byKind:{automatic_reset:{status:'monitoring'},banked_reset:{status:'monitoring'}}});
 });
 
 test('历史补录预告不冒充现在，历史完成仍可查；延迟证据不制造预测',()=>{

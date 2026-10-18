@@ -3,6 +3,7 @@ import type { Activity, Article, Evidence, PublicData, Publication, RadarEvent, 
 import type { PublicReadEnvelope, PublicReadOptions, PublicView } from '../lib/public-read';
 import { projectPublicHistory } from '../lib/history';
 import { publicActions, publicationSourceTime, recentCompletedBenefits } from '../lib/public-facts';
+import { publicNewsGroups, homeNewsGroups } from '../lib/public-feed';
 import { publicResetOutlook } from '../lib/reset-outlook';
 import { activityDayNumber } from '../lib/activity-display';
 import { getPublicForecast, forecastTablesAvailable } from './forecast';
@@ -103,6 +104,19 @@ export function decodeCursor(value: string | undefined, options: PublicReadOptio
   if (!value) return;
   try { const parsed = JSON.parse(Buffer.from(value, 'base64url').toString()); if (parsed.view !== options.view || parsed.filter !== options.filter || typeof parsed.id !== 'string' || !Number.isFinite(Date.parse(parsed.at)) || !Number.isFinite(Date.parse(parsed.publishedAt))) return fail(); return parsed; } catch { return fail(); }
 }
+/** Group before paging, using existing lightweight public facts; no database mutation. */
+export function paginatePublicNews(facts: PublicData, options: PublicReadOptions) {
+  const cursor = decodeCursor(options.cursor, options);
+  const groups = publicNewsGroups(facts).filter(group => !options.filter || options.filter === 'all' || group.category === options.filter);
+  const rows = groups.map(group => ({group, id:group.latest.id, at:publicationSourceTime(group.latest), publishedAt:group.latest.publishedAt}));
+  const after = rows.filter(row => !cursor || Date.parse(row.at) < Date.parse(cursor.at)
+    || Date.parse(row.at) === Date.parse(cursor.at) && (Date.parse(row.publishedAt) < Date.parse(cursor.publishedAt)
+    || Date.parse(row.publishedAt) === Date.parse(cursor.publishedAt) && row.id > cursor.id));
+  const visible = after.slice(0, 20), last = visible.at(-1);
+  const selected = new Set(visible.flatMap(row => row.group.updates.map(p => p.id).concat(row.id)));
+  return {selected, page:{ids:visible.map(row=>row.id), total:rows.length, nextCursor:after.length > 20 && last
+    ? encodePublicCursor({at:last.at,publishedAt:last.publishedAt,id:last.id,view:options.view,filter:options.filter || 'all'}) : null}};
+}
 async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicReadEnvelope> {
   const rpc=configuredPublicRpc();
   if(rpc)return (await import('./cloudbase/public-read')).createCloudbasePublicReader(rpc).read(options);
@@ -113,13 +127,17 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
     const site = (await client.query("SELECT payload FROM radar_settings WHERE id='site'")).rows[0]?.payload;
     const empty: PublicData = { events: [], articles: [], publications: [], evidence: [], notices: [], activities: [], sources: state.sources, site: site || { name: '模钥重置雷达', description: '', autoPublish: false, version: 1 }, serverTime: now };
     if (options.view === 'state') return { data: empty, version: state.version, contentVersion: state.contentVersion };
-    const facts = ['home','methodology','calendar'].includes(options.view) ? await readPublicFacts(client, now) : {...empty};
+    const facts = ['home','methodology','calendar','news'].includes(options.view) ? await readPublicFacts(client, now) : {...empty};
     const activities: Activity[] = (await client.query('SELECT payload FROM radar_activities')).rows.map(row => row.payload);
     const selected = new Set<string>();
     let page: PublicReadEnvelope['page'];
     let extraEvidence: string[] = [];
     const detailed = options.view === 'detail' || options.view === 'activity';
-    if (options.view === 'history' || options.view === 'news') {
+    if (options.view === 'news') {
+      const grouped = paginatePublicNews(facts, options);
+      grouped.selected.forEach(id => selected.add(id));
+      page = grouped.page;
+    } else if (options.view === 'history') {
       // Filtering, ordering and the 20-row window happen in SQL, never Array.slice pagination.
       const cursor = decodeCursor(options.cursor, options), args: unknown[] = [options.filter || 'all'];
       const history = options.view === 'history';
@@ -134,11 +152,12 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
       page = { ids: visible.map(row => row.id), total: count.rows[0].total, nextCursor: rows.length > 20 ? encodePublicCursor({ at: new Date(visible.at(-1)!.at).toISOString(), publishedAt:new Date(visible.at(-1)!.published).toISOString(), id: visible.at(-1)!.id, view: options.view, filter: options.filter || 'all' }) : null };
     } else if (options.view === 'home' || options.view === 'methodology') {
       const outlook = publicResetOutlook(facts);
+      for (const lane of Object.values(outlook.byKind ?? {})) for (const round of [lane.active,lane.latestCompletion,lane.lastResolved]) if (round) selected.add(round.publicationId);
       for (const id of [outlook.active?.publicationId, outlook.latestCompletion?.publicationId, outlook.lastResolved?.publicationId]) if (id) selected.add(id);
       const actions = publicActions(facts).sort((a,b) => Date.parse(b.action.statementAt)-Date.parse(a.action.statementAt));
       recentCompletedBenefits(facts).forEach(item=>selected.add(item.publication.id));
       for (const kind of ['automatic_reset','banked_reset']) { const item = actions.find(item => item.action.kind === kind && item.action.stage === 'claimed_complete' && Date.parse(item.action.statementAt) <= Date.parse(now) && Date.parse(item.publication.publishedAt) <= Date.parse(now)); if (item) selected.add(item.publication.id); }
-      facts.articles.slice().sort((a,b) => Date.parse(b.sourcePublishedAt || b.publishedAt)-Date.parse(a.sourcePublishedAt || a.publishedAt)).slice(0,3).forEach(article => selected.add(article.publicationId));
+      homeNewsGroups(facts).forEach(group => selected.add(group.latest.id));
     } else if (options.view === 'calendar') {
       publicActions(facts).forEach(item => selected.add(item.publication.id));
     } else if (options.view === 'activity') {
