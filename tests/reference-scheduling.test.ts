@@ -3,11 +3,26 @@ import assert from 'node:assert/strict';
 import {pool,put,list,transaction} from '../src/db';
 import type {Candidate,Evidence,Job,Notice,Publication,Source} from '../src/lib/types';
 import {createEvidence,defaultSite,getPublicData,publishHistoricalDraft,queueJob} from '../src/server/service';
-import {buildAutomaticTemplate} from '../src/server/automatic-content';
+import {buildAutomaticTemplate,evidenceFingerprint} from '../src/server/automatic-content';
 import {parseReferenceLatest,REFERENCE_RESET_SOURCE} from '../src/server/reference-reset-source';
 import {parseReferenceOriginal} from '../src/server/source-enrichment';
 import {generationCandidateOrder,runOne,scheduleDue} from '../src/server/worker';
 import {publicResetOutlook} from '../src/lib/reset-outlook';
+import {gatherEvidenceContext,processingObstacles} from '../src/server/source-context';
+
+test('同帖Tibo裸Done原文不替代参考分类的原文补证，也不能阻止补证入队',()=>{
+ const at='2026-10-18T09:00:00.000Z',doneAt='2026-10-17T21:12:21.000Z',postId='2111566005684289735',source={url:`https://x.com/thsottiaux/status/${postId}`};
+ const raw=parseReferenceLatest({schema_version:1,generated_at:at,last_global_reset:{event_id:'source-overlap',reset_type:'global',record_status:'recorded',occurred_at:doneAt,source},latest_signal:{signal_id:postId,recorded_at:doneAt,summary:'Done',source}},at)[0];
+ const excerpt:Evidence={...raw,id:'reference-excerpt',hash:'excerpt',historical:true};
+ const tibo:Evidence={...excerpt,id:'tibo-original',hash:'original',sourceId:'tibo-public',textOrigin:'original',metadata:{sourceGroup:'fxembed:thsottiaux',category:'reset'}};
+ const context=gatherEvidenceContext(excerpt,[excerpt,tibo]);
+ assert.equal(buildAutomaticTemplate(context),undefined,'裸Done和参考摘要不能直接发布完成');
+ assert.equal(processingObstacles(context).missing,true,'参考候选仍需补成自身可核验的原文，不得被其他来源同帖原文错误标成无需补证');
+ const verified=parseReferenceOriginal({code:200,tweet:{id:postId,text:'Done',created_at:doneAt,author:{id:'1953337039510003712',screen_name:'thsottiaux'}}},excerpt,at)!;
+ assert.equal(processingObstacles([excerpt,verified]).missing,false,'本来源核验过的原文仍可作为补证');
+ const archive={...excerpt,id:'other-archive',sourceId:'reset-archive',metadata:{sourceGroup:'codex-resets',category:'reset' as const}};
+ assert.equal(processingObstacles([archive,tibo]).missing,false,'不改变其他归档沿用的跨来源上下文规则');
+});
 
 test('新消息优先、最新完成线索其次；普通历史仍按原文顺序且不改写事实',()=>{
  const at='2026-10-18T09:00:00.000Z';
@@ -50,7 +65,11 @@ test('历史积压不饿死最新完成对账：先核验原帖、结束旧倒�
   const existingJob=await transaction(c=>queueJob('generate',{candidateId:backlog[0].id,historical:true,automatic:true,contextProbe:true,expectedVersion:1,evidencePublishedAt:time(-30*86_400_000)},c));
   const source={url:`https://x.com/thsottiaux/status/${postId}`};
   const record=parseReferenceLatest({schema_version:1,generated_at:snapshotAt,last_global_reset:{event_id:'priority-fixture',reset_type:'global',record_status:'recorded',occurred_at:doneAt,source},latest_signal:{signal_id:postId,recorded_at:doneAt,summary:'Done',source}},snapshotAt)[0];
+  await put('sources',{...backlogSource,id:'tibo-public',kind:'timeline',url:'https://api.fxtwitter.com/2/profile/thsottiaux/statuses'});
+  await createEvidence({...record,sourceId:'tibo-public',textOrigin:'original',historical:true,metadata:{sourceGroup:'fxembed:thsottiaux',category:'reset'}});
   const latest=await createEvidence({...record,historical:true});
+  const currentContext=gatherEvidenceContext(latest.evidence,await list<Evidence>('evidence'));
+  await put('candidates',{...latest.candidate!,automation:{...latest.candidate!.automation!,state:'deferred',reasonCodes:['rule_unsupported'],inputFingerprint:evidenceFingerprint(currentContext),evaluatedAt:snapshotAt}});
   assert.ok(publicResetOutlook(await getPublicData()).active,'修复前公开预告仍存在');
   await scheduleDue({skipSources:true});
   const queued=(await list<Job>('jobs')).filter(job=>job.status==='queued');

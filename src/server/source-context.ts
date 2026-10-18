@@ -1,4 +1,4 @@
-import {referenceCompletionClaim} from './reference-reset-source';
+import {referenceCompletionClaim,REFERENCE_RESET_SOURCE} from './reference-reset-source';
 import type { Evidence } from '../lib/types';
 import { extractBenefitClaims, extractReplyClaims, hasDayEndDeadline, isTruncatedBenefitText, type BenefitClaim } from './benefit-rules';
 
@@ -198,7 +198,9 @@ export function processingObstacles(context:Evidence[]):{codes:string[];missing:
   if(!primary)return {codes:['rule_unsupported'],missing:false,conflict:false};
   const codes:string[]=[];
   if(context.some(e=>originalConflict(e,context)))codes.push('evidence_conflict');
-  if(context.some(e=>isTruncatedText(e.text)||e.textOrigin==='archive_excerpt'&&!isVerifiedCampaignCalendar(e,context)&&!context.some(o=>o.textOrigin==='original'&&o.messageId===e.messageId&&namespace(o)===namespace(e)&&!isTruncatedText(o.text))))codes.push('truncated_body');
+  // The typed reference claim needs its own verified original. Another source's
+  // bare Done has no benefit type and must not suppress this enrichment probe.
+  if(context.some(e=>isTruncatedText(e.text)||e.textOrigin==='archive_excerpt'&&!isVerifiedCampaignCalendar(e,context)&&!context.some(o=>o.textOrigin==='original'&&o.messageId===e.messageId&&namespace(o)===namespace(e)&&(e.sourceId!==REFERENCE_RESET_SOURCE.id||o.sourceId===e.sourceId)&&!isTruncatedText(o.text))))codes.push('truncated_body');
   if(context.some(e=>e.parentId&&!context.some(p=>isExplicitParent(e,p))))codes.push('missing_parent');
   if(!evidenceBenefitClaims(primary,context).length&&/reset|重置|banked/i.test(primary.text))codes.push('ambiguous_kind_or_audience');
   if(!codes.length)codes.push('rule_unsupported');
