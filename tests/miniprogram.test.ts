@@ -663,7 +663,11 @@ test('原始来源链接仅允许明确HTTP地址，不执行脚本或复制隐�
 test('原生项目配置与页面完整，支持游客或真实AppID，正文与触控规格有实物对应', () => {
   const app = JSON.parse(readFileSync(resolve(root, 'miniprogram/app.json'), 'utf8'));
   const project = JSON.parse(readFileSync(resolve(root, 'miniprogram/project.config.json'), 'utf8'));
-  assert.equal(app.pages.length, 12);
+  const pages = [...app.pages, ...app.subPackages.flatMap((pack: { root: string; pages: string[] }) => pack.pages.map(page => `${pack.root}/${page}`))];
+  assert.equal(pages.length, 12);
+  assert.equal(new Set(pages).size, pages.length);
+  assert.ok(pages.includes('packages/poster/index'));
+  assert.ok(app.tabBar.list.every((tab: { pagePath: string }) => app.pages.includes(tab.pagePath)));
   assert.ok(app.pages.includes('pages/replay/index'));
   assert.equal(app.window.backgroundColorTop,app.window.backgroundColor);
   assert.equal(app.window.backgroundColorBottom,app.window.backgroundColor);
@@ -672,7 +676,7 @@ test('原生项目配置与页面完整，支持游客或真实AppID，正文与
   assert.equal(project.compileType, 'miniprogram');
   assert.equal(project.miniprogramRoot, './');
   assert.equal(project.setting.urlCheck, true);
-  for (const page of app.pages) for (const extension of ['js', 'json', 'wxml', 'wxss']) assert.equal(existsSync(resolve(root, 'miniprogram', `${page}.${extension}`)), true, `${page}.${extension}`);
+  for (const page of pages) for (const extension of ['js', 'json', 'wxml', 'wxss']) assert.equal(existsSync(resolve(root, 'miniprogram', `${page}.${extension}`)), true, `${page}.${extension}`);
   const css = readFileSync(resolve(root, 'miniprogram/app.wxss'), 'utf8');
   assert.match(css, /font-size:\s*16px/); assert.match(css, /min-height:\s*44px/);
   assert.equal(app.tabBar.list[0].text, '首页');

@@ -16,7 +16,7 @@ import type {PublicData,Publication} from '../src/lib/types';
 const require=createRequire(import.meta.url);
 const native=require('../miniprogram/utils/status-timeline.js');
 const nativeModel=require('../miniprogram/utils/model.js');
-const nativePoster=require('../miniprogram/utils/status-poster.js');
+const nativePoster=require('../miniprogram/packages/poster/status-poster.js');
 const now='2026-10-17T04:00:00.000Z';
 const source={type:'x_post',author:'thsottiaux',url:'https://x.com/thsottiaux/status/2111176111111111111'};
 function response():any {return {meta:{api_version:'v1',generated_at:now},data:{latest_reset:{reset_type:'regular',announced_at:'2026-10-15T06:28:13Z'},scheduled_reset:null,active_watch:{level:'elevated',reset_chance_percent:73,forecast_window:'within 10 hours',observed_at:'2026-10-16T19:00:00Z',expires_at:'2026-10-17T05:00:00Z',text:'A possible reset, not a commitment.',source}}};}
@@ -87,7 +87,7 @@ test('原生海报在信号到期时主动清除预览和缓存，不能切换�
   let definition:any,clock=Date.parse(now);const timers:any[]=[];
   const value=data(),state={data:value,receivedAt:clock};
   class ClockDate extends Date {static now(){return clock;}}
-  new Script(readFileSync('miniprogram/pages/poster/index.js','utf8')).runInNewContext({Date:ClockDate,Page(d:any){definition=d;},wx:{},getApp:()=>({client:{getState:()=>state}}),setTimeout(fn:()=>void,delay:number){const timer={fn,delay,unref(){}};timers.push(timer);return timer;},clearTimeout(){},require(path:string){if(path.endsWith('/page'))return {createPage:(_build:unknown,extra:any)=>({...extra,...extra.methods})};if(path.endsWith('/status-poster'))return nativePoster;if(path.endsWith('/poster'))return {};return {privacyRequired:async()=>false};}});
+  new Script(readFileSync('miniprogram/packages/poster/index.js','utf8')).runInNewContext({Date:ClockDate,Page(d:any){definition=d;},wx:{},getApp:()=>({client:{getState:()=>state}}),setTimeout(fn:()=>void,delay:number){const timer={fn,delay,unref(){}};timers.push(timer);return timer;},clearTimeout(){},require(path:string){if(path.endsWith('/page'))return {createPage:(_build:unknown,extra:any)=>({...extra,...extra.methods})};if(path.endsWith('/status-poster'))return nativePoster;if(path.endsWith('/poster'))return {};return {privacyRequired:async()=>false};}});
   const page={...definition,data:{...definition.data},_active:true,_artifacts:{precision:{artifact:{tempFilePath:'old.png'}}},setData(patch:any){Object.assign(this.data,patch);},generate(){}};
   page.afterRender();assert.ok(page._snapshot);assert.ok(timers.some(t=>t.delay===3600020));
   page.data.preview='old.png';clock+=3600020;timers.find(t=>t.delay===3600020).fn();

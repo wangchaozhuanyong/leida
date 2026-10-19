@@ -1,7 +1,7 @@
-const m=require('./model');
-const {statusTimelineModel,statusTimelineRevision}=require('./status-timeline');
-const {PosterError,loadCanvasImage,exportCanvas}=require('./poster');
-const assets={precision:'/assets/posters/precision.jpg',editorial:'/assets/posters/editorial.jpg',brand:'/assets/posters/brand.png',website:'/assets/posters/website-qr.png'};
+const m=require('../../utils/model');
+const {statusTimelineModel,statusTimelineRevision}=require('../../utils/status-timeline');
+const {PosterError,loadCanvasImage,exportCanvas}=require('../../utils/poster');
+const assets={precision:'/assets/posters/precision.jpg',editorial:'/assets/posters/editorial.jpg',brand:'/packages/poster/brand.png',website:'/assets/posters/website-qr.png'};
 function dateTime(value){
   if(!Number.isFinite(Date.parse(value)))return{date:'暂无公开公告',time:''};
   const d=new Date(Date.parse(value)+8*3600000),pad=n=>String(n).padStart(2,'0');

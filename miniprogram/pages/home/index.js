@@ -58,7 +58,7 @@ Page(createPage((data, query, page, app) => {
   },
   cancelCalendarPrefetch() { if(this._calendarPrefetchTimer)clearTimeout(this._calendarPrefetchTimer);this._calendarPrefetchTimer=null; },
   toggleFreshness() { this.setData({ freshnessOpen: !this.data.freshnessOpen }); },
-  openPoster() { if (this.data.connected) wx.navigateTo({ url:'/pages/poster/index' }); },
+  openPoster() { if (this.data.connected) wx.navigateTo({ url:'/packages/poster/index',fail(){wx.showToast({title:'海报页面加载失败，请重试。',icon:'none'});} }); },
   syncCountdown() {
     if (!this.data.dial?.completed && !this.data.lastReset && !this.data.resetCards?.some(card=>['scheduled','revised','completed'].includes(card.state)) && !(this.data.pending && this.data.pending.counting) && !(this.data.timeline && (this.data.timeline.completed || this.data.timeline.scheduled))) { this.stopCountdown(); return; }
     if (!this._countdownTimer) this._countdownTimer = setInterval(() => this.tickCountdown(), 1000);

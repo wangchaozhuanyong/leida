@@ -88,7 +88,8 @@ test('Every configured page retains a header outside its loading branch, with ba
   assert.equal(app.usingComponents['navigation-header'], '/components/navigation-header/index');
   assert.equal(app.tabBar.list.length, 4);
   const tabs = new Set(app.tabBar.list.map((item: { pagePath: string }) => item.pagePath));
-  for (const page of app.pages) {
+  const pages = [...app.pages, ...app.subPackages.flatMap((pack: { root: string; pages: string[] }) => pack.pages.map(page => `${pack.root}/${page}`))];
+  for (const page of pages) {
     const template = readFileSync(new URL(`../miniprogram/${page}.wxml`, import.meta.url), 'utf8');
     const header = template.match(/<navigation-header\b[^>]*\/>/)?.[0];
     assert.ok(header, `${page} has a custom header`);
