@@ -46,7 +46,11 @@ test('未来、无效、未完成、个人、新闻以及撤回记录均不能�
 test('完成后主状态等待下一轮，持续保留上次重置计时和完成记录',()=>{
  const data=fixture([reset(),card()],'2026-10-14T08:00:00.000Z');
  const html=renderToStaticMarkup(createElement(Home,{data,historical:false,onWechatReminders:()=>{},onPoster:()=>{},onShare:async()=>{}}));
- assert.match(html,/等待下一次 Reset/);assert.match(html,/pub-reset-last-facts/);assert.match(html,/上次额度重置/);
+ assert.match(html,/等待下一次 Reset/);assert.match(html,/上次额度重置/);
+ assert.equal((html.match(/class="pub-last-reset-value"/g)||[]).length,1,'历史秒计时只展示一次');
+ assert.match(html,/aria-label="1天2小时53分钟53秒"/);
+ assert.ok(html.indexOf('pub-home-current')<html.indexOf('pub-last-reset'),'历史计时位于当前进度之后');
+ assert.doesNotMatch(html,/pub-dial-face|pub-reset-last-facts/);
  assert.match(html,/公告称已重置用量/);assert.match(html,/公告称已发放重置卡/);
  assert.match(html,/href="\/events\/event-reset"/);assert.match(html,/href="\/events\/event-card"/);
  assert.match(html,/2026\/10\/13 13:06/);assert.match(html,/2026\/10\/13 15:25/);
