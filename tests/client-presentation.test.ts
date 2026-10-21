@@ -51,17 +51,19 @@ test('详情只展示一份重复来源，动作独有的不同原文仍可达',
   assert.match(html,/查看来源/);assert.doesNotMatch(html,/相同内容的另外|辅助归档/);
   assert.match(html,/个人账户是否到账尚未观测/);assert.match(html,/原帖未列明具体套餐/);
 });
-test('等待期间完成公告前置，明确预告才进入倒计时布局',()=>{
+test('首页先显示当前进度，再显示独立历史计时，预告不会清空最近完成记录',()=>{
   const data=fixture();
   const render=()=>renderToStaticMarkup(createElement(Home,{data,historical:false,onWechatReminders(){},onPoster(){},onShare:async()=>{}}));
-  const idle=render();assert.match(idle,/pub-instrument-layout is-idle/);assert.match(idle,/上次额度重置/);
-  assert.ok(idle.indexOf('最近完成公告')<idle.indexOf('查看最近公告'));
-  assert.ok(idle.indexOf('pub-home-completions')<idle.indexOf('pub-home-actions'));
+  const idle=render();assert.match(idle,/pub-home-dashboard/);assert.match(idle,/上次额度重置已经过去/);
+  assert.doesNotMatch(idle,/pub-dial-face|pub-home-dial/);
+  assert.ok(idle.indexOf('pub-reset-progress')<idle.indexOf('pub-last-reset'));
+  assert.ok(idle.indexOf('pub-last-reset')<idle.indexOf('pub-home-card-actions'));
   const pending=structuredClone(publication);pending.id='v2';pending.article.id='article2';pending.article.publicationId='v2';pending.event.id='event2';pending.eventId='event2';pending.event.publicationId='v2';
   pending.event.actions=[{...pending.event.actions[0],id:'new-action',stage:'promised',statementAt:'2026-10-12T04:30:00Z',expectedAt:'2026-10-12T08:20:00Z',timeNote:'原文预计时刻'}];
   data.publications.push(pending);data.events.push(pending.event);data.articles.push(pending.article);
-  const active=render();assert.doesNotMatch(active,/pub-instrument-layout is-idle/);assert.match(active,/3小时20分钟/);assert.match(active,/公开预告/);
-  assert.match(active,/查看本次公告/);assert.match(active.match(/<a\b[^>]*class="pub-home-evidence"[^>]*>/)?.[0]||'',/href="\/events\/event2"/);
+  const active=render();assert.doesNotMatch(active,/pub-dial-face/);assert.match(active,/3小时20分钟/);assert.match(active,/公开预告/);
+  assert.match(active,/查看安排依据/);assert.match(active,/href="\/events\/event2\?version=v2"/);
+  assert.doesNotMatch(active,/pub-home-record-evidence/);
   assert.equal((active.match(/class="pub-home-completions"/g)||[]).length,1,'完成记录不因当前预告重复分组');
 });
 test('同轮提醒只归组展示，保留全部版本与原始顺序',()=>{
@@ -77,7 +79,7 @@ test('依据入口保留真实原文片段，待开放提醒不承诺可订阅',
   const html=renderToStaticMarkup(createElement(SearchParamsContext.Provider,{value:new URLSearchParams()},createElement(EventPage,{data,id:'event',onPoster(){},onShare:async()=>{}})));
   assert.match(html,/完成声明的实际原文。/);assert.doesNotMatch(html,/来源1 ·/);
   const home=renderToStaticMarkup(createElement(Home,{data,historical:false,wechatEntry:'unavailable',onWechatReminders(){},onPoster(){},onShare:async()=>{}}));
-  assert.match(home,/待开放/);assert.match(home,/距最近一次确认重置/);assert.match(home,/1小时0分钟0秒/);assert.doesNotMatch(home,/去微信订阅/);
+  assert.match(home,/待开放/);assert.match(home,/上次额度重置已经过去/);assert.match(home,/1小时0分钟0秒/);assert.doesNotMatch(home,/去微信订阅/);
 });
 
 test('站内信加载失败只影响信箱内容，微信提醒仍可见且不冒充空信箱',()=>{

@@ -19,20 +19,20 @@ function fixture(publications:Publication[]):PublicData {
 }
 function nativeHome(data:PublicData) {
  let advance=0,definition:any,listener:(state:any)=>void=()=>{},timerId=0;
- const timers=new Map<number,()=>void>(),cache=new Map<string,any>();
+ const timers=new Map<number,()=>void>(),cache=new Map<string,any>(),navigations:string[]=[];
  class Clock extends Date { static now(){return 1000000+advance;} }
  const state=()=>({data,receivedAt:1000000,loading:false,unconfigured:false,error:''});
  const app={client:{subscribe(fn:(state:any)=>void){listener=fn;fn(state());return()=>{listener=()=>{};};},getState:state}};
  function load(filename:string):any {
   if(cache.has(filename))return cache.get(filename).exports;
   const module={exports:{}};cache.set(filename,module);
-  new Script(readFileSync(filename,'utf8'),{filename}).runInNewContext({module,exports:module.exports,Date:Clock,wx:{},getApp:()=>app,Page:(value:any)=>{definition=value;},setInterval:(fn:()=>void)=>{timers.set(++timerId,fn);return timerId;},clearInterval:(id:number)=>timers.delete(id),require:(path:string)=>load(resolve(dirname(filename),path.endsWith('.js')?path:`${path}.js`))});
+  new Script(readFileSync(filename,'utf8'),{filename}).runInNewContext({module,exports:module.exports,Date:Clock,wx:{navigateTo:({url}:{url:string})=>navigations.push(url)},getApp:()=>app,Page:(value:any)=>{definition=value;},setInterval:(fn:()=>void)=>{timers.set(++timerId,fn);return timerId;},clearInterval:(id:number)=>timers.delete(id),require:(path:string)=>load(resolve(dirname(filename),path.endsWith('.js')?path:`${path}.js`))});
   return module.exports;
  }
  load(resolve(root,'miniprogram/pages/home/index.js'));
  const page={...definition,data:structuredClone(definition.data),setData(patch:object){for(const [key,value] of Object.entries(patch)){const path=key.split('.');let target:any=this.data;for(const part of path.slice(0,-1)){target[part]??={};target=target[part];}target[path.at(-1)!]=value;}}};
  page.onLoad({});page.onShow();
- return {page,timers,advance(ms:number){advance+=ms;[...timers.values()].forEach(fn=>fn());},refresh(){listener(state());}};
+ return {page,timers,navigations,advance(ms:number){advance+=ms;[...timers.values()].forEach(fn=>fn());},refresh(){listener(state());}};
 }
 test('小程序与网站采用相同的两类完成记录和24小时规则，保持原输入',()=>{
  const data=fixture([publication('old','automatic_reset','2026-10-10T04:00:00Z'),publication('reset','automatic_reset','2026-10-13T05:45:00Z'),publication('card','banked_reset','2026-10-13T07:25:00Z')]);
@@ -122,22 +122,38 @@ test('首页每秒只更新经过时长字段，不跨原生桥重发列表、�
  const changes:Record<string,unknown>[]=[],original=h.page.setData.bind(h.page),before=h.page.data.completions;
  h.page.setData=(patch:Record<string,unknown>)=>{changes.push(patch);original(patch);};
  h.advance(1000);
- assert.ok(changes.some(p=>'lastReset.elapsed'in p));assert.ok(changes.every(p=>Object.keys(p).every(key=>['lastReset.elapsed','dial.elapsedLabel','dial.elapsedClock','dial.accessible'].includes(key))));
+ assert.ok(changes.some(p=>'lastReset.elapsed'in p));assert.ok(changes.every(p=>Object.keys(p).every(key=>['lastReset.elapsed','lastReset.days','lastReset.hoursMinutes','lastReset.seconds'].includes(key))));
  assert.equal(h.page.data.completions,before);assert.equal(h.page.data.lastReset.elapsed,'2小时15分钟1秒');h.page.onUnload();
 });
 
 
-test('原生首页两类表盘与状态卡同步切换，跨天拆分并持续计秒',()=>{
+test('原生首页切换类型同时切换历史计时和记录链接，返回与刷新保持所选类别',()=>{
  const h=nativeHome(fixture([publication('reset','automatic_reset','2026-10-11T19:14:52Z'),publication('card','banked_reset','2026-10-13T07:25:00Z')]));
- assert.equal(h.page.data.dial.category,'额度重置');assert.equal(h.page.data.dial.elapsedDays,1);
- assert.deepEqual(JSON.parse(JSON.stringify(h.page.data.dial.elapsedClock)),[{value:'12',unit:'小时'},{value:'45',unit:'分钟'},{value:'08',unit:'秒'}]);
+ assert.equal(h.page.data.dial,undefined);assert.equal(h.page.data.lastReset.days,1);
+ assert.equal(h.page.data.lastReset.hoursMinutes,'12:45');assert.equal(h.page.data.lastReset.seconds,'08');
  h.page.selectResetKind({currentTarget:{dataset:{kind:'banked_reset'}}});
- assert.equal(h.page.data.dial.category,'重置卡');assert.equal(h.page.data.dial.bankedCompleted,true);assert.equal(h.page.data.dial.elapsedDays,0);
- h.advance(1000);assert.equal(h.page.data.dial.elapsedClock[2].value,'01');
- assert.equal(h.page.data.lastReset.elapsed,'1天12小时45分钟9秒');
+ assert.equal(h.page.data.selectedResetKind,'banked_reset');assert.equal(h.page.data.lastReset.days,0);assert.equal(h.page.data.lastReset.hoursMinutes,'00:35');assert.equal(h.page.data.lastReset.seconds,'00');
+ h.page.openLastReset();assert.equal(h.navigations.at(-1),'/pages/detail/index?publicationId=card');
+ const changes:Record<string,unknown>[]=[],original=h.page.setData.bind(h.page);h.page.setData=(patch:Record<string,unknown>)=>{changes.push(patch);original(patch);};
+ h.advance(1000);assert.equal(h.page.data.lastReset.seconds,'01');assert.equal(h.page.data.lastReset.elapsed,'0小时35分钟1秒');
+ assert.ok(changes.some(p=>'lastReset.seconds'in p));assert.ok(changes.every(p=>Object.keys(p).every(key=>['lastReset.elapsed','lastReset.days','lastReset.hoursMinutes','lastReset.seconds'].includes(key))),'发卡每秒更新同样只传输变化的计时字段');
  h.page.onHide();h.advance(60000);h.page.onShow();
- assert.equal(h.page.data.selectedResetKind,'banked_reset');assert.equal(h.page.data.dial.category,'重置卡');
- assert.deepEqual(JSON.parse(JSON.stringify(h.page.data.dial.elapsedClock)),[{value:'00',unit:'小时'},{value:'36',unit:'分钟'},{value:'01',unit:'秒'}]);
- assert.equal(h.page.data.lastReset.elapsed,'1天12小时46分钟9秒','返回首页后两类时钟仍独立');
+ assert.equal(h.page.data.selectedResetKind,'banked_reset');assert.equal(h.page.data.lastReset.hoursMinutes,'00:36');assert.equal(h.page.data.lastReset.seconds,'01');
+ h.refresh();assert.equal(h.page.data.lastReset.publicationId,'card');assert.equal(h.page.data.lastReset.hoursMinutes,'00:36');
+ h.page.selectResetKind({currentTarget:{dataset:{kind:'automatic_reset'}}});
+ assert.equal(h.page.data.lastReset.days,1);assert.equal(h.page.data.lastReset.hoursMinutes,'12:46');assert.equal(h.page.data.lastReset.seconds,'09');
+ h.page.openLastReset();assert.equal(h.navigations.at(-1),'/pages/detail/index?publicationId=reset');
  h.page.onUnload();assert.equal(h.timers.size,0);
+});
+
+test('原生所选类别无历史时清空旧时长，切换到有历史的类别能重新启动计时',()=>{
+ const h=nativeHome(fixture([publication('reset','automatic_reset','2026-10-11T19:14:52Z')]));
+ h.page.selectResetKind({currentTarget:{dataset:{kind:'banked_reset'}}});assert.equal(h.page.data.lastReset,null);assert.equal(h.timers.size,0);
+ h.page.openLastReset();assert.equal(h.navigations.length,0);
+ h.advance(2000);h.page.selectResetKind({currentTarget:{dataset:{kind:'automatic_reset'}}});
+ assert.equal(h.page.data.lastReset.seconds,'10');assert.equal(h.timers.size,1);h.page.onUnload();
+ const banked=nativeHome(fixture([publication('card','banked_reset','2026-10-08T03:44:55Z')]));
+ assert.equal(banked.page.data.lastReset,null);assert.equal(banked.timers.size,0);
+ banked.page.selectResetKind({currentTarget:{dataset:{kind:'banked_reset'}}});assert.equal(banked.page.data.lastReset.days,5);assert.equal(banked.page.data.lastReset.seconds,'05');assert.equal(banked.timers.size,1);
+ banked.advance(1000);assert.equal(banked.page.data.lastReset.seconds,'06');banked.page.onUnload();
 });

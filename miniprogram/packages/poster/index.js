@@ -1,5 +1,5 @@
 const {createPage}=require('../../utils/page');
-const {statusPosterInput,statusPosterAvailable,renderStatusPoster}=require('../../utils/status-poster');
+const {statusPosterInput,statusPosterAvailable,renderStatusPoster}=require('./status-poster');
 const poster=require('../../utils/poster');
 const {privacyRequired}=require('../../utils/wechat');
 function canvasNode(page){return new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('海报画布暂未准备好，请重试。')),10000);try{wx.createSelectorQuery().in(page).select('#status-poster-canvas').fields({node:true},result=>{clearTimeout(timer);result&&result.node?resolve(result.node):reject(new Error('海报画布暂不可用。'));}).exec();}catch(_){clearTimeout(timer);reject(new Error('海报画布暂不可用。'));}});}

@@ -9,7 +9,7 @@ const at = value => valid(value) ? m.displayTime(value) : '';
 const names = {automatic_reset:'额度重置',banked_reset:'重置卡'};
 const waitingTitle = kind => kind === 'banked_reset' ? '等待下一次重置卡发放' : '等待下一次 Reset';
 function base(kind) {
-  return {kind, name:names[kind] || '公开线索', state:'waiting', tone:'slate', badge:'等待新消息', evidence:'公开动态追踪', title:waitingTitle(kind), description:`暂无新的${kind==='banked_reset'?'重置卡发放':'额度重置'}预告，有可靠消息后更新。`, icon:'radar', metric:'', metricLabel:'', window:'', timeLabel:'当前状态', time:'没有有效的新信号或安排', timeAt:'', oldTime:'', footer:'依据公开信息更新', action:'查看最近公告', publicationId:'', eventId:'', sourceUrl:'', sourceName:'', expiresAt:'', sourceType:'', watchNote:''};
+  return {kind, name:names[kind] || '公开线索', state:'waiting', tone:'slate', badge:'等待新消息', evidence:'公开动态追踪', title:waitingTitle(kind), description:`暂无新的${kind==='banked_reset'?'重置卡发放':'额度重置'}预告，有可靠消息后更新。`, icon:'radar', metric:'', metricLabel:'', window:'', timeLabel:'当前状态', time:'没有有效的新信号或安排', timeAt:'', oldTime:'', footer:'依据公开信息更新', action:'查看最近公告', publicationId:'', eventId:'', sourceUrl:'', sourceName:'', expiresAt:'', sourceType:'', watchNote:'',progress:/** @type {{label:string,current:boolean}[]} */([])};
 }
 function sourceTarget(card, round) {
   if (!round) return;
@@ -85,8 +85,20 @@ function resetStateCards(data, now=data.serverTime) {
   const expired=forecasts?.watch?.status==='active' && !activeSignal && valid(forecasts.watch.signal?.expiresAt) && Date.parse(forecasts.watch.signal.expiresAt)<=current;
   const sourceUnavailable=forecasts?.status==='unavailable'||forecasts?.watch?.status==='unavailable';
   const completed=m.latestCompletedBenefits({...data,serverTime:now});
-  const reset=completed.find(item=>item.action.kind==='automatic_reset')?.action;
-  const banked=completed.find(item=>item.action.kind==='banked_reset')?.action;
-  return {cards,untyped,sourceWarning:sourceUnavailable?'信号来源暂时无法更新，已读取的公开记录仍保留。':'',expiredNote:expired&&!signal?'先前信号已过观察期，等待新的公开消息。':'',lastReset:reset?{time:at(reset.statementAt),elapsed:m.completionElapsed(reset,now)?.label||'',statementAt:reset.statementAt}:null,lastCard:banked?{time:at(banked.statementAt),statementAt:banked.statementAt}:null};
+  for(const card of cards){
+    const current=['announced','scheduled','revised','overdue'].includes(card.state)?0:card.state==='progress'?1:card.state==='completed'?2:-1;
+    // A later declaration does not prove that earlier stages were publicly recorded.
+    card.progress=['公开预告',card.kind==='banked_reset'?'发放进行':'重置进行','完成确认'].map((label,index)=>({label,current:index===current}));
+  }
+  const history=kind=>{
+    const item=completed.find(item=>item.action.kind===kind);
+    if(!item)return null;
+    const elapsed=m.completionElapsed(item.action,now);
+    if(!elapsed)return null;
+    const parts=elapsed.parts,clock=unit=>String(parts.find(part=>part.unit===unit)?.value||0).padStart(2,'0');
+    const date=at(item.action.statementAt);
+    return {time:date,displayTime:`${date.slice(0,4)===m.dateKey(now).slice(0,4)?'':date.slice(0,4)+'年'}${Number(date.slice(5,7))}月${Number(date.slice(8,10))}日 ${date.slice(11,16)}`,elapsed:elapsed.label,days:parts.find(part=>part.unit==='天')?.value||0,hoursMinutes:clock('小时')+':'+clock('分钟'),seconds:clock('秒'),statementAt:item.action.statementAt,publicationId:item.publication.id,eventId:item.event.id};
+  };
+  return {cards,untyped,sourceWarning:sourceUnavailable?'信号来源暂时无法更新，已读取的公开记录仍保留。':'',expiredNote:expired&&!signal?'先前信号已过观察期，等待新的公开消息。':'',lastReset:history('automatic_reset'),lastCard:history('banked_reset')};
 }
 module.exports={resetStateCards};

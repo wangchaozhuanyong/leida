@@ -6,7 +6,7 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import type {PublicData,Publication,ActionKind,ActionStage} from '../src/lib/types';
 import {publicResetOutlook} from '../src/lib/reset-outlook';
 import {resetStateCards} from '../src/lib/reset-state-cards';
-import {ResetStateCards,ResetStateCardView} from '../src/components/public/ResetStateCards';
+import {ResetStateCards,ResetStateCardView,LastResetElapsed} from '../src/components/public/ResetStateCards';
 import {InstrumentDial} from '../src/components/public/InstrumentDial';
 import {referenceForecast} from '../src/lib/forecast';
 const require=createRequire(import.meta.url),native=require('../miniprogram/utils/reset-state-cards.js');
@@ -78,7 +78,7 @@ test('已有可信分类的信号按类型显示；来源中断保留完成事�
 test('旧接口单状态可显示，当前两类投影可靠时优先使用，两类切换入口不混成阶段线',()=>{
  const d=fixture();projected(d);d.forecasts!.outlook={status:'scheduled',active:{actionId:'a',eventId:'e',publicationId:'p',kind:'banked_reset',stage:'promised',statementAt:'2026-10-18T10:00:00Z',expectedAt:'2026-10-18T14:00:00Z'}};
  assert.equal(card(d,'banked_reset').state,'scheduled');assert.equal(card(d).state,'waiting');
- const html=renderToStaticMarkup(createElement(ResetStateCards,{data:d}));assert.match(html,/role="tablist"/);assert.match(html,/重置卡/);assert.match(html,/时间已公布/);assert.doesNotMatch(html,/timeline-stages|较早的安排/);
+ const html=renderToStaticMarkup(createElement(ResetStateCards,{data:d,selectedKind:'banked_reset'}));assert.match(html,/role="tablist"/);assert.match(html,/重置卡/);assert.match(html,/时间已公布/);assert.match(html,/aria-label="当前事件进度"/);assert.doesNotMatch(html,/较早的安排/);
 });
 
 test('未验证的实验分类不能替未知信号归类，旧线索不盖过较新的完成；两个信号按发布时间选择',()=>{
@@ -105,4 +105,42 @@ test('桌面表盘跟随所选类别，旧接口的发卡安排仍可显示且�
  const d=fixture();projected(d);d.forecasts!.outlook={status:'scheduled',active:{actionId:'a',eventId:'e',publicationId:'p',kind:'banked_reset',stage:'promised',statementAt:'2026-10-18T10:00:00Z',expectedAt:'2026-10-18T14:35:00Z'}};
  const html=renderToStaticMarkup(createElement(InstrumentDial,{data:d,statusKind:'banked_reset',outlook:{status:'monitoring'},serverTime:now}));assert.match(html,/2小时35分钟/);assert.match(html,/重置卡 · /);
  const quota=renderToStaticMarkup(createElement(InstrumentDial,{data:d,statusKind:'automatic_reset',outlook:{status:'monitoring'},serverTime:now}));assert.doesNotMatch(quota,/2小时35分钟/);assert.match(quota,/等待下一次 Reset/);
+});
+
+test('卡片历史计时只使用额度重置完成记录，预告和发卡完成不改变起点',()=>{
+ const d=fixture();add(d,'reset','automatic_reset','claimed_complete','2026-10-17T00:00:00Z');add(d,'card','banked_reset','claimed_complete','2026-10-18T11:00:00Z');projected(d);
+ const before=resetStateCards(d,now).lastReset!;
+ assert.equal(before.days,1);assert.equal(before.hoursMinutes,'12:00');assert.equal(before.seconds,'00');assert.equal(before.displayTime,'10月17日 08:00');
+ add(d,'next','automatic_reset','promised','2026-10-18T11:30:00Z','2026-10-18T15:00:00Z');projected(d);
+ const after=resetStateCards(d,'2026-10-18T12:00:01Z').lastReset!;
+ assert.equal(after.statementAt,before.statementAt);assert.equal(after.publicationId,'p-reset');assert.equal(after.seconds,'01');
+ const html=renderToStaticMarkup(createElement(LastResetElapsed,{data:d}));
+ assert.match(html,/上次额度重置已经过去/);assert.match(html,/events\/reset\?version=p-reset/);assert.doesNotMatch(html,/pub-dial-face|p-card/);
+});
+
+test('选择发卡类别后，历史标题、计时和固定公告链接都使用发卡完成记录',()=>{
+ const d=fixture();add(d,'reset','automatic_reset','claimed_complete','2026-10-17T00:00:00Z');add(d,'card','banked_reset','claimed_complete','2026-10-18T11:00:00Z');projected(d);
+ const banked=resetStateCards(d,now).lastCard!;
+ assert.equal(banked.days,0);assert.equal(banked.hoursMinutes,'01:00');assert.equal(banked.seconds,'00');assert.equal(banked.displayTime,'10月18日 19:00');assert.equal(banked.publicationId,'p-card');
+ add(d,'next-card','banked_reset','promised','2026-10-18T11:30:00Z','2026-10-18T15:00:00Z');projected(d);
+ assert.equal(resetStateCards(d,now).lastCard!.statementAt,banked.statementAt,'下一次发卡预告不重置历史计时');
+ const html=renderToStaticMarkup(createElement(LastResetElapsed,{data:d,selectedKind:'banked_reset'}));
+ assert.match(html,/上次重置卡发放已经过去/);assert.match(html,/上次发放时间/);assert.match(html,/10月18日 19:00/);assert.match(html,/events\/card\?version=p-card/);assert.match(html,/查看这次发卡记录/);assert.doesNotMatch(html,/上次额度重置|p-reset|p-next-card/);
+ const states=renderToStaticMarkup(createElement(ResetStateCards,{data:d,selectedKind:'banked_reset'}));assert.doesNotMatch(states,/pub-reset-last-card-note/,'上方不再重复显示同一发卡时间');
+});
+
+test('所选类别没有完成记录时显示空态，不借用另一类的历史',()=>{
+ for(const selectedKind of ['automatic_reset','banked_reset'] as const){
+  const d=fixture(),other=selectedKind==='automatic_reset'?'banked_reset':'automatic_reset';add(d,'other',other,'claimed_complete','2026-10-18T11:00:00Z');projected(d);
+  const html=renderToStaticMarkup(createElement(LastResetElapsed,{data:d,selectedKind}));
+  assert.match(html,/暂无已确认记录/);assert.doesNotMatch(html,/pub-last-reset-value|p-other/);
+ }
+});
+
+test('历史计时无记录显示空态，阶段只点亮有依据的当前声明',()=>{
+ const d=fixture();const empty=renderToStaticMarkup(createElement(LastResetElapsed,{data:d}));
+ assert.match(empty,/暂无已确认记录/);assert.doesNotMatch(empty,/pub-last-reset-value|查看这次重置记录/);
+ add(d,'done','automatic_reset','claimed_complete','2026-10-18T11:00:00Z');projected(d);
+ const stages=card(d).progress;assert.deepEqual(stages.map(step=>step.current),[false,false,true]);
+ const next=resetStateCards(d,'2026-10-18T12:00:01Z').lastReset!;assert.equal(next.days,0);assert.equal(next.hoursMinutes,'01:00');assert.equal(next.seconds,'01');
 });

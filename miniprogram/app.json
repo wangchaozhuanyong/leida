@@ -10,8 +10,15 @@
     "pages/notices/index",
     "pages/methodology/index",
     "pages/replay/index",
-    "pages/privacy/index",
-    "pages/poster/index"
+    "pages/privacy/index"
+  ],
+  "subPackages": [
+    {
+      "root": "packages/poster",
+      "pages": [
+        "index"
+      ]
+    }
   ],
   "window": {
     "navigationBarTitleText": "模钥重置雷达",

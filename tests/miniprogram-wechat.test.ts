@@ -417,7 +417,7 @@ test('首页没有完成记录时，海报分享最新公开动态的固定版�
   assert.match(page.data.posterDescription,/黑金或水墨/);
   assert.equal(h.requests.length,0);assert.deepEqual(h.calls,[]);
   page.openPoster();
-  assert.deepEqual(h.navigation,[{method:'navigateTo',url:'/pages/poster/index'}]);
+  assert.deepEqual(h.navigation,[{method:'navigateTo',url:'/packages/poster/index'}]);
   assert.equal(h.data.publications[1].mode,'news_only');assert.equal(h.data.events[0].actions.length,0);
   page.onUnload();
 });
@@ -446,7 +446,7 @@ test('首页海报跳过撤回、合并和关联缺失的动态；无有效记�
   }
   const empty=pageHarness();empty.data.publications=[];empty.data.events=[];empty.data.articles=[];
   const page=empty.page('home');assert.equal(page.data.posterPath,'');assert.match(page.data.posterDescription,/分享当前公开状态/);
-  page.openPoster();assert.deepEqual(empty.navigation,[{method:'navigateTo',url:'/pages/poster/index'}]);assert.equal(empty.requests.length,0);page.onUnload();
+  page.openPoster();assert.deepEqual(empty.navigation,[{method:'navigateTo',url:'/packages/poster/index'}]);assert.equal(empty.requests.length,0);page.onUnload();
 });
 
 test('首页微信提醒切换到设置标签页，不打开动态记录或自动发起微信登录授权',()=>{

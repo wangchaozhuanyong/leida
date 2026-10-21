@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Script } from 'node:vm';
 import type { BenefitAction, PublicData, Publication } from '../src/lib/types';
 import { currentStatusPosterSvg, assertStatusPosterRound } from '../src/server/status-poster';
 const require=createRequire(import.meta.url);
-const native=require('../miniprogram/utils/status-poster.js');
+const native=require('../miniprogram/packages/poster/status-poster.js');
 const generic=require('../miniprogram/utils/poster.js');
 const now='2026-10-15T00:00:00Z';
 function fixture(stage?:BenefitAction['stage'],expectedAt?:string):PublicData {
@@ -54,15 +54,17 @@ test('完成海报打开后出现新的预告也会拒绝旧轮次，切换风�
 test('原生艺术海报实际画原背景和品牌后导出1080×1920 PNG，保存相册仍须主动操作',async()=>{
   const calls:any[]=[];
   const ctx={font:'',fillStyle:'',globalAlpha:1,measureText:(s:string)=>({width:measure(s,30)}),drawImage:(...args:any[])=>calls.push(['image',...args]),fillText:(...args:any[])=>calls.push(['text',...args]),fillRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},arc(){},fill(){},createLinearGradient(){return{addColorStop(){}};}};
-  const canvas={width:0,height:0,getContext:()=>ctx,requestAnimationFrame(fn:()=>void){queueMicrotask(fn);},createImage(){const image:any={width:1080,height:1920};Object.defineProperty(image,'src',{set(value){calls.push(['load',value]);queueMicrotask(()=>image.onload());}});return image;}};
+  const canvas={width:0,height:0,getContext:()=>ctx,requestAnimationFrame(fn:()=>void){queueMicrotask(fn);},createImage(){const image:any={width:1080,height:1920};Object.defineProperty(image,'src',{set(value){assert.ok(existsSync(resolve('miniprogram',value.replace(/^\//,''))),`实际海报资源存在：${value}`);calls.push(['load',value]);queueMicrotask(()=>image.onload());}});return image;}};
   let saves=0;const wx={canvasToTempFilePath(o:any){assert.equal(o.destWidth,1080);assert.equal(o.destHeight,1920);assert.equal(o.fileType,'png');o.success({tempFilePath:'wxfile://art.png'});},saveImageToPhotosAlbum(o:any){saves++;o.success();}};
   const artifact=await native.renderStatusPoster({wxApi:wx,canvas,input:native.statusPosterInput(fixture()),theme:'editorial'});
-  assert.ok(calls.some(c=>c[0]==='load'&&c[1]==='/assets/posters/editorial.jpg'));assert.ok(calls.some(c=>c[0]==='load'&&c[1]==='/assets/posters/brand.png'));assert.equal(saves,0);
+  await native.renderStatusPoster({wxApi:wx,canvas,input:native.statusPosterInput(fixture()),theme:'precision'});
+  assert.ok(calls.some(c=>c[0]==='load'&&c[1]==='/assets/posters/precision.jpg'));
+  assert.ok(calls.some(c=>c[0]==='load'&&c[1]==='/assets/posters/editorial.jpg'));assert.ok(calls.some(c=>c[0]==='load'&&c[1]==='/packages/poster/brand.png'));assert.equal(saves,0);
   await assert.rejects(generic.savePoster(wx,artifact),/点击/);await generic.savePoster(wx,artifact,{userInitiated:true});assert.equal(saves,1);
   await assert.rejects(native.renderStatusPoster({wxApi:wx,canvas,input:native.statusPosterInput(fixture()),isCurrent:()=>false}),/取消/);
 });
 test('原生海报样式快速切换和离开页面时，旧生成结果不能覆盖新预览',async()=>{
-  const filename=resolve('miniprogram/pages/poster/index.js');let definition:any;
+  const filename=resolve('miniprogram/packages/poster/index.js');let definition:any;
   const renders:Array<{options:any;resolve:(v:any)=>void}>=[];
   const wx={createSelectorQuery(){return{in(){return this;},select(){return this;},fields(_o:any,fn:(v:any)=>void){fn({node:{}});return this;},exec(){}};}};
   const app={client:{getState:()=>({data:fixture()})}};
@@ -76,7 +78,7 @@ test('原生海报样式快速切换和离开页面时，旧生成结果不能�
 
 
 test('固定海报十次切换和预览返回复用两张成品，撤回立即清除缓存',async()=>{
-  const filename=resolve('miniprogram/pages/poster/index.js');let definition:any,renders=0;
+  const filename=resolve('miniprogram/packages/poster/index.js');let definition:any,renders=0;
   const data=fixture('claimed_complete');const input=native.statusPosterInput(data);input.publicationId='';
   const wx={createSelectorQuery(){return{in(){return this;},select(){return this;},fields(_o:any,fn:(v:any)=>void){fn({node:{}});return this;},exec(){}};}};
   const app={client:{getState:()=>({data})}};

@@ -310,6 +310,7 @@ for(const order of ['订阅先到','固定记录先到'])test(`实际方法页 $
 
 test('预测用户文字为中文，历史参考与卡样本不足有明确说明，未新增概率微信推送',()=>{
   const home=readFileSync(resolve(root,'miniprogram/pages/home/index.wxml'),'utf8'),rules=readFileSync(resolve(root,'miniprogram/pages/methodology/index.wxml'),'utf8');
-  assert.doesNotMatch(home+rules,/experimental_seed|verified_live|automatic_reset|banked_reset|already_known/);assert.match(rules,/样本不足/);assert.match(rules,/固定预测记录/);assert.match(rules,/首次合格信号|windowNote/);
+  const visibleCopy=(home+rules).replace(/\{\{[\s\S]*?\}\}/g,'').replace(/<[^>]*>/g,'');
+  assert.doesNotMatch(visibleCopy,/experimental_seed|verified_live|automatic_reset|banked_reset|already_known/);assert.match(rules,/样本不足/);assert.match(rules,/固定预测记录/);assert.match(rules,/首次合格信号|windowNote/);
   const code=readFileSync(resolve(root,'miniprogram/pages/methodology/index.js'),'utf8');assert.doesNotMatch(code,/requestSubscribeMessage|\/api\/wechat\//);
 });
