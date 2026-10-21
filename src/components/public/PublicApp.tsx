@@ -16,10 +16,8 @@ import { usePublicNavigation } from './usePublicNavigation';
 import { useFixedSnapshot } from './useFixedSnapshot';
 import type {ForecastSnapshot} from '@/lib/forecast';
 import {ForecastPanel} from './ForecastPanel';
-import {InstrumentDial} from './InstrumentDial';
 import {statusPosterSnapshot} from '@/lib/status-timeline';
-import {ResetStateCards,ResetStatePending} from './ResetStateCards';
-import {publicResetOutlook} from '@/lib/reset-outlook';
+import {ResetStateCards,ResetStatePending,LastResetElapsed} from './ResetStateCards';
 import { actionLabels } from '@/lib/labels';
 import { activityDayNumber, activityHomeVisible } from '@/lib/activity-display';
 import { publicationUrl, isLocalShareUrl } from '@/lib/share';
@@ -204,9 +202,7 @@ export default function PublicApp() {
 }
 
 export function Home({ data, onWechatReminders, onPoster, onShare, historical, wechatEntry = 'checking' }: { data: PublicData; onWechatReminders: () => void; onPoster: (p?: Publication, actionId?: string) => void; onShare: (p?: Publication) => Promise<void>; historical: boolean; wechatEntry?: WechatEntryState }) {
-  const outlook = data.forecasts?.outlook ?? publicResetOutlook(data);
   const [resetKind,setResetKind]=useState<'automatic_reset'|'banked_reset'>('automatic_reset');
-  const selectedOutlook=outlook.byKind?.[resetKind]??publicResetOutlook(data,resetKind);
   const completions = recentCompletedBenefits(data), latest = latestCompletedBenefits(data)[0];
   const recent = homeNewsGroups(data).map(group => group.latest);
   const activity = data.activities.find(item => activityHomeVisible(item, data.serverTime));
@@ -219,29 +215,17 @@ export function Home({ data, onWechatReminders, onPoster, onShare, historical, w
       <time dateTime={item.action.statementAt} title={`${displayTime(item.action.statementAt)} · 北京时间`}>{completionTime(item.action.statementAt).replace(/^(\d{4})\/(\d{2})\/(\d{2}) /, (_, year: string, month: string, day: string) => `${year === dateKey(data.serverTime).slice(0, 4) ? '' : `${year}年`}${Number(month)}月${Number(day)}日 `)}</time>
     </Link>)}
   </section> : null;
-  const evidenceHref = outlook.active ? `/events/${encodeURIComponent(outlook.active.eventId)}` : latest ? `/events/${encodeURIComponent(latest.event.id)}` : '/history';
-  const evidenceLabel = outlook.active ? '查看本次公告' : latest ? '查看最近公告' : '浏览历史记录';
   return <>
     {historical && <p className="pub-warning">当前展示历史收录资料。</p>}
-    <div className={`pub-instrument-layout${outlook.active ? '' : ' is-idle'}`}>
-      <div className="pub-home-dial"><InstrumentDial outlook={selectedOutlook} serverTime={data.serverTime} completion={selectedOutlook.latestCompletion??null} data={data} statusKind={resetKind}/></div>
-      <aside className="pub-instrument-summary" aria-label="重置状态与操作">
-        <div className="pub-home-state-zone">
-          <ResetStateCards data={data} selectedKind={resetKind} onKindChange={setResetKind}/>
-
-          {latestRecord}
-          <div className="pub-home-actions">
-          <button onClick={onWechatReminders} className="pub-button pub-home-reminder"><Icon name="bell"/><span>微信提醒</span>{wechatEntry === 'unavailable' && <small>待开放</small>}</button>
-          <Link scroll={false} href={evidenceHref} className="pub-home-evidence">{evidenceLabel}<Icon name="arrow"/></Link>
-          </div>
-        </div>
-        <button className="pub-share-entry" onClick={() => onPoster(latest?.publication, latest?.action.id)} aria-label="生成分享海报，分享重置动态，黑金或水墨两款可选">
-          <span className="pub-share-entry-posters" aria-hidden="true"><span className="pub-share-entry-poster precision"/><span className="pub-share-entry-poster editorial"/></span>
-          <span className="pub-share-entry-copy"><span className="pub-share-entry-title">分享重置动态</span><span className="pub-share-entry-description">生成海报，分享给朋友</span></span><Icon name="arrow"/>
-
-        </button>
-        {activity && <Link scroll={false} className="pub-instrument-activity" href={`/activities/${encodeURIComponent(activity.id)}`}><div><h2>{activity.title}</h2><p>{activityPhase}</p></div><Icon name="calendar"/></Link>}
-      </aside>
+    <div className="pub-home-dashboard">
+      <div className="pub-home-current"><ResetStateCards data={data} selectedKind={resetKind} onKindChange={setResetKind}/></div>
+      <LastResetElapsed data={data} selectedKind={resetKind}/>
+      <div className="pub-home-card-actions">
+        <button onClick={onWechatReminders} className="pub-button pub-home-reminder"><Icon name="bell"/><span>微信提醒</span>{wechatEntry === 'unavailable' && <small>待开放</small>}</button>
+        <button className="pub-button secondary" onClick={()=>onPoster(latest?.publication,latest?.action.id)}>分享重置动态</button>
+      </div>
+      {latestRecord&&<div className="pub-home-records">{latestRecord}</div>}
+      {activity && <Link scroll={false} className="pub-home-activity-card" href={`/activities/${encodeURIComponent(activity.id)}`}><div><h2>{activity.title}</h2><p>{activityPhase}</p></div><Icon name="calendar"/></Link>}
     </div>
     <section className="pub-recent"><div className="pub-section-heading"><div><h2>重置动态</h2></div><TextLink href="/news">全部动态</TextLink></div><div className="pub-recent-grid">{recent.length ? recent.map(p => <Announcement key={p.id} publication={p} withdrawn={publicationWithdrawn(data,p)} />) : <Empty title="暂无公开公告" detail="有新的重置或发卡消息时，会显示在这里。" />}</div></section>
   </>;
@@ -500,7 +484,7 @@ function PosterModal({ target, name, blocked:externalBlocked, note, statusDesign
         <div className="pub-poster-styles" role="group" aria-label="海报风格">{statusPosterStyles.map(option => <button key={option.id} type="button" className={`pub-poster-style${style === option.id ? ' is-selected' : ''}`} aria-pressed={style === option.id} disabled={sharing || !!blocked} onClick={() => { if (style !== option.id) { setGenerating(true); setError(''); setStyle(option.id); } }}><span className={`pub-poster-swatch ${option.id}`} aria-hidden="true" /><span>{option.label}</span>{style === option.id && <Icon name="check" />}</button>)}</div>
         <label className="pub-poster-code-option"><input type="checkbox" checked={includeCode && codeAvailable} disabled={!codeAvailable || sharing || !!blocked} onChange={event => { setGenerating(true); setError(''); setIncludeCode(event.target.checked); }} /><span>带圆形小程序码</span>{!codeAvailable && <small>默认显示网站二维码</small>}</label>
       </div>}
-      <div className="pub-poster-preview" aria-busy={generating}>
+      <div className={`pub-poster-preview${!preview || blocked ? ' pub-poster-preview-empty' : ''}`} aria-busy={generating}>
         {blocked ? <p className="pub-warning" role="alert">{blocked}</p> : <>
           {preview && <img className="pub-poster-image" src={preview.url} alt={`${name}分享海报：${target.title}`} />}
           {generating && <div className="pub-poster-loading" role="status"><span className="pub-loading-bar" aria-hidden="true"/><p>正在生成{statusDesign ? selectedStyle.label : ''}海报…</p></div>}

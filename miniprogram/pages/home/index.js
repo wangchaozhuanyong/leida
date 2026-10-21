@@ -1,7 +1,6 @@
 const { createPage } = require('../../utils/page');
 const m = require('../../utils/model');
 const { resetStateCards } = require('../../utils/reset-state-cards');
-const { dialModel } = require('../../utils/dial');
 const { statusTimelineModel } = require('../../utils/status-timeline');
 function completionDate(value, now) {
   const full = m.completionTime(value);
@@ -13,8 +12,6 @@ Page(createPage((data, query, page, app) => {
   if (!data) return { name: '模钥重置雷达', latest: null, completions: [], pending: null, forecast: null, recent: [], activity: null, sharePath: '', timeline: null, posterPath: '', posterDescription: '' };
   const states = resetStateCards(data);
   const selectedResetKind=page.selectedResetKind||'automatic_reset';
-  const selectedOutlook=m.resetOutlookModel(data,selectedResetKind);
-  const dial=dialModel(selectedOutlook,data.serverTime,selectedOutlook.latestCompletion,states.cards.find(card=>card.kind===selectedResetKind));
   const outlook = m.resetOutlookModel(data), completed = m.latestCompletedBenefits(data), latestItem = completed[0], pending = outlook.active;
   const latestPublication = latestItem && latestItem.publication;
   const latestAction = latestItem && latestItem.action;
@@ -32,9 +29,9 @@ Page(createPage((data, query, page, app) => {
   const posterDescription = '选择黑金或水墨，分享当前公开状态';
   return {
     name: data.site.name || '模钥重置雷达',
-    dial,resetCards:states.cards,untypedSignal:states.untyped,stateWarning:states.sourceWarning,signalExpiredNote:states.expiredNote,lastCard:states.lastCard,selectedResetKind:page.selectedResetKind||'automatic_reset',
+    resetCards:states.cards,untypedSignal:states.untyped,stateWarning:states.sourceWarning,signalExpiredNote:states.expiredNote,selectedResetKind,
     historicalProbability: m.referenceCadenceView(data.forecasts?.referenceCadence,data.serverTime),
-    lastReset: states.lastReset,
+    lastReset: selectedResetKind==='banked_reset'?states.lastCard:states.lastReset,
     latest: latest ? { title: latest.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', elapsed: m.elapsed(latest.statementAt, data.serverTime), time: m.completionTime(latest.statementAt), eligibility: latestAction.eligibility, path: pathFor(latest) } : null,
     completions: m.recentCompletedBenefits(data).map(item => ({ id:item.action.id, kind: item.action.kind, title: item.action.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', label: item.action.kind === 'banked_reset' ? '重置卡发放' : '用量重置', time: m.completionTime(item.action.statementAt), shortTime: completionDate(item.action.statementAt, data.serverTime), path: pathFor({ publicationId: item.publication.id }) })),
     evidencePath: pathFor(pending || latest) || '/pages/announcements/index',
@@ -60,7 +57,7 @@ Page(createPage((data, query, page, app) => {
   toggleFreshness() { this.setData({ freshnessOpen: !this.data.freshnessOpen }); },
   openPoster() { if (this.data.connected) wx.navigateTo({ url:'/packages/poster/index',fail(){wx.showToast({title:'海报页面加载失败，请重试。',icon:'none'});} }); },
   syncCountdown() {
-    if (!this.data.dial?.completed && !this.data.lastReset && !this.data.resetCards?.some(card=>['scheduled','revised','completed'].includes(card.state)) && !(this.data.pending && this.data.pending.counting) && !(this.data.timeline && (this.data.timeline.completed || this.data.timeline.scheduled))) { this.stopCountdown(); return; }
+    if (!this.data.lastReset && !this.data.resetCards?.some(card=>['scheduled','revised','completed'].includes(card.state)) && !(this.data.pending && this.data.pending.counting) && !(this.data.timeline && (this.data.timeline.completed || this.data.timeline.scheduled))) { this.stopCountdown(); return; }
     if (!this._countdownTimer) this._countdownTimer = setInterval(() => this.tickCountdown(), 1000);
   },
   tickCountdown() {
@@ -69,8 +66,6 @@ Page(createPage((data, query, page, app) => {
     const now=new Date(Date.parse(state.data.serverTime)+Math.max(0,Date.now()-state.receivedAt)).toISOString();
     const outlook=m.resetOutlookModel(state.data),completed=m.latestCompletedBenefits(state.data)[0];
     const timeline=statusTimelineModel(outlook,now,completed?.action||null,state.data.forecasts);
-    const reset=m.latestCompletedBenefits(state.data).find(item=>item.action.kind==='automatic_reset');
-    if(reset&&this.data.lastReset){const elapsed=m.completionElapsed(reset.action,now)?.label;if(elapsed&&elapsed!==this.data.lastReset.elapsed)this.setData({'lastReset.elapsed':elapsed});}
     // Only the clock region crosses the native bridge; lists and page layout stay untouched.
     if(JSON.stringify(timeline)!==JSON.stringify(this.data.timeline))this.setData({timeline});
     if(outlook.active && this.data.pending){
@@ -114,10 +109,9 @@ Page(createPage((data, query, page, app) => {
   resetCardsPatch(data, now) {
     const states=resetStateCards(data,now),patch={};
     for(const [key,value] of Object.entries({resetCards:states.cards,untypedSignal:states.untyped,stateWarning:states.sourceWarning,signalExpiredNote:states.expiredNote}))if(JSON.stringify(this.data[key])!==JSON.stringify(value))patch[key]=value;
-    const selected=this.data.selectedResetKind||'automatic_reset',outlook=m.resetOutlookModel(data,selected);
-    const dial=dialModel(outlook,now,outlook.latestCompletion,states.cards.find(card=>card.kind===selected));
-    if(!this.data.dial)patch.dial=dial;
-    else for(const [key,value] of Object.entries(dial))if(JSON.stringify(value)!==JSON.stringify(this.data.dial[key]))patch['dial.'+key]=value;
+    const history=this.data.selectedResetKind==='banked_reset'?states.lastCard:states.lastReset;
+    if(!history||!this.data.lastReset){if(JSON.stringify(history)!==JSON.stringify(this.data.lastReset))patch.lastReset=history;}
+    else for(const [key,value] of Object.entries(history))if(value!==this.data.lastReset[key])patch['lastReset.'+key]=value;
     return patch;
   },
   selectResetKind(event) { const kind=event.currentTarget.dataset.kind;if(['automatic_reset','banked_reset'].includes(kind)){this.setData({selectedResetKind:kind,expandedSourceKind:''});this.tickCountdown();this.syncCountdown();} },
@@ -128,6 +122,7 @@ Page(createPage((data, query, page, app) => {
     if(card.publicationId)wx.navigateTo({url:'/pages/detail/index?publicationId='+encodeURIComponent(card.publicationId)});
     else wx.switchTab({url:'/pages/news/index'});
   },
+  openLastReset() { if(this.data.lastReset?.publicationId)wx.navigateTo({url:'/pages/detail/index?publicationId='+encodeURIComponent(this.data.lastReset.publicationId)}); },
   copyStatusSource(event) { const url=event.currentTarget.dataset.url;if(typeof url==='string'&&url.startsWith('https://')&&m.safeUrl(url))wx.setClipboardData({data:url,fail(){wx.showToast({title:'复制失败，请稍后重试',icon:'none'});}}); },
   copyWatchSource() {
     const url=this.data.timeline && this.data.timeline.sourceUrl;

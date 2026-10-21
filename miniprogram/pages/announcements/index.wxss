@@ -61,3 +61,10 @@
 .date-empty .text-button{margin:0;text-align:left}
 .record-sheet button::after{border:0}
 @media(max-width:360px){.month-calendar{padding:12px 10px 10px}.month-select{font-size:19px}.record-detail{padding:16px 14px 6px}.records-page .record-kinds .record-dot{margin-right:4px}.kind-count{margin-left:4px}}
+
+/* Calendar and selected-day records use the same card inset. */
+.records-page .month-calendar{padding:20px 16px 12px}
+.records-page .record-detail{padding:20px 16px 8px}
+@media(min-width:701px){.records-page .month-calendar{padding:24px 24px 12px}.records-page .record-detail{padding:24px 24px 8px}}
+
+.records-page .month-heading{margin-left:0;margin-right:0}

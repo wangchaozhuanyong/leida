@@ -11,12 +11,26 @@ export function ResetStateCardView({card}:{card:ResetStateCard}) {
   const href=card.eventId?`/events/${encodeURIComponent(card.eventId)}?version=${encodeURIComponent(card.publicationId)}`:'/news?category=reset';
   return <article className={`pub-reset-state tone-${card.tone}`} data-state={card.state} aria-label={card.title}>
     <div className="pub-reset-state-body">
-      <div className="pub-reset-state-meta"><span>{card.evidence}</span><span className="pub-reset-state-badge">{card.badge}</span></div>
-      <div className="pub-reset-state-heading"><h2>{card.title}</h2><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{!['signal','progress','calendar'].includes(card.icon)&&<circle cx="24" cy="24" r="15"/>}{card.icon==='radar'&&<circle cx="24" cy="24" r="8"/>}{card.icon==='calendar'&&<rect x="10" y="12" width="28" height="28" rx="5"/>}<path d={symbols[card.icon]}/></svg></div>
-      <p className="pub-reset-state-description">{card.description}</p>
+      <div className="pub-reset-state-meta"><span>{card.kind?`当前${card.kind==='banked_reset'?'重置卡发放':'额度重置'}状态`:card.evidence}</span><span className="pub-reset-state-badge">{card.badge}</span></div>
+      <div className="pub-reset-state-overview">
+        <div className="pub-reset-state-copy">
+          <div className="pub-reset-state-heading"><h2>{card.state==='waiting'?'等待下一次公开预告':card.title}</h2></div>
+          <p className="pub-reset-state-description">{card.description}</p>
+        </div>
+        <div className={`pub-reset-state-visual visual-${card.icon}`} aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+            {card.icon==='radar'?<><circle cx="24" cy="24" r="21"/><circle cx="24" cy="24" r="14"/><circle cx="24" cy="24" r="7"/><path d="M24 3v42M3 24h42" opacity=".18"/><path d="M24 24 39 9" strokeWidth="2"/></>:<>
+              {!['signal','progress','calendar'].includes(card.icon)&&<circle cx="24" cy="24" r="15"/>}
+              {card.icon==='calendar'&&<rect x="10" y="12" width="28" height="28" rx="5"/>}
+              <path d={symbols[card.icon]}/>
+            </>}
+          </svg>
+        </div>
+      </div>
       {card.window&&<div className="pub-reset-state-window"><span>信号发布时预计</span><strong>{card.window}</strong><small>不是承诺发放时间</small></div>}
       {card.metric&&<div className="pub-reset-state-metric"><span>{card.metricLabel}</span><strong>{card.metric}</strong></div>}
-      <div className="pub-reset-state-fact"><div><span>{card.timeLabel}</span><time dateTime={card.timeAt||undefined}>{card.time}</time>{card.oldTime&&<del>{card.oldTime}</del>}</div>{card.timeAt&&<small>北京时间</small>}</div>
+      {card.timeAt&&<div className="pub-reset-state-fact"><div><span>{card.timeLabel}</span><time dateTime={card.timeAt}>{card.time}</time>{card.oldTime&&<del>{card.oldTime}</del>}</div><small>北京时间</small></div>}
+      {card.kind&&<ol className="pub-reset-progress" aria-label="当前事件进度">{card.progress.map(step=><li key={step.label} aria-current={step.current?'step':undefined}><span aria-hidden="true"/>{step.label}</li>)}</ol>}
     </div>
     <div className="pub-reset-state-footer"><span>{card.footer}</span>{card.sourceName?<details className="pub-reset-state-source"><summary>{card.action} →</summary><div><p>来源：{card.sourceName}{card.sourceType==='observed'?' · 观察记录':''}</p>{card.watchNote&&<p>{card.watchNote}</p>}{card.sourceUrl&&safeUrl(card.sourceUrl)?<a href={card.sourceUrl} target="_blank" rel="noopener noreferrer">查看来源原文 ↗</a>:<p>此观察记录没有公开原文链接。</p>}</div></details>:<Link scroll={false} href={href}>{card.action} →</Link>}</div>
   </article>;
@@ -28,12 +42,35 @@ export function ResetStateCards({data,selectedKind,onKindChange}:{data:PublicDat
   const setSelected=(kind:'automatic_reset'|'banked_reset')=>{setLocalKind(kind);onKindChange?.(kind);};
   const card=model.cards.find(item=>item.kind===selected)!;
   return <section className="pub-reset-states" aria-label="额度重置和重置卡进展">
-    <div className="pub-reset-tabs" role="tablist" aria-label="重置类型">{model.cards.map(item=><button type="button" key={item.kind} id={`reset-tab-${item.kind}`} role="tab" aria-selected={item.kind===selected} tabIndex={item.kind===selected?0:-1} aria-controls="reset-state-panel" onKeyDown={event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const kind=event.key==='Home'?'automatic_reset':event.key==='End'?'banked_reset':selected==='automatic_reset'?'banked_reset':'automatic_reset';setSelected(kind);document.getElementById(`reset-tab-${kind}`)?.focus();}}} onClick={()=>setSelected(item.kind as 'automatic_reset'|'banked_reset')}><span>{item.name}</span><small>{item.badge}</small></button>)}</div>
+    <div className="pub-reset-tabs" role="tablist" aria-label="重置类型">{model.cards.map(item=><button type="button" key={item.kind} id={`reset-tab-${item.kind}`} role="tab" aria-selected={item.kind===selected} tabIndex={item.kind===selected?0:-1} aria-controls="reset-state-panel" onKeyDown={event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const kind=event.key==='Home'?'automatic_reset':event.key==='End'?'banked_reset':selected==='automatic_reset'?'banked_reset':'automatic_reset';setSelected(kind);document.getElementById(`reset-tab-${kind}`)?.focus();}}} onClick={()=>setSelected(item.kind as 'automatic_reset'|'banked_reset')}><span>{item.kind==='banked_reset'?'重置卡发放':item.name}</span></button>)}</div>
     {model.sourceWarning&&<p className="pub-reset-source-warning" role="status">{model.sourceWarning}</p>}
     <div id="reset-state-panel" role="tabpanel" aria-labelledby={`reset-tab-${selected}`}><ResetStateCardView card={card}/></div>
     {model.untyped&&<div className="pub-reset-untyped"><p>类型暂未明确的公开线索</p><ResetStateCardView card={model.untyped}/></div>}
     {model.expiredNote&&<p className="pub-reset-expired">{model.expiredNote}</p>}
-    {(model.lastReset||model.lastCard)&&<aside className="pub-reset-last-facts">{model.lastReset&&<><div><span>上次额度重置</span><time dateTime={model.lastReset.statementAt}>{model.lastReset.time} · 北京时间</time></div><p aria-label="距上次额度重置已过去">{model.lastReset.elapsed}<small>已过去</small></p></>}{model.lastCard&&<div className="pub-reset-last-card"><span>上次发放重置卡</span><time dateTime={model.lastCard.statementAt}>{model.lastCard.time} · 北京时间</time></div>}</aside>}
+  </section>;
+}
+
+export function LastResetElapsed({data,selectedKind='automatic_reset'}:{data:PublicData;selectedKind?:'automatic_reset'|'banked_reset'}) {
+  const now=usePublicClock(data.serverTime),model=resetStateCards(data,now),banked=selectedKind==='banked_reset';
+  const record=banked?model.lastCard:model.lastReset;
+  return <section className="pub-last-reset" aria-labelledby="last-reset-heading">
+    <div className="pub-last-reset-heading">
+      <span className="pub-last-reset-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="24" cy="24" r="16"/><path d={symbols.clock}/></svg></span>
+      <h2 id="last-reset-heading" aria-label={banked?'上次重置卡发放已经过去':'上次额度重置已经过去'}><span>{banked?'上次重置卡发放':'上次额度重置'}</span><span className="pub-last-reset-caption">已经过去</span></h2>
+    </div>
+    {record ? <>
+      <div className="pub-last-reset-value" aria-label={record.elapsed}>
+        <span className="pub-last-reset-days"><strong>{record.days}</strong><span>天</span></span>
+        <span className="pub-last-reset-clockwork"><span className="pub-last-reset-hms">{record.hoursMinutes}<span>:{record.seconds}</span></span><span className="pub-last-reset-units" aria-hidden="true"><span>时</span><span>分</span><span>秒</span></span></span>
+      </div>
+      <div className="pub-last-reset-record">
+        <p className="pub-last-reset-time"><span>{banked?'上次发放时间':'上次重置时间'}</span><time dateTime={record.statementAt}>{record.displayTime} · 北京时间</time></p>
+        <div className="pub-last-reset-footer">
+          <p className="pub-last-reset-basis">{banked?'依据公开发放完成消息记录':'依据公开完成消息记录'}</p>
+          <Link scroll={false} href={`/events/${encodeURIComponent(record.eventId)}?version=${encodeURIComponent(record.publicationId)}`} className="pub-last-reset-link" aria-label={banked?'查看这次发卡记录':'查看这次重置记录'}>查看记录 <span aria-hidden="true">↗</span></Link>
+        </div>
+      </div>
+    </> : <><p className="pub-last-reset-empty">暂无已确认记录</p><p className="pub-last-reset-basis">收到公开完成记录后开始计时</p></>}
   </section>;
 }
 

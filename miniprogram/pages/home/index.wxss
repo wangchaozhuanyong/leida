@@ -126,17 +126,18 @@
 
 .historical-probability{margin-top:16px}.historical-probability-values{display:flex;gap:24px;margin:8px 0;color:#18335c;font-size:22px;font-variant-numeric:tabular-nums}
 
-/* Fixed 16:9 masthead; rpx follows the full phone width. */
-.home-heading{display:block;position:relative;isolation:isolate;width:calc(100% + 40px);height:421.875rpx;min-height:0;margin:0 -20px 12px;padding:0;background:#f2f5fb;text-align:center;box-sizing:border-box}
+/* Compact banner; rpx follows the full phone width. */
+.home-heading{display:block;position:relative;isolation:isolate;width:calc(100% + 40px);height:312.5rpx;min-height:144px;margin:0 -20px 8px;padding:0;background:#f2f5fb;text-align:center;box-sizing:border-box}
 .home-atmosphere-fade{position:absolute;inset:0;pointer-events:none;background:linear-gradient(0deg,#f2f5fb,transparent 17%)}
-.home-heading-copy{position:absolute;z-index:1;left:3.7%;top:19.5%;width:51%}
-.home-heading-title{font-family:"Songti SC",STSong,SimSun,serif;font-size:54.75rpx;font-weight:600;line-height:1.15;letter-spacing:2.25rpx;color:#173758}
+.home-heading-copy{position:absolute;z-index:1;left:3.7%;top:14%;width:51%}
+.home-heading-title{font-family:"Songti SC",STSong,SimSun,serif;font-size:51rpx;font-weight:600;line-height:1.15;letter-spacing:2.25rpx;color:#173758}
 .home-heading-topic{display:flex;align-items:baseline;justify-content:center;gap:13.5rpx;white-space:nowrap}
-.home-heading-product{font-family:Georgia,serif;font-size:63.75rpx;font-style:italic;font-weight:400;line-height:1.08;letter-spacing:-3rpx;margin:0}
-.home-heading-accent{display:block;font-size:54.75rpx;line-height:1.2;letter-spacing:9rpx;padding-left:9rpx;margin-top:15rpx;color:#2458ce}
+.home-heading-product{font-family:Georgia,serif;font-size:57rpx;font-style:italic;font-weight:400;line-height:1.08;letter-spacing:-3rpx;margin:0}
+.home-heading-accent{display:block;font-size:48.75rpx;line-height:1.2;letter-spacing:8.25rpx;padding-left:8.25rpx;margin-top:9rpx;color:#2458ce}
 .home-heading-accent::before,.home-heading-accent::after{content:none}
-.home-heading-subtitle{font-size:21rpx;line-height:1.5;letter-spacing:1.875rpx;margin-top:22.5rpx;color:#617693;white-space:nowrap}
-.home-heading .freshness-summary{position:absolute;left:3.7%;width:51%;bottom:6%;margin:0;min-height:44px;font-size:10px;line-height:1.5;justify-content:center;z-index:1}
+.home-heading-subtitle{font-size:19.5rpx;line-height:1.5;letter-spacing:1.875rpx;margin-top:12rpx;color:#617693;white-space:nowrap}
+.home-heading .freshness-summary{position:absolute;left:3.7%;width:51%;bottom:0;margin:0;min-height:44px;font-size:10px;line-height:1.5;justify-content:center;z-index:1}
+@media(max-width:360px){.home-heading-subtitle{font-size:10px}}
 
 .timeline-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .state-badge{padding:3px 8px;border-radius:6px;background:#e8eef8;color:#4d607b;font-size:11px;line-height:1.5;white-space:nowrap}
@@ -157,3 +158,43 @@
 
 /* The same dial is retained above the status cards on small screens. */
 .home-dial{position:relative;z-index:1;width:100%;max-width:380px;margin:0 auto 20px}
+
+/* Approved compact homepage; current progress precedes the historical clock. */
+.home-page>.status-card{border-radius:18px;background:#fff;box-shadow:none}
+.reset-tabs{background:#fff;padding:6px;gap:6px}.reset-tabs button{min-height:42px}.reset-tabs button>text:first-child{font-size:13px}
+.reset-state,.reset-state.tone-blue,.reset-state.tone-green,.reset-state.tone-teal,.reset-state.tone-amber,.reset-state.tone-violet{background:linear-gradient(120deg,#fff,#f3f7ff)}
+.reset-state-body{padding:20px 20px 0;min-height:0}.reset-state-heading{margin-top:0}.reset-state-heading>view:first-child{font-size:23px;line-height:1.45;letter-spacing:-.5px;color:#14263e}.reset-state-description{margin-top:9px;font-size:12px;line-height:1.85;color:#4d607b}.reset-state-fact{padding-top:18px;margin-top:0}
+.reset-state-overview{display:flex;align-items:center;gap:16px;margin-top:16px}.reset-state-copy{flex:1;min-width:0}.reset-state-visual{flex:none;width:80px;height:80px;display:flex;align-items:center;justify-content:center;border-radius:50%;color:#2458ce;background:#edf3fe}.reset-state-visual .reset-state-icon{display:block;width:28px;height:28px;margin:0;opacity:1;transform:scale(2)}.reset-state-visual.visual-radar{background:conic-gradient(from 0deg,#f3f7ff 0deg 315deg,#d9e6fb 360deg)}.reset-state-visual .icon-radar>view:after{content:'';position:absolute;inset:3px;border:1px solid currentColor;border-radius:50%}
+.reset-progress{display:flex;margin-top:22px;padding-bottom:22px}.reset-progress-step{flex:1;position:relative;text-align:center;font-size:11px;line-height:1.6;color:#6e819e}.reset-progress-step:before{content:'';position:absolute;top:6px;left:50%;width:100%;height:1px;background:#dbe5f3}.reset-progress-step:last-child:before{display:none}.reset-progress-dot{position:relative;width:13px;height:13px;margin:0 auto 11px;border-radius:50%;background:#dfe8f6;box-shadow:0 0 0 5px #f5f8fe}.reset-progress-step.current{color:#2458ce;font-weight:600}.reset-progress-step.current .reset-progress-dot{background:#2458ce;box-shadow:0 0 0 5px #e0eaff}
+.reset-last-card-note{display:flex;flex-wrap:wrap;gap:5px 10px;justify-content:space-between;padding:12px 20px;border-top:1px solid #ccd9ed;background:#fff;font-size:11px;line-height:1.8;color:#4d607b}
+.last-reset-card{position:relative;overflow:hidden;margin-top:14px;padding:22px 22px 0;border:1px solid #ccd9ed;border-radius:18px;background:#fff}
+.last-reset-heading-row{display:flex;align-items:center;gap:9px;min-width:0}.last-reset-icon{display:flex;align-items:center;justify-content:center;flex:none;width:28px;height:28px;border-radius:8px;background:#edf3fe;color:#2458ce}.last-reset-icon>view{position:relative;width:16px;height:16px;border:1.3px solid currentColor;border-radius:50%}.last-reset-icon>view:before{content:'';position:absolute;width:1.3px;height:5px;left:6px;top:2px;background:currentColor}.last-reset-icon>view:after{content:'';position:absolute;width:4px;height:1.3px;left:6px;top:6px;background:currentColor;transform:rotate(25deg);transform-origin:left center}
+.last-reset-heading{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 7px;min-width:0;font-size:14px;font-weight:600;line-height:1.6;letter-spacing:0;color:#14263e}.last-reset-caption{font-size:12px;font-weight:400;color:#4d607b;white-space:nowrap}
+.last-reset-value{display:flex;align-items:center;flex-wrap:wrap;gap:12px 20px;margin:18px 0 20px;font-variant-numeric:tabular-nums}.last-reset-days{display:flex;align-items:baseline;gap:5px;line-height:1;white-space:nowrap;color:#18365e}.last-reset-days>text:first-child{font-size:64px;font-weight:600;letter-spacing:-2px}.last-reset-days>text:last-child{font-size:20px;font-weight:500;color:#4d607b}.last-reset-clockwork{display:flex;flex-direction:column;gap:7px;padding-left:20px;border-left:1px solid #dce5f3}.last-reset-hms{font-size:30px;font-weight:550;line-height:1.15;letter-spacing:.3px;white-space:nowrap;color:#18365e}.last-reset-hms>text{color:#2458ce}.last-reset-units{display:grid;grid-template-columns:repeat(3,1fr);font-size:10px;line-height:1.4;text-align:center;color:#71829b}
+.last-reset-record{margin:0 -22px;padding:13px 22px 6px;background:#f8faff;border-top:1px solid #e4ebf6}.last-reset-time{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 9px;font-size:11px;line-height:1.8;color:#4d607b}.last-reset-time>text:last-child{font-size:12px;color:#435f85;font-variant-numeric:tabular-nums}.last-reset-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0 8px;margin-top:2px}.last-reset-basis{font-size:10px;line-height:1.8;color:#71829b}.last-reset-link{display:flex;align-items:center;justify-content:flex-end;gap:5px;min-height:44px;margin-left:auto;font-size:11px;font-weight:500;color:#2458ce;text-align:right}.last-reset-link>text{font-size:15px}.last-reset-empty{margin:20px 0 8px;font-size:21px;line-height:1.6;color:#6e819e}.last-reset-empty+.last-reset-basis{margin-bottom:20px}
+.home-card-actions{display:flex;gap:10px;margin-top:14px}.home-card-actions button{flex:1;min-width:0;min-height:46px;border-radius:11px;padding:10px 8px;font-size:12px}.home-card-actions .secondary{color:#2458ce;background:#fff;border:1px solid #ccd9ed}
+.home-records{margin-top:14px;padding:0 20px;border:1px solid #ccd9ed;border-radius:18px;background:#fff}.home-records .recent-complete{margin:0;padding:14px 0 8px;border:0}.home-record-evidence{display:flex;justify-content:flex-end;align-items:center;width:100%;min-height:40px;font-size:11px}.home-page>.activity-entry{margin-top:14px}
+@media(max-width:360px){.last-reset-card{padding:20px 17px 0}.last-reset-record{margin:0 -17px;padding-left:17px;padding-right:17px}.last-reset-days>text:first-child{font-size:54px}.last-reset-hms{font-size:26px}.last-reset-value{gap:12px}.last-reset-clockwork{padding-left:12px}.reset-state-body{padding-left:17px;padding-right:17px}.reset-state-heading>view:first-child{font-size:21px}.reset-state-overview{gap:12px}.reset-state-visual{width:68px;height:68px}.reset-state-visual .reset-state-icon{transform:scale(1.8)}}
+
+/* Homepage modules share the page gutter and one inner text alignment. */
+.home-page>.home-heading{width:calc(100% + 24px);margin-left:-12px;margin-right:-12px;margin-bottom:12px}
+.home-page>.status-card{margin-bottom:0}
+.home-page .reset-state-body{padding:20px 16px 0}
+.home-page .reset-state-footer,.home-page .reset-state-warning,.home-page .reset-expired{padding-left:16px;padding-right:16px}
+.home-page .last-reset-card{margin-top:12px;padding:20px 16px 0}
+.home-page .last-reset-record{margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px}
+.home-page .home-card-actions{gap:8px;margin-top:12px}
+.home-page .home-records{margin-top:12px;padding:0 16px}
+.home-page .home-records .recent-complete{padding:20px 0}
+.home-page>.activity-entry{margin-top:12px;padding:20px 16px}
+.home-page>.activity-entry .small{margin-top:8px}
+@media(min-width:701px){
+ .home-page>.home-heading{width:100%;margin-left:0;margin-right:0;margin-bottom:16px}
+ .home-page .reset-state-body{padding:24px 24px 0}
+ .home-page .reset-state-footer,.home-page .reset-state-warning,.home-page .reset-expired{padding-left:24px;padding-right:24px}
+ .home-page .last-reset-card{margin-top:16px;padding:24px 24px 0}
+ .home-page .last-reset-record{margin-left:-24px;margin-right:-24px;padding-left:24px;padding-right:24px}
+ .home-page .home-card-actions{gap:12px;margin-top:16px}
+ .home-page .home-records{margin-top:16px;padding:0 24px}.home-page .home-records .recent-complete{padding:24px 0}
+ .home-page>.activity-entry{margin-top:16px;padding:24px}
+}
