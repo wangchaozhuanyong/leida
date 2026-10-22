@@ -1,5 +1,6 @@
 import http from 'node:http';
 import {pathToFileURL} from 'node:url';
+import {initializeGatewayNetwork} from './cloudrun-network-init.mjs';
 
 function cleanHeaders(headers) {
   const blocked = new Set(['connection','keep-alive','proxy-authenticate','proxy-authorization','te','trailer','transfer-encoding','upgrade']);
@@ -51,6 +52,7 @@ export function createGateway(upstreamUrl, {timeoutMs = 15000} = {}) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const port = Number(process.env.PORT || '8080');
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid gateway port');
+  initializeGatewayNetwork();
   const server = createGateway(process.argv[2]);
   server.listen(port, '0.0.0.0', () => console.log('Gateway ready'));
   const stop = () => {server.close(() => process.exit(0)); setTimeout(() => process.exit(1), 10000).unref();};
