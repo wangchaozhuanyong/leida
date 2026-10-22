@@ -13,5 +13,7 @@ work/
 *.tsbuildinfo
 .DS_Store
 *.pem
+# This exact file is the public server certificate used to pin the TLS upstream.
+!scripts/gateway-server-public.pem
 *.key
 project.private.config.json
