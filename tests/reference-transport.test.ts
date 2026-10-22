@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {fetchRecords,SourceRateLimitError,SourceStructureError} from '../src/server/ingestion';
+import {fetchRecords,sourceReadCheckpoint,SourceRateLimitError,SourceStructureError} from '../src/server/ingestion';
 import {REFERENCE_RESET_SOURCE,REFERENCE_SIGNAL_SOURCE,REFERENCE_HISTORY_SOURCE,referenceContentsURL} from '../src/server/reference-reset-source';
 
 function snapshot(){
@@ -22,8 +22,10 @@ test('参考快照只允许同一公开仓库的固定文件，Contents读取保
   return Response.json(body,{headers:{ETag:'"public-reference"'}});
  }});
  assert.equal(requests.length,1);assert.equal(records[0].metadata?.referenceReset?.referenceUrl,REFERENCE_RESET_SOURCE.url);assert.equal(records[0].textOrigin,'archive_excerpt');assert.equal(records[0].contextComplete,false);
- const cached={...source,httpCheckpoints:{[referenceContentsURL(source)!]:{bodyHash:'fixture',etag:'"public-reference"'}}};
+ assert.equal(sourceReadCheckpoint(source)?.referenceSnapshotAt,body.generated_at);
+ const cached={...source,referenceSnapshotAt:body.generated_at,httpCheckpoints:{[referenceContentsURL(source)!]:{bodyHash:'fixture',etag:'"public-reference"'}}};
  assert.deepEqual(await fetchRecords(cached,false,{onRequestEvent:diagnostics,fetcher:async(input,init)=>{assert.equal(String(input),referenceContentsURL(source));assert.equal(new Headers(init?.headers).get('If-None-Match'),'"public-reference"');return new Response(null,{status:304});}}),[]);
+ assert.equal(sourceReadCheckpoint(cached)?.referenceSnapshotAt,body.generated_at,'304不能把HTTP检查时间当作快照更新时间');
 });
 
 test('Contents暂时不可用时有界回退原文件；不新增鉴权或改写来源',async()=>{

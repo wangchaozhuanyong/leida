@@ -3,7 +3,7 @@ import type {Evidence,Source} from '../lib/types';
 import type {Incoming} from './ingestion';
 import type {BenefitClaim} from './benefit-rules';
 import {isTruncatedBenefitText} from './benefit-rules';
-import {forecastSourceAvailable,type ReferencePublicSignal} from '../lib/forecast';
+import {forecastSourceAvailable,referenceSnapshotFresh,type ReferencePublicSignal} from '../lib/forecast';
 
 export const REFERENCE_DATA_ROOT='https://raw.githubusercontent.com/gdutxiaoxu/codex-reset-radar/master/data';
 export const REFERENCE_RESET_SOURCE:Source={id:'aiplanwatch-reference',name:'AIPlanWatch 公开数据对账',kind:'archive',url:`${REFERENCE_DATA_ROOT}/latest.json`,enabled:false,validated:false,intervalMinutes:30,collectionPolicy:'manual',version:1,status:'unconnected'};
@@ -24,12 +24,18 @@ const latestSchema=z.object({schema_version:z.literal(1),generated_at:at,last_gl
 const signalSchema=z.object({schema_version:z.literal(1),generated_at:at,signals:z.array(z.object({signal_id:z.string().regex(/^\d{15,20}$/),signal_type:z.enum(['forecast_source','reset_announcement']),recorded_at:at,summary:z.string().min(1).max(3000),source})).max(1000)});
 const historySchema=z.object({schema_version:z.literal(1),generated_at:at,events:z.array(z.object({event_id:z.string().min(1).max(180),reset_type:z.enum(['global','banked','unknown']),record_status:z.string().min(1).max(40),occurred_at:at,source})).max(1000)});
 
-function freshSnapshot(generatedAt:string,collectedAt:string) {
+function archiveSnapshot(generatedAt:string,collectedAt:string) {
  const generated=Date.parse(generatedAt),collected=Date.parse(collectedAt);
- if(!Number.isFinite(collected)||generated>collected+60000||collected-generated>48*3600000)throw new Error('REFERENCE_SNAPSHOT_STALE');
+ if(!Number.isFinite(collected)||!Number.isFinite(generated)||generated>collected+60000)throw new Error('REFERENCE_SNAPSHOT_TIME_INVALID');
+}
+/** Versioned archives change only when their data changes. Their original
+ * timestamp is retained; stale signal contents never establish live coverage. */
+export function referenceCollectionHealth(source:Source,collectedAt:string):Pick<Source,'status'|'error'> {
+ const delayed=source.id===REFERENCE_SIGNAL_SOURCE.id&&!referenceSnapshotFresh(source.referenceSnapshotAt,collectedAt);
+ return {status:!source.enabled?'paused':delayed?'delayed':'healthy',error:delayed?'公开信号快照尚未更新；旧记录仅供回看，继续定时检查':undefined};
 }
 export function parseReferenceSignals(value:unknown,collectedAt:string):Incoming[] {
- const data=signalSchema.parse(value);freshSnapshot(data.generated_at,collectedAt);
+ const data=signalSchema.parse(value);archiveSnapshot(data.generated_at,collectedAt);
  return data.signals.filter(row=>row.signal_type==='forecast_source').map(row=>{
   const messageId=row.source.url.split('/').at(-1)!;
   if(messageId!==row.signal_id||Date.parse(row.recorded_at)>Date.parse(data.generated_at))throw new Error('REFERENCE_SIGNAL_INVALID');
@@ -37,7 +43,7 @@ export function parseReferenceSignals(value:unknown,collectedAt:string):Incoming
  });
 }
 export function parseReferenceHistory(value:unknown,collectedAt:string):Incoming[] {
- const data=historySchema.parse(value);freshSnapshot(data.generated_at,collectedAt);
+ const data=historySchema.parse(value);archiveSnapshot(data.generated_at,collectedAt);
  const start=new Date(collectedAt);start.setUTCMonth(start.getUTCMonth()-6);
  return data.events.filter(row=>Date.parse(row.occurred_at)>=start.getTime()&&Date.parse(row.occurred_at)<=Date.parse(data.generated_at)).map(row=>{
   const messageId=row.source.url.split('/').at(-1)!;
