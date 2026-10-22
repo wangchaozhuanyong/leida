@@ -84,7 +84,7 @@ test('依据入口保留真实原文片段，待开放提醒不承诺可订阅',
 
 test('站内信加载失败只影响信箱内容，微信提醒仍可见且不冒充空信箱',()=>{
   const html=renderToStaticMarkup(createElement(Settings,{notices:[],read:[],markRead(){},storageError:'',pending:createElement('p',{role:'alert'},'消息暂时无法加载')}));
-  assert.ok(html.indexOf('微信提醒')<html.indexOf('站内信'));
+  assert.ok(html.indexOf('站内信')<html.indexOf('微信提醒'));
   assert.match(html,/查看全部提醒/);assert.match(html,/消息暂时无法加载/);assert.match(html,/小程序内开启/);
   assert.doesNotMatch(html,/暂无提醒|刷新授权状态|选择接收下一次提醒|活动进展/);
 });

@@ -392,17 +392,18 @@ function ActivityContent({ activity, data, pending, day, onDay, onPoster, onDayP
 export function Settings({notices,read,markRead,storageError,pending,data,codeAvailable=false}:{notices:Notice[];read:string[];markRead:(ids:string[])=>void;storageError:string;pending?:React.ReactNode;data?:PublicData|null;codeAvailable?:boolean}) {
   const unread=notices.filter(n=>!read.includes(n.id)).length;
   return <>
-    <section className="pub-card pub-reminder-pending"><div className="pub-section-heading"><h2>微信提醒</h2><Badge tone="muted">小程序内开启</Badge></div><p>请在小程序的提醒页开启微信提醒，每次成功授权增加一次提醒机会。</p><p className="pub-muted">可分别选择重置预告、重置完成提醒和重要更正。每成功发送一条使用一次，未开启的类型不使用次数。</p><WechatEntryGuide publicationId={data?.publications.find(p=>!publicationWithdrawn(data,p))?.id} codeAvailable={codeAvailable}/></section>
     <section className="pub-card pub-inbox-card"><div className="pub-section-heading"><h2>站内信 {unread>0&&<span className="pub-inbox-unread">{unread} 未读</span>}</h2><TextLink href="/notices">查看全部提醒</TextLink></div>
       {pending ?? <>{notices.slice(0,3).map(n=><Link scroll={false} key={n.id} className="pub-inbox-preview" href={n.origin==='admin'?`/notices?message=${encodeURIComponent(n.id)}`:`/events/${encodeURIComponent(n.eventId)}?version=${encodeURIComponent(n.publicationId)}`} onClick={()=>markRead([n.id])}><div><strong>{n.title}</strong>{!read.includes(n.id)&&<span className="pub-status-dot"/>}</div><p>{publicNoticeSummary(n,data?.publications)}</p><small>{displayTime(n.createdAt)}</small></Link>)}
       {!notices.length&&<p className="pub-inbox-empty">暂无提醒，有新消息会显示在这里。</p>}</>}
     </section>
+    <section className="pub-card pub-reminder-pending"><div className="pub-section-heading"><h2>微信提醒</h2><Badge tone="muted">小程序内开启</Badge></div><p>请在小程序的提醒页开启微信提醒，每次成功授权增加一次提醒机会。</p><p className="pub-muted">可分别选择重置预告、重置完成提醒和重要更正。每成功发送一条使用一次，未开启的类型不使用次数。</p><WechatEntryGuide publicationId={data?.publications.find(p=>!publicationWithdrawn(data,p))?.id} codeAvailable={codeAvailable}/></section>
     {storageError&&<p className="pub-warning">{storageError}</p>}
 
   </>;
 }
 function MorePage() {
   return <><section className="pub-card"><h2>关于模钥重置雷达</h2><p>关注 Codex 额度重置、重置卡发放和公开活动安排。</p><p>本站整理公开消息，具体适用范围和到账情况以发布方及你的账户为准。</p></section>
+    <section className="pub-card"><h2>微信客服</h2><p>在微信中打开“模钥重置雷达”小程序，进入底部“提醒”，点击“联系小程序客服”即可打开微信客服会话。</p><p className="pub-muted">客服用于网站使用与信息反馈，无法代查你的 Codex 账户或办理额度发放。请勿在会话中发送密码或密钥。</p></section>
     <section className="pub-card" id="privacy"><h2>隐私说明</h2><p>查看公开消息无需提供手机号、通讯录或位置。已读状态保存在当前设备，清除浏览器数据后可能重置。</p><p>微信提醒使用微信提供的用户标识管理接收状态，可以在小程序提醒页关闭。保存海报由你主动操作，我们不读取或上传你的相册。</p><p>小程序内可查看平台提供的完整隐私指引。</p></section></>;
 }
 export function Methodology({data,snapshotId,cadenceId,target='automatic_reset',onPoster,onShare}:{data:PublicData;snapshotId:string|null;cadenceId:string|null;target?:'automatic_reset'|'banked_reset';onPoster:(s:ForecastSnapshot)=>void;onShare:(s:ForecastSnapshot)=>Promise<void>}) {
@@ -428,7 +429,7 @@ function PosterModal({ target, name, blocked:externalBlocked, note, statusDesign
   const cache = useRef(new Map<string, PosterImage>());
   const [result, setResult] = useState<{ image: PosterImage; key: string } | null>(null);
   const [style, setStyle] = useState<StatusPosterStyle>('precision');
-  const [includeCode, setIncludeCode] = useState(false);
+  const [includeCode, setIncludeCode] = useState(true);
   const [generating, setGenerating] = useState(true);
   const [sharing, setSharing] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -483,7 +484,7 @@ function PosterModal({ target, name, blocked:externalBlocked, note, statusDesign
     <div className="pub-dialog-body">
       {statusDesign && <div className="pub-poster-options">
         <div className="pub-poster-styles" role="group" aria-label="海报风格">{statusPosterStyles.map(option => <button key={option.id} type="button" className={`pub-poster-style${style === option.id ? ' is-selected' : ''}`} aria-pressed={style === option.id} disabled={sharing || !!blocked} onClick={() => { if (style !== option.id) { setGenerating(true); setError(''); setStyle(option.id); } }}><span className={`pub-poster-swatch ${option.id}`} aria-hidden="true" /><span>{option.label}</span>{style === option.id && <Icon name="check" />}</button>)}</div>
-        <label className="pub-poster-code-option"><input type="checkbox" checked={includeCode && codeAvailable} disabled={!codeAvailable || sharing || !!blocked} onChange={event => { setGenerating(true); setError(''); setIncludeCode(event.target.checked); }} /><span>带圆形小程序码</span>{!codeAvailable && <small>默认显示网站二维码</small>}</label>
+        <label className="pub-poster-code-option"><input type="checkbox" checked={includeCode && codeAvailable} disabled={!codeAvailable || sharing || !!blocked} onChange={event => { setGenerating(true); setError(''); setIncludeCode(event.target.checked); }} /><span>带微信官方小程序码</span>{!codeAvailable && <small>小程序码暂未启用，本张海报不带扫码入口</small>}</label>
       </div>}
       <div className={`pub-poster-preview${!preview || blocked ? ' pub-poster-preview-empty' : ''}`} aria-busy={generating}>
         {blocked ? <p className="pub-warning" role="alert">{blocked}</p> : <>
@@ -493,7 +494,7 @@ function PosterModal({ target, name, blocked:externalBlocked, note, statusDesign
         {error && <div className="pub-warning" role="alert"><p>{error}</p>{!image && !blocked && <button className="pub-text-button" onClick={() => setAttempt(value => value + 1)}>重新生成</button>}</div>}
       </div>
       <div className="pub-share-row"><button className="pub-button" disabled={sharing || linkBlocked || (canShareImage && generating)} onClick={() => void (canShareImage ? shareImage() : onShare())}>{sharing ? '正在打开分享…' : canShareImage ? '转发海报' : '分享公告链接'}<Icon name="share" /></button><button className="pub-button primary" disabled={generating || !image || !!blocked} onClick={() => image && savePosterImage(image)}>保存海报</button></div>
-      <p className="pub-dialog-note" role="status">{statusDesign ? image?.codeState === 'unavailable' ? '小程序码暂时获取失败，本次使用网站二维码。' : '海报记录生成时的公开状态，所有时间均为北京时间。' : note || (image ? '长按图片可保存，海报与扫码链接固定对应此版本。' : '海报固定使用这一发布版本。')}{local && '当前为本机预览，手机扫码需正式网站地址。'}</p>
+      <p className="pub-dialog-note" role="status">{statusDesign ? image?.codeState === 'unavailable' ? '微信官方小程序码暂时获取失败，本张海报未附扫码入口，可分享公告链接。' : '海报记录生成时的公开状态，所有时间均为北京时间。' : note || (image ? '长按图片可保存，海报与扫码链接固定对应此版本。' : '海报固定使用这一发布版本。')}{local && '当前为本机预览，手机扫码需正式网站地址。'}</p>
     </div>
   </dialog>;
 }

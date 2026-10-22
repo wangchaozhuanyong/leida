@@ -22,11 +22,16 @@
     </view>
     </view>
     <view class="last-reset-card" aria-label="{{selectedResetKind==='banked_reset'?'上次重置卡发放已经过去':'上次额度重置已经过去'}}">
-      <view class="last-reset-heading-row"><view class="last-reset-icon" aria-hidden="true"><view/></view><view class="last-reset-heading"><text>{{selectedResetKind==='banked_reset'?'上次重置卡发放':'上次额度重置'}}</text><text class="last-reset-caption">已经过去</text></view></view>
+      <view class="last-reset-heading-row"><view class="last-reset-icon" aria-hidden="true"><view/></view><text class="last-reset-heading">{{selectedResetKind==='banked_reset'?'上次重置卡发放':'上次额度重置'}}</text><text class="last-reset-caption">已经过去</text></view>
       <block wx:if="{{lastReset}}">
-        <view class="last-reset-value" aria-label="{{lastReset.elapsed}}"><view class="last-reset-days"><text>{{lastReset.days}}</text><text>天</text></view><view class="last-reset-clockwork"><view class="last-reset-hms">{{lastReset.hoursMinutes}}<text>:{{lastReset.seconds}}</text></view><view class="last-reset-units" aria-hidden="true"><text>时</text><text>分</text><text>秒</text></view></view></view>
+        <view class="last-reset-value" aria-label="{{lastReset.elapsed}}">
+          <view class="last-reset-part last-reset-days {{lastReset.days >= 1000 ? 'is-long' : lastReset.days >= 100 ? 'is-medium' : ''}}" aria-hidden="true"><text class="last-reset-number">{{lastReset.days}}</text><text class="last-reset-unit">天</text></view>
+          <view class="last-reset-part" aria-hidden="true"><text class="last-reset-number">{{lastReset.hours}}</text><text class="last-reset-unit">小时</text></view>
+          <view class="last-reset-part" aria-hidden="true"><text class="last-reset-number">{{lastReset.minutes}}</text><text class="last-reset-unit">分钟</text></view>
+          <view class="last-reset-part last-reset-seconds" aria-hidden="true"><text class="last-reset-number">{{lastReset.seconds}}</text><text class="last-reset-unit">秒</text></view>
+        </view>
         <view class="last-reset-record">
-          <view class="last-reset-time"><text>{{selectedResetKind==='banked_reset'?'上次发放时间':'上次重置时间'}}</text><text>{{lastReset.displayTime}} · 北京时间</text></view>
+          <view class="last-reset-time"><text>{{selectedResetKind==='banked_reset'?'上次发放时间':'上次重置时间'}}</text><view class="last-reset-date"><text>{{lastReset.displayTime}}</text><text class="last-reset-zone">北京时间</text></view></view>
           <view class="last-reset-footer"><view class="last-reset-basis">{{selectedResetKind==='banked_reset'?'依据公开发放完成消息记录':'依据公开完成消息记录'}}</view><button class="text-button last-reset-link" bindtap="openLastReset" aria-label="{{selectedResetKind==='banked_reset'?'查看这次发卡记录':'查看这次重置记录'}}">查看记录 <text aria-hidden="true">↗</text></button></view>
         </view>
       </block>

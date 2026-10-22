@@ -14,7 +14,7 @@ interface HistorySample {
   evidence: Evidence;
   expected: Pick<BenefitAction, 'kind' | 'stage' | 'scope' | 'eligibility'>[];
 }
-const history = JSON.parse(readFileSync(new URL('../outputs/implementation-qa/history-evidence-samples-20261010.json', import.meta.url), 'utf8')) as { samples: HistorySample[] };
+const history = JSON.parse(readFileSync(new URL('./fixtures/history-evidence-samples-20261010.json', import.meta.url), 'utf8')) as { samples: HistorySample[] };
 const at = '2026-10-10T04:00:00.000Z';
 function synthetic(text: string, extra: Partial<Evidence> = {}): Evidence {
   return { id: 'synthetic-evidence', sourceId: 'reset-archive', messageId: 'synthetic-message', url: 'https://x.com/repair_fixture/status/synthetic-message', text, hash: text, contextComplete: true, historical: false, publishedAt: at, collectedAt: at, provenance: 'archive', textOrigin: 'original', ...extra };
