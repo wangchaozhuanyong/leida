@@ -477,6 +477,7 @@ function PosterModal({ target, name, blocked:externalBlocked, note, statusDesign
     finally { setSharing(false); }
   };
   const local = typeof location !== 'undefined' && isLocalShareUrl(location.origin);
+  const linkBlocked = !!blocked || /^(此内容已撤回|公开状态已变化)/.test(error);
   return <dialog className={`pub-dialog${statusDesign ? ' pub-poster-dialog' : ''}`} ref={dialog} onClose={onClose} onCancel={onClose} aria-labelledby="pub-poster-title">
     <div className="pub-dialog-heading"><h2 id="pub-poster-title">分享海报</h2><button className="pub-icon-button" aria-label="关闭海报" onClick={onClose}><Icon name="close" /></button></div>
     <div className="pub-dialog-body">
@@ -491,7 +492,7 @@ function PosterModal({ target, name, blocked:externalBlocked, note, statusDesign
         </>}
         {error && <div className="pub-warning" role="alert"><p>{error}</p>{!image && !blocked && <button className="pub-text-button" onClick={() => setAttempt(value => value + 1)}>重新生成</button>}</div>}
       </div>
-      <div className="pub-share-row"><button className="pub-button" disabled={sharing || !!blocked || (canShareImage && generating)} onClick={() => void (canShareImage ? shareImage() : onShare())}>{sharing ? '正在打开分享…' : canShareImage ? '转发海报' : '分享公告链接'}<Icon name="share" /></button><button className="pub-button primary" disabled={generating || !image || !!blocked} onClick={() => image && savePosterImage(image)}>保存海报</button></div>
+      <div className="pub-share-row"><button className="pub-button" disabled={sharing || linkBlocked || (canShareImage && generating)} onClick={() => void (canShareImage ? shareImage() : onShare())}>{sharing ? '正在打开分享…' : canShareImage ? '转发海报' : '分享公告链接'}<Icon name="share" /></button><button className="pub-button primary" disabled={generating || !image || !!blocked} onClick={() => image && savePosterImage(image)}>保存海报</button></div>
       <p className="pub-dialog-note" role="status">{statusDesign ? image?.codeState === 'unavailable' ? '小程序码暂时获取失败，本次使用网站二维码。' : '海报记录生成时的公开状态，所有时间均为北京时间。' : note || (image ? '长按图片可保存，海报与扫码链接固定对应此版本。' : '海报固定使用这一发布版本。')}{local && '当前为本机预览，手机扫码需正式网站地址。'}</p>
     </div>
   </dialog>;
