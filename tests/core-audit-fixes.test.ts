@@ -75,7 +75,7 @@ test('参考信号只作为有出处的观察，不伪造预测窗口、概率�
  const lead=parseReferenceSignals(snapshot,now)[0];
  assert.equal(lead.textOrigin,'archive_excerpt');
  const original={...lead,id:'signal-proof',hash:'fixture',historical:true,textOrigin:'original' as const,text:'Let us break the cycle.'};
- const source={...REFERENCE_SIGNAL_SOURCE,enabled:true,validated:true,status:'healthy' as const,lastSuccessAt:now};
+ const source={...REFERENCE_SIGNAL_SOURCE,enabled:true,validated:true,status:'healthy' as const,lastSuccessAt:now,referenceSnapshotAt:now};
  assert.equal(referencePublicSignal([{...original,textOrigin:'archive_excerpt'}],[source],now),undefined);
  const signal=referencePublicSignal([original],[source],now);assert.ok(signal);
  const d=facts();const model=statusTimelineModel(publicResetOutlook(d),now,undefined,{referenceSignal:signal} as never);

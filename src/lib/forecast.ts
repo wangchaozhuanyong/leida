@@ -73,8 +73,14 @@ export function referenceForecast():ForecastReference {
 export function forecastWindows(signalAt:string):{24:string;48:string} {
  const time=Date.parse(signalAt);if(!Number.isFinite(time))throw new Error('信号时间无效');return {24:new Date(time+24*3600_000).toISOString(),48:new Date(time+48*3600_000).toISOString()};
 }
+/** A successful HTTP check does not refresh a public snapshot's contents. */
+export function referenceSnapshotFresh(snapshotAt:string|undefined,timestamp:string):boolean {
+ const age=Date.parse(timestamp)-Date.parse(snapshotAt??'');
+ return Number.isFinite(age)&&age>=-60_000&&age<=48*3600_000;
+}
 export function forecastSourceAvailable(source:Source|undefined,timestamp=new Date().toISOString()):boolean {
  const last=Date.parse(source?.lastSuccessAt??''),time=Date.parse(timestamp);
+ if(source?.id==='aiplanwatch-signals'&&!referenceSnapshotFresh(source.referenceSnapshotAt,timestamp))return false;
  return !!source?.enabled&&source.validated&&!source.publicationPaused&&!['failed','paused','delayed','unconnected'].includes(source.status)&&source.kind!=='manual'&&Number.isFinite(last)&&Number.isFinite(time)&&time-last>=0&&time-last<=(source.effectiveIntervalMinutes??source.intervalMinutes)*3*60_000;
 }
 export function qualifyForecastSignal(evidence:Evidence,source:Source|undefined,timestamp=evidence.collectedAt):{identity:string;title:string;url:string;signalAt:string}|undefined {

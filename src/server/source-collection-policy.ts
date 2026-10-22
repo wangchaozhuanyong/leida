@@ -1,7 +1,7 @@
 import type {Evidence,RadarEvent,Source} from '../lib/types';
 
 export const SOURCE_BURST_MS=2*3600_000;
-export const sourceForecastConfiguration=(source:Source)=>{const schedule=sourceCollectionSchedule(source);return JSON.stringify([source.enabled,source.validated,source.publicationPaused===true,source.pauseReason??null,source.kind,source.url,schedule.intervalMinutes,schedule.effectiveIntervalMinutes,schedule.collectionPolicy,source.status]);};
+export const sourceForecastConfiguration=(source:Source)=>{const schedule=sourceCollectionSchedule(source);return JSON.stringify([source.enabled,source.validated,source.publicationPaused===true,source.pauseReason??null,source.kind,source.url,schedule.intervalMinutes,schedule.effectiveIntervalMinutes,schedule.collectionPolicy,source.status,source.referenceSnapshotAt??null]);};
 export interface SourceCollectionWindow {identity:string;startsAt:string;endsAt:string;}
 const normalMinutes=(source:Source)=>source.id==='tibo-public'?10:source.kind==='releases'?360:30;
 const supported=(source:Source)=>source.id==='tibo-public'||['official-status','official-releases','reset-archive','activity-archive'].includes(source.id)||source.kind==='activity'&&source.discoveredFrom==='reset-archive';
