@@ -20,9 +20,16 @@ import {forecastPosterSvg} from '@/server/forecast-poster';
 import {getLightPublicVersion,getPublicRead,parsePublicRead} from '@/server/public-read';
 import {publicReplayRuns,publicReplayStep} from '@/server/historical-replay';
 import releaseManifest from '../../../../../release-manifest.json';
+import {getNativeDatabaseHealth} from '@/server/native-database-health';
 export const dynamic='force-dynamic';
 export async function GET(request:Request,{params}:{params:Promise<{path:string[]}>}){let keepWatchAlive=false;try{const {path}=await params;const [kind,id]=path;const acceptsObserved=request.headers.get('X-Radar-Watch-Contract')==='2';
  if(kind==='release'&&path.length===1)return json(releaseManifest);
+ if(kind==='health'&&path.length===1&&new URL(request.url).searchParams.has('probe')){
+  const query=new URL(request.url).searchParams;
+  if(query.getAll('probe').length!==1||query.get('probe')!=='native'||[...query.keys()].some(key=>key!=='probe'))throw Object.assign(new Error('数据库检测参数无效'),{status:400});
+  const result=await getNativeDatabaseHealth(process.env.DATABASE_URL);
+  return json(result,result.database==='ready'?200:503);
+ }
  keepWatchAlive=true;
  if(kind==='replays'&&path.length<=2){const query=new URL(request.url).searchParams;if([...query.keys()].some(key=>key!=='step')||query.getAll('step').length>1||!id&&query.has('step'))throw Object.assign(new Error('回放查询无效'),{status:400});return json(id?await publicReplayStep(id,query.get('step')??undefined):await publicReplayRuns());}
  if(kind==='version'&&new URL(request.url).searchParams.get('light')==='1'){const state=await getLightPublicVersion(),etag=`"${state.version}"`;if(request.headers.get('if-none-match')===etag)return new Response(null,{status:304,headers:{ETag:etag,'Cache-Control':'no-store'}});return Response.json({data:state},{headers:{ETag:etag,'Cache-Control':'no-store'}});}
