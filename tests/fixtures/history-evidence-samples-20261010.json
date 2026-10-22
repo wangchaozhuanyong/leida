@@ -1,0 +1,979 @@
+{
+  "project": "模钥重置雷达",
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-10T04:02:28.655Z",
+  "publicRead": {
+    "url": "http://127.0.0.1:5190/api/v1/bootstrap",
+    "serverTime": "2026-10-10T04:02:28.648Z",
+    "counts": {
+      "events": 64,
+      "publications": 98,
+      "articles": 83,
+      "evidence": 99
+    }
+  },
+  "defaultReplayCutoffAt": "2026-10-08T16:00:00.000Z",
+  "cutoffPolicy": "按原消息发布时间做识别回放，不是证明当时本站已采到；collectedAt/verifiedAt仍保留真实后读时间。晚取官方Help不进入预测输入，后取原帖也不能证明过去版本未编辑。",
+  "executionBoundary": {
+    "codeModified": false,
+    "databaseModified": false,
+    "aiCalled": false,
+    "wechatCalled": false,
+    "externalActions": "仅公开读取；无登录、注册或部署"
+  },
+  "expectedPolicy": "expected 只放完整且语义直接支撑的动作；空数组表示不能安全改变福利状态，不表示现实没有发放。sourceId/现有动作标签不是真值。",
+  "samples": [
+    {
+      "key": "regular-completed-all-plans",
+      "label": "全套餐用量重置完成声明",
+      "evidence": {
+        "id": "evidence_b7fff4f436543ac386de3eac1ca6c9e9786f9fd23616f6e685855c69b7624a75",
+        "url": "https://x.com/thsottiaux/status/2037346989244096581",
+        "hash": "9eaf0d11e048c5e0ede86149f055209db022f04d13014f724fcf9118c354ffe8",
+        "text": "Hello. We have reset Codex usage limits across all plans to let everyone experiment with the magnificent plugins we just launched, and because it had been a while! \n\nYou can just build unlimited things with Codex. Have fun!",
+        "metadata": {
+          "summary": "大家好。我们已经重置了所有套餐的 Codex 使用限制，让大家都能体验我们刚刚推出的绝妙插件，而且确实已经有一阵子没有重置了！\n\n你可以用 Codex 构建无限的东西。玩得开心！",
+          "category": "reset",
+          "sourceGroup": "codex-resets"
+        },
+        "sourceId": "reset-archive",
+        "messageId": "2037346989244096581",
+        "historical": true,
+        "provenance": "archive",
+        "textOrigin": "original",
+        "collectedAt": "2026-10-09T15:30:47.021Z",
+        "publishedAt": "2026-03-27T01:52:28.000Z",
+        "contextComplete": true
+      },
+      "sourceKind": "archive",
+      "origin": "live_checked_original",
+      "verifiedAt": "2026-10-10T04:02:28.655Z",
+      "textCompleteness": "full_visible_oembed_body",
+      "parentRelationConfidence": "no_relationship_asserted",
+      "provider": {
+        "url": "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2037346989244096581&omit_script=true&dnt=true",
+        "fetchedOn": "2026-10-10",
+        "fetchedAtPrecision": "date",
+        "recordedAt": "2026-10-10T04:02:28.655Z",
+        "author": "thsottiaux",
+        "postIdentityMatched": true,
+        "status": 200,
+        "bodyComplete": true,
+        "matchesSaved": true
+      },
+      "expected": [
+        {
+          "kind": "automatic_reset",
+          "stage": "claimed_complete",
+          "scope": "public",
+          "eligibility": "所有套餐的 Codex 用户",
+          "quote": "We have reset Codex usage limits across all plans"
+        }
+      ],
+      "limitations": [
+        "完整可见正文与已保存原文逐字一致；仅证明公告完成声明，不证明个人到账或精确执行时间。"
+      ],
+      "links": [
+        "https://x.com/thsottiaux/status/2037346989244096581",
+        "https://codex-resets.com/zh-CN",
+        "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2037346989244096581&omit_script=true&dnt=true"
+      ],
+      "observedProductRecord": {
+        "evidence": {
+          "id": "evidence_b7fff4f436543ac386de3eac1ca6c9e9786f9fd23616f6e685855c69b7624a75",
+          "contextComplete": true,
+          "textOrigin": "original",
+          "publishedAt": "2026-03-27T01:52:28.000Z",
+          "collectedAt": "2026-10-09T15:30:47.021Z"
+        },
+        "latestPublicationId": "pub_10bc24b8-a556-4f39-886b-4f127afb2a2f",
+        "latestMode": "news_only",
+        "currentLabelsAreNotGroundTruth": true
+      }
+    },
+    {
+      "key": "double-completed-scope-unclear",
+      "label": "双动作声明但资格范围不完整",
+      "evidence": {
+        "id": "evidence_575c771ed6c1a7a4b020eab78308b92bde609b29366af62bdfe6ec56e7824c42",
+        "url": "https://x.com/thsottiaux/status/2067399435009622521",
+        "hash": "8bd28c5d41708553652fcec6b554c3f49343576e33bb8ba14c219932ce7ebf8f",
+        "text": "Dearest gentle codexer.\n\nWe did a sneaky double reset. Not only do you get a full reset on us. But you are also getting one into the reset bank to use at your own leisure. \n\nEnjoy https://t.co/eORoaKb3pL",
+        "metadata": {
+          "summary": "最亲爱的温柔 Codex 使用者：\n\n我们悄悄地做了一次双重重置。你不仅能获得一次由我们提供的完整重置，还会额外得到一个存入重置储备库的额度，供你自行择时使用。\n\n尽情享用",
+          "category": "reset",
+          "sourceGroup": "codex-resets"
+        },
+        "sourceId": "reset-archive",
+        "messageId": "2067399435009622521",
+        "historical": true,
+        "provenance": "archive",
+        "textOrigin": "original",
+        "collectedAt": "2026-10-09T15:35:26.410Z",
+        "publishedAt": "2026-06-18T00:10:10.000Z",
+        "contextComplete": false
+      },
+      "sourceKind": "archive",
+      "origin": "live_checked_original",
+      "verifiedAt": "2026-10-10T04:02:28.655Z",
+      "textCompleteness": "full_visible_oembed_body",
+      "parentRelationConfidence": "no_relationship_asserted",
+      "provider": {
+        "url": "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2067399435009622521&omit_script=true&dnt=true",
+        "fetchedOn": "2026-10-10",
+        "fetchedAtPrecision": "date",
+        "recordedAt": "2026-10-10T04:02:28.655Z",
+        "author": "thsottiaux",
+        "postIdentityMatched": true,
+        "status": 200,
+        "bodyComplete": true,
+        "matchesSaved": true
+      },
+      "expected": [],
+      "limitations": [
+        "完整可见正文逐字匹配，但仅称 full reset 与 reset bank，未明确所有账户、套餐或地区；独立语义可见两个动作，不强行赋予普发范围。",
+        "原型站日历 regular 标签不能证明仅用量重置；expected 留空表示暂缓事实动作。"
+      ],
+      "links": [
+        "https://x.com/thsottiaux/status/2067399435009622521",
+        "https://codex-resets.com/zh-CN",
+        "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2067399435009622521&omit_script=true&dnt=true"
+      ],
+      "observedProductRecord": {
+        "evidence": {
+          "id": "evidence_575c771ed6c1a7a4b020eab78308b92bde609b29366af62bdfe6ec56e7824c42",
+          "contextComplete": false,
+          "textOrigin": "original",
+          "publishedAt": "2026-06-18T00:10:10.000Z",
+          "collectedAt": "2026-10-09T15:35:26.410Z"
+        },
+        "latestPublicationId": "pub_ee2dc87a-e983-4cb9-b851-9e656e1f9765",
+        "latestMode": "news_only",
+        "currentLabelsAreNotGroundTruth": true
+      }
+    },
+    {
+      "key": "regular-giving-in-progress",
+      "label": "正在给所有 Codex 用户重置用量",
+      "evidence": {
+        "id": "evidence_191138a9b85f9f5729c055eb45d893cb1c4236fbd6b8980ab7e04f6fc5f2e951",
+        "url": "https://x.com/thsottiaux/status/2070653282440405046",
+        "hash": "949710d87615c1cbf5b48fd65f726050e2b4e07e2b21096f699fa6d27c7d90ea",
+        "text": "We are giving all Codex users a usage reset on the house. Should be showing in your accounts in the next few hours.\n\nWe have applied some mitigations, but our investigation hasn't shown users being impacted at large. We are continuing to monitor the situation. https://t.co/rLJrQdI1ks",
+        "metadata": {
+          "summary": "我们正在为所有 Codex 用户免费提供一次用量重置。应该会在接下来几个小时内显示在你们的账户中。\n\n我们已经采取了一些缓解措施，但我们的调查尚未显示用户受到大规模影响。我们正在继续监控这一情况。",
+          "category": "reset",
+          "sourceGroup": "codex-resets"
+        },
+        "sourceId": "reset-archive",
+        "messageId": "2070653282440405046",
+        "historical": true,
+        "provenance": "archive",
+        "textOrigin": "original",
+        "collectedAt": "2026-10-09T15:30:42.818Z",
+        "publishedAt": "2026-06-26T23:39:48.000Z",
+        "contextComplete": true
+      },
+      "sourceKind": "archive",
+      "origin": "live_checked_original",
+      "verifiedAt": "2026-10-10T04:02:28.655Z",
+      "textCompleteness": "full_visible_oembed_body",
+      "parentRelationConfidence": "no_relationship_asserted",
+      "provider": {
+        "url": "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2070653282440405046&omit_script=true&dnt=true",
+        "fetchedOn": "2026-10-10",
+        "fetchedAtPrecision": "date",
+        "recordedAt": "2026-10-10T04:02:28.655Z",
+        "author": "thsottiaux",
+        "postIdentityMatched": true,
+        "status": 200,
+        "bodyComplete": true,
+        "matchesSaved": true
+      },
+      "expected": [
+        {
+          "kind": "automatic_reset",
+          "stage": "in_progress",
+          "scope": "public",
+          "eligibility": "所有 Codex 用户",
+          "quote": "We are giving all Codex users a usage reset on the house."
+        }
+      ],
+      "limitations": [
+        "可见原文逐字匹配；should be showing in the next few hours 为预期传播，不是完成。",
+        "预计相对时间不转成精确截止，不因时间过去改成完成。"
+      ],
+      "links": [
+        "https://x.com/thsottiaux/status/2070653282440405046",
+        "https://codex-resets.com/zh-CN",
+        "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2070653282440405046&omit_script=true&dnt=true"
+      ],
+      "observedProductRecord": {
+        "evidence": {
+          "id": "evidence_191138a9b85f9f5729c055eb45d893cb1c4236fbd6b8980ab7e04f6fc5f2e951",
+          "contextComplete": true,
+          "textOrigin": "original",
+          "publishedAt": "2026-06-26T23:39:48.000Z",
+          "collectedAt": "2026-10-09T15:30:42.818Z"
+        },
+        "latestPublicationId": "pub_a684e2e5-31da-4fce-901e-2f245be2dfaf",
+        "latestMode": "news_only",
+        "currentLabelsAreNotGroundTruth": true
+      }
+    },
+    {
+      "key": "double-promised-truncated",
+      "label": "一小时用量重置与额外卡的截断预告",
+      "evidence": {
+        "id": "evidence_cc6e78da1a7f555dc5e77af6de207be73d5af112cce604a84b0a5d68e997e165",
+        "url": "https://x.com/thsottiaux/status/2071740419030053227",
+        "hash": "c12a8e0580ee59056e46b07baf56587b0b8ab211483bc8cc1eac91dc26397c9e",
+        "text": "Codex 使用限制将在接下来一小时内再次完全重置，并且我们会向你的余额中存入一次额外的重置额度，供你在接下来的 24 小时内自行使用。\n\n我们调查了有关 Codex 使用量消耗速度快于预期的报告。并非只有一个核心问题，而是",
+        "metadata": {
+          "summary": "Codex 使用限制将在接下来一小时内再次完全重置，并且我们会向你的余额中存入一次额外的重置额度，供你在接下来的 24 小时内自行使用。\n\n我们调查了有关 Codex 使用量消耗速度快于预期的报告。并非只有一个核心问题，而是",
+          "category": "reset",
+          "sourceGroup": "codex-resets"
+        },
+        "sourceId": "reset-archive",
+        "messageId": "2071740419030053227",
+        "historical": true,
+        "provenance": "archive",
+        "textOrigin": "archive_excerpt",
+        "collectedAt": "2026-10-09T15:30:21.969Z",
+        "publishedAt": "2026-06-29T23:39:41.000Z",
+        "contextComplete": false
+      },
+      "sourceKind": "archive",
+      "origin": "saved_archive_excerpt",
+      "verifiedAt": "2026-10-10T04:02:28.655Z",
+      "textCompleteness": "provider_truncated",
+      "parentRelationConfidence": "no_relationship_asserted",
+      "provider": {
+        "url": "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2071740419030053227&omit_script=true&dnt=true",
+        "fetchedOn": "2026-10-10",
+        "fetchedAtPrecision": "date",
+        "recordedAt": "2026-10-10T04:02:28.655Z",
+        "author": "thsottiaux",
+        "postIdentityMatched": true,
+        "status": 200,
+        "bodyComplete": false,
+        "matchesSaved": false,
+        "truncated": true
+      },
+      "expected": [],
+      "limitations": [
+        "当前中文归档正文停在“而是”，属于语义截断，即使末尾没有省略号。",
+        "公开嵌入英文也明确截断；24 hours 不能据此断言是发放截止或卡有效期。",
+        "只有范围明确、全文与两项证据均补齐后才能拆成两个独立动作。"
+      ],
+      "links": [
+        "https://x.com/thsottiaux/status/2071740419030053227",
+        "https://codex-resets.com/zh-CN",
+        "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2071740419030053227&omit_script=true&dnt=true"
+      ],
+      "observedProductRecord": {
+        "evidence": {
+          "id": "evidence_cc6e78da1a7f555dc5e77af6de207be73d5af112cce604a84b0a5d68e997e165",
+          "contextComplete": false,
+          "textOrigin": "archive_excerpt",
+          "publishedAt": "2026-06-29T23:39:41.000Z",
+          "collectedAt": "2026-10-09T15:30:21.969Z"
+        },
+        "latestPublicationId": "pub_c8e3f46b-98f6-43ac-b128-f76bc647eb9b",
+        "latestMode": "news_only",
+        "currentLabelsAreNotGroundTruth": true
+      }
+    },
+    {
+      "key": "targeted-banked-truncated",
+      "label": "500k 用户补卡的部分可见原文",
+      "evidence": {
+        "id": "replay-live-targeted-2076418567143408112",
+        "sourceId": "reset-archive",
+        "messageId": "2076418567143408112",
+        "url": "https://x.com/thsottiaux/status/2076418567143408112",
+        "text": "Added a banked reset to 500k users of ChatGPT Work and Codex.",
+        "publishedAt": "2026-07-12T21:28:59.055Z",
+        "collectedAt": "2026-10-10T04:02:28.655Z",
+        "contextComplete": false,
+        "historical": true,
+        "provenance": "archive",
+        "textOrigin": "original",
+        "metadata": {
+          "category": "reset",
+          "sourceGroup": "codex-resets"
+        },
+        "hash": "420b09ab63f1e60c97853303b5c051469c7ee65ed5634f26ddac22cc05369eed"
+      },
+      "sourceKind": "archive",
+      "origin": "live_checked_original_excerpt",
+      "verifiedAt": "2026-10-10T04:02:28.655Z",
+      "textCompleteness": "explicit_excerpt",
+      "parentRelationConfidence": "no_relationship_asserted",
+      "provider": {
+        "url": "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2076418567143408112&omit_script=true&dnt=true",
+        "fetchedOn": "2026-10-10",
+        "fetchedAtPrecision": "date",
+        "recordedAt": "2026-10-10T04:02:28.655Z",
+        "author": "thsottiaux",
+        "postIdentityMatched": true,
+        "status": 200,
+        "bodyComplete": false,
+        "matchesSaved": false,
+        "truncated": true
+      },
+      "expected": [],
+      "limitations": [
+        "保存第一段逐字片段；提供方全文在 less than 10% ... 处截断，无法独立确定两小时资格窗口。",
+        "历史研究“窗口内点过按钮”是摘要，不能作为本条可信原文。",
+        "500k 用户不等于所有账户，不能从数字群体或归档 regular 标签生成普发。"
+      ],
+      "links": [
+        "https://x.com/thsottiaux/status/2076418567143408112",
+        "https://codex-resets.com/zh-CN",
+        "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2076418567143408112&omit_script=true&dnt=true"
+      ]
+    },
+    {
+      "key": "banked-added-completed",
+      "label": "所有 Work/Codex 用户已添加重置卡",
+      "evidence": {
+        "id": "evidence_4d4b87bfdf533ab5bc802010c0b6a54e742df29819d5d4c39dd9f8ee3f606339",
+        "url": "https://x.com/thsottiaux/status/2076735790567338203",
+        "hash": "f638ffa6e99f648e95a6b2cc1e3f345a846aa19f7eba1738f175625a8c83ed9c",
+        "text": "Thank you to the 7M active users who are now using Codex and ChatGPT Work.\n\nWe have added a banked reset to everyone's account to celebrate the milestone. You can apply the reset in the desktop app or on web and it will replenish the weekly usage for you.\n\nHave fun out there.",
+        "metadata": {
+          "summary": "感谢现在正在使用 Codex 和 ChatGPT Work 的 7M 活跃用户。\n\n为庆祝这一里程碑，我们已为每个人的账户添加了一项可自行启用的重置额度。你可以在桌面应用或网页端启用它，启用后将为你补充每周使用量。\n\n祝大家玩得开心。",
+          "category": "reset",
+          "sourceGroup": "codex-resets"
+        },
+        "sourceId": "reset-archive",
+        "messageId": "2076735790567338203",
+        "historical": true,
+        "provenance": "archive",
+        "textOrigin": "original",
+        "collectedAt": "2026-10-09T15:30:41.485Z",
+        "publishedAt": "2026-07-13T18:29:31.000Z",
+        "contextComplete": true
+      },
+      "sourceKind": "archive",
+      "origin": "live_checked_original",
+      "verifiedAt": "2026-10-10T04:02:28.655Z",
+      "textCompleteness": "full_visible_oembed_body",
+      "parentRelationConfidence": "no_relationship_asserted",
+      "provider": {
+        "url": "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2076735790567338203&omit_script=true&dnt=true",
+        "fetchedOn": "2026-10-10",
+        "fetchedAtPrecision": "date",
+        "recordedAt": "2026-10-10T04:02:28.655Z",
+        "author": "thsottiaux",
+        "postIdentityMatched": true,
+        "status": 200,
+        "bodyComplete": true,
+        "matchesSaved": true
+      },
+      "expected": [
+        {
+          "kind": "banked_reset",
+          "stage": "claimed_complete",
+          "scope": "public",
+          "eligibility": "所有 ChatGPT Work 和 Codex 用户",
+          "quote": "We have added a banked reset to everyone's account to celebrate the milestone."
+        }
+      ],
+      "limitations": [
+        "原文全文与公开嵌入逐字一致，语义明确；当前数据库 contextComplete=false 留在 observedProductRecord，不改真实记录。",
+        "added 是已经添加卡的声明；不是自动恢复用量，手动使用卡不会产生一次新发放。",
+        "现有 hasCompletion/上下文词法未识别 added 是待核对的漏判，不把当前 news_only 标签当正确答案。"
+      ],
+      "links": [
+        "https://x.com/thsottiaux/status/2076735790567338203",
+        "https://codex-resets.com/zh-CN",
+        "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2076735790567338203&omit_script=true&dnt=true"
+      ],
+      "observedProductRecord": {
+        "evidence": {
+          "id": "evidence_4d4b87bfdf533ab5bc802010c0b6a54e742df29819d5d4c39dd9f8ee3f606339",
+          "contextComplete": false,
+          "textOrigin": "original",
+          "publishedAt": "2026-07-13T18:29:31.000Z",
+          "collectedAt": "2026-10-09T15:30:41.485Z"
+        },
+        "latestPublicationId": "pub_d7eceb1f-c956-4b60-bef6-f81556febf4c",
+        "latestMode": "news_only",
+        "currentLabelsAreNotGroundTruth": true
+      }
+    },
+    {
+      "key": "banked-day-promise-archive",
+      "label": "20M 里程碑当天发卡的归档摘录",
+      "evidence": {
+        "id": "evidence_e8d08f953f5439ff83c1b7cf1c992de3a4e3d713641c318d51e8d22cc8d48b88",
+        "url": "https://x.com/thsottiaux/status/2090766694897619318",
+        "hash": "59e07faefa8432e8c4f824571621e8bb2c7030480c6d5be46fa35e9fc6752b50",
+        "text": "又是我。我带来了好消息。\n\n首先，本周内Codex的活跃用户已经达到了2000万。其次，这值得庆祝，今天白天我们将为每一位Codex和ChatGPT Work用户存入一次BANKED重置额度，你可以按自己的节奏使用：",
+        "metadata": {
+          "summary": "又是我。我带来了好消息。\n\n首先，本周内Codex的活跃用户已经达到了2000万。其次，这值得庆祝，今天白天我们将为每一位Codex和ChatGPT Work用户存入一次BANKED重置额度，你可以按自己的节奏使用：",
+          "category": "reset",
+          "sourceGroup": "codex-resets"
+        },
+        "sourceId": "reset-archive",
+        "messageId": "2090766694897619318",
+        "historical": true,
+        "provenance": "archive",
+        "textOrigin": "archive_excerpt",
+        "collectedAt": "2026-10-09T15:30:21.969Z",
+        "publishedAt": "2026-08-21T11:43:19.000Z",
+        "contextComplete": false
+      },
+      "sourceKind": "archive",
+      "origin": "saved_archive_excerpt",
+      "verifiedAt": "2026-10-10T04:02:28.655Z",
+      "textCompleteness": "provider_truncated",
+      "parentRelationConfidence": "no_relationship_asserted",
+      "provider": {
+        "url": "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2090766694897619318&omit_script=true&dnt=true",
+        "fetchedOn": "2026-10-10",
+        "fetchedAtPrecision": "date",
+        "recordedAt": "2026-10-10T04:02:28.655Z",
+        "author": "thsottiaux",
+        "postIdentityMatched": true,
+        "status": 200,
+        "bodyComplete": false,
+        "matchesSaved": false,
+        "truncated": true
+      },
+      "expected": [],
+      "limitations": [
+        "现有中文记录有明确 BANKED 与当天预告，但以冒号结束；公开原帖嵌入也截断。",
+        "归档描述不能证明完整资格与规则；当前 state_change/promised/所有账户 标签非独立真值。",
+        "没有精确截止或完成证据，不生成预测到期的完成动作。"
+      ],
+      "links": [
+        "https://x.com/thsottiaux/status/2090766694897619318",
+        "https://codex-resets.com/zh-CN",
+        "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2090766694897619318&omit_script=true&dnt=true"
+      ],
+      "observedProductRecord": {
+        "evidence": {
+          "id": "evidence_e8d08f953f5439ff83c1b7cf1c992de3a4e3d713641c318d51e8d22cc8d48b88",
+          "contextComplete": true,
+          "textOrigin": "archive_excerpt",
+          "publishedAt": "2026-08-21T11:43:19.000Z",
+          "collectedAt": "2026-10-09T15:30:21.969Z"
+        },
+        "latestPublicationId": "pub_89902061-0c62-4bea-9d4e-b6391a57f519",
+        "latestMode": "state_change",
+        "currentLabelsAreNotGroundTruth": true
+      }
+    },
+    {
+      "key": "banked-delay-promise-paid",
+      "label": "等待 Astra 的付费账户发卡预告",
+      "evidence": {
+        "id": "evidence_c045122b5a9c0335a0d12892d1a64a614fb2d728d27d7c4b99200881a34460ca",
+        "url": "https://x.com/thsottiaux/status/2095651088502591861",
+        "hash": "62d2d08fd94e8f7c644614e1f92053a8b0f8d610ee6348542a435d360a50fac5",
+        "text": "We will give one banked reset for every day you don't have access to Astra on your paid ChatGPT plan, starting today.  Team is moving mountains to give access as fast as we can.\n\nFirst one will land in ~ 3 hours. There is still time to create your account if you don't have one.",
+        "metadata": {
+          "summary": "从今天开始，在你付费的 ChatGPT 套餐中，每有一天无法访问 Astra，我们就会为你存入一次累积重置额度。团队正在竭尽全力，以最快速度为你提供访问权限。\n\n第一次重置额度大约在 3 小时后发放。如果你还没有账户，仍然有时间创建。",
+          "category": "reset",
+          "sourceGroup": "codex-resets"
+        },
+        "sourceId": "reset-archive",
+        "messageId": "2095651088502591861",
+        "historical": true,
+        "provenance": "archive",
+        "textOrigin": "original",
+        "collectedAt": "2026-10-09T15:30:34.830Z",
+        "publishedAt": "2026-09-03T23:12:09.000Z",
+        "contextComplete": true
+      },
+      "sourceKind": "archive",
+      "origin": "live_checked_original",
+      "verifiedAt": "2026-10-10T04:02:28.655Z",
+      "textCompleteness": "full_visible_oembed_body",
+      "parentRelationConfidence": "no_relationship_asserted",
+      "provider": {
+        "url": "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2095651088502591861&omit_script=true&dnt=true",
+        "fetchedOn": "2026-10-10",
+        "fetchedAtPrecision": "date",
+        "recordedAt": "2026-10-10T04:02:28.655Z",
+        "author": "thsottiaux",
+        "postIdentityMatched": true,
+        "status": 200,
+        "bodyComplete": true,
+        "matchesSaved": true
+      },
+      "expected": [
+        {
+          "kind": "banked_reset",
+          "stage": "promised",
+          "scope": "public",
+          "eligibility": "尚未获得 Astra 访问权限的付费 ChatGPT 账户",
+          "quote": "We will give one banked reset"
+        }
+      ],
+      "limitations": [
+        "公开嵌入完整正文与保存原文相同，按其条件保留资格，不泛化成所有账户。",
+        "first one ~3 hours 是预计首批时间，不能证明完成或全部轮次同时到账。",
+        "本次后读到的官方 Help 回溯资格和发放日不进入 2026-10-08 之前的预测输入。"
+      ],
+      "links": [
+        "https://x.com/thsottiaux/status/2095651088502591861",
+        "https://codex-resets.com/zh-CN",
+        "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2095651088502591861&omit_script=true&dnt=true"
+      ],
+      "observedProductRecord": {
+        "evidence": {
+          "id": "evidence_c045122b5a9c0335a0d12892d1a64a614fb2d728d27d7c4b99200881a34460ca",
+          "contextComplete": true,
+          "textOrigin": "original",
+          "publishedAt": "2026-09-03T23:12:09.000Z",
+          "collectedAt": "2026-10-09T15:30:34.830Z"
+        },
+        "latestPublicationId": "pub_b4a6df2f-6a86-401a-a14c-1fe6d46147ca",
+        "latestMode": "news_only",
+        "currentLabelsAreNotGroundTruth": true
+      }
+    },
+    {
+      "key": "banked-eod-archive",
+      "label": "Astra 上线日与新户截止的归档预告",
+      "evidence": {
+        "id": "evidence_f8b08d5eedfe78b3b19a83561ade94fb4ba1174828ff7f0d9cf25f9148f39006",
+        "url": "https://x.com/thsottiaux/status/2096035437299237298",
+        "hash": "d17bd92c16ae194ac4359f3baf467bed90067fdfaa290d9436225943f01371bd",
+        "text": "因为我们对Astra今天提前上线感到无比兴奋，而你们一直对我们超级耐心（其实并没有，但没关系！）……我们将在今天为所有Plus、Pro和Business用户进行完整的累积额度重置。额度将在本日结束时到账。\n\n祝Astra日快乐，享受一个美好的周末。\n\n附：如果你在太平洋时间晚上8点前创建账户或升级，也能获得重置。还有时间！",
+        "metadata": {
+          "summary": "因为我们对Astra今天提前上线感到无比兴奋，而你们一直对我们超级耐心（其实并没有，但没关系！）……我们将在今天为所有Plus、Pro和Business用户进行完整的累积额度重置。额度将在本日结束时到账。\n\n祝Astra日快乐，享受一个美好的周末。\n\n附：如果你在太平洋时间晚上8点前创建账户或升级，也能获得重置。还有时间！",
+          "category": "reset",
+          "sourceGroup": "codex-resets"
+        },
+        "sourceId": "reset-archive",
+        "messageId": "2096035437299237298",
+        "historical": true,
+        "provenance": "archive",
+        "textOrigin": "archive_excerpt",
+        "collectedAt": "2026-10-09T15:30:21.969Z",
+        "publishedAt": "2026-09-05T00:39:25.000Z",
+        "contextComplete": false
+      },
+      "sourceKind": "archive",
+      "origin": "saved_archive_excerpt",
+      "verifiedAt": "2026-10-10T04:02:28.655Z",
+      "textCompleteness": "provider_truncated",
+      "parentRelationConfidence": "no_relationship_asserted",
+      "provider": {
+        "url": "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2096035437299237298&omit_script=true&dnt=true",
+        "fetchedOn": "2026-10-10",
+        "fetchedAtPrecision": "date",
+        "recordedAt": "2026-10-10T04:02:28.655Z",
+        "author": "thsottiaux",
+        "postIdentityMatched": true,
+        "status": 200,
+        "bodyComplete": false,
+        "matchesSaved": false,
+        "truncated": true
+      },
+      "expected": [],
+      "limitations": [
+        "保存的是中文归档转录；公开原帖嵌入截断，本次没有独立完整正文。",
+        "今天结束前的发放时间与 20:00PT 新户/升级资格截止不同，不合并为一个 deadline。",
+        "不使用后来 Help 的回溯发放日证明当时已经完成。"
+      ],
+      "links": [
+        "https://x.com/thsottiaux/status/2096035437299237298",
+        "https://codex-resets.com/zh-CN",
+        "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2096035437299237298&omit_script=true&dnt=true"
+      ],
+      "observedProductRecord": {
+        "evidence": {
+          "id": "evidence_f8b08d5eedfe78b3b19a83561ade94fb4ba1174828ff7f0d9cf25f9148f39006",
+          "contextComplete": true,
+          "textOrigin": "archive_excerpt",
+          "publishedAt": "2026-09-05T00:39:25.000Z",
+          "collectedAt": "2026-10-09T15:30:21.969Z"
+        },
+        "latestPublicationId": "pub_30e12614-115a-4a41-9dcc-dafae5eecff6",
+        "latestMode": "news_only",
+        "currentLabelsAreNotGroundTruth": true
+      }
+    },
+    {
+      "key": "banked-loading-archive",
+      "label": "Sol/Luna 发布时加载卡的辅助转录",
+      "evidence": {
+        "id": "evidence_d85a3631cb30f32cac246a25de9184f3d5549dff130986f4fc5aa8d737074d51",
+        "url": "https://x.com/thsottiaux/status/2102463847714247142",
+        "hash": "f690efd0ff036da63d7ef27b78fb7248e8ab5e93f20c450281f52d4479eec7dc",
+        "text": "GPT-6 Sol 和 Luna 出来了。它们不仅在各方面都有非常显著的提升，而且在写作和那种“你一用就知道”的整体质量上也是如此。\n\n我们还将 API 价格永久下调 50%，让这两者都能适用于大量新的使用场景，也让你的用量更经用，即使是在订阅上也是如此。\n\n还有一件事。我们正在向我们所有 Plus、Pro 和 Business 用户的账户加载一次 banked reset。冲！",
+        "metadata": {
+          "summary": "GPT-6 Sol 和 Luna 出来了。它们不仅在各方面都有非常显著的提升，而且在写作和那种“你一用就知道”的整体质量上也是如此。\n\n我们还将 API 价格永久下调 50%，让这两者都能适用于大量新的使用场景，也让你的用量更经用，即使是在订阅上也是如此。\n\n还有一件事。我们正在向我们所有 Plus、Pro 和 Business 用户的账户加载一次 banked reset。冲！",
+          "category": "reset",
+          "sourceGroup": "codex-resets"
+        },
+        "sourceId": "reset-archive",
+        "messageId": "2102463847714247142",
+        "historical": true,
+        "provenance": "archive",
+        "textOrigin": "archive_excerpt",
+        "collectedAt": "2026-10-09T15:30:21.969Z",
+        "publishedAt": "2026-09-22T18:23:37.000Z",
+        "contextComplete": false
+      },
+      "sourceKind": "archive",
+      "origin": "saved_archive_excerpt",
+      "verifiedAt": "2026-10-10T04:02:28.655Z",
+      "textCompleteness": "provider_truncated",
+      "parentRelationConfidence": "no_relationship_asserted",
+      "provider": {
+        "url": "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2102463847714247142&omit_script=true&dnt=true",
+        "fetchedOn": "2026-10-10",
+        "fetchedAtPrecision": "date",
+        "recordedAt": "2026-10-10T04:02:28.655Z",
+        "author": "thsottiaux",
+        "postIdentityMatched": true,
+        "status": 200,
+        "bodyComplete": false,
+        "matchesSaved": false,
+        "truncated": true
+      },
+      "expected": [],
+      "limitations": [
+        "中文保存文本清楚写 Plus/Pro/Business 与正在加载；仅归档转录，不是原帖全文。",
+        "本次原帖公开嵌入截断在价格降幅段，尚未读到福利句；需独立证据才能验真该动作。",
+        "当前 state_change/in_progress 可作为系统输出对照，不作为事实真值或两个模型各发一次的依据。"
+      ],
+      "links": [
+        "https://x.com/thsottiaux/status/2102463847714247142",
+        "https://codex-resets.com/zh-CN",
+        "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2102463847714247142&omit_script=true&dnt=true"
+      ],
+      "observedProductRecord": {
+        "evidence": {
+          "id": "evidence_d85a3631cb30f32cac246a25de9184f3d5549dff130986f4fc5aa8d737074d51",
+          "contextComplete": true,
+          "textOrigin": "archive_excerpt",
+          "publishedAt": "2026-09-22T18:23:37.000Z",
+          "collectedAt": "2026-10-09T15:30:21.969Z"
+        },
+        "latestPublicationId": "pub_192bd4f5-7b85-45f6-8b88-9898d6ae1c42",
+        "latestMode": "state_change",
+        "currentLabelsAreNotGroundTruth": true
+      }
+    },
+    {
+      "key": "day3-parent-excerpt",
+      "label": "Day3 父帖关键发卡句的独立原文片段",
+      "evidence": {
+        "id": "replay-live-parent-2107913674593644711",
+        "sourceId": "reset-archive",
+        "messageId": "2107913674593644711",
+        "url": "https://x.com/thsottiaux/status/2107913674593644711",
+        "text": "Loading a banked reset in everyone's paid accounts.",
+        "publishedAt": "2026-10-07T19:19:17.822Z",
+        "collectedAt": "2026-10-10T04:02:28.655Z",
+        "contextComplete": false,
+        "historical": true,
+        "provenance": "archive",
+        "textOrigin": "original",
+        "metadata": {
+          "category": "reset",
+          "sourceGroup": "codex-resets"
+        },
+        "hash": "c89c161f2a476fb94ff33423cf91276ad595ad03df0f9651bc52a19d1c323744"
+      },
+      "sourceKind": "archive",
+      "origin": "live_checked_original_excerpt",
+      "verifiedAt": "2026-10-10T04:02:28.655Z",
+      "textCompleteness": "explicit_excerpt",
+      "parentRelationConfidence": "no_relationship_asserted",
+      "provider": {
+        "url": "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2107913674593644711&omit_script=true&dnt=true",
+        "fetchedOn": "2026-10-10",
+        "fetchedAtPrecision": "date",
+        "recordedAt": "2026-10-10T04:02:28.655Z",
+        "author": "thsottiaux",
+        "postIdentityMatched": true,
+        "status": 200,
+        "bodyComplete": true,
+        "matchesSaved": false
+      },
+      "expected": [],
+      "limitations": [
+        "提供方完整可见正文已读取，本样本仅保存关键原句，明确按片段回放，不伪装全文。",
+        "正文将 loading 与付费账户结合，语义是进行中；当前库只有人工摘要，不能用人工摘要代替完整原文自动发布。",
+        "publishedAt 来自已保存研究注明的帖子 ID 时间推导，与旧手工 03:18 记录存在差异，不是到账时间。"
+      ],
+      "links": [
+        "https://x.com/thsottiaux/status/2107913674593644711",
+        "https://codex-resets.com/zh-CN",
+        "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2107913674593644711&omit_script=true&dnt=true"
+      ],
+      "observedProductRecord": {
+        "evidence": {
+          "id": "historical-parent-summary",
+          "contextComplete": false,
+          "publishedAt": "2026-10-08T03:18:00+08:00",
+          "collectedAt": "2026-10-08T06:38:00+08:00"
+        },
+        "latestPublicationId": "historical-pub-complete",
+        "latestMode": "legacy_state",
+        "currentLabelsAreNotGroundTruth": true
+      }
+    },
+    {
+      "key": "eod-pst-reply-parent-unverified",
+      "label": "EOD PST 回复缺独立父链",
+      "evidence": {
+        "id": "historical-timing",
+        "url": "https://x.com/thsottiaux/status/2107913738791596286",
+        "hash": "8641eec7bb5cb7ad94e46f81d485b8af387696a2d8631ce8d1020848e5910283",
+        "text": "Will be there by EOD PST.",
+        "sourceId": "reset-archive",
+        "messageId": "2107913738791596286",
+        "historical": true,
+        "provenance": "archive",
+        "collectedAt": "2026-10-08T06:38:00+08:00",
+        "publishedAt": "2026-10-08T03:18:00+08:00",
+        "contextComplete": false
+      },
+      "sourceKind": "archive",
+      "origin": "saved_archive_excerpt",
+      "verifiedAt": "2026-10-10T04:02:28.655Z",
+      "textCompleteness": "full_visible_oembed_body",
+      "parentRelationConfidence": "unverified_candidate",
+      "candidateParentId": "2107913674593644711",
+      "provider": {
+        "url": "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2107913738791596286&omit_script=true&dnt=true",
+        "fetchedOn": "2026-10-10",
+        "fetchedAtPrecision": "date",
+        "recordedAt": "2026-10-10T04:02:28.655Z",
+        "author": "thsottiaux",
+        "postIdentityMatched": true,
+        "status": 200,
+        "bodyComplete": true,
+        "matchesSaved": true
+      },
+      "expected": [],
+      "limitations": [
+        "回复正文已完整可见但没有福利类型和资格，不能单条推成发卡预告。",
+        "PST 字面 UTC-8 与当地 PDT UTC-7 的15:00/16:00北京时间解释需保留歧义。",
+        "旧导入 publishedAt=03:18+08 与研究注明03:19:33.128+08不一致；本样本保留现存时间并指出冲突。",
+        "candidateParentId 仅为历史研究或导入的候选关系，本次未取得独立父子关系；不放入 evidence.parentId。"
+      ],
+      "links": [
+        "https://x.com/thsottiaux/status/2107913738791596286",
+        "https://codex-resets.com/zh-CN",
+        "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2107913738791596286&omit_script=true&dnt=true"
+      ],
+      "observedProductRecord": {
+        "evidence": {
+          "id": "historical-timing",
+          "contextComplete": false,
+          "parentId": "2107913674593644711",
+          "publishedAt": "2026-10-08T03:18:00+08:00",
+          "collectedAt": "2026-10-08T06:38:00+08:00"
+        },
+        "latestPublicationId": "historical-pub-complete",
+        "latestMode": "legacy_state",
+        "currentLabelsAreNotGroundTruth": true
+      }
+    },
+    {
+      "key": "completion-reply-parent-unverified",
+      "label": "已落地回复仍缺轮次和类型父链",
+      "evidence": {
+        "id": "evidence_04464813f0b304e15850ee4e07f404b75e0b9ef65c7b6d579da3ecf8a19f5e71",
+        "url": "https://x.com/thsottiaux/status/2108040921044639779",
+        "hash": "505e7065a9b083dbd9631555ca4e1ac21cbbc6ee5d0f4be6055d2dbb1d2f6834",
+        "text": "Confirmed landed across all accounts. How are we doing so far? https://t.co/tzw7dNX4pN",
+        "metadata": {
+          "summary": "已确认在所有账户落地。到目前为止我们做得怎么样？",
+          "category": "reset",
+          "sourceGroup": "codex-resets"
+        },
+        "sourceId": "reset-archive",
+        "messageId": "2108040921044639779",
+        "historical": true,
+        "provenance": "archive",
+        "textOrigin": "original",
+        "collectedAt": "2026-10-09T15:30:21.969Z",
+        "publishedAt": "2026-10-08T03:44:55.740Z",
+        "contextComplete": false
+      },
+      "sourceKind": "archive",
+      "origin": "live_checked_original",
+      "verifiedAt": "2026-10-10T04:02:28.655Z",
+      "textCompleteness": "full_visible_oembed_body",
+      "parentRelationConfidence": "unverified_candidate",
+      "candidateParentId": "2107913674593644711",
+      "provider": {
+        "url": "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2108040921044639779&omit_script=true&dnt=true",
+        "fetchedOn": "2026-10-10",
+        "fetchedAtPrecision": "date",
+        "recordedAt": "2026-10-10T04:02:28.655Z",
+        "author": "thsottiaux",
+        "postIdentityMatched": true,
+        "status": 200,
+        "bodyComplete": true,
+        "matchesSaved": true
+      },
+      "expected": [],
+      "limitations": [
+        "正文与嵌入完整匹配，仅说 all accounts landed；单条无法确定是重置卡还是用量重置。",
+        "活动页标题 Banked reset 与重置页分类是同一辅助来源的标签，不是第二份原帖证据。",
+        "同一 messageId 在两个归档页、多个正文版本及历史导入出现，不能多计次数或提醒。",
+        "现有 legacy claimed_complete 仅研究快照，不能拿它反证该回复本身有完整福利类型。",
+        "candidateParentId 仅为历史研究或导入的候选关系，本次未取得独立父子关系；不放入 evidence.parentId。"
+      ],
+      "links": [
+        "https://x.com/thsottiaux/status/2108040921044639779",
+        "https://codex-resets.com/zh-CN",
+        "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2108040921044639779&omit_script=true&dnt=true"
+      ],
+      "observedProductRecord": {
+        "evidence": {
+          "id": "evidence_04464813f0b304e15850ee4e07f404b75e0b9ef65c7b6d579da3ecf8a19f5e71",
+          "contextComplete": false,
+          "textOrigin": "original",
+          "publishedAt": "2026-10-08T03:44:55.740Z",
+          "collectedAt": "2026-10-09T15:30:21.969Z"
+        },
+        "latestPublicationId": "pub_461bae98-6634-43ef-820b-d79b5846ee64",
+        "latestMode": "news_only",
+        "currentLabelsAreNotGroundTruth": true
+      }
+    },
+    {
+      "key": "private-carryover-not-grant",
+      "label": "简短回复与私人已有卡结转",
+      "evidence": {
+        "id": "replay-live-private-2105120226027450685",
+        "sourceId": "reset-archive",
+        "messageId": "2105120226027450685",
+        "url": "https://x.com/thsottiaux/status/2105120226027450685",
+        "text": "Shhhhhh",
+        "publishedAt": "2026-09-30T02:19:07.784Z",
+        "collectedAt": "2026-10-10T04:02:28.655Z",
+        "contextComplete": false,
+        "historical": true,
+        "provenance": "archive",
+        "textOrigin": "original",
+        "metadata": {
+          "sourceGroup": "codex-resets"
+        },
+        "hash": "d2cf1e8a8da3aa7dfba2205ea3414295cb85b766f7b747c78744d26961302ea4"
+      },
+      "sourceKind": "archive",
+      "origin": "live_checked_original",
+      "verifiedAt": "2026-10-10T04:02:28.655Z",
+      "textCompleteness": "not_independently_complete",
+      "parentRelationConfidence": "unverified_candidate",
+      "candidateParentId": "2105016954797072492",
+      "provider": {
+        "url": "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2105120226027450685&omit_script=true&dnt=true",
+        "fetchedOn": "2026-10-10",
+        "fetchedAtPrecision": "date",
+        "recordedAt": "2026-10-10T04:02:28.655Z",
+        "author": "thsottiaux",
+        "postIdentityMatched": true,
+        "status": 200,
+        "bodyComplete": true,
+        "matchesSaved": false
+      },
+      "expected": [],
+      "limitations": [
+        "回复独立读到，但不含任何新发放承诺，不能生成福利动作。",
+        "另公开可见 theo 原句是 My resets carried over；仅支持个人卡结转描述。两帖父子关系本次未独立证实。",
+        "旧归档观察时间2026-09-29T19:00Z早于原帖研究时间2026-09-30T02:19:07.784Z，不当公告时间。",
+        "candidateParentId 仅为历史研究或导入的候选关系，本次未取得独立父子关系；不放入 evidence.parentId。"
+      ],
+      "links": [
+        "https://x.com/thsottiaux/status/2105120226027450685",
+        "https://codex-resets.com/zh-CN",
+        "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Fthsottiaux%2Fstatus%2F2105120226027450685&omit_script=true&dnt=true",
+        "https://x.com/theo/status/2105016954797072492",
+        "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Ftheo%2Fstatus%2F2105016954797072492&omit_script=true&dnt=true"
+      ],
+      "relatedOriginalExcerpt": {
+        "url": "https://x.com/theo/status/2105016954797072492",
+        "text": "My resets carried over :') https://t.co/NH69PTdJno pic.twitter.com/467NnsiPU7",
+        "origin": "live_checked_original",
+        "providerUrl": "https://publish.twitter.com/oembed?url=https%3A%2F%2Fx.com%2Ftheo%2Fstatus%2F2105016954797072492&omit_script=true&dnt=true",
+        "fetchedOn": "2026-10-10",
+        "fetchedAtPrecision": "date",
+        "relationshipVerified": false
+      }
+    },
+    {
+      "key": "unexpected-reset-incident-not-promotion",
+      "label": "异常重置故障不等于主动赠送",
+      "evidence": {
+        "id": "replay-official-unexpected-reset",
+        "sourceId": "official-status",
+        "messageId": "incident:01M23KG62KKK448RN434CQ64Z8:investigating",
+        "url": "https://status.openai.com/incidents/01M23KG62KKK448RN434CQ64Z8",
+        "text": "Some Codex users may be experiencing unexpected usage limit resets.",
+        "publishedAt": "2026-09-09T17:29:00.000Z",
+        "collectedAt": "2026-10-10T04:02:28.655Z",
+        "hash": "f5edbd409fcc4e4b4306f19115f5756d1f5c1cba44ddfd3ce960f9a754eedecb",
+        "contextComplete": true,
+        "historical": true,
+        "provenance": "official",
+        "textOrigin": "structured",
+        "metadata": {
+          "title": "Investigating unexpected usage limit resets",
+          "category": "product",
+          "status": "investigating"
+        }
+      },
+      "sourceKind": "status",
+      "origin": "live_checked_original",
+      "verifiedAt": "2026-10-10T04:02:28.655Z",
+      "textCompleteness": "full_visible_incident_update",
+      "parentRelationConfidence": "no_relationship_asserted",
+      "provider": {
+        "url": "https://status.openai.com/incidents/01M23KG62KKK448RN434CQ64Z8",
+        "fetchedOn": "2026-10-10",
+        "fetchedAtPrecision": "date",
+        "status": 200
+      },
+      "expected": [],
+      "limitations": [
+        "官方状态原文描述 unexpected reset 故障；之后 mitigated/resolved 仅表示服务恢复。",
+        "允许生成官方故障新闻，不生成发卡、普发用量重置或福利次数。"
+      ],
+      "links": [
+        "https://status.openai.com/incidents/01M23KG62KKK448RN434CQ64Z8"
+      ]
+    }
+  ],
+  "excludedResearchSummaries": [
+    {
+      "file": "work/banked-research.json",
+      "reason": "历史CUA核对说明和资格摘要没有完整原文快照，不作为可信原文输入。"
+    },
+    {
+      "file": "outputs/client-design/assets/data.js",
+      "reason": "旧设计/研究标签、事件状态与类型分类只作索引，不作为原文。"
+    }
+  ],
+  "laterRuleReferences": [
+    {
+      "url": "https://help.openai.com/en/articles/20001498-how-banked-codex-resets-work",
+      "checkedOn": "2026-10-10",
+      "usedFor": "当前规则核对，禁止进入defaultReplayCutoff之前的预测证据",
+      "summary": "banked保存后手动使用，global直接作用于用量；资格和到期随offer变化；未来发放不保证；Sep3/4补卡与Sep7global必须区分。"
+    }
+  ],
+  "gaps": [
+    "未取得7/12定向补卡的完整原文和两小时窗口全文。",
+    "未取得6/29双动作全文和24小时指代的明确上下文。",
+    "10/8回复与Day3父帖关系本次未独立核实；导入parentId不升级为新证据。",
+    "未找到真实重置取消或明确福利更正的历史原文，不能用软件 release 中cancel/correct词制造案例。",
+    "个人账户是否到账及实际执行时刻未观测。",
+    "历史原帖当日不可变网页版本缺失；回放只能证明当前保存文本的判断，不能证明当时已可见或准确预测。"
+  ]
+}

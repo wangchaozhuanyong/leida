@@ -56,15 +56,14 @@ export function LastResetElapsed({data,selectedKind='automatic_reset'}:{data:Pub
   return <section className="pub-last-reset" aria-labelledby="last-reset-heading">
     <div className="pub-last-reset-heading">
       <span className="pub-last-reset-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="24" cy="24" r="16"/><path d={symbols.clock}/></svg></span>
-      <h2 id="last-reset-heading" aria-label={banked?'上次重置卡发放已经过去':'上次额度重置已经过去'}><span>{banked?'上次重置卡发放':'上次额度重置'}</span><span className="pub-last-reset-caption">已经过去</span></h2>
+      <h2 id="last-reset-heading" aria-label={banked?'上次重置卡发放已经过去':'上次额度重置已经过去'}>{banked?'上次重置卡发放':'上次额度重置'}</h2><span className="pub-last-reset-caption">已经过去</span>
     </div>
     {record ? <>
       <div className="pub-last-reset-value" aria-label={record.elapsed}>
-        <span className="pub-last-reset-days"><strong>{record.days}</strong><span>天</span></span>
-        <span className="pub-last-reset-clockwork"><span className="pub-last-reset-hms">{record.hoursMinutes}<span>:{record.seconds}</span></span><span className="pub-last-reset-units" aria-hidden="true"><span>时</span><span>分</span><span>秒</span></span></span>
+        {[{value:record.days,unit:'天',days:true},{value:record.hours,unit:'小时'},{value:record.minutes,unit:'分钟'},{value:record.seconds,unit:'秒'}].map(part=><span key={part.unit} className={`pub-last-reset-part${part.days?' pub-last-reset-days':''}${part.days&&record.days>=1000?' is-long':part.days&&record.days>=100?' is-medium':''}`} aria-hidden="true"><strong>{part.value}</strong><span>{part.unit}</span></span>)}
       </div>
       <div className="pub-last-reset-record">
-        <p className="pub-last-reset-time"><span>{banked?'上次发放时间':'上次重置时间'}</span><time dateTime={record.statementAt}>{record.displayTime} · 北京时间</time></p>
+        <p className="pub-last-reset-time"><span>{banked?'上次发放时间':'上次重置时间'}</span><span className="pub-last-reset-date"><time dateTime={record.statementAt}>{record.displayTime}</time><small>北京时间</small></span></p>
         <div className="pub-last-reset-footer">
           <p className="pub-last-reset-basis">{banked?'依据公开发放完成消息记录':'依据公开完成消息记录'}</p>
           <Link scroll={false} href={`/events/${encodeURIComponent(record.eventId)}?version=${encodeURIComponent(record.publicationId)}`} className="pub-last-reset-link" aria-label={banked?'查看这次发卡记录':'查看这次重置记录'}>查看记录 <span aria-hidden="true">↗</span></Link>

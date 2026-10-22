@@ -83,7 +83,7 @@ function resetStateCards(data, now=data.serverTime) {
     }
   }
   const expired=forecasts?.watch?.status==='active' && !activeSignal && valid(forecasts.watch.signal?.expiresAt) && Date.parse(forecasts.watch.signal.expiresAt)<=current;
-  const sourceUnavailable=forecasts?.status==='unavailable'||forecasts?.watch?.status==='unavailable';
+  const sourceWarning=forecasts?.status==='unavailable'?'趋势分析暂未更新，公开公告与历史记录仍可查看。':forecasts?.watch?.status==='unavailable'?'辅助信号等待更新：第三方辅助信号暂未更新，仅影响信号观察；公开公告与历史记录仍可查看。':'';
   const completed=m.latestCompletedBenefits({...data,serverTime:now});
   for(const card of cards){
     const current=['announced','scheduled','revised','overdue'].includes(card.state)?0:card.state==='progress'?1:card.state==='completed'?2:-1;
@@ -97,8 +97,8 @@ function resetStateCards(data, now=data.serverTime) {
     if(!elapsed)return null;
     const parts=elapsed.parts,clock=unit=>String(parts.find(part=>part.unit===unit)?.value||0).padStart(2,'0');
     const date=at(item.action.statementAt);
-    return {time:date,displayTime:`${date.slice(0,4)===m.dateKey(now).slice(0,4)?'':date.slice(0,4)+'年'}${Number(date.slice(5,7))}月${Number(date.slice(8,10))}日 ${date.slice(11,16)}`,elapsed:elapsed.label,days:parts.find(part=>part.unit==='天')?.value||0,hoursMinutes:clock('小时')+':'+clock('分钟'),seconds:clock('秒'),statementAt:item.action.statementAt,publicationId:item.publication.id,eventId:item.event.id};
+    return {time:date,displayTime:`${date.slice(0,4)===m.dateKey(now).slice(0,4)?'':date.slice(0,4)+'年'}${Number(date.slice(5,7))}月${Number(date.slice(8,10))}日 ${date.slice(11,16)}`,elapsed:elapsed.label,days:parts.find(part=>part.unit==='天')?.value||0,hours:clock('小时'),minutes:clock('分钟'),hoursMinutes:clock('小时')+':'+clock('分钟'),seconds:clock('秒'),statementAt:item.action.statementAt,publicationId:item.publication.id,eventId:item.event.id};
   };
-  return {cards,untyped,sourceWarning:sourceUnavailable?'信号来源暂时无法更新，已读取的公开记录仍保留。':'',expiredNote:expired&&!signal?'先前信号已过观察期，等待新的公开消息。':'',lastReset:history('automatic_reset'),lastCard:history('banked_reset')};
+  return {cards,untyped,sourceWarning,expiredNote:expired&&!signal?'先前信号已过观察期，等待新的公开消息。':'',lastReset:history('automatic_reset'),lastCard:history('banked_reset')};
 }
 module.exports={resetStateCards};

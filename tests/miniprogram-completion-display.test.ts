@@ -122,8 +122,17 @@ test('首页每秒只更新经过时长字段，不跨原生桥重发列表、�
  const changes:Record<string,unknown>[]=[],original=h.page.setData.bind(h.page),before=h.page.data.completions;
  h.page.setData=(patch:Record<string,unknown>)=>{changes.push(patch);original(patch);};
  h.advance(1000);
- assert.ok(changes.some(p=>'lastReset.elapsed'in p));assert.ok(changes.every(p=>Object.keys(p).every(key=>['lastReset.elapsed','lastReset.days','lastReset.hoursMinutes','lastReset.seconds'].includes(key))));
+ assert.ok(changes.some(p=>'lastReset.elapsed'in p));assert.ok(changes.every(p=>Object.keys(p).every(key=>['lastReset.elapsed','lastReset.days','lastReset.hours','lastReset.minutes','lastReset.hoursMinutes','lastReset.seconds'].includes(key))));
  assert.equal(h.page.data.completions,before);assert.equal(h.page.data.lastReset.elapsed,'2小时15分钟1秒');h.page.onUnload();
+});
+
+test('四列计时跨秒、分、小时和天边界时同步进位，补零且不更换公告起点',()=>{
+ const h=nativeHome(fixture([publication('reset','automatic_reset','2026-10-12T08:00:01Z')]));
+ assert.equal(h.page.data.lastReset.days,0);assert.equal(h.page.data.lastReset.hours,'23');assert.equal(h.page.data.lastReset.minutes,'59');assert.equal(h.page.data.lastReset.seconds,'59');
+ h.advance(1000);
+ assert.equal(h.page.data.lastReset.days,1);assert.equal(h.page.data.lastReset.hours,'00');assert.equal(h.page.data.lastReset.minutes,'00');assert.equal(h.page.data.lastReset.seconds,'00');
+ assert.equal(h.page.data.lastReset.hoursMinutes,'00:00');assert.equal(h.page.data.lastReset.publicationId,'reset');
+ h.page.onUnload();
 });
 
 
@@ -136,7 +145,7 @@ test('原生首页切换类型同时切换历史计时和记录链接，返回�
  h.page.openLastReset();assert.equal(h.navigations.at(-1),'/pages/detail/index?publicationId=card');
  const changes:Record<string,unknown>[]=[],original=h.page.setData.bind(h.page);h.page.setData=(patch:Record<string,unknown>)=>{changes.push(patch);original(patch);};
  h.advance(1000);assert.equal(h.page.data.lastReset.seconds,'01');assert.equal(h.page.data.lastReset.elapsed,'0小时35分钟1秒');
- assert.ok(changes.some(p=>'lastReset.seconds'in p));assert.ok(changes.every(p=>Object.keys(p).every(key=>['lastReset.elapsed','lastReset.days','lastReset.hoursMinutes','lastReset.seconds'].includes(key))),'发卡每秒更新同样只传输变化的计时字段');
+ assert.ok(changes.some(p=>'lastReset.seconds'in p));assert.ok(changes.every(p=>Object.keys(p).every(key=>['lastReset.elapsed','lastReset.days','lastReset.hours','lastReset.minutes','lastReset.hoursMinutes','lastReset.seconds'].includes(key))),'发卡每秒更新同样只传输变化的计时字段');
  h.page.onHide();h.advance(60000);h.page.onShow();
  assert.equal(h.page.data.selectedResetKind,'banked_reset');assert.equal(h.page.data.lastReset.hoursMinutes,'00:36');assert.equal(h.page.data.lastReset.seconds,'01');
  h.refresh();assert.equal(h.page.data.lastReset.publicationId,'card');assert.equal(h.page.data.lastReset.hoursMinutes,'00:36');

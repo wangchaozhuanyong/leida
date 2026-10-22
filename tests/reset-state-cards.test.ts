@@ -72,7 +72,15 @@ test('已有可信分类的信号按类型显示；来源中断保留完成事�
  d.forecasts!.watch={status:'active',checkedAt:now,signal:{sourceUrl:url,text:'public hint',level:'elevated',observedAt:'2026-10-18T10:00:00Z',expiresAt:'2026-10-18T14:00:00Z',forecastWindow:'within 2 hours'}};
  d.forecasts!.cases=[{id:'existing',url,target:'banked_reset',status:'watching',coverage:{status:'verified'},signalEvidenceIds:[]} as any];
  assert.equal(card(d,'banked_reset').title,'预计近期发放重置卡');assert.equal(card(d).state,'waiting');
- add(d,'done','automatic_reset','claimed_complete');projected(d);d.forecasts!.watch={status:'unavailable',checkedAt:now};assert.equal(card(d).state,'completed');assert.match(resetStateCards(d).sourceWarning,/仍保留/);
+ add(d,'done','automatic_reset','claimed_complete');projected(d);d.forecasts!.watch={status:'unavailable',checkedAt:now};assert.equal(card(d).state,'completed');assert.match(resetStateCards(d).sourceWarning,/仅影响信号观察/);assert.match(resetStateCards(d).sourceWarning,/公开公告与历史记录仍可查看/);
+});
+
+test('内部趋势读取失败不归咎第三方信号，保留公告状态与历史计时',()=>{
+ const d=fixture();add(d,'done','automatic_reset','claimed_complete');projected(d);
+ const before=card(d),last=resetStateCards(d).lastReset;
+ d.forecasts!.status='unavailable';d.forecasts!.watch={status:'unavailable',checkedAt:now};
+ assert.match(resetStateCards(d).sourceWarning,/趋势分析暂未更新/);assert.doesNotMatch(resetStateCards(d).sourceWarning,/第三方/);
+ assert.deepEqual(card(d),before);assert.deepEqual(resetStateCards(d).lastReset,last);
 });
 
 test('旧接口单状态可显示，当前两类投影可靠时优先使用，两类切换入口不混成阶段线',()=>{

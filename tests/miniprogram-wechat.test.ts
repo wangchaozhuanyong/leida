@@ -172,20 +172,21 @@ test('页面声明真实canvas、主动授权和隐私入口，场景解析不�
   assert.doesNotThrow(()=>new Script(code));
 });
 
-function pageHarness(reader?:Options) {
+function pageHarness(reader?:Options,initialFeed:Options={}) {
   const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
   const publication:Publication={id:'fixture-old',articleId:'fixture-article',eventId:'fixture-event',publishedAt:'2026-10-10T01:00:00Z',cutoffAt:'2026-10-10T01:00:00Z',reason:'隔离页面输入',mode:'news_only',article:{id:'fixture-article',eventId:'fixture-event',title:'测试旧版本标题',summary:'测试旧版本正文',translation:'',category:'product',version:1,status:'published',publicationId:'fixture-old',evidenceIds:[],publishedAt:'2026-10-10T01:00:00Z',updatedAt:'2026-10-10T01:00:00Z'},event:{id:'fixture-event',title:'测试事件',version:1,status:'published',publicationId:'fixture-old',actions:[],evidenceIds:[],updatedAt:'2026-10-10T01:00:00Z'}};
   const latest=structuredClone(publication);latest.id='fixture-new';latest.article.publicationId=latest.id;latest.article.title='测试最新版本标题';latest.article.version=2;latest.event.publicationId=latest.id;
   const data:PublicData={publications:[publication,latest],events:[latest.event],articles:[latest.article],activities:[],evidence:[],notices:[],sources:[],site:{name:'模钥重置雷达',description:'',version:1,autoPublish:true},serverTime:'2026-10-10T04:00:00Z'};
   const listeners=new Set<(value:unknown)=>void>(),requests:{path:string;abortCount:number;resolve:(value:unknown)=>void;reject:(error:Error)=>void}[]=[],calls:string[]=[],navigation:{method:string;url:string}[]=[];
-  const app={client:{getState(){return{data,receivedAt:Date.now(),loading:false,unconfigured:false,error:''};},subscribe(fn:(value:unknown)=>void){listeners.add(fn);fn(this.getState());return()=>listeners.delete(fn);},async refresh(){calls.push('refresh');}},preferences:{snapshot(){return{preferences:{},read:[],error:''};}},publicApi(path:string){let resolve!:(value:unknown)=>void,reject!:(error:Error)=>void;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});const item={path,abortCount:0,resolve,reject};requests.push(item);return{promise,abort(){item.abortCount++;}};},wechat:{getState(){return{safe:{state:'revoked'}};},subscribe(fn:(value:unknown)=>void){calls.push('reader-subscribe');fn({label:'点击后连接',busy:false});return()=>calls.push('reader-unsubscribe');},async prepare(options:Options){assert.equal(options.userInitiated,true);calls.push('reader-prepare');},async authorize(options:Options){assert.equal(options.userInitiated,true);calls.push('reader-authorize');},async refresh(options:Options){assert.equal(options.userInitiated,true);calls.push('reader-refresh');},async revoke(options:Options){assert.equal(options.userInitiated,true);calls.push('reader-revoke');}}};
+  const feedState={data,receivedAt:Date.now(),loading:false,unconfigured:false,error:'',...initialFeed};
+  const app={client:{getState(){return feedState;},subscribe(fn:(value:unknown)=>void){listeners.add(fn);fn(this.getState());return()=>listeners.delete(fn);},async refresh(){calls.push('refresh');}},preferences:{snapshot(){return{preferences:{},read:[],error:''};}},publicApi(path:string){let resolve!:(value:unknown)=>void,reject!:(error:Error)=>void;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});const item={path,abortCount:0,resolve,reject};requests.push(item);return{promise,abort(){item.abortCount++;}};},wechat:{getState(){return{safe:{state:'revoked'}};},subscribe(fn:(value:unknown)=>void){calls.push('reader-subscribe');fn({label:'点击后连接',busy:false});return()=>calls.push('reader-unsubscribe');},async prepare(options:Options){assert.equal(options.userInitiated,true);calls.push('reader-prepare');},async authorize(options:Options){assert.equal(options.userInitiated,true);calls.push('reader-authorize');},async refresh(options:Options){assert.equal(options.userInitiated,true);calls.push('reader-refresh');},async revoke(options:Options){assert.equal(options.userInitiated,true);calls.push('reader-revoke');}}};
   if(reader)app.wechat=reader as typeof app.wechat;
   function page(name:string,query:Record<string,string>={}){
     let definition:Options|undefined;const cache=new Map<string,{exports:Options}>();
     function load(filename:string):Options{const existing=cache.get(filename);if(existing)return existing.exports;const module={exports:{}};cache.set(filename,module);new Script(readFileSync(filename,'utf8'),{filename}).runInNewContext({module,exports:module.exports,wx:{showShareMenu(){},hideShareMenu(){},showToast(){},switchTab(options:Options){navigation.push({method:'switchTab',url:options.url});},navigateTo(options:Options){navigation.push({method:'navigateTo',url:options.url});}},getApp(){return app;},setTimeout,clearTimeout,setInterval(){return 1;},clearInterval(){},Date,Page(value:Options){definition=value;},require(path:string){const target=resolve(dirname(filename),path.endsWith('.js')?path:`${path}.js`);assert.ok(target.startsWith(resolve(root,'miniprogram')+'/'));return load(target);}});return module.exports;}
-    load(resolve(root,`miniprogram/pages/${name}/index.js`));assert.ok(definition);const instance:Options={...definition,data:structuredClone(definition.data),setData(patch:Options){for(const [key,value] of Object.entries(patch)){const path=key.split('.');let target=this.data;for(const part of path.slice(0,-1)){target[part]??={};target=target[part];}target[path.at(-1)!]=value;}}};instance.onLoad(query);instance.onShow();return instance;
+    load(resolve(root,`miniprogram/pages/${name}/index.js`));assert.ok(definition);const instance:Options={...definition,data:structuredClone(definition.data),setData(patch:Options){for(const [key,value] of Object.entries(patch)){const path=key.split('.');let target=this.data;for(const part of path.slice(0,-1)){target[part]??={};target=target[part];}target[path.at(-1)!]=structuredClone(value);}}};instance.onLoad(query);instance.onShow();return instance;
   }
-  return{page,requests,calls,navigation,data,get subscriptions(){return listeners.size;}};
+  return{page,requests,calls,navigation,data,feed(patch:Options){Object.assign(feedState,patch);listeners.forEach(fn=>fn(feedState));},get subscriptions(){return listeners.size;}};
 }
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 
@@ -287,7 +288,7 @@ test('已有次数直接展示；短时间切回提醒页复用准备，不重�
   } finally {page.onUnload();}
 });
 
-test('慢速首次读取不伪造零次数；次数到达立即展示，不等待后续预备请求',async()=>{
+test('慢速首次读取等次数和按钮就绪后整体展示，中途切回仍保持加载',async()=>{
   const h=mock({state:'available',sessionMs:600000,challengeMs:300000}),request=h.wx.request;
   const held:Options[]=[];
   h.wx.request=(options:Options)=>{
@@ -296,14 +297,14 @@ test('慢速首次读取不伪造零次数；次数到达立即展示，不等�
   };
   const page=pageHarness(h.reader).page('settings');
   try{
-    await flush();assert.equal(held.length,1);assert.equal(page.data.wechat.safe,null);assert.equal(page.data.wechat.remainingCount,null);
+    await flush();assert.equal(held.length,1);assert.equal(page.data.wechat.safe,null);assert.equal(page.data.wechat.remainingCount,null);assert.equal(page.data.settingsReady,false);
     request(held.shift()!);await flush();
     assert.equal(held.length,1);assert.match(held[0].url,/challenge$/);
-    assert.equal(page.data.wechat.remainingCount,1);assert.equal(page.data.wechat.busy,true);
+    assert.equal(page.data.wechat.remainingCount,1);assert.equal(page.data.wechat.busy,true);assert.equal(page.data.settingsReady,false,'次数已存入但预备按钮尚未完成，仍显示整页加载');
     page.onHide();page.onShow();
-    assert.equal(page.data.wechat.remainingCount,1,'切回时同步显示已确认次数');
+    assert.equal(page.data.wechat.remainingCount,1,'保留已确认次数');assert.equal(page.data.settingsReady,false);
     await flush();assert.equal(held.length,1,'预备未结束时不重复请求');
-    request(held.shift()!);await flush();assert.equal(page.data.wechat.ready,true);assert.equal(h.subscribe,0);
+    request(held.shift()!);await flush();assert.equal(page.data.wechat.ready,true);assert.equal(page.data.settingsReady,true);assert.equal(h.subscribe,0);
   }finally{held.splice(0).forEach(request);await flush();page.onUnload();}
 });
 
@@ -317,9 +318,66 @@ test('超过缓存时间切回仍立即保留次数，慢速核对返回后更�
       return request(options);
     };
     page.onShow();assert.equal(page.data.wechat.remainingCount,1);
-    await flush();assert.ok(held);assert.equal(page.data.wechat.remainingCount,1);
+    await flush();assert.ok(held);assert.equal(page.data.wechat.remainingCount,1);assert.equal(page.data.settingsReady,true);assert.equal(page.data.wechatAction,'');
     request(held);held=undefined;await flush();
     assert.equal(page.data.wechat.remainingCount,0);assert.equal(h.login,1);assert.equal(h.subscribe,0);
+  }finally{if(held)request(held);await flush();page.onUnload();}
+});
+
+test('提醒先就绪时等待站内信首次读取，失败或未配置也结束整体加载',async()=>{
+  for(const outcome of ['success','error','unconfigured']){
+    const h=mock({state:'available',sessionMs:600000,challengeMs:300000});
+    const harness=pageHarness(h.reader,{data:null,loading:true}),page=harness.page('settings');
+    try{
+      await flush();assert.equal(page.data.wechat.ready,true);assert.equal(page.data.settingsReady,false);
+      harness.feed({loading:false,...(outcome==='success'?{data:harness.data}:outcome==='error'?{error:'站内信暂时无法读取'}:{unconfigured:true})});
+      assert.equal(page.data.settingsReady,true);assert.equal(page.data.wechat.remainingCount,1);
+    }finally{page.onUnload();}
+  }
+});
+
+test('微信首次读取失败或需要隐私授权时显示可操作页面，不停留在整体加载',async()=>{
+  for(const options of [{failState:true},{privacy:true}]){
+    const h=mock(options),page=pageHarness(h.reader).page('settings');
+    try{
+      await flush();assert.equal(page.data.settingsReady,true);assert.equal(page.data.wechat.remainingCount,null);
+      assert.ok(page.data.wechat.error||page.data.wechat.privacyNeeded);assert.equal(page.data.wechatAction,'');assert.equal(h.subscribe,0);
+    }finally{page.onUnload();}
+  }
+});
+
+test('增加和关闭各自保持操作状态，连续点击不会重复授权或交叉关闭',async()=>{
+  const h=mock({state:'available',sessionMs:600000,challengeMs:300000}),page=pageHarness(h.reader).page('settings');
+  const request=h.wx.request;let held:Options|undefined;
+  try{
+    await flush();
+    h.wx.request=(options:Options)=>{
+      if(options.url.endsWith('/confirm')||options.method==='DELETE'){held=options;return{abort(){}};}
+      return request(options);
+    };
+    const adding=page.addWechat();assert.equal(h.subscribe,1,'授权仍在手势同步调用栈');assert.equal(page.data.wechatAction,'add');
+    await page.addWechat();await page.revokeWechat();await flush();assert.ok(held);assert.equal(h.subscribe,1);
+    assert.equal(page.data.settingsReady,true);assert.equal(page.data.wechat.remainingCount,1);
+    request(held!);held=undefined;await adding;assert.equal(page.data.wechatAction,'');assert.equal(page.data.wechat.remainingCount,2);
+    const closing=page.revokeWechat();assert.equal(page.data.wechatAction,'revoke');await page.addWechat();await page.revokeWechat();await flush();
+    assert.ok(held);assert.equal((held as Options|undefined)?.method,'DELETE');assert.equal(h.subscribe,1);assert.equal(page.data.wechat.remainingCount,2);
+    request(held!);held=undefined;await closing;assert.equal(page.data.wechatAction,'');assert.equal(page.data.wechat.safe.state,'revoked');assert.equal(page.data.wechat.remainingCount,0);
+  }finally{if(held)request(held);await flush();page.onUnload();}
+});
+
+test('类型开关在保存期间保留点击选择，响应不确定后恢复确认值，重读再核对',async()=>{
+  const h=mock({state:'available',sessionMs:600000,challengeMs:300000,failPreferencesAfterSave:true}),page=pageHarness(h.reader).page('settings');
+  const request=h.wx.request;let held:Options|undefined;
+  try{
+    await flush();h.wx.request=(options:Options)=>{if(options.url.endsWith('/preferences')){held=options;return{abort(){}};}return request(options);};
+    const saving=page.changeWechatPreference({currentTarget:{dataset:{kind:'result'}},detail:{value:false}});
+    assert.equal(page.data.wechatAction,'preferences');assert.equal(page.data.wechat.reminderPreferences.result,false);
+    assert.equal(h.reader.getState().reminderPreferences.result,true,'读取器仍保留服务端确认值');
+    await page.addWechat();await page.revokeWechat();await flush();assert.ok(held);assert.equal(h.subscribe,0);
+    request(held!);held=undefined;await saving;
+    assert.equal(page.data.wechatAction,'');assert.equal(page.data.wechat.reminderPreferences.result,true);
+    assert.match(page.data.wechat.error,/尚未确认/);assert.equal(page.data.wechat.canChooseTypes,false);assert.equal(page.data.settingsReady,true);
+    await page.addWechat();assert.equal(page.data.wechat.reminderPreferences.result,false);assert.equal(page.data.wechatAction,'');assert.equal(h.subscribe,0);
   }finally{if(held)request(held);await flush();page.onUnload();}
 });
 

@@ -1,8 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
-import {readFileSync} from 'node:fs';
-import jsQR from 'jsqr';
 import {statusTimelineModel} from '../src/lib/status-timeline';
 import {currentStatusPosterSvg} from '../src/server/status-poster';
 import type {PublicData} from '../src/lib/types';
@@ -34,17 +32,19 @@ test('两类预告、进行、过点、完成与等待采用同一事件结果�
   }
 });
 
-test('等待状态的两款分享海报默认网站码，在手机分享尺寸仍能解码，原生默认码目标一致',async()=>{
+test('等待状态缺少小程序码时不生成网站替代码，手机分享尺寸仍可正常渲染',async()=>{
   const data:PublicData={serverTime:now,site:{name:'模钥重置雷达',description:'验收',autoPublish:false,version:1},events:[],articles:[],publications:[],evidence:[],notices:[],activities:[],sources:[]};
   for(const style of ['precision','editorial'] as const){
     const svg=currentStatusPosterSvg(data,now,'waiting',style,undefined,url);
-    assert.match(svg,/data-poster-code="website"/);
+    assert.doesNotMatch(svg,/data-poster-code="website"|网站二维码|扫码查看最新动态/);
+    assert.match(svg,/小程序码暂不可用/);
     assert.doesNotMatch(svg,/公告称已/);
     for(const width of [1080,540,390,320]){
       const {data:pixels,info}=await sharp(Buffer.from(svg)).resize({width}).ensureAlpha().raw().toBuffer({resolveWithObject:true});
-      assert.equal(jsQR(new Uint8ClampedArray(pixels),info.width,info.height)?.data,url,`${style} ${width}px`);
+      assert.equal(info.width,width);assert.equal(info.height,Math.round(width*1920/1080));assert.ok(pixels.length>0);
     }
   }
-  const {data:pixels,info}=await sharp(readFileSync('miniprogram/assets/posters/website-qr.png')).ensureAlpha().raw().toBuffer({resolveWithObject:true});
-  assert.equal(jsQR(new Uint8ClampedArray(pixels),info.width,info.height)?.data,url);
+  const nativePoster=require('../miniprogram/packages/poster/status-poster.js');
+  const layout=nativePoster.createStatusPosterLayout(nativePoster.statusPosterInput(data),(text:string,size:number)=>text.length*size);
+  assert.equal(layout.commands.some((item:{asset?:string})=>item.asset==='website'||item.asset==='code'),false);
 });

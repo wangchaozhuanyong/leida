@@ -10,7 +10,7 @@ export function parseStatusPosterOptions(params: URLSearchParams): { style?: Sta
   const style = params.get('style'), code = params.get('code');
   if (style !== null && !statusPosterStyles.some(option => option.id === style)) throw new Error('海报样式无效');
   if (code !== null && code !== 'mini' && code !== 'none') throw new Error('海报码选项无效');
-  return { style: style as StatusPosterStyle | null ?? undefined, includeCode: code === 'mini' || (style === null && code === null) };
+  return { style: style as StatusPosterStyle | null ?? undefined, includeCode: code !== 'none' };
 }
 
 export function statusPosterVariant(endpoint: string, filename: string, style: StatusPosterStyle, includeCode: boolean) {

@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { StatusPosterStyle } from '@/lib/status-poster-style';
 import type { StatusPosterCode } from './status-poster';
-import QRCode from 'qrcode';
 
 interface DesignedPoster {
   style: StatusPosterStyle; name: string; title: string; interval: string;
@@ -35,17 +34,15 @@ export function designedStatusPoster(input: DesignedPoster): string {
   const text = (value: string, x: number, y: number, size: number, color = ink, weight = 400, anchor = 'start', extra = '') => `<text x="${x}" y="${y}" font-size="${size}" fill="${color}" font-weight="${weight}" text-anchor="${anchor}" ${extra}>${escape(value)}</text>`;
   const line = (x1: number, y1: number, x2: number, y2: number) => `<path d="M${x1} ${y1}L${x2} ${y2}" fill="none" stroke="${dark ? '#8c7650' : '#3e4647'}" stroke-width="1.5"/>`;
   const mark = (x: number, y: number, scale = 1) => `<g transform="translate(${x} ${y}) scale(${scale})">${input.brand}</g>`;
-  // A scan target is part of the composition, never overlaid on the dial or factual text.
-  let websiteCode = '';
+  // Only the original image returned by WeChat is a mini-program code.
+  // Keep all image bytes and its quiet area; never fabricate or crop its pattern.
   if(input.shareUrl){
     const url=new URL(input.shareUrl);
     if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw new Error('无效的扫码地址');
-    const matrix=QRCode.create(input.shareUrl,{errorCorrectionLevel:'M'}).modules,side=matrix.size+8;
-    let cells='';for(let y=0;y<matrix.size;y++)for(let x=0;x<matrix.size;x++)if(matrix.get(y,x))cells+=`<rect x="${x+4}" y="${y+4}" width="1" height="1"/>`;
-    websiteCode=`<svg x="740" y="1570" width="270" height="270" viewBox="0 0 ${side} ${side}" data-poster-code="website"><rect width="${side}" height="${side}" fill="#fff"/><g fill="#101d2d">${cells}</g></svg>`;
   }
-  const scan = input.code ? `<g data-poster-code="mini"><rect x="740" y="1570" width="270" height="270" rx="16" fill="#fff"/><image x="754" y="1584" width="242" height="242" preserveAspectRatio="xMidYMid meet" href="data:${input.code.contentType};base64,${input.code.image.toString('base64')}"/></g>` : websiteCode;
-  const footer=scan?`<rect x="0" y="1530" width="1080" height="390" fill="${dark?'#0b0d10':'#faf6ec'}" opacity="1"/>${text('扫码查看最新动态',82,1653,40)}${text(input.sourceLabel,82,1711,fit(input.sourceLabel,28,610),muted)}${text('海报为生成时的快照，实时状态以网站为准',82,1772,24,muted)}${scan}${text(input.code?'小程序码':'网站二维码',875,1876,25,muted,400,'middle')}${text('仅整理公开公告，个人状态以账户显示为准',82,1833,24,muted)}${text(`生成于 ${dateTime(input.generatedAt).date} ${dateTime(input.generatedAt).time} · 北京时间`,82,1880,22,muted)}`:`${text(input.sourceLabel,72,1751,fit(input.sourceLabel,31,930),muted)}${text('仅整理公开公告，个人状态以账户显示为准',72,1800,28,muted)}${text(`生成于 ${dateTime(input.generatedAt).date} ${dateTime(input.generatedAt).time} · 北京时间`,72,1870,25,muted)}`;
+  const scan = input.code ? `<g data-poster-code="mini"><circle cx="875" cy="1705" r="135" fill="#fff"/><image x="780.5" y="1610.5" width="189" height="189" preserveAspectRatio="xMidYMid meet" href="data:${input.code.contentType};base64,${input.code.image.toString('base64')}"/></g>` : '';
+  const scanHeading=input.code?'微信扫码进入小程序':input.name;
+  const footer=`<rect x="0" y="1530" width="1080" height="390" fill="${dark?'#0b0d10':'#faf6ec'}" opacity="1"/>${text(scanHeading,82,1653,fit(scanHeading,40,input.code?610:930))}${text(input.sourceLabel,82,1711,fit(input.sourceLabel,28,input.code?610:930),muted)}${text(input.code?'海报为生成时的快照，最新进展请查看小程序':'小程序码暂不可用，可分享公告链接查看进展',82,1772,24,muted)}${scan}${input.code?text('微信小程序码',875,1876,25,muted,400,'middle'):''}${text('仅整理公开公告，个人状态以账户显示为准',82,1833,24,muted)}${text(`生成于 ${dateTime(input.generatedAt).date} ${dateTime(input.generatedAt).time} · 北京时间`,82,1880,22,muted)}`;
   const date = dateTime(input.statementAt), generated = dateTime(input.generatedAt);
   const elapsed = input.interval.match(/^(\d+) (.+)$/);
   const next = input.nextNote === '暂无可靠的下次重置日期' ? '下一次时间待公开确认' : input.nextNote;

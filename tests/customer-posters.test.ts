@@ -21,7 +21,7 @@ test('两款固定海报在无公告、预告、进行中和逾期时均可用�
   for(const [stage,time,value]of [[undefined,undefined,'等待下一次 Reset'],['promised','2026-10-15T03:00:00Z','3小时0分钟'],['in_progress',undefined,'重置进行中'],['promised','2026-10-14T23:00:00Z','等待确认']] as const){
     const data=fixture(stage,time),input=native.statusPosterInput(data);
     assert.equal(input.value,value);assert.notEqual(input.label,'距该公告');assert.ok(native.statusPosterAvailable(input,data));
-    for(const theme of ['precision','editorial']){const layout=native.createStatusPosterLayout(input,measure,theme);assert.equal(layout.width,1080);assert.equal(layout.height,1920);assert.match(layout.background,new RegExp(theme+'\\.jpg$'));assert.ok(layout.commands.some((c:any)=>c.value===value));assert.equal(layout.commands.some((c:any)=>c.asset==='code'),false);}
+    for(const theme of ['precision','editorial']){const layout=native.createStatusPosterLayout(input,measure,theme);assert.equal(layout.width,1080);assert.equal(layout.height,1920);assert.match(layout.background,new RegExp(theme+'\\.jpg$'));assert.ok(layout.commands.some((c:any)=>c.value===value));assert.equal(layout.commands.some((c:any)=>c.asset==='code'||c.asset==='website'),false);}
   }
 });
 test('完成海报冻结声明和生成时间；布局切换不改事实，撤回后不能保存',()=>{

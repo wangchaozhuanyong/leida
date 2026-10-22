@@ -1,7 +1,7 @@
 const m=require('../../utils/model');
 const {statusTimelineModel,statusTimelineRevision}=require('../../utils/status-timeline');
 const {PosterError,loadCanvasImage,exportCanvas}=require('../../utils/poster');
-const assets={precision:'/assets/posters/precision.jpg',editorial:'/assets/posters/editorial.jpg',brand:'/packages/poster/brand.png',website:'/assets/posters/website-qr.png'};
+const assets={precision:'/assets/posters/precision.jpg',editorial:'/assets/posters/editorial.jpg',brand:'/packages/poster/brand.png'};
 function dateTime(value){
   if(!Number.isFinite(Date.parse(value)))return{date:'暂无公开公告',time:''};
   const d=new Date(Date.parse(value)+8*3600000),pad=n=>String(n).padStart(2,'0');
@@ -42,8 +42,7 @@ function createStatusPosterLayout(input,measure,theme='precision',includeCode=fa
   const brand=(x,y)=>commands.push({type:'image',asset:'brand',x,y,width:100,height:75,sx:110,sy:520,sw:1850,sh:1010});
   const code=()=>{
     if(includeCode){commands.push({type:'circle',x:875,y:1705,r:135,color:'#fff'});commands.push({type:'image',asset:'code',x:780.5,y:1610.5,width:189,height:189});}
-    else commands.push({type:'image',asset:'website',x:740,y:1570,width:270,height:270});
-    text(includeCode?'小程序码':'网站二维码',875,1876,25,muted,400,'center');
+    if(includeCode)text('微信小程序码',875,1876,25,muted,400,'center');
   };
   const nextLines=[];let row='';for(const c of input.nextNote.replace(' · 北京时间','')){if(c==='\n'){if(row)nextLines.push(row);row='';continue;}if(measure(row+c,38,500)>(dark?425:415)){nextLines.push(row);row='';}row+=c;}if(row)nextLines.push(row);
   if(nextLines.length>3){nextLines.length=3;nextLines[2]=nextLines[2].slice(0,-1)+'…';}
@@ -68,8 +67,8 @@ function createStatusPosterLayout(input,measure,theme='precision',includeCode=fa
 
   }
   rect(0,1530,1080,390,dark?'#0b0d10':'#faf6ec',1);
-  text('扫码查看最新动态',82,1653,40);text(input.sourceLabel,82,1711,28,muted,400,'left',610);
-  text('海报为生成时的快照，实时状态以网站为准',82,1772,24,muted);
+  text(includeCode?'微信扫码进入小程序':input.name,82,1653,40,ink,400,'left',includeCode?610:930);text(input.sourceLabel,82,1711,28,muted,400,'left',includeCode?610:930);
+  text(includeCode?'海报为生成时的快照，最新进展请查看小程序':'小程序码暂不可用，可直接分享小程序卡片',82,1772,24,muted);
   code();text('仅整理公开公告，个人状态以账户显示为准',82,1833,24,muted);text(`生成于 ${input.generated} · 北京时间`,82,1880,22,muted);
   return{width:1080,height:1920,theme,background:assets[theme],commands};
 }
@@ -77,7 +76,7 @@ async function renderStatusPoster({wxApi,canvas,page,input,theme='precision',cod
   const ctx=canvas.getContext('2d');if(!ctx)throw new PosterError('canvas','海报画布暂不可用。');
   if(code&&(code.publicationId!==input.publicationId||!code.filePath))throw new PosterError('code_version','小程序码与当前海报不匹配。');
   const layout=createStatusPosterLayout(input,(value,size,weight)=>{ctx.font=`${weight} ${size}px Songti SC,STSong,serif`;return ctx.measureText(value).width;},theme,!!code);
-  const images={background:await loadCanvasImage(canvas,layout.background),brand:await loadCanvasImage(canvas,assets.brand),website:await loadCanvasImage(canvas,assets.website)};
+  const images={background:await loadCanvasImage(canvas,layout.background),brand:await loadCanvasImage(canvas,assets.brand)};
   if(code){images.code=await loadCanvasImage(canvas,code.filePath);if(!images.code.width||images.code.width!==images.code.height)throw new PosterError('image','小程序码格式不正确。');}
   if(!isCurrent())throw new PosterError('cancelled','已取消旧海报生成。');
   canvas.width=1080;canvas.height=1920;ctx.drawImage(images.background,0,0,1080,1920);ctx.textBaseline='alphabetic';

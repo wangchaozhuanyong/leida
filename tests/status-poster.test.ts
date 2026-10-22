@@ -178,12 +178,12 @@ test('模板切换保留发布目标和动作，无圆码版不请求微信，�
   assert.equal(variant.filename, 'record-水墨刊物.png');
   assert.deepEqual(parseStatusPosterOptions(new URLSearchParams('style=precision&code=mini')), { style: 'precision', includeCode: true });
   assert.deepEqual(parseStatusPosterOptions(new URLSearchParams()), { style: undefined, includeCode: true });
-  assert.deepEqual(parseStatusPosterOptions(new URLSearchParams('style=editorial')), { style: 'editorial', includeCode: false });
+  assert.deepEqual(parseStatusPosterOptions(new URLSearchParams('style=editorial')), { style: 'editorial', includeCode: true });
   for (const value of ['style=unknown', 'style=../../outside', 'style=', 'style=editorial&code=fake']) assert.throws(() => parseStatusPosterOptions(new URLSearchParams(value)), /无效/);
 });
 
 for (const { id: style } of statusPosterStyles) {
-  test(`${style} 动态模板使用真实状态和北京时间，默认网站二维码可解码`, async () => {
+  test(`${style} 动态模板使用真实状态和北京时间，缺少小程序码时不生成网站替代码`, async () => {
     const selected = publication();
     const svg = statusPosterSvg(input({ style, publication: selected }));
     assert.match(svg, new RegExp(`data-poster-style="${style}"`));
@@ -195,8 +195,8 @@ for (const { id: style } of statusPosterStyles) {
     assert.match(svg, /个人状态以账户显示为准/);
     assert.match(svg, /依据：所选公开公告/);
     assert.doesNotMatch(svg, /圆码示意|设计样张|data-poster-code="mini"/);
-    assert.match(svg, /data-poster-code="website"/);
-    assert.equal((await decodedPoster(svg)).url, input({style}).shareUrl);
+    assert.doesNotMatch(svg, /data-poster-code="website"|网站二维码|扫码查看最新动态/);
+    assert.match(svg, /小程序码暂不可用，可分享公告链接查看进展/);
     const png = await rasterize(Buffer.from(svg)).png().toBuffer();
     assert.equal(png.readUInt32BE(16), 1080); assert.equal(png.readUInt32BE(20), 1920);
     const future = statusPosterSvg(input({ style, nextAction: announcement({ expectedAt: '2026-10-11T03:30:00Z' }) }));
