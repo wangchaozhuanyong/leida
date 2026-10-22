@@ -1,9 +1,3 @@
-## 云托管双网卡回包兼容（2026-10-22）
-
-两端抓包确认 Lighthouse 收到 SYN 并发回 SYN-ACK，云托管容器的 `IPReversePathFilter` 丢包计数在同一次测试中增加。入口仅将容器 `eth0`、`eth1` 的反向路径校验设为宽松模式 2，保留来源校验，以适配非对称 VPC 回包；root 初始化后清空附加组并降为 UID/GID 1000，完成后才监听 HTTP。设置或降权失败即停止启动，不开放新端口、不申请新能力、不改业务或数据库。
-
-本地 13 项测试及 Linux amd64 镜像验证通过，已核对普通用户处理请求、有效特权为零、源码只读以及参数不可写时禁止启动。云托管实际参数写入、公开接口及小程序仍须发布后分别验证；不以本地验证或 Git 推送代替恢复证明。证据在 `outputs/gateway-release-20261022/`。业务与小程序版本保持 1.0.39。
-
 ## 新服务器部署与微信入口转发
 
 网站、后台任务及原生 PostgreSQL 运行在现有 Lighthouse 服务器。根目录 `Dockerfile` 专用于 `express-l98p` 的微信入口：仅转发至已接通私网中的 `10.0.0.8:8080`，不启动 CloudBase 应用或 worker，不读取旧库凭据。原应用构建保留为 `Dockerfile.server`，服务器后续构建使用 `docker build -f Dockerfile.server`。
