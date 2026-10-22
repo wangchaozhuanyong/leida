@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import {createGateway} from '../scripts/cloudrun-gateway.mjs';
+import {diagnoseGatewayNetwork, networkDiagnosticSummary} from '../scripts/cloudrun-network-diagnostics.mjs';
 const listen = server => new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server.address().port)));
 const close = server => new Promise(resolve => {server.closeAllConnections(); server.close(resolve);});
 
@@ -59,4 +60,28 @@ test('absolute-form destinations cannot turn the gateway into an open proxy', as
     });
     assert.equal(result,400);assert.equal(upstreamCalls,0);
   } finally {await close(gateway);await close(backend);}
+});
+
+
+test('background diagnostic completes against the fixed upstream while HTTP forwarding remains available', async () => {
+  const logs = [];
+  const backend = http.createServer((_req,res) => res.end('fixture-public-response'));
+  const backendPort = await listen(backend), target = `http://127.0.0.1:${backendPort}`;
+  const gateway = createGateway(target), port = await listen(gateway);
+  try {
+    const diagnostic = diagnoseGatewayNetwork(target, {idleMs:10, timeoutMs:100, log:line=>logs.push(line)});
+    const response = await fetch(`http://127.0.0.1:${port}/api/v1/release`);
+    assert.equal(response.status,200); assert.equal(await response.text(),'fixture-public-response');
+    assert.equal(response.headers.get('x-radar-gateway-build'),'procfs-readonly-20261022');
+    const result = await diagnostic;
+    assert.equal(result.state,'tcp-connected');
+    assert.match(networkDiagnosticSummary(),/^tcp-connected;idle=(\d+|na);probe=(\d+|na);after=(\d+|na);control=not-run$/);
+    assert.equal(logs.length,1); assert.ok(!logs[0].includes('127.0.0.1')); assert.ok(!logs[0].includes('fixture-public-response'));
+  } finally {await close(gateway);await close(backend);}
+});
+
+test('diagnostic rejects credentialed and non-http upstreams before attempting a connection', async () => {
+  for (const target of ['http://user:fixture@127.0.0.1:80','https://127.0.0.1','http://127.0.0.1/path']) {
+    await assert.rejects(diagnoseGatewayNetwork(target,{idleMs:0,timeoutMs:1,log:()=>{}}), /Invalid diagnostic upstream/);
+  }
 });
