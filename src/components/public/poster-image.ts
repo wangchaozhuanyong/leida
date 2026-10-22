@@ -11,12 +11,16 @@ export async function createPosterFromEndpoint(endpoint: string, filename: strin
   if (!/^\/api\/v1\/(?:posters|activity-posters|forecast-posters)\//.test(endpoint) || /[\r\n]/.test(endpoint)) throw new Error('海报地址无效。');
   const response = await fetch(endpoint, { cache: 'no-store', signal });
   if (!response.ok) throw new Error(response.status === 410 ? '此内容已撤回，已停止生成海报。' : response.status === 409 ? '公开状态已变化，请关闭后重新生成海报。' : '海报生成失败，请稍后重试。');
+  if (response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'image/svg+xml') throw new Error('海报接口返回格式异常，请稍后重试。');
   const svg = await response.blob();
   const source = URL.createObjectURL(svg);
   try {
     const image = new Image();
     await new Promise<void>((resolve, reject) => {
+      let settled = false, retried = false;
       const finish = (error?: Error) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timer);
         signal.removeEventListener('abort', abort);
         image.onload = null; image.onerror = null;
@@ -25,7 +29,15 @@ export async function createPosterFromEndpoint(endpoint: string, filename: strin
       const abort = () => { image.src = ''; finish(new DOMException('已取消', 'AbortError')); };
       const timer = setTimeout(() => finish(new Error('图片生成超时，请重新生成。')), 15_000);
       image.onload = () => finish();
-      image.onerror = () => finish(new Error('浏览器未能生成海报图片，请重试。'));
+      image.onerror = () => {
+        if (retried) { finish(new Error('浏览器未能生成海报图片，请重试。')); return; }
+        retried = true;
+        // Retry a rejected SVG blob URL with the same fixed response, keeping
+        // the publication and generated time instead of requesting new facts.
+        void svg.text().then(text => {
+          if (!settled && !signal.aborted) image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(text)}`;
+        }).catch(() => finish(new Error('浏览器未能生成海报图片，请重试。')));
+      };
       signal.addEventListener('abort', abort, { once: true });
       if (signal.aborted) { abort(); return; }
       image.src = source;
