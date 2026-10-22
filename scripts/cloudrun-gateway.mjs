@@ -1,5 +1,6 @@
 import http from 'node:http';
 import {pathToFileURL} from 'node:url';
+import {diagnoseGatewayNetwork, networkDiagnosticSummary} from './cloudrun-network-diagnostics.mjs';
 
 function cleanHeaders(headers) {
   const blocked = new Set(['connection','keep-alive','proxy-authenticate','proxy-authorization','te','trailer','transfer-encoding','upgrade']);
@@ -21,7 +22,7 @@ export function createGateway(upstreamUrl, {timeoutMs = 15000} = {}) {
     headers['x-forwarded-host'] = headers.host;
     headers['x-forwarded-proto'] = 'https';
     const proxy = http.request({hostname:upstream.hostname, port:upstream.port || 80, method:request.method, path:request.url, headers, agent}, incoming => {
-      response.writeHead(incoming.statusCode ?? 502, {...cleanHeaders(incoming.headers), 'x-radar-gateway':'native-server-20261022'});
+      response.writeHead(incoming.statusCode ?? 502, {...cleanHeaders(incoming.headers), 'x-radar-gateway':'native-server-20261022', 'x-radar-gateway-build':'procfs-readonly-20261022'});
       incoming.on('error', () => response.destroy());
       incoming.pipe(response);
     });
@@ -35,7 +36,7 @@ export function createGateway(upstreamUrl, {timeoutMs = 15000} = {}) {
     proxy.on('error', () => {
       clear();
       if (response.headersSent) {response.destroy(); return;}
-      response.writeHead(503, {'content-type':'application/json; charset=utf-8', 'cache-control':'no-store'});
+      response.writeHead(503, {'content-type':'application/json; charset=utf-8', 'cache-control':'no-store', 'x-radar-gateway':'native-server-20261022', 'x-radar-gateway-build':'procfs-readonly-20261022', 'x-radar-network-check':networkDiagnosticSummary()});
       response.end(JSON.stringify({error:'服务暂时不可用，请稍后重试'}));
     });
     request.pipe(proxy);
@@ -52,7 +53,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const port = Number(process.env.PORT || '8080');
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid gateway port');
   const server = createGateway(process.argv[2]);
-  server.listen(port, '0.0.0.0', () => console.log('Gateway ready'));
+  server.listen(port, '0.0.0.0', () => {
+    console.log('Gateway ready');
+    diagnoseGatewayNetwork(process.argv[2], {controlUrl:'http://43.142.149.178:22'}).catch(() => console.log('Gateway network diagnostic unavailable'));
+  });
   const stop = () => {server.close(() => process.exit(0)); setTimeout(() => process.exit(1), 10000).unref();};
   process.once('SIGTERM', stop); process.once('SIGINT', stop);
 }
