@@ -1,5 +1,7 @@
 import http from 'node:http';
 import https from 'node:https';
+import {isIP} from 'node:net';
+import {checkServerIdentity} from 'node:tls';
 import {createHash, createPublicKey, generateKeyPairSync, randomBytes, sign, verify} from 'node:crypto';
 
 export const keyPath = '/.well-known/radar-gateway-key';
@@ -59,7 +61,9 @@ export function createSignedGateway(upstreamUrl,{ca,timeoutMs=15000}={}) {
     const time=String(Date.now()),nonce=randomBytes(18).toString('base64url');
     const signature=sign(null,frame(req.method,req.url,headers,time,nonce),identity.privateKey).toString('base64');
     Object.assign(headers,{[prefix+'key-id']:publicIdentity.keyId,[prefix+'time']:time,[prefix+'nonce']:nonce,[prefix+'signature']:signature});
-    pipeUpstream(req,res,{hostname:target.hostname,port:Number(target.port||443),path:req.url,method:req.method,headers,agent},{tls:true,timeoutMs,mark:true});
+    // Keep application Host intact, but bind TLS identity to the configured upstream.
+    // Node otherwise derives SNI from the forwarded Host header.
+    pipeUpstream(req,res,{hostname:target.hostname,port:Number(target.port||443),servername:isIP(target.hostname)?'':target.hostname,checkServerIdentity:(_name,peer)=>checkServerIdentity(target.hostname,peer),path:req.url,method:req.method,headers,agent},{tls:true,timeoutMs,mark:true});
   });
   return configure(server,()=>agent.destroy());
 }
