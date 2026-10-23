@@ -21,8 +21,8 @@
       <view wx:if="{{signalExpiredNote}}" class="reset-expired">{{signalExpiredNote}}</view>
     </view>
     </view>
-    <view class="last-reset-card" aria-label="{{selectedResetKind==='banked_reset'?'上次重置卡发放已经过去':'上次额度重置已经过去'}}">
-      <view class="last-reset-heading-row"><view class="last-reset-icon" aria-hidden="true"><view/></view><text class="last-reset-heading">{{selectedResetKind==='banked_reset'?'上次重置卡发放':'上次额度重置'}}</text><text class="last-reset-caption">已经过去</text></view>
+    <view class="last-reset-card" aria-label="{{lastReset.sourceType==='observed'?'距最近重置观测已经过去':selectedResetKind==='banked_reset'?'上次重置卡发放已经过去':'上次额度重置已经过去'}}">
+      <view class="last-reset-heading-row"><view class="last-reset-icon" aria-hidden="true"><view/></view><text class="last-reset-heading">{{lastReset.sourceType==='observed'?'最近重置观测':selectedResetKind==='banked_reset'?'上次重置卡发放':'上次额度重置'}}</text><text class="last-reset-caption">已经过去</text></view>
       <block wx:if="{{lastReset}}">
         <view class="last-reset-value" aria-label="{{lastReset.elapsed}}">
           <view class="last-reset-part last-reset-days {{lastReset.days >= 1000 ? 'is-long' : lastReset.days >= 100 ? 'is-medium' : ''}}" aria-hidden="true"><text class="last-reset-number">{{lastReset.days}}</text><text class="last-reset-unit">天</text></view>
@@ -31,14 +31,14 @@
           <view class="last-reset-part last-reset-seconds" aria-hidden="true"><text class="last-reset-number">{{lastReset.seconds}}</text><text class="last-reset-unit">秒</text></view>
         </view>
         <view class="last-reset-record">
-          <view class="last-reset-time"><text>{{selectedResetKind==='banked_reset'?'上次发放时间':'上次重置时间'}}</text><view class="last-reset-date"><text>{{lastReset.displayTime}}</text><text class="last-reset-zone">北京时间</text></view></view>
-          <view class="last-reset-footer"><view class="last-reset-basis">{{selectedResetKind==='banked_reset'?'依据公开发放完成消息记录':'依据公开完成消息记录'}}</view><button class="text-button last-reset-link" bindtap="openLastReset" aria-label="{{selectedResetKind==='banked_reset'?'查看这次发卡记录':'查看这次重置记录'}}">查看记录 <text aria-hidden="true">↗</text></button></view>
+          <view class="last-reset-time"><text>{{lastReset.sourceType==='observed'?'来源观测时间':selectedResetKind==='banked_reset'?'上次发放时间':'上次重置时间'}}</text><view class="last-reset-date"><text>{{lastReset.displayTime}}</text><text class="last-reset-zone">北京时间</text></view></view>
+          <view class="last-reset-footer"><view class="last-reset-basis">{{lastReset.sourceType==='observed'?lastReset.sourceName+' 观测 · 个人到账未核验':selectedResetKind==='banked_reset'?'依据公开发放完成消息记录':'依据公开完成消息记录'}}</view><button class="text-button last-reset-link" bindtap="openLastReset" aria-label="{{selectedResetKind==='banked_reset'?'查看这次发卡记录':'查看这次重置记录'}}">查看记录 <text aria-hidden="true">↗</text></button></view>
         </view>
       </block>
       <block wx:else><view class="last-reset-empty">暂无已确认记录</view><view class="last-reset-basis">收到公开完成记录后开始计时</view></block>
     </view>
     <view class="home-card-actions"><button class="primary" bindtap="openWechatSettings">微信提醒</button><button class="secondary" bindtap="openPoster">分享重置动态</button></view>
-    <view wx:if="{{completions.length}}" class="home-records"><view class="recent-complete"><view class="completion-heading"><view class="section-overline">最近完成</view><button class="text-button" data-path="/pages/announcements/index" bindtap="navigate">全部记录 →</button></view><view wx:for="{{completions}}" wx:key="id" class="completion-line" data-path="{{item.path}}" bindtap="navigate" hover-class="completion-line-pressed" role="button" aria-label="{{item.title}}，{{item.time}}，查看公告"><text class="completion-check" aria-hidden="true">✓</text><text class="completion-label">{{item.label}}</text><text class="completion-date">{{item.shortTime}}</text></view></view></view>
+    <view wx:if="{{completions.length}}" class="home-records"><view class="recent-complete"><view class="completion-heading"><view class="section-overline">最近完成公告</view><button class="text-button" data-path="/pages/announcements/index" bindtap="navigate">全部记录 →</button></view><view wx:for="{{completions}}" wx:key="id" class="completion-line" data-path="{{item.path}}" bindtap="navigate" hover-class="completion-line-pressed" role="button" aria-label="{{item.title}}，{{item.time}}，查看公告"><text class="completion-check" aria-hidden="true">✓</text><text class="completion-label">{{item.label}}</text><text class="completion-date">{{item.shortTime}}</text></view></view></view>
     <view wx:if="{{activity}}" class="activity-entry" data-path="{{activity.path}}" bindtap="navigate" role="button"><image src="/assets/neural/calendar-blue.png" class="action-icon" aria-hidden="true"/><view class="grow"><view class="activity-title">{{activity.title}}</view><view class="small muted">{{activity.phase}}</view></view></view>
     <view class="row section"><view class="heading">重置动态</view><button class="text-button" data-path="/pages/news/index" bindtap="navigate">全部动态 →</button></view>
     <publication-card wx:for="{{recent}}" wx:key="id" item="{{item}}" />

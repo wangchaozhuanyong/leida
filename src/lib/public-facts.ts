@@ -1,5 +1,6 @@
 import type { PublicData, Publication, RadarEvent } from './types';
 import { isHistoricalArticle } from './history';
+import {resetObservations} from './reset-observations';
 export type PublicFactsData = Pick<PublicData, 'events' | 'articles' | 'publications' | 'evidence' | 'serverTime'>;
 
 export const currentPublication = (data: PublicFactsData, event: RadarEvent) => data.publications.find(p => p.id === event.publicationId);
@@ -59,4 +60,7 @@ const comparePublications = (a: Publication, b: Publication) => Date.parse(publi
   || Date.parse(b.publishedAt) - Date.parse(a.publishedAt) || a.id.localeCompare(b.id);
 
 export const sortedPublications = (data: PublicData) => data.events.filter(e => e.status !== 'merged').map(e => currentPublication(data, e)).filter((p): p is Publication => !!p).sort(comparePublications);
-export const sortedStatePublications = (data: PublicData) => data.events.filter(e => e.status !== 'merged').map(e => statePublication(data, e)).filter((p): p is Publication => !!p).sort(comparePublications);
+export const sortedStatePublications = (data: PublicData) => {
+  const observed=new Set(resetObservations(data).map(o=>o.publicationId));
+  return data.events.filter(e=>e.status!=='merged').map(e=>data.publications.find(p=>p.id===e.publicationId&&(observed.has(p.id)||!isNewsOnly(p)))??data.publications.filter(p=>p.eventId===e.id&&(observed.has(p.id)||!isNewsOnly(p))).sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt))[0]).filter((p):p is Publication=>!!p).sort(comparePublications);
+};

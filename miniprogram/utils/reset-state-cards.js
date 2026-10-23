@@ -2,6 +2,7 @@
 /** @typedef {import('../../src/lib/types').ActionKind} ActionKind */
 /** @typedef {import('../../src/lib/reset-outlook').ResetOutlook} ResetOutlook */
 const m = require('./model');
+const {resetObservations}=require('./reset-observations');
 const {countdownParts} = require('./status-timeline');
 const kinds = ['automatic_reset', 'banked_reset'];
 const valid = value => typeof value === 'string' && Number.isFinite(Date.parse(value));
@@ -35,6 +36,7 @@ function resetStateCards(data, now=data.serverTime) {
     }
   }
   const remote=m.activeResetSchedule(forecasts?.watch,now);
+  const observations=resetObservations({...data,serverTime:now});
   const cards=kinds.map(kind=>{
     const outlook=outlooks[kind], card=base(kind);
     let active=outlook.active;
@@ -44,6 +46,9 @@ function resetStateCards(data, now=data.serverTime) {
     const useRemote=remote?.kind===kind && (!resolution || Date.parse(remote.announcedAt)>Date.parse(resolution.statementAt)) && (!active || Date.parse(remote.announcedAt)>Date.parse(active.statementAt));
     if(useRemote) {active={kind,stage:'promised',statementAt:remote.announcedAt,expectedAt:remote.scheduledFor||undefined,publicationId:'',eventId:''};card.sourceUrl=remote.sourceUrl||'';card.sourceName='Codex Resets';card.sourceType=remote.sourceType||'x_post';}
     const completion=outlook.latestCompletion;
+    const observation=observations.find(o=>o.kind===kind&&Date.parse(o.observedAt)>Date.parse(completion?.statementAt||'1970-01-01'));
+    // The observation may resolve its linked announcement; another round is left intact.
+    if(observation&&active&&(card.sourceUrl===observation.referenceUrl||data.evidence.some(e=>e.url===observation.referenceUrl&&data.publications.some(p=>p.id===active.publicationId&&p.article.evidenceIds.includes(e.id))))&&Date.parse(active.statementAt)<=Date.parse(observation.observedAt))active=null;
     sourceTarget(card, completion);
     if(active){
       sourceTarget(card,active);
@@ -62,6 +67,9 @@ function resetStateCards(data, now=data.serverTime) {
     }else if(completion && valid(completion.statementAt) && current>=Date.parse(completion.statementAt) && current-Date.parse(completion.statementAt)<86400000){
       Object.assign(card,{state:'completed',tone:'green',badge:'公开完成',evidence:'公开完成声明',title:kind==='banked_reset'?'重置卡发放已确认':'额度重置已确认',description:'本轮已有公开完成声明，等待下一次预告。',icon:'check',timeLabel:'完成消息',time:at(completion.statementAt),timeAt:completion.statementAt,footer:'个人账户以实际显示为准',action:'查看完成公告'});
     }
+    if(!active&&observation&&(!resolution||Date.parse(resolution.statementAt)<Date.parse(observation.observedAt))&&current-Date.parse(observation.observedAt)<86400000){
+      Object.assign(card,{state:'observed',tone:'teal',badge:'来源观测',evidence:'第三方重置观测',title:'来源观测：用量已重置',description:'辅助来源记录了重置，个人账户以实际额度为准；等待新的公开安排。',icon:'check',timeLabel:'观测时间',time:at(observation.observedAt),timeAt:observation.observedAt,footer:'来源观测，非原作者完成公告',action:'查看观测依据',publicationId:observation.publicationId,eventId:observation.eventId,sourceName:observation.sourceName,sourceType:'observed',sourceUrl:observation.sourceUrl});
+    }
     return card;
   });
   const activeSignal=m.activeResetWatch(forecasts?.watch,now);
@@ -75,7 +83,7 @@ function resetStateCards(data, now=data.serverTime) {
   if(signal){
     const kind=signalKind(data,signal.url), target=cards.find(c=>c.kind===kind);
     const resolution=kind ? outlooks[kind].latestResolutions?.[kind] || outlooks[kind].lastResolved : kinds.map(k=>outlooks[k].latestResolutions?.[k]||outlooks[k].lastResolved).filter(Boolean).sort((a,b)=>Date.parse(b.statementAt)-Date.parse(a.statementAt))[0];
-    const consumed=m.publicActions(data).some(({action})=>['claimed_complete','cancelled'].includes(action.stage) && Date.parse(action.statementAt)>=Date.parse(signal.at) && data.evidence.some(e=>e.url===signal.url && action.evidenceIds.includes(e.id)));
+    const consumed=observations.some(o=>o.referenceUrl===signal.url&&Date.parse(o.observedAt)>=Date.parse(signal.at))||m.publicActions(data).some(({action})=>['claimed_complete','cancelled'].includes(action.stage) && Date.parse(action.statementAt)>=Date.parse(signal.at) && data.evidence.some(e=>e.url===signal.url && action.evidenceIds.includes(e.id)));
     if(!consumed && (!resolution || Date.parse(resolution.statementAt)<Date.parse(signal.at)) && (!target || ['waiting','completed','cancelled'].includes(target.state) && (!target.timeAt || Date.parse(signal.at)>Date.parse(target.timeAt)))){
       const card=base(kind);
       Object.assign(card,{state:signal.window?'estimated':'signal',tone:'violet',badge:signal.window?'信号推测':'信号观察',evidence:'依据公开线索'+(signal.window?'推测':'观察'),title:!kind?'发现重置相关信号':signal.window?kind==='banked_reset'?'预计近期发放重置卡':'预计近期额度重置':kind==='banked_reset'?'发现重置卡发放线索':'发现额度重置信号',description:!kind?'发现公开线索，具体类型及发放安排尚未明确。':'这是信号推测，尚未形成明确安排。',icon:'signal',window:signal.window,timeLabel:'信号发布',time:at(signal.at),timeAt:signal.at,footer:'尚未形成明确预告',action:signal.window?'查看预测依据':'查看信号依据',sourceUrl:signal.url,sourceName:signal.sourceName,sourceType:signal.type,expiresAt:signal.expiresAt,watchNote:signal.expiresAt?'观察有效至 '+at(signal.expiresAt)+' · 北京时间；不是发放截止时间。':'公开线索尚无明确发放时间。'});
@@ -92,12 +100,14 @@ function resetStateCards(data, now=data.serverTime) {
   }
   const history=kind=>{
     const item=completed.find(item=>item.action.kind===kind);
-    if(!item)return null;
-    const elapsed=m.completionElapsed(item.action,now);
+    const observation=observations.find(o=>o.kind===kind&&(!item||Date.parse(o.observedAt)>Date.parse(item.action.statementAt)));
+    if(!item&&!observation)return null;
+    const statementAt=observation?observation.observedAt:item.action.statementAt;
+    const elapsed=m.completionElapsed({kind,stage:'claimed_complete',statementAt},now);
     if(!elapsed)return null;
     const parts=elapsed.parts,clock=unit=>String(parts.find(part=>part.unit===unit)?.value||0).padStart(2,'0');
-    const date=at(item.action.statementAt);
-    return {time:date,displayTime:`${date.slice(0,4)===m.dateKey(now).slice(0,4)?'':date.slice(0,4)+'年'}${Number(date.slice(5,7))}月${Number(date.slice(8,10))}日 ${date.slice(11,16)}`,elapsed:elapsed.label,days:parts.find(part=>part.unit==='天')?.value||0,hours:clock('小时'),minutes:clock('分钟'),hoursMinutes:clock('小时')+':'+clock('分钟'),seconds:clock('秒'),statementAt:item.action.statementAt,publicationId:item.publication.id,eventId:item.event.id};
+    const date=at(statementAt);
+    return {time:date,displayTime:`${date.slice(0,4)===m.dateKey(now).slice(0,4)?'':date.slice(0,4)+'年'}${Number(date.slice(5,7))}月${Number(date.slice(8,10))}日 ${date.slice(11,16)}`,elapsed:elapsed.label,days:parts.find(part=>part.unit==='天')?.value||0,hours:clock('小时'),minutes:clock('分钟'),hoursMinutes:clock('小时')+':'+clock('分钟'),seconds:clock('秒'),statementAt,publicationId:observation?observation.publicationId:item.publication.id,eventId:observation?observation.eventId:item.event.id,sourceType:observation?'observed':'announcement',sourceName:observation?.sourceName||''};
   };
   return {cards,untyped,sourceWarning,expiredNote:expired&&!signal?'先前信号已过观察期，等待新的公开消息。':'',lastReset:history('automatic_reset'),lastCard:history('banked_reset')};
 }

@@ -1,7 +1,7 @@
 const { createPage } = require('../../utils/page');
 const { noticeModel } = require('../../utils/model');
 // Bundled client version; keep this aligned with the development-tool upload.
-const buildVersion = '1.0.41';
+const buildVersion = '1.0.42';
 Page(createPage((data, query, page, app) => {
   const stored=app.preferences.snapshot(),notices=data?noticeModel(data,stored.preferences,stored.read):[];
   return { notices:notices.slice(0,3),unread:notices.filter(n=>!n.read).length,storageError:stored.error };
@@ -59,8 +59,19 @@ Page(createPage((data, query, page, app) => {
       return work.then(()=>{if(this._visible&&!reader.getState().error)return this.loadWechat();});
     });
   },
-  revokeWechat(){
+  async revokeWechat(confirmed=false){
     const reader=getApp().wechat;if(!reader||reader.getState().busy||this.data.wechatAction)return;
+    if(confirmed!==true){
+      this.setData({wechatAction:'confirm-revoke'});
+      const remaining=reader.getState().remainingCount;
+      const count=Number.isSafeInteger(remaining)&&remaining>=0?`剩余 ${remaining} 次提醒授权`:'剩余提醒授权';
+      let accepted=false;
+      try{accepted=await new Promise(resolve=>{
+        if(typeof wx.showModal!=='function'){resolve(false);return;}
+        wx.showModal({title:'关闭并作废提醒次数？',content:`关闭后，${count}将作废，尚未发送的提醒也会取消。若只想暂停，请关闭上方提醒类型，次数会保留。`,confirmText:'关闭并作废',cancelText:'暂不关闭',confirmColor:'#b42318',success:result=>resolve(result.confirm===true),fail:()=>resolve(false)});
+      });}finally{this.setData({wechatAction:''});}
+      if(!accepted||reader.getState().busy)return;
+    }
     this._wechatPrivacyAction='close';
     return this.runWechatAction('revoke',async()=>{await reader.revoke({userInitiated:true});if(this._visible&&!reader.getState().privacyNeeded&&!reader.getState().error)await this.loadWechat();});
   },
@@ -78,6 +89,6 @@ Page(createPage((data, query, page, app) => {
       if(!reader.getState().privacyNeeded)this._wechatPendingPreferences=null;
     });
   },
-  agreeWechatPrivacy(){if(this._wechatPrivacyAction==='close')return this.revokeWechat();if(this._wechatPrivacyAction==='preferences'&&this._wechatPendingPreferences)return this.saveWechatPreferences(this._wechatPendingPreferences);return this.loadWechat();},
+  agreeWechatPrivacy(){if(this._wechatPrivacyAction==='close')return this.revokeWechat(true);if(this._wechatPrivacyAction==='preferences'&&this._wechatPendingPreferences)return this.saveWechatPreferences(this._wechatPendingPreferences);return this.loadWechat();},
   openPrivacyContract(){if(typeof wx.openPrivacyContract==='function')wx.openPrivacyContract({fail(){wx.showToast({title:'隐私指引暂不可用',icon:'none'});}});}
 } }));

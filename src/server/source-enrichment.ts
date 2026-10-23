@@ -51,6 +51,7 @@ async function boundedJSON(response:Response):Promise<unknown> {
 }
 /** Pure fetch enrichment: the worker saves returned evidence through createEvidence. */
 export async function enrichKnownEvidence(evidence:Evidence,fetcher:typeof fetch=fetch):Promise<Evidence|undefined> {
+ if(evidence.messageId.startsWith('observed-'))return; // Do not replace an observation with its linked announcement's text/time.
  const post=knownPostIdentity(evidence.url);if(!post||evidence.provenance==='manual')return undefined;
  if(REFERENCE_SOURCES.some(source=>source.id===evidence.sourceId)&&evidence.textOrigin!=='original'){
   try{
@@ -121,6 +122,8 @@ async function quotedIdentity(url:string,fetcher:typeof fetch):Promise<ReturnTyp
  * No relationship comes from timing/title similarity, and no DB write occurs.
  */
 export async function enrichQuotedResetContext(evidence:Evidence,available:Evidence[],fetcher:typeof fetch=fetch):Promise<Evidence[]> {
+ const anchor=await enrichCampaignAnchor(evidence,available,fetcher);
+ if(anchor)return [anchor];
  const childIdentity=knownPostIdentity(evidence.url);
  if(!childIdentity||evidence.provenance==='manual'||!snowflakeTime(childIdentity.messageId))return [];
  try{
@@ -156,6 +159,23 @@ export async function enrichQuotedResetContext(evidence:Evidence,available:Evide
  }catch {return [];}
 }
 
+/** Recover this known campaign's original anchor, with the relay's actual parent retained. */
+export async function enrichCampaignAnchor(evidence:Evidence,available:Evidence[],fetcher:typeof fetch=fetch):Promise<Evidence|undefined> {
+ const ruleId='2106845241357824205',dayOne='2107158998495748264';
+ if(evidence.sourceId!=='tibo-public'||evidence.textOrigin!=='original'||evidence.provenance!=='archive'||!/(?:^|\n)\s*Day\s+\d+\s*\//i.test(evidence.text)||available.some(e=>e.sourceId==='tibo-public'&&e.messageId===dayOne&&e.textOrigin==='original'&&e.parentId===ruleId))return;
+ const rule=available.find(e=>e.sourceId==='tibo-public'&&e.messageId===ruleId&&e.textOrigin==='original'&&/Over the next 28 days, each day we[’']ll either ship one thing/i.test(e.text));
+ const calendar=available.find(e=>e.metadata?.activity?.startsOn==='2026-10-05'&&e.metadata.activity.days===28&&e.metadata.activity.timezone==='America/Los_Angeles');
+ if(!rule||!calendar||Date.parse(evidence.publishedAt)<Date.parse(rule.publishedAt))return;
+ const prototype:Evidence={...evidence,id:`campaign-anchor:${dayOne}`,messageId:dayOne,url:`https://x.com/thsottiaux/status/${dayOne}`,text:'',hash:'',parentId:undefined,publishedAt:snowflakeTime(dayOne)!,collectedAt:new Date().toISOString(),contextComplete:false,historical:true,metadata:{sourceGroup:'fxembed:thsottiaux',category:'product'}};
+ try {
+  const response=await fetcher(`https://api.fxtwitter.com/status/${dayOne}`,{redirect:'error',signal:AbortSignal.timeout(10000),headers:{Accept:'application/json'}});
+  if(!response.ok){await response.body?.cancel();return;}
+  const original=parseKnownRelayOriginal(await boundedJSON(response),prototype);
+  if(!original||original.parentId!==ruleId||!/^Day 1\//i.test(original.text))return;
+  return original;
+ }catch{return;}
+}
+
 /** Reuse the existing free relay, verifying identity and original timestamp. */
 export function parseReferenceOriginal(value:unknown,evidence:Evidence,collectedAt=new Date().toISOString()):Evidence|undefined {
  if(!REFERENCE_SOURCES.some(source=>source.id===evidence.sourceId))return;
@@ -163,10 +183,19 @@ export function parseReferenceOriginal(value:unknown,evidence:Evidence,collected
 }
 export function parseKnownRelayOriginal(value:unknown,evidence:Evidence,collectedAt=new Date().toISOString()):Evidence|undefined {
  if(knownPostIdentity(evidence.url)?.messageId!==evidence.messageId||evidence.provenance==='manual'||!value||typeof value!=='object')return;
- const data=value as {code?:unknown;tweet?:{id?:unknown;text?:unknown;created_at?:unknown;author?:{screen_name?:unknown;id?:unknown;protected?:unknown};replying_to?:unknown;replying_to_status?:unknown}};
+ const data=value as {code?:unknown;tweet?:{id?:unknown;text?:unknown;created_at?:unknown;author?:{screen_name?:unknown;id?:unknown;protected?:unknown};replying_to?:unknown;replying_to_status?:unknown;quote?:{id?:unknown;url?:unknown;author?:{screen_name?:unknown;id?:unknown}}}};
  const tweet=data.tweet;
  if(data.code!==200||!tweet||tweet.id!==evidence.messageId||tweet.author?.screen_name!=='thsottiaux'||String(tweet.author.id)!=='1953337039510003712'||tweet.author.protected===true||typeof tweet.text!=='string'||!tweet.text.trim()||tweet.text.length>30000||isTruncatedText(tweet.text)||typeof tweet.created_at!=='string'||Math.abs(Date.parse(tweet.created_at)-Date.parse(evidence.publishedAt))>1000)return;
  if(!Number.isFinite(Date.parse(tweet.created_at)))return;
- const parentId=tweet.replying_to==='thsottiaux'&&typeof tweet.replying_to_status==='string'&&/^\d{15,20}$/.test(tweet.replying_to_status)?tweet.replying_to_status:undefined;
+ const parents=new Set<string>();
+ if(tweet.replying_to==='thsottiaux'&&typeof tweet.replying_to_status==='string'&&/^\d{15,20}$/.test(tweet.replying_to_status))parents.add(tweet.replying_to_status);
+ const quote=tweet.quote;
+ if(quote?.author?.screen_name==='thsottiaux'){
+  if(String(quote.author.id)!=='1953337039510003712'||typeof quote.id!=='string'||!/^\d{15,20}$/.test(quote.id)||typeof quote.url!=='string'||knownPostIdentity(quote.url)?.messageId!==quote.id)return;
+  parents.add(quote.id);
+ }
+ if(parents.size>1)return;
+ const parentId=[...parents][0]??evidence.parentId;
+ if(parentId&&(!/^\d{15,20}$/.test(parentId)||BigInt(parentId)>=BigInt(evidence.messageId)||evidence.parentId&&evidence.parentId!==parentId))return;
  return {...evidence,text:tweet.text,textOrigin:'original',parentId,contextComplete:!parentId&&hasStandaloneContext(tweet.text,'reset'),collectedAt};
 }

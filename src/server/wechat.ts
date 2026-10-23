@@ -1,6 +1,6 @@
 import {publicResetOutlook} from '../lib/reset-outlook';
 import { lockTransaction } from '../db';
-import {createCipheriv,createDecipheriv,createHash,randomBytes} from 'node:crypto';
+import {createCipheriv,createDecipheriv,createHash,createHmac,randomBytes} from 'node:crypto';
 import {z} from 'zod';
 import {isCloudbaseClient,list,one,put,insert,transaction,type Client,type Table} from '../db';
 import type {Article,Evidence,Job,Notice,Publication,RadarEvent} from '../lib/types';
@@ -117,6 +117,34 @@ export function createWechatService(dependencies:WechatDependencies={}) {
   }
   const day=()=>new Date(clock()+8*3600_000).toISOString().slice(0,10);
   const tomorrow=()=>new Date(Date.parse(`${day()}T00:00:00+08:00`)+24*3600_000).toISOString();
+  const budgetError=(message:string,at:number|string)=>new WechatServiceError(message,'budget',undefined,new Date(at).toISOString());
+  // Admission hints limit a noisy caller, never authenticate it. The global hard budget remains authoritative.
+  type LoginAttempt={at:number;count:number;failed:number;minuteAt?:number};
+  async function admitLogin(code:string,clientHint:string){
+    return store.transaction(async client=>{
+      await lock(client,'wechat_login_admission');
+      const previous=await store.one<{id:string;clients:Record<string,LoginAttempt>;codes:Record<string,number>}>('settings','wechat_login_admission',client);
+      const current=clock(),clientKey=createHmac('sha256',key()).update(clientHint.slice(0,256)).digest('hex'),codeKey=digest(code);
+      const clients=Object.fromEntries(Object.entries(previous?.clients??{}).filter(([,v])=>v.at<=current&&current-v.at<15*60_000));
+      const codes=Object.fromEntries(Object.entries(previous?.codes??{}).filter(([,at])=>at<=current&&current-at<10*60_000));
+      const attempt=clients[clientKey]??{at:current,count:0,failed:0};
+      const minuteAt=attempt.minuteAt??attempt.at,minuteFresh=current-minuteAt<60_000;
+      if(codes[codeKey]!==undefined)throw budgetError('此微信登录凭证已尝试，请重新打开提醒页面获取新凭证',codes[codeKey]+10*60_000);
+      if(attempt.failed>=5)throw budgetError('当前来源连续登录失败，请在15分钟后重试',attempt.at+15*60_000);
+      if(attempt.count>=8&&minuteFresh)throw budgetError('当前连接登录过于频繁，请一分钟后重试',minuteAt+60_000);
+      if(Object.keys(clients).length>=1024&&!clients[clientKey]||Object.keys(codes).length>=4096)throw budgetError('微信登录请求较多，请一分钟后重试',current+60_000);
+      clients[clientKey]={...attempt,count:(minuteFresh?attempt.count:0)+1,minuteAt:minuteFresh?minuteAt:current};codes[codeKey]=current;
+      await store.put('settings',{id:'wechat_login_admission',clients,codes},client);return clientKey;
+    });
+  }
+  async function failedLogin(clientKey:string){
+    await store.transaction(async client=>{
+      await lock(client,'wechat_login_admission');
+      const previous=await store.one<{id:string;clients:Record<string,LoginAttempt>;codes:Record<string,number>}>('settings','wechat_login_admission',client);
+      const attempt=previous?.clients[clientKey];if(!previous||!attempt)return;
+      await store.put('settings',{...previous,clients:{...previous.clients,[clientKey]:{...attempt,failed:attempt.failed+1}}},client);
+    });
+  }
   async function usage(kind:'login'|'token'|'qr'|'send',existingClient?:Client,expectedVersion?:number) {
     const reserve=async(client:Client)=>{
       await lock(client,'wechat_usage');const settings=await config(client);
@@ -124,8 +152,9 @@ export function createWechatService(dependencies:WechatDependencies={}) {
       if(kind==='qr'&&!ready(settings,'qr')||(['login','send'].includes(kind))&&!ready(settings,'subscription')||kind==='token'&&!ready(settings,'qr')&&!ready(settings,'subscription'))throw new WechatServiceError('微信功能尚未配置或已关闭','configuration');
       const usageId=`wechat_usage_${day()}`;const previous=await store.one<{id:string;calls:number;codes:number;sends:number;logins?:number;loginWindowAt?:number;loginWindowCount?:number}>('settings',usageId,client)??{id:usageId,calls:0,codes:0,sends:0};
       const windowFresh=Number.isFinite(previous.loginWindowAt)&&clock()-previous.loginWindowAt!<60_000,windowCount=windowFresh?previous.loginWindowCount??0:0;
-      if(kind==='login'&&((previous.logins??0)>=Math.max(1,Math.floor(settings.dailyApiLimit/4))||windowCount>=10))throw new WechatServiceError('微信登录调用已达限制，请稍后再试','budget');
-      if(previous.calls>=settings.dailyApiLimit||kind==='qr'&&previous.codes>=settings.dailyQrLimit||kind==='send'&&previous.sends>=settings.dailySendLimit)throw new WechatServiceError('今日微信接口调用上限已达，次日恢复','budget');
+      if(kind==='login'&&(previous.logins??0)>=Math.max(1,Math.floor(settings.dailyApiLimit/4)))throw budgetError('微信登录调用已达限制，次日零点恢复',tomorrow());
+      if(kind==='login'&&windowCount>=10)throw budgetError('微信登录调用已达限制，请一分钟后再试',previous.loginWindowAt!+60_000);
+      if(previous.calls>=settings.dailyApiLimit||kind==='qr'&&previous.codes>=settings.dailyQrLimit||kind==='send'&&previous.sends>=settings.dailySendLimit)throw budgetError('今日微信接口调用上限已达，次日恢复',tomorrow());
       const updated={...previous,calls:previous.calls+1,codes:previous.codes+(kind==='qr'?1:0),sends:previous.sends+(kind==='send'?1:0),logins:(previous.logins??0)+(kind==='login'?1:0),loginWindowAt:kind==='login'?(windowFresh?previous.loginWindowAt:clock()):previous.loginWindowAt,loginWindowCount:kind==='login'?windowCount+1:previous.loginWindowCount};await store.put('settings',updated,client);return settings;
     };return existingClient?reserve(existingClient):store.transaction(reserve);
   }
@@ -200,9 +229,12 @@ export function createWechatService(dependencies:WechatDependencies={}) {
     // Re-read after acquiring the same lock used by login/preferences writes.
     return reader(sessionToken,client);
   }
-  async function wechatLogin(code:string):Promise<{sessionToken:string;expiresAt:string}> {
-    const input=z.string().min(1).max(512).parse(code),settings=await usage('login');
-    const openid=await provider.login(settings.appId,open(settings.encryptedSecret!),input);
+  async function wechatLogin(code:string,clientHint='anonymous'):Promise<{sessionToken:string;expiresAt:string}> {
+    const input=z.string().min(1).max(512).parse(code);
+    if(!ready(await config(),'subscription'))throw new WechatServiceError('微信功能尚未配置或已关闭','configuration');
+    const clientKey=await admitLogin(input,clientHint),settings=await usage('login');
+    let openid:string;
+    try{openid=await provider.login(settings.appId,open(settings.encryptedSecret!),input);}catch(error){if(error instanceof WechatServiceError&&[40029,40163].includes(error.errorCode??0))await failedLogin(clientKey);throw error;}
     const openidHash=digest(`${settings.appId}:${openid}`),readerId=`wxreader_${openidHash}`,sessionToken=randomBytes(32).toString('base64url'),expiresAt=new Date(clock()+7*24*3600_000).toISOString();
     await store.transaction(async client=>{
       await lock(client,readerId);const existing=await store.one<WechatReader>('wechat_readers',readerId,client);

@@ -170,7 +170,7 @@ export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichme
         continue;
       }
       const probeDue=obstacles.missing && options.allowEnrichment!==false && canEnrich(original) && (!candidate.automation?.resumeAt||Date.parse(candidate.automation.resumeAt)<=Date.now());
-      const newsContextProbe=enrichArticle&&actualArticle?.publicationMode==='news_only'&&!hasCompleteContext(original,context)&&probeDue;
+      const newsContextProbe=enrichArticle&&actualArticle?.publicationMode==='news_only'&&!original.messageId.startsWith('observed-')&&!hasCompleteContext(original,context)&&probeDue;
       const candidateEvent=events.find(event=>event.id===(candidate.content.eventId??actualArticle?.eventId));
       if(ruleOnly&&candidate.automation?.state==='conflict'&&!isStaleMachineConflict(candidate,candidateEvent)&&!isResolvedNewsContextConflict(candidate,original,context,events,evidence,articles))continue;
       // A rule release may re-evaluate supported templates once, not all old long-form model inputs.

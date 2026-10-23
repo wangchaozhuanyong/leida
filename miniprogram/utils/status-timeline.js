@@ -58,6 +58,11 @@ function statusPresentation(model) {
   return {tone:'muted',badge:'等待新消息',heading:'等待下一次 Reset',kind:'公开动态追踪'};
 }
 function statusTimelineModel(outlook,now,completion=outlook.latestCompletion,forecasts) {
+  const observation=require('./reset-observations').timelineObservation(outlook,now,completion);
+  if(observation&&!activeResetSchedule(forecasts?.watch,now)){
+    const model=resolveStatusTimeline(outlook,now,{kind:'automatic_reset',stage:'claimed_complete',statementAt:observation.observedAt},forecasts?{...forecasts,referenceSignal:undefined,watch:undefined}:undefined);
+    return {...model,sourceName:observation.sourceName,sourceUrl:observation.sourceUrl,sourceType:'observed',sourceCredit:true,publicationId:observation.publicationId,statementAt:observation.observedAt,note:'第三方来源记录了用量重置；个人到账尚未核验。',presentation:{tone:'green',badge:'来源观测',heading:'来源观测：用量已重置',kind:'额度重置'}};
+  }
   const model=resolveStatusTimeline(outlook,now,completion,forecasts);
   return {...model,presentation:statusPresentation(model)};
 }

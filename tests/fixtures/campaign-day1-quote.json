@@ -1,0 +1,22 @@
+{
+  "code": 200,
+  "tweet": {
+    "id": "2107158998495748264",
+    "text": "Day 1/\n\nWe have optimized the default speed to be ~50% faster across GPT-6 Astra and GPT-6.1 Sol through the subscription across all our products and partners using Sign in With ChatGPT (including OpenCode, Pi, Amp, Devin, ...).\n\nNo changes needed on your end and this should be felt within the next two hours.",
+    "created_at": "Mon Oct 05 17:20:29 +0000 2026",
+    "replying_to": null,
+    "replying_to_status": null,
+    "author": {
+      "id": "1953337039510003712",
+      "screen_name": "thsottiaux"
+    },
+    "quote": {
+      "id": "2106845241357824205",
+      "url": "https://x.com/thsottiaux/status/2106845241357824205",
+      "author": {
+        "id": "1953337039510003712",
+        "screen_name": "thsottiaux"
+      }
+    }
+  }
+}
