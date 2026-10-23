@@ -25,7 +25,7 @@ After=docker.service
 
 [Service]
 Type=oneshot
-WorkingDirectory="$radar_quoted_root"
+WorkingDirectory=$radar_root
 ExecStart=/bin/bash "$radar_quoted_root/scripts/backup-database.sh" --container $radar_container
 TimeoutStartSec=1800
 Restart=on-failure
@@ -68,6 +68,7 @@ umask 022
 set -o noclobber
 if ! test -e "$radar_service"; then render_service > "$radar_service"; fi
 if ! test -e "$radar_timer"; then render_timer > "$radar_timer"; fi
+systemd-analyze verify "$radar_service" "$radar_timer"
 systemctl daemon-reload
 systemctl enable --now reset-radar-backup.timer
 systemctl start reset-radar-backup.service
