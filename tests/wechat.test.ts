@@ -266,15 +266,29 @@ test('32位scene支持旧发布ID，解析精确版本且拒绝非法/未知',as
 test('真实码接口使用固定页/scene和环境；重复获取复用缓存；JSON错误不能充作图',async()=>{
   const f=await fixture();const first=await f.service.generateWechatCode(f.publication.id),second=await f.service.generateWechatCode(f.publication.id);
   assert.equal(first.contentType,'image/png');assert.equal(first.publicationId,f.publication.id);assert.ok(first.image.equals(second.image));
-  const code=f.calls.filter(call=>call.url.includes('getwxacodeunlimit'));assert.equal(code.length,1);assert.equal(code[0].body?.scene,publicationScene(f.publication.id));assert.equal(code[0].body?.page,'pages/detail/index');assert.equal(code[0].body?.env_version,'trial');assert.equal(code[0].body?.check_path,false);
+  const code=f.calls.filter(call=>call.url.includes('getwxacodeunlimit'));assert.equal(code.length,1);assert.equal(code[0].body?.scene,publicationScene(f.publication.id));assert.equal(code[0].body?.page,'pages/home/index');assert.equal(code[0].body?.env_version,'trial');assert.equal(code[0].body?.check_path,false);
   const bad=await fixture({qr:'error'});await assert.rejects(bad.service.generateWechatCode(bad.publication.id),/41030/);assert.equal((await bad.service.adminWechat()).codesToday,1);
 });
 
-test('体验和开发码允许尚未正式发布的固定详情页，正式码仍检查页面且不自动降级',async()=>{
+test('首页小程序码不复用旧详情码缓存，保留原scene和历史缓存',async()=>{
+  const f=await fixture(),scene=publicationScene(f.publication.id);
+  const cacheId=(page:string)=>`wechat_code_${createHash('sha256').update(`wx0123456789abcdef:trial:${page}:${f.publication.id}`).digest('hex')}`;
+  const old={id:cacheId('pages/detail/index'),status:'ready',base64:actualJpeg.toString('base64'),contentType:'image/jpeg',scene,publicationId:f.publication.id};
+  await f.store.put('settings',old);
+  const first=await f.service.generateWechatCode(f.publication.id),second=await f.service.generateWechatCode(f.publication.id);
+  assert.equal(first.contentType,'image/png');assert.ok(first.image.equals(actualPng));assert.ok(second.image.equals(first.image));
+  assert.equal(first.scene,scene);assert.equal(first.publicationId,f.publication.id);assert.deepEqual(await f.service.resolveWechatScene(scene),{publicationId:f.publication.id});
+  const calls=f.calls.filter(call=>call.url.includes('getwxacodeunlimit'));assert.equal(calls.length,1);assert.equal(calls[0].body?.page,'pages/home/index');assert.equal(calls[0].body?.scene,scene);
+  assert.deepEqual(await f.store.one('settings',old.id),old);
+  const saved=await f.store.one<{status:string;base64:string;scene:string;publicationId:string}>('settings',cacheId('pages/home/index'));
+  assert.equal(saved?.status,'ready');assert.equal(saved?.base64,actualPng.toString('base64'));assert.equal(saved?.scene,scene);assert.equal(saved?.publicationId,f.publication.id);
+});
+
+test('体验和开发码允许尚未正式发布的固定首页，正式码仍检查页面且不自动降级',async()=>{
   const calls:Record<string,unknown>[]=[];
   const provider=createWechatProvider(async(_input,init)=>{
     const body=JSON.parse(String(init?.body));calls.push(body);
-    assert.equal(body.page,'pages/detail/index');
+    assert.equal(body.page,'pages/home/index');
     return body.check_path?Response.json({errcode:41030}):new Response(new Uint8Array(actualPng));
   });
   for(const env of ['trial','develop']){

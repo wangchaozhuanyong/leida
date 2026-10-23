@@ -77,7 +77,7 @@ test('完整真码置于圆形白底内，保留所有像素，不裁剪或生�
   const image=canvas.calls.find(item=>item.type==='image') as {x:number;y:number;width:number;height:number};
   for(const x of [image.x,image.x+image.width])for(const y of [image.y,image.y+image.height])assert.ok(Math.hypot(x-circle.x,y-circle.y)<circle.r);
   const layout=p.createPosterLayout(p.posterInput(data(),'fixture-publication'),measure,{status:'ready',publicationId:'fixture-publication',filePath:'wxfile://fixture-server-code.png'});
-  const caption=layout.commands.find((item:{text?:string})=>item.text==='扫码查看此发布版本');assert.ok(caption.y>circle.y+circle.r);
+  const caption=layout.commands.find((item:{text?:string})=>item.text==='扫码进入小程序首页');assert.ok(caption.y>circle.y+circle.r);
 });
 
 test('海报黑金与水墨切换只改样式，指定版本、完整事实及真码位置保持一致',()=>{

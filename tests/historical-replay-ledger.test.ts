@@ -47,8 +47,8 @@ test('小程序回放路径白名单不允许私有请求、额外查询或路�
 test('旧回放链接直接进入真实重置记录，不读取回放数据，跳转失败后可手动重试',()=>{
  let definition:any;const calls:string[]=[];
  const code=readFileSync(new URL('../miniprogram/pages/replay/index.js',import.meta.url),'utf8');
- runInNewContext(code,{Page:(value:unknown)=>definition=value,wx:{switchTab:({url}:{url:string})=>calls.push(url)},getApp:()=>{throw new Error('兼容入口不应读取任何回放数据');}});
- definition.onLoad();definition.openRecords();
+ runInNewContext(code,{Page:(value:unknown)=>definition=value,require:()=>({enterPage:()=>false,suspendEntry(){}}),wx:{switchTab:({url}:{url:string})=>calls.push(url)},getApp:()=>{throw new Error('兼容入口不应读取任何回放数据');}});
+ definition.onShow();definition.openRecords();
  assert.deepEqual(calls,['/pages/announcements/index','/pages/announcements/index']);
 });
 test('客户导航不能进入回放，仍能打开日程和真实重置记录',()=>{

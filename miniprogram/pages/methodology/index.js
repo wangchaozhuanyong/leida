@@ -1,4 +1,5 @@
 const m = require('../../utils/model');
+const {enterPage,suspendEntry}=require('../../utils/entry-navigation');
 const { cadenceModel, cadenceSnapshotId, validateCadenceSnapshot } = require('../../utils/cadence');
 const horizonRows = (data, id) => (data && data.cadenceHorizonOutcomes || []).filter(row => id ? row.snapshotId === id : Object.values(data.cadenceByKind || {}).some(snapshot=>snapshot.id===row.snapshotId)).map(row => ({ id:row.id, label:row.target==='banked_reset'?'重置卡发放':'用量重置', horizon:row.horizonHours, result:row.result==='occurred'?'已找到对应公开动态':row.result==='not_occurred'?'覆盖已核验，未发现对应动态':'暂不能判断', end:m.displayTime(row.windowEnd), actual:row.actualAt?m.displayTime(row.actualAt):'', note:row.scorable?'已加入可评分记录':'资料不完整或消息晚采，未计入预测成绩' }));
 const validId = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,179}$/.test(value);
@@ -13,6 +14,7 @@ Page({
     else if (this._snapshotId) void this.loadFixed();
   },
   onShow() {
+    if(enterPage(this,()=>this.onShow()))return;
     this._visible = true;
     const generation = this._navigationGeneration = (this._navigationGeneration || 0) + 1;
 
@@ -45,8 +47,8 @@ Page({
     this._fixedTask = null;
     this.setData({ fixedLoading: false });
   },
-  onHide() { this.suspend(); },
-  onUnload() { this.suspend(); },
+  onHide() { suspendEntry(this);this.suspend(); },
+  onUnload() { suspendEntry(this,true);this.suspend(); },
   updateOutcomes() {
     const state = this._latestState;
     const data = state && !state.error && state.data && state.data.forecasts;

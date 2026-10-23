@@ -69,7 +69,7 @@ test('真实隔离库：微信身份、一次性授权、任务派发和安全�
       return tokenFailure ? Response.json({ errcode: 40125, errmsg: 'synthetic-private-provider-error' }) : Response.json({ access_token: fixtureToken, expires_in: 7200 });
     }
     if (url.pathname === '/wxa/getwxacodeunlimit') {
-      assert.equal(body?.page, 'pages/detail/index');
+      assert.equal(body?.page, 'pages/home/index');
       assert.equal(body?.env_version, 'trial');
       assert.equal(body?.check_path, false, '体验版圆码沿用已核验的固定页面策略');
       assert.match(String(body?.scene), /^[a-f0-9]{32}$/);
@@ -170,6 +170,20 @@ test('真实隔离库：微信身份、一次性授权、任务派发和安全�
       const fixture = await publishedFixture(), code = await service.generateWechatCode(fixture.publication.id);
       assert.equal(code.contentType, 'image/png');
       assert.equal((await sharp(code.image).metadata()).width, 2, '返回的图片必须真正可解码');
+    });
+    await t.test('旧详情页二维码缓存隔离，首页码独立持久化且再次读取复用', async () => {
+      const fixture = await publishedFixture();
+      const cacheId = (page:string) => `wechat_code_${createHash('sha256').update(`wx${tag}:trial:${page}:${fixture.publication.id}`).digest('hex')}`;
+      const old = {id:cacheId('pages/detail/index'),status:'ready',base64:png.toString('base64'),contentType:'image/png',scene:createHash('sha256').update(fixture.publication.id).digest('hex').slice(0,32),publicationId:fixture.publication.id};
+      await put('settings',old);
+      const before = calls.filter(call=>call.path==='/wxa/getwxacodeunlimit').length;
+      const first = await service.generateWechatCode(fixture.publication.id), second = await service.generateWechatCode(fixture.publication.id);
+      assert.equal(calls.filter(call=>call.path==='/wxa/getwxacodeunlimit').length,before+1);
+      assert.equal(first.scene,old.scene);assert.equal(first.publicationId,fixture.publication.id);assert.ok(first.image.equals(second.image));
+      assert.deepEqual(await service.resolveWechatScene(old.scene),{publicationId:fixture.publication.id});
+      assert.deepEqual(await one('settings',old.id),old,'历史缓存不被重写或删除');
+      const saved = await one<{status:string;base64:string;scene:string;publicationId:string}>('settings',cacheId('pages/home/index'));
+      assert.equal(saved?.status,'ready');assert.equal(saved?.base64,png.toString('base64'));assert.equal(saved?.scene,old.scene);assert.equal(saved?.publicationId,fixture.publication.id);
     });
     await t.test('授权前原文在授权后才入库和发布，不补发且不占用次数', async () => {
       const reader = await identity();

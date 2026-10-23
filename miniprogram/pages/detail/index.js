@@ -1,3 +1,4 @@
+const {preserveNativeReturn}=require('../../utils/entry-navigation');
 const { createPage } = require('../../utils/page');
 const m = require('../../utils/model');
 const poster=require('../../utils/poster');
@@ -63,18 +64,18 @@ Page(createPage((data, query, page) => data && !page.sceneLoading && !page.scene
       catch(error){if(this._active&&generation===this._posterGeneration)this.setData({posterError:error.message||'海报暂时无法生成，请重试。'});}
       finally{if(asset)await asset.dispose();if(this._active&&generation===this._posterGeneration){clearTimeout(this._posterTimeout);this.setData({posterBusy:false});}}
     },
-    previewPoster(){if(this.data.posterPreview&&typeof wx.previewImage==='function')wx.previewImage({urls:[this.data.posterPreview],current:this.data.posterPreview});},
+    previewPoster(){if(this.data.posterPreview&&typeof wx.previewImage==='function'){const guard=preserveNativeReturn();try{wx.previewImage({urls:[this.data.posterPreview],current:this.data.posterPreview,fail:()=>guard.cancel()});}catch(_){guard.cancel();}}},
     async savePoster(){
       if(this._savingPoster||this.data.posterBusy)return;
       if(!this._posterArtifact||!m.resolveDetail(getApp().client.getState().data,{publicationId:this._posterArtifact.publicationId}).canShare){this.setData({posterError:'请先生成仍可公开分享的海报。'});return;}
       this._savingPoster=true;this.setData({posterSaving:true});
       try{if(await privacyRequired(wx)){this.setData({posterPrivacyNeeded:true,posterError:'请先阅读并同意隐私指引。'});return;}
-        await poster.savePoster(wx,this._posterArtifact,{userInitiated:true});this.setData({posterPrivacyNeeded:false,posterError:''});wx.showToast({title:'已保存到相册',icon:'success'});}
+        const guard=preserveNativeReturn();try{await poster.savePoster(wx,this._posterArtifact,{userInitiated:true});}finally{guard.finish();}this.setData({posterPrivacyNeeded:false,posterError:''});wx.showToast({title:'已保存到相册',icon:'success'});}
       catch(error){this.setData({posterError:error.message||'保存失败，请重试。'});}
       finally{this._savingPoster=false;this.setData({posterSaving:false});}
     },
     agreePosterPrivacy(){void this.savePoster();},
-    openPrivacyContract(){if(typeof wx.openPrivacyContract==='function')wx.openPrivacyContract({fail(){wx.showToast({title:'隐私指引暂不可用',icon:'none'});}});},
+    openPrivacyContract(){if(typeof wx.openPrivacyContract==='function'){const guard=preserveNativeReturn();try{wx.openPrivacyContract({fail(){guard.cancel();wx.showToast({title:'隐私指引暂不可用',icon:'none'});}});}catch(_){guard.cancel();}}},
     copySource(event) { const url = m.safeUrl(event.currentTarget.dataset.url); if (url) wx.setClipboardData({ data: url, fail() { wx.showToast({ title: '复制失败，请稍后重试', icon: 'none' }); } }); },
     onShareAppMessage() {
       const data = getApp().client.getState().data;

@@ -2,7 +2,7 @@
 <navigation-header icon="reminder" title="提醒" />
 <view class="refresh-track {{settingsReady && (refreshing || wechat.refreshing) ? 'is-active' : ''}}"><view/></view>
 <page-loader wx:if="{{!settingsReady}}" />
-<view wx:else class="page">
+<view wx:else class="page" bindtouchstart="nativeReturnTouched">
   <view wx:if="{{storageError}}" class="warning">{{storageError}}</view>
   <view class="card inbox-card"><view class="row"><view class="heading">站内信 <text wx:if="{{unread}}" class="inbox-unread">{{unread}} 未读</text></view><button class="text-button" data-path="/pages/notices/index" bindtap="navigate">查看全部提醒 →</button></view>
     <view wx:if="{{!connected}}" class="inbox-loading"><text>{{error || (unconfigured ? '站内信暂不可用' : '正在更新提醒')}}</text><button wx:if="{{error}}" class="text-button" bindtap="retry">重新加载</button></view>
@@ -30,7 +30,7 @@
     <button class="secondary full reminder-close {{wechat.busy || wechatAction || !wechat.canRevoke ? 'is-disabled' : ''}} {{wechatAction === 'revoke' ? 'is-pending' : ''}}" loading="{{wechatAction === 'revoke'}}" disabled="{{wechat.busy || wechatAction || !wechat.canRevoke}}" bindtap="revokeWechat">{{wechatAction === 'revoke' ? '正在关闭' : '关闭微信提醒'}}</button></block>
     <view class="small muted lead">关闭后剩余授权次数作废并停止后续提醒，已提交微信的消息可能仍会收到。</view>
   </view>
-  <button class="row-button" open-type="contact" binderror="contactError"><text>联系小程序客服</text><text>→</text></button>
+  <button class="row-button" open-type="contact" bindtap="contactStart" bindcontact="contactReturn" binderror="contactError"><text>联系小程序客服</text><text>→</text></button>
   <button class="row-button" data-path="/pages/privacy/index" bindtap="navigate"><text>关于与隐私</text><text>→</text></button>
   <view class="foot">版本 {{clientVersion}}</view>
 </view>

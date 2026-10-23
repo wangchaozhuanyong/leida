@@ -1,6 +1,6 @@
 <navigation-header title="分享海报" back="{{true}}" />
 <page-loader wx:if="{{navigationLoading}}" />
-<view wx:else class="page poster-page">
+<view wx:else class="page poster-page" bindtouchstart="nativeReturnTouched">
   <status-panel wx:if="{{!connected}}" loading="{{loading}}" error="{{error}}" unconfigured="{{unconfigured}}" bindretry="retry" />
   <block wx:else><view class="poster-style-options"><button class="{{theme==='precision'?'selected':''}}" data-theme="precision" bindtap="selectTheme"><view class="style-dot dark"></view>黑金仪表</button><button class="{{theme==='editorial'?'selected':''}}" data-theme="editorial" bindtap="selectTheme"><view class="style-dot light"></view>水墨刊物</button></view>
     <view class="poster-stage {{!preview ? 'poster-stage-empty' : ''}}"><image wx:if="{{preview}}" src="{{preview}}" mode="widthFix" class="poster-image" bindtap="previewImage" aria-label="分享海报，点击查看大图"/><view wx:if="{{posterBusy}}" class="poster-message poster-busy" role="status">正在生成海报</view><view wx:elif="{{!preview}}" class="poster-message">{{blocked || posterError || '海报暂不可用'}}</view></view>
