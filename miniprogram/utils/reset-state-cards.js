@@ -10,11 +10,22 @@ const at = value => valid(value) ? m.displayTime(value) : '';
 const names = {automatic_reset:'额度重置',banked_reset:'重置卡'};
 const waitingTitle = kind => kind === 'banked_reset' ? '等待下一次重置卡发放' : '等待下一次 Reset';
 function base(kind) {
-  return {kind, name:names[kind] || '公开线索', state:'waiting', tone:'slate', badge:'等待新消息', evidence:'公开动态追踪', title:waitingTitle(kind), description:`暂无新的${kind==='banked_reset'?'重置卡发放':'额度重置'}预告，有可靠消息后更新。`, icon:'radar', metric:'', metricLabel:'', window:'', timeLabel:'当前状态', time:'没有有效的新信号或安排', timeAt:'', oldTime:'', footer:'依据公开信息更新', action:'查看最近公告', publicationId:'', eventId:'', sourceUrl:'', sourceName:'', expiresAt:'', sourceType:'', watchNote:'',progress:/** @type {{label:string,current:boolean}[]} */([])};
+  return {kind, name:names[kind] || '公开线索', state:'waiting', tone:'slate', badge:'等待新消息', evidence:'公开动态追踪', title:waitingTitle(kind), description:`暂无新的${kind==='banked_reset'?'重置卡发放':'额度重置'}预告，有可靠消息后更新。`, icon:'radar', metric:'', metricParts:/** @type {{value:number,unit:string}[]} */([]), metricLabel:'', window:'', timeLabel:'当前状态', time:'没有有效的新信号或安排', timeAt:'', oldTime:'', footer:'依据公开信息更新', action:'查看最近公告', publicationId:'', eventId:'', sourceUrl:'', sourceName:'', expiresAt:'', sourceType:'', watchNote:'',progress:/** @type {{label:string,current:boolean}[]} */([])};
 }
 function sourceTarget(card, round) {
   if (!round) return;
   card.publicationId=round.publicationId || ''; card.eventId=round.eventId || '';
+}
+/** Presentation only: preserve the source time qualifiers and the underlying state.
+ * @param {ReturnType<typeof base>} card
+ */
+function dialPresentation(card) {
+  const titles={waiting:'等待新消息',announced:'已发布预告',progress:'正在进行',completed:'完成已记录',observed:'观测已记录',overdue:'等待确认',cancelled:'安排已取消',signal:'发现公开线索',estimated:'信号推测'};
+  const units=card.metricParts.some(part=>part.unit==='天')?['天','小时','分钟']:['小时','分钟'];
+  const clockParts=card.metric && card.metricParts.length?units.map(unit=>({unit,value:String(card.metricParts.find(part=>part.unit===unit)?.value||0).padStart(2,'0')})):[];
+  const date=card.timeAt?card.time.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2})(.*)$/):null;
+  const status={waiting:'公开动态追踪',scheduled:'公开预告',progress:'等待完成声明',overdue:'等待完成声明',cancelled:'本轮已结束'};
+  return {...card,dialTitle:titles[card.state]||card.title,dialStatus:status[card.state]||card.badge,clockParts,clockLong:clockParts.some(part=>part.value.length>2),dateText:date?`${date[1]}年${Number(date[2])}月${Number(date[3])}日`:'',clockText:date?date[4]:'',timeQualifier:date?date[5].trim():''};
 }
 /** A source URL linked to a classified public action or existing forecast case is required. */
 function signalKind(data, url) {
@@ -58,8 +69,9 @@ function resetStateCards(data, now=data.serverTime) {
       Object.assign(card,{tone:'blue',badge:'已预告',state:'announced',evidence:'公开预告',title:kind==='banked_reset'?'已预告发放重置卡':'已预告额度重置',description:'已公布相关安排，具体时间仍待说明。',icon:'calendar',timeLabel:'预告发布',time:at(active.statementAt),timeAt:active.statementAt,action:'查看预告原文'});
       if(active.stage==='in_progress')Object.assign(card,{state:'progress',tone:'teal',badge:'进行中',evidence:'公开进展消息',title:kind==='banked_reset'?'重置卡正在发放':'额度重置进行中',description:'公开消息称已开始，完成情况等待后续声明。',icon:'progress',timeLabel:'进展消息',action:'查看最新进展'});
       else if(timed){
-        const metric=countdownParts(active.expectedAt,now).map(p=>p.value+p.unit).join('') || '不足1分钟';
-        Object.assign(card,{state:overdue?'overdue':adjusted?'revised':'scheduled',tone:overdue?'amber':'blue',badge:overdue?'等待确认':adjusted?'安排已调整':'时间已公布',evidence:overdue?'原预告已到预计时间':'公开预告 · 有明确时间',title:overdue?'预计时间已到，待确认':adjusted?`${kind==='banked_reset'?'重置卡发放':'额度重置'}时间已更新`:kind==='banked_reset'?'预计发放重置卡':'预计额度重置',description:overdue?`尚未看到${kind==='banked_reset'?'重置卡发放':'额度重置'}完成声明，正在持续关注。`:'预计时间仅供参考，以实际发放为主。',icon:'clock',metric:overdue?'':metric,metricLabel:adjusted?'距离最新预计安排':timing==='deadline'?'距离预计最晚时间':timing==='approximate'?'距离预计时间（约）':'距离预计安排',timeLabel:overdue?'原预计安排':adjusted?'最新安排':'预计安排',time:at(active.expectedAt)+(timing==='deadline'?' 前':timing==='approximate'?' 左右':''),timeAt:active.expectedAt,oldTime:adjusted?'原预计 '+at(active.previousExpectedAt):'',footer:overdue?'停止倒计时，保留原安排':'依据公开信息更新',action:adjusted?'查看调整说明':overdue?'查看最新消息':'查看安排依据'});
+        const metricParts=overdue?[]:countdownParts(active.expectedAt,now);
+        const metric=metricParts.map(p=>p.value+p.unit).join('') || '不足1分钟';
+        Object.assign(card,{state:overdue?'overdue':adjusted?'revised':'scheduled',tone:overdue?'amber':'blue',badge:overdue?'等待确认':adjusted?'安排已调整':'时间已公布',evidence:overdue?'原预告已到预计时间':'公开预告 · 有明确时间',title:overdue?'预计时间已到，待确认':adjusted?`${kind==='banked_reset'?'重置卡发放':'额度重置'}时间已更新`:kind==='banked_reset'?'预计发放重置卡':'预计额度重置',description:overdue?`尚未看到${kind==='banked_reset'?'重置卡发放':'额度重置'}完成声明，正在持续关注。`:'预计时间仅供参考，以实际发放为主。',icon:'clock',metric:overdue?'':metric,metricParts,metricLabel:adjusted?'距离最新预计安排':timing==='deadline'?'距离预计最晚时间':timing==='approximate'?'距离预计时间（约）':'距离预计安排',timeLabel:overdue?'原预计安排':adjusted?'最新安排':'预计安排',time:at(active.expectedAt)+(timing==='deadline'?' 前':timing==='approximate'?' 左右':''),timeAt:active.expectedAt,oldTime:adjusted?'原预计 '+at(active.previousExpectedAt):'',footer:overdue?'停止倒计时，保留原安排':'依据公开信息更新',action:adjusted?'查看调整说明':overdue?'查看最新消息':'查看安排依据'});
       }
     }else if(resolution?.stage==='cancelled'){
       sourceTarget(card,resolution);
@@ -109,6 +121,6 @@ function resetStateCards(data, now=data.serverTime) {
     const date=at(statementAt);
     return {time:date,displayTime:`${date.slice(0,4)===m.dateKey(now).slice(0,4)?'':date.slice(0,4)+'年'}${Number(date.slice(5,7))}月${Number(date.slice(8,10))}日 ${date.slice(11,16)}`,elapsed:elapsed.label,days:parts.find(part=>part.unit==='天')?.value||0,hours:clock('小时'),minutes:clock('分钟'),hoursMinutes:clock('小时')+':'+clock('分钟'),seconds:clock('秒'),statementAt,publicationId:observation?observation.publicationId:item.publication.id,eventId:observation?observation.eventId:item.event.id,sourceType:observation?'observed':'announcement',sourceName:observation?.sourceName||''};
   };
-  return {cards,untyped,sourceWarning,expiredNote:expired&&!signal?'先前信号已过观察期，等待新的公开消息。':'',lastReset:history('automatic_reset'),lastCard:history('banked_reset')};
+  return {cards:cards.map(dialPresentation),untyped:untyped?dialPresentation(untyped):null,sourceWarning,expiredNote:expired&&!signal?'先前信号已过观察期，等待新的公开消息。':'',lastReset:history('automatic_reset'),lastCard:history('banked_reset')};
 }
 module.exports={resetStateCards};

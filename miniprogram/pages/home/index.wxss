@@ -198,3 +198,28 @@
  .home-page .home-records{margin-top:16px;padding:0 24px}.home-page .home-records .recent-complete{padding:24px 0}
  .home-page>.activity-entry{margin-top:16px;padding:24px}
 }
+
+/* Approved central radar, matching the web layout without a progress track. */
+.home-page>.status-card:not(.reset-state){padding:14px 20px 12px;border-radius:23px}
+.reset-tabs{gap:4px;padding:4px;background:#f4f6fa;border:0;border-radius:13px}
+.home-page .reset-tabs button{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:10px 2px;border:0;border-radius:9px;text-align:center;box-sizing:border-box}
+.reset-tab-icon{width:24px;height:24px;flex:none}.reset-tab-copy>text{font-size:13px;font-weight:500;line-height:1.3;white-space:nowrap}
+.home-page .reset-tabs button.selected{background:#fff;color:#3c68ca;box-shadow:0 1px 4px #2036530b}.home-page .reset-tabs button.selected .reset-tab-copy>text{font-weight:650}.home-page .reset-tabs button.kind-banked_reset.selected{color:#8063b6}
+.home-page .reset-orbit{background:#fff}.reset-orbit-body{color:#203653}
+.radar-scope{--radar-ink:#3c68ca;--radar-wash:#eff5ff;--radar-line:#d5e1f7;--radar-soft:#eff4ff;width:250px;height:250px;position:relative;margin:18px auto 13px;display:flex;align-items:center;justify-content:center}
+.radar-disc{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,#fff 46%,var(--radar-wash) 69%,#fff 73%)}
+.radar-ring{position:absolute;border:1px solid var(--radar-line);border-radius:50%;box-sizing:border-box;opacity:.65}.radar-ring.ring-outer{inset:3px;border-style:dashed}.radar-ring.ring-middle{inset:12px}.radar-ring.ring-inner{inset:27px;opacity:.4}
+.radar-sweep{position:absolute;inset:12px;border-radius:50%;border:2px solid transparent;border-top-color:var(--radar-ink);opacity:.5;animation:radar-scan 16s linear infinite}.radar-sweep::after{content:"";position:absolute;top:25px;right:25px;width:5px;height:5px;border-radius:50%;background:var(--radar-ink);box-shadow:0 0 0 5px var(--radar-soft)}
+.radar-core{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:195px;min-height:190px;border-radius:50%;background:radial-gradient(circle,#fff 58%,#ffffffd9 77%,#ffffff00);text-align:center}
+.orbit-label{font-size:12px;font-weight:400;line-height:1.6;color:#63758e;margin:0 0 12px;letter-spacing:.2px}
+.orbit-digits{display:grid;grid-template-columns:1fr 16px 1fr;gap:6px;align-items:start;width:170px}.orbit-part{display:flex;flex-direction:column;gap:7px;min-width:0}.orbit-number{font-size:49px;line-height:1;font-weight:550;letter-spacing:-2.5px;font-variant-numeric:tabular-nums;color:#234574}.orbit-unit{font-size:10px;color:#6e7e94;letter-spacing:2px;padding-left:2px}.orbit-colon{color:#a6badc;font-size:35px;font-weight:300;line-height:1.15}
+.orbit-digits.with-days{width:192px;grid-template-columns:1fr 8px 1fr 8px 1fr;gap:2px}.orbit-digits.with-days .orbit-number{font-size:37px;letter-spacing:-1.5px}.orbit-digits.with-days .orbit-colon{font-size:27px;line-height:1.2}.orbit-digits.is-long .orbit-number{font-size:28px;letter-spacing:-1px}.orbit-minute{grid-column:1/-1;font-size:24px;line-height:1.6;font-weight:550;color:#234574}
+.orbit-status{display:flex;align-items:center;justify-content:center;gap:5px;margin:16px 0 0;font-size:10px;color:var(--radar-ink);line-height:1.6}.orbit-status::before{content:"";width:4px;height:4px;flex:none;border-radius:50%;background:var(--radar-ink)}
+.orbit-title{font-size:23px;letter-spacing:-.6px;font-weight:600;line-height:1.5;margin:0 0 8px;color:#3b4964}.orbit-description{margin:0;font-size:11px;line-height:1.8;color:#68768b;max-width:168px}
+.orbit-schedule{display:flex;align-items:center;justify-content:space-between;padding:0 1px 17px;gap:12px}.orbit-schedule>view{min-width:0}.orbit-date-label{font-size:10px;color:#6e7e94;display:block;margin-bottom:6px}.orbit-date{font-size:15px;line-height:1.6;font-weight:600;letter-spacing:.1px}.orbit-time{text-align:right;flex:none}.orbit-clock{font-size:23px;font-weight:550;font-variant-numeric:tabular-nums;letter-spacing:-.7px;line-height:1.2}.orbit-qualifier{margin-left:4px;font-size:10px;color:#63758e}
+.orbit-waiting{font-size:12px;line-height:1.8;text-align:center;color:#6e7e94;margin:0 0 17px}.orbit-old{font-size:10px;line-height:1.8;color:#6e7e94;margin:-6px 0 14px;text-decoration:line-through}
+.home-page .reset-orbit .reset-state-footer{padding:9px 0 0;min-height:44px;background:#fff;border-top:1px solid #eef1f6;gap:4px 10px}.reset-orbit .reset-state-footer>text{flex:1;min-width:110px;color:#6e7e94;font-size:10px;line-height:1.7}.home-page .reset-orbit .reset-state-footer button{color:#4169ab;min-height:44px;font-size:11px;flex:none}
+.radar-scope.kind-banked_reset,.radar-scope.radar-signal,.radar-scope.radar-estimated{--radar-ink:#8063b6;--radar-wash:#f7f3fc;--radar-line:#e4daf3;--radar-soft:#f5f1fb}.radar-scope.radar-completed,.radar-scope.radar-observed,.radar-scope.radar-progress{--radar-ink:#327c70;--radar-wash:#f1f8f4;--radar-line:#cde4dc;--radar-soft:#eef8f3}.radar-scope.radar-overdue,.radar-scope.radar-cancelled{--radar-ink:#69788e;--radar-wash:#f5f7fa;--radar-line:#e1e6ee}
+@keyframes radar-scan{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@media(max-width:350px){.home-page>.status-card:not(.reset-state){padding-left:15px;padding-right:15px}.radar-scope{width:236px;height:236px}.orbit-number{font-size:47px}.reset-tab-copy>text{font-size:12px}.reset-tab-icon{width:22px;height:22px}.orbit-date{font-size:14px}}
+@media(prefers-reduced-motion:reduce){.radar-sweep{animation:none!important}}

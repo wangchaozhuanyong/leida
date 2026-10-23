@@ -1,4 +1,4 @@
-import {REFERENCE_RESET_SOURCE,REFERENCE_SOURCES} from './reference-reset-source';
+import {REFERENCE_SOURCES,parseReferenceHistoricalLatest,needsReferenceHistoryRecovery,referenceCompletionClaim} from './reference-reset-source';
 import { load } from 'cheerio';
 import type { Evidence } from '../lib/types';
 import { hasStandaloneContext, isTruncatedText } from './source-context';
@@ -57,9 +57,11 @@ export async function enrichKnownEvidence(evidence:Evidence,fetcher:typeof fetch
   try{
    const response=await fetcher(`https://api.fxtwitter.com/status/${post.messageId}`,{signal:AbortSignal.timeout(10000),redirect:'error',headers:{Accept:'application/json'}});
    if(!response.ok){await response.body?.cancel();return undefined;}
-   return parseReferenceOriginal(await boundedJSON(response),evidence);
+   const original=parseReferenceOriginal(await boundedJSON(response),evidence);
+   return original ? (await recoverReferenceHistoryEvidence(original,fetcher))??original : undefined;
   }catch{return undefined;}
  }
+ if(needsReferenceHistoryRecovery(evidence))return recoverReferenceHistoryEvidence(evidence,fetcher);
  const currentTime=Date.now(),cached=fetcher===fetch?attempts.get(post.url):undefined;
  if(cached&&currentTime<Math.max(cached.checkedAt+ATTEMPT_INTERVAL_MS,cached.retryAt??0)) {
   const enriched=cached.evidence;
@@ -198,4 +200,35 @@ export function parseKnownRelayOriginal(value:unknown,evidence:Evidence,collecte
  const parentId=[...parents][0]??evidence.parentId;
  if(parentId&&(!/^\d{15,20}$/.test(parentId)||BigInt(parentId)>=BigInt(evidence.messageId)||evidence.parentId&&evidence.parentId!==parentId))return;
  return {...evidence,text:tweet.text,textOrigin:'original',parentId,contextComplete:!parentId&&hasStandaloneContext(tweet.text,'reset'),collectedAt};
+}
+
+/** A history row only discovers a post. Short completion text also needs the
+ * contemporaneous, explicitly typed latest snapshot from an immutable commit. */
+export async function recoverReferenceHistoryEvidence(evidence:Evidence,fetcher:typeof fetch=fetch):Promise<Evidence|undefined> {
+ if(!needsReferenceHistoryRecovery(evidence))return;
+ const post=knownPostIdentity(evidence.url),posted=Date.parse(evidence.publishedAt);
+ if(!post||post.messageId!==evidence.messageId||!Number.isFinite(posted))return;
+ const time=Date.now(),key=`history:${post.url}`,cached=attempts.get(key);
+ if(fetcher===fetch&&cached&&time-cached.checkedAt<ATTEMPT_INTERVAL_MS)return;
+ if(fetcher===fetch){if(attempts.size>=500)attempts.delete(attempts.keys().next().value!);attempts.set(key,{checkedAt:time});}
+ const until=new Date(Math.min(time,posted+48*3600000)).toISOString();
+ const listURL=`https://api.github.com/repos/gdutxiaoxu/codex-reset-radar/commits?path=data/latest.json&since=${encodeURIComponent(evidence.publishedAt)}&until=${encodeURIComponent(until)}&per_page=10`;
+ const get=async(url:string)=>{
+  const response=await fetcher(url,{signal:AbortSignal.timeout(10000),redirect:'error',headers:{Accept:'application/json'}});
+  if(!response.ok){await response.body?.cancel();throw new Error('REFERENCE_ARCHIVE_UNAVAILABLE');}
+  return boundedJSON(response);
+ };
+ try{
+  const value=await get(listURL);if(!Array.isArray(value)||value.length>10)return;
+  const commits=value.filter((row):row is {sha:string;commit:{committer:{date:string}}}=>!!row&&typeof row==='object'&&/^[a-f0-9]{40}$/.test(row.sha)&&Number.isFinite(Date.parse(row.commit?.committer?.date))&&Date.parse(row.commit.committer.date)>=posted&&Date.parse(row.commit.committer.date)<=Date.parse(until))
+   .sort((a,b)=>Date.parse(a.commit.committer.date)-Date.parse(b.commit.committer.date)).slice(0,3);
+  for(const commit of commits){
+   const raw=await get(`https://raw.githubusercontent.com/gdutxiaoxu/codex-reset-radar/${commit.sha}/data/latest.json`);
+   const row=parseReferenceHistoricalLatest(raw,commit.sha,new Date(time).toISOString()).find(item=>item.messageId===evidence.messageId&&Math.abs(Date.parse(item.publishedAt)-posted)<=1000);
+   const proof=row?.metadata?.referenceReset;
+   if(!proof||Date.parse(proof.snapshotAt)<posted||Date.parse(proof.snapshotAt)>posted+48*3600000||Date.parse(proof.snapshotAt)>Date.parse(commit.commit.committer.date)+60000||!proof.summary)continue;
+   const recovered:Evidence={...evidence,collectedAt:new Date(time).toISOString(),metadata:{...evidence.metadata,...row!.metadata}};
+   if(referenceCompletionClaim(recovered))return recovered;
+  }
+ }catch { /* An unavailable or mismatched archive remains a discovery lead. */ }
 }

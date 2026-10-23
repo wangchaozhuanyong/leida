@@ -1,4 +1,4 @@
-import {REFERENCE_RESET_SOURCE,REFERENCE_SOURCES} from './reference-reset-source';
+import {REFERENCE_RESET_SOURCE,REFERENCE_SOURCES,needsReferenceHistoryRecovery} from './reference-reset-source';
 import { lockTransaction } from '../db';
 import { configuredStorageRpc } from './cloudbase/storage-config';
 import { cloudbaseTasks } from './cloudbase/tasks';
@@ -47,6 +47,7 @@ export function contextFor(candidate:Candidate,primary:Evidence,all:Evidence[]):
   return hasCompleteContext(primary,context)?context.filter(item=>hasCompleteContext(item,context)||isVerifiedCampaignCalendar(item,context)):context;
 }
 export function canEnrich(primary:Evidence):boolean {
+  if(needsReferenceHistoryRecovery(primary))return true;
   return (primary.provenance==='archive'||primary.provenance==='official'&&primary.sourceId==='tibo-timeline') && (primary.textOrigin!=='original'||!primary.contextComplete&&(!!primary.parentId||/https:\/\/t\.co\/[A-Za-z0-9]+\b/.test(primary.text))) && /^https:\/\/(?:x|twitter)\.com\/[A-Za-z0-9_]+\/status\/\d+(?:[?#].*)?$/.test(primary.url);
 }
 export function aiReady(ai:AIRecord|undefined):boolean {
@@ -165,16 +166,19 @@ export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichme
       const publishedRecheck=enrichArticle&&actualArticle?.publicationMode==='news_only'&&inputChanged;
       const template=allowTemplates&&(!enrichArticle||publishedRecheck)?buildAutomaticTemplate(context):undefined;
       const obstacles=processingObstacles(context);
-      if(!template&&!ready&&!enrichArticle&&!obstacles.missing){
+      // A bare historical completion remains unsupported until its pinned
+      // snapshot is recovered; that missing proof must still enter the probe queue.
+      const historyProofMissing=needsReferenceHistoryRecovery(original);
+      if(!template&&!ready&&!enrichArticle&&!obstacles.missing&&!historyProofMissing){
         if(inputChanged||!savedFingerprint)await put('candidates',{...candidate,automation:{state:obstacles.conflict?'conflict':'deferred',reasonCodes:obstacles.codes,dependencyIds:[],inputFingerprint:fingerprint,evaluatedAt:now()},updatedAt:now()},c);
         continue;
       }
-      const probeDue=obstacles.missing && options.allowEnrichment!==false && canEnrich(original) && (!candidate.automation?.resumeAt||Date.parse(candidate.automation.resumeAt)<=Date.now());
+      const probeDue=(obstacles.missing||historyProofMissing) && options.allowEnrichment!==false && canEnrich(original) && (!candidate.automation?.resumeAt||Date.parse(candidate.automation.resumeAt)<=Date.now());
       const newsContextProbe=enrichArticle&&actualArticle?.publicationMode==='news_only'&&!original.messageId.startsWith('observed-')&&!hasCompleteContext(original,context)&&probeDue;
       const candidateEvent=events.find(event=>event.id===(candidate.content.eventId??actualArticle?.eventId));
       if(ruleOnly&&candidate.automation?.state==='conflict'&&!isStaleMachineConflict(candidate,candidateEvent)&&!isResolvedNewsContextConflict(candidate,original,context,events,evidence,articles))continue;
       // A rule release may re-evaluate supported templates once, not all old long-form model inputs.
-      if(ruleOnly&&!template)continue;
+      if(ruleOnly&&!template&&!(historyProofMissing&&probeDue))continue;
       if(enrichArticle&&!ready&&!(publishedRecheck&&template)&&!newsContextProbe)continue;
       const augmentationGenerated=enrichArticle&&latest?.payload.enrichArticle===true&&latest.payload.generated===true&&candidate.content.contentOrigin==='generated';
       const resumingPublication=latest?.payload.publishOnly===true&&latest.status==='failed'&&latest.payload.blockedReason==='source';
@@ -340,7 +344,7 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
   if(job.payload.contextProbe&&previousFingerprint===fingerprint) {
     const blocked=classifyBlockers(candidate.reasons,context);
     const obstacles=processingObstacles(context);
-    const waiting=obstacles.missing;
+    const waiting=obstacles.missing||needsReferenceHistoryRecovery(primary);
     const state=waiting?Date.now()-Date.parse(candidate.createdAt)>24*3600_000?'deferred':'waiting_evidence':obstacles.conflict?'conflict':'deferred';
     await saveAutomation(candidate,{...blocked,state,reasonCodes:obstacles.codes,inputFingerprint:fingerprint,evaluatedAt:now(),resumeAt:waiting?new Date(Date.now()+CONTEXT_PROBE_INTERVAL).toISOString():undefined,articleId:candidate.automation?.articleId,templatePublished:candidate.automation?.templatePublished});
     return false;
@@ -357,7 +361,7 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
   else {
     const blocked=classifyBlockers(candidate.reasons,context);
     const obstacles=processingObstacles(context);
-    const waiting=obstacles.missing;
+    const waiting=obstacles.missing||needsReferenceHistoryRecovery(primary);
     await saveAutomation(candidate,{...blocked,state:waiting?'waiting_evidence':obstacles.conflict?'conflict':'deferred',reasonCodes:obstacles.codes,inputFingerprint:fingerprint,evaluatedAt:now(),resumeAt:waiting?new Date(Date.now()+CONTEXT_PROBE_INTERVAL).toISOString():undefined,articleId:candidate.automation?.articleId,templatePublished:candidate.automation?.templatePublished});
     return false;
   }

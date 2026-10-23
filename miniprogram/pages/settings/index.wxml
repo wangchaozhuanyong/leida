@@ -1,5 +1,5 @@
 <page-meta root-background-color="#f2f5fb" page-style="background-color:#f2f5fb" />
-<navigation-header title="提醒" />
+<navigation-header icon="reminder" title="提醒" />
 <view class="refresh-track {{settingsReady && (refreshing || wechat.refreshing) ? 'is-active' : ''}}"><view/></view>
 <page-loader wx:if="{{!settingsReady}}" />
 <view wx:else class="page">
