@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
-import {readFileSync} from 'node:fs';
+import {readFileSync,mkdirSync,mkdtempSync,copyFileSync,rmSync} from 'node:fs';
+import {resolve,join} from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {spawnSync} from 'node:child_process';
 import type {Evidence,Publication,PublicData} from '../src/lib/types';
-import {resetObservations} from '../src/lib/reset-observations';
+import {resetObservations,observedEvidence,timelineObservation} from '../src/lib/reset-observations';
 import {publicResetOutlook} from '../src/lib/reset-outlook';
 import {publicActions,sortedStatePublications} from '../src/lib/public-facts';
 import {buildAutomaticTemplate} from '../src/server/automatic-content';
@@ -21,6 +24,27 @@ function fixture(e=observation()):PublicData {
  const p:Publication={id:'observed-publication',eventId:'observed-event',articleId:'observed-article',mode:'news_only',event:{id:'observed-event',title:draft.title,version:1,status:'published',actions:[],evidenceIds:[e.id],publicationId:'observed-publication',updatedAt:e.collectedAt},article:{...draft,id:'observed-article',eventId:'observed-event',version:1,status:'published',publicationId:'observed-publication',publishedAt:e.collectedAt,updatedAt:e.collectedAt},publishedAt:e.collectedAt,cutoffAt:e.collectedAt,reason:'retained observation'};
  return {events:[p.event],articles:[p.article],publications:[p],evidence:[e],notices:[],activities:[],sources:[],site:{name:'雷达',description:'',autoPublish:true,version:1},serverTime:now};
 }
+test('服务器观测模块在没有小程序目录的运行边界中仍能加载',()=>{
+ const outputs=resolve('outputs');mkdirSync(outputs,{recursive:true});
+ const isolated=mkdtempSync(join(outputs,'worker-runtime-'));
+ try{
+  const target=join(isolated,'src/lib');mkdirSync(target,{recursive:true});
+  copyFileSync(resolve('src/lib/reset-observations.ts'),join(target,'reset-observations.ts'));
+  const code=`const m=await import(${JSON.stringify(pathToFileURL(join(target,'reset-observations.ts')).href)});if(typeof m.resetObservations!=='function')process.exit(1);`;
+  const result=spawnSync(process.execPath,['--import','tsx','--input-type=module','-e',code],{encoding:'utf8'});
+  assert.equal(result.status,0,result.stderr);
+ }finally{rmSync(isolated,{recursive:true});}
+});
+test('服务器与原生小程序的观测投影及时间线保持一致',()=>{
+ const native=require('../miniprogram/utils/reset-observations.js');
+ for(const patch of [{},{sourceId:'manual'},{text:'可能会重置'},{publishedAt:'2026-10-24T00:00:00Z'}]){
+  const e={...observation(),...patch},data=fixture(e);
+  assert.deepEqual(native.observedEvidence(e,now),observedEvidence(e,now));
+  assert.deepEqual(native.resetObservations(data),resetObservations(data));
+  const outlook=publicResetOutlook(data);
+  assert.deepEqual(native.timelineObservation(outlook,now),timelineObservation(outlook,now));
+ }
+});
 test('真实01:00观测进入公共状态和共享首页计时，不伪造成原帖声明或预测训练动作',()=>{
  const data=fixture(),outlook=publicResetOutlook(data),view=resetStateCards(data);
  assert.equal(outlook.latestObservation?.observedAt,observedAt);

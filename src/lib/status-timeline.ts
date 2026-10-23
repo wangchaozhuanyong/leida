@@ -5,7 +5,7 @@ import type {ForecastPublicData} from './forecast';
 import {activeResetWatch,activeResetSchedule,resetWatchWindow} from './reset-watch';
 import {announcementCountdown,completionElapsed,latestCompletedBenefits} from '../components/public/model';
 import {publicResetOutlook} from './reset-outlook';
-import {timelineObservation} from '../../miniprogram/utils/reset-observations.js';
+import {timelineObservation} from './reset-observations';
 const beijing=(value:string)=>new Date(Date.parse(value)+8*3600_000).toISOString().slice(0,16).replace('T',' ');
 
 export type Completion = Pick<BenefitAction, 'kind' | 'stage' | 'statementAt'> | null | undefined;
