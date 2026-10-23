@@ -11,7 +11,7 @@ import {publicResetOutlook} from '../src/lib/reset-outlook';
 import {publicActions,sortedStatePublications} from '../src/lib/public-facts';
 import {buildAutomaticTemplate} from '../src/server/automatic-content';
 import {parseReferenceLatest} from '../src/server/reference-reset-source';
-import {enrichKnownEvidence,enrichCampaignAnchor} from '../src/server/source-enrichment';
+import {enrichKnownEvidence,enrichCampaignAnchor,parseKnownRelayOriginal} from '../src/server/source-enrichment';
 import {gatherEvidenceContext,evidenceBenefitClaims} from '../src/server/source-context';
 import {validateDraft} from '../src/server/domain';
 import {statusTimelineModel,statusPosterSnapshot} from '../src/lib/status-timeline';
@@ -101,7 +101,7 @@ test('真实Day17及时间回复形成可核验预告，Day15完成、Day18预�
  assert.equal(publicResetOutlook(data).active,undefined,'linked observation stops the same announcement countdown without changing its action');assert.equal(p.event.actions[0].stage,'promised');
  assert.equal(resetStateCards(data).cards[0].state,'observed');
  const missing=all.filter(e=>e.messageId!==base[1].messageId);assert.deepEqual(evidenceBenefitClaims(reply,gatherEvidenceContext(reply,missing)),[]);
- const complete=original('2112431842643804292','Day 15/ Nevermind, we’re still cooking... and reset. Enjoy.','2026-10-20T06:33:48Z');
+ const complete=original('2112432076767289678','Day 15/ Nevermind, we’re still cooking... and reset. Enjoy.','2026-10-20T06:33:48Z');
  assert.equal(evidenceBenefitClaims(complete,gatherEvidenceContext(complete,[...base,complete]))[0]?.stage,'claimed_complete');
  const next=original('2113492187770175603','Day 18/ Decisions API is GA, OpenResponses joined the Linux Foundation, we shipped some performance improvements and Uber is going all-in on codex & work. But yes… that’s a reset!','2026-10-23T04:46:19Z');
  assert.equal(evidenceBenefitClaims(next,gatherEvidenceContext(next,[...base,next]))[0]?.stage,'promised');
@@ -117,4 +117,13 @@ test('缺少Day1时仅补取固定原帖，必须核验作者、真实时间及�
  assert.equal(await enrichCampaignAnchor(day,[...base],async()=>{throw new Error('already saved');}),undefined);
  const bad:typeof fetch=async()=>Response.json({code:200,tweet:{id:base[1].messageId,text:base[1].text,created_at:base[1].publishedAt,author:{id:'1953337039510003712',screen_name:'thsottiaux'}}});
  assert.equal(await enrichCampaignAnchor(day,[base[0],base[2]],bad),undefined);
+});
+
+test('Day15完成原帖使用真实原帖编号、作者和编号对应的发布时间',()=>{
+ const source=JSON.parse(readFileSync(new URL('./fixtures/campaign-day15-original.json',import.meta.url),'utf8'));
+ const id=source.tweet.id,publishedAt=new Date(Number((BigInt(id)>>22n)+1288834974657n)).toISOString();
+ const prototype=original(id,'',publishedAt),parsed=parseKnownRelayOriginal(source,prototype,now);
+ assert.ok(parsed);assert.equal(parsed.messageId,'2112432076767289678');
+ assert.equal(Math.floor(Date.parse(parsed.publishedAt)/1000),Math.floor(Date.parse(source.tweet.created_at)/1000));
+ assert.equal(evidenceBenefitClaims(parsed,gatherEvidenceContext(parsed,[...campaign(),parsed]))[0]?.stage,'claimed_complete');
 });

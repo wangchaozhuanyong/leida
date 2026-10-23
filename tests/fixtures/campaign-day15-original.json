@@ -1,0 +1,15 @@
+{
+  "code": 200,
+  "tweet": {
+    "id": "2112432076767289678",
+    "url": "https://x.com/thsottiaux/status/2112432076767289678",
+    "text": "Day 15/ Nevermind, we're still cooking... and reset. Enjoy.",
+    "created_at": "Tue Oct 20 06:33:48 +0000 2026",
+    "replying_to": null,
+    "replying_to_status": null,
+    "author": {
+      "screen_name": "thsottiaux",
+      "id": "1953337039510003712"
+    }
+  }
+}
