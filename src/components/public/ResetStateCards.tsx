@@ -1,38 +1,34 @@
 'use client';
-import {useState} from 'react';
+import {Fragment,useState} from 'react';
 import Link from 'next/link';
 import type {PublicData} from '@/lib/types';
 import {resetStateCards,type ResetStateCard} from '@/lib/reset-state-cards';
 import {usePublicClock} from './PublicSession';
 import {safeUrl} from './model';
+import {RadarScope} from './RadarScope';
 
 const symbols:Record<string,string>={radar:'M24 24l11-11M24 9v4M9 24h4M24 35v4M35 24h4',signal:'M9 24h7l4-9 7 18 4-9h8',clock:'M24 14v11l7 4',check:'m16 24 5 5 11-12',progress:'M37 19a14 14 0 0 0-24-4l-4 5m0-8v8h8M11 29a14 14 0 0 0 24 4l4-5m0 8v-8h-8',calendar:'M17 8v8M31 8v8M10 22h28m-20 7h4m5 0h4',cancel:'m18 18 12 12m0-12L18 30'};
 export function ResetStateCardView({card}:{card:ResetStateCard}) {
   const href=card.eventId?`/events/${encodeURIComponent(card.eventId)}?version=${encodeURIComponent(card.publicationId)}`:'/news?category=reset';
-  return <article className={`pub-reset-state tone-${card.tone}`} data-state={card.state} aria-label={card.title}>
-    <div className="pub-reset-state-body">
-      <div className="pub-reset-state-meta"><span>{card.kind?`当前${card.kind==='banked_reset'?'重置卡发放':'额度重置'}状态`:card.evidence}</span><span className="pub-reset-state-badge">{card.badge}</span></div>
-      <div className="pub-reset-state-overview">
-        <div className="pub-reset-state-copy">
-          <div className="pub-reset-state-heading"><h2>{card.state==='waiting'?'等待下一次公开预告':card.title}</h2></div>
-          <p className="pub-reset-state-description">{card.description}</p>
-        </div>
-        <div className={`pub-reset-state-visual visual-${card.icon}`} aria-hidden="true">
-          <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-            {card.icon==='radar'?<><circle cx="24" cy="24" r="21"/><circle cx="24" cy="24" r="14"/><circle cx="24" cy="24" r="7"/><path d="M24 3v42M3 24h42" opacity=".18"/><path d="M24 24 39 9" strokeWidth="2"/></>:<>
-              {!['signal','progress','calendar'].includes(card.icon)&&<circle cx="24" cy="24" r="15"/>}
-              {card.icon==='calendar'&&<rect x="10" y="12" width="28" height="28" rx="5"/>}
-              <path d={symbols[card.icon]}/>
-            </>}
-          </svg>
-        </div>
-      </div>
-      {card.window&&<div className="pub-reset-state-window"><span>信号发布时预计</span><strong>{card.window}</strong><small>不是承诺发放时间</small></div>}
-      {card.metric&&<div className="pub-reset-state-metric"><span>{card.metricLabel}</span><strong>{card.metric}</strong></div>}
-      {card.timeAt&&<div className="pub-reset-state-fact"><div><span>{card.timeLabel}</span><time dateTime={card.timeAt}>{card.time}</time>{card.oldTime&&<del>{card.oldTime}</del>}</div><small>北京时间</small></div>}
-      {card.kind&&<ol className="pub-reset-progress" aria-label="当前事件进度">{card.progress.map(step=><li key={step.label} aria-current={step.current?'step':undefined}><span aria-hidden="true"/>{step.label}</li>)}</ol>}
+  return <article className={`pub-reset-state pub-reset-orbit tone-${card.tone}`} data-state={card.state} aria-label={card.title}>
+    <div className="pub-reset-orbit-body">
+      <RadarScope state={card.state} kind={card.kind}>
+        {card.metric?<>
+          <h2 className="pub-orbit-label">{card.metricLabel}</h2>
+          <div className={`pub-orbit-digits${card.clockParts.length===3?' with-days':''}${card.clockLong?' is-long':''}`} role="img" aria-label={card.metric}>
+            {card.clockParts.length?card.clockParts.map((part,index)=><Fragment key={part.unit}>{index>0&&<span className="pub-orbit-colon" aria-hidden="true">:</span>}<span className="pub-orbit-part" aria-hidden="true"><strong>{part.value}</strong><small>{part.unit}</small></span></Fragment>):<strong className="pub-orbit-minute">{card.metric}</strong>}
+          </div>
+        </>:<>
+          {card.window&&<span className="pub-orbit-label">信号发布时预计</span>}
+          <h2 className="pub-orbit-title">{card.window||card.dialTitle}</h2>
+          <p className="pub-orbit-description">{card.description}</p>
+        </>}
+        <p className="pub-orbit-status" aria-label={`当前状态：${card.badge}`}>{card.dialStatus}</p>
+      </RadarScope>
+      {card.timeAt?<div className="pub-orbit-schedule"><div><span>{card.timeLabel}</span><time dateTime={card.timeAt}>{card.dateText||card.time}</time></div>{card.clockText&&<div className="pub-orbit-time"><span>北京时间</span><strong>{card.clockText}<small>{card.timeQualifier}</small></strong></div>}</div>:<p className="pub-orbit-waiting">收到明确预告后，将在这里展示时间。</p>}
+      {card.oldTime&&<del className="pub-orbit-old">{card.oldTime} · 北京时间</del>}
     </div>
-    <div className="pub-reset-state-footer"><span>{card.footer}</span>{card.sourceName?<details className="pub-reset-state-source"><summary>{card.action} →</summary><div><p>来源：{card.sourceName}{card.sourceType==='observed'?' · 观察记录':''}</p>{card.watchNote&&<p>{card.watchNote}</p>}{card.sourceUrl&&safeUrl(card.sourceUrl)?<a href={card.sourceUrl} target="_blank" rel="noopener noreferrer">查看来源原文 ↗</a>:<p>此观察记录没有公开原文链接。</p>}</div></details>:<Link scroll={false} href={href}>{card.action} →</Link>}</div>
+    <div className="pub-reset-state-footer"><span>{card.metric?'预计安排，以实际发放为准':card.window?'不是承诺发放时间 · '+card.footer:card.footer}</span>{card.sourceName?<details className="pub-reset-state-source"><summary>{card.action} →</summary><div><p>来源：{card.sourceName}{card.sourceType==='observed'?' · 观察记录':''}</p>{card.watchNote&&<p>{card.watchNote}</p>}{card.sourceUrl&&safeUrl(card.sourceUrl)?<a href={card.sourceUrl} target="_blank" rel="noopener noreferrer">查看来源原文 ↗</a>:<p>此观察记录没有公开原文链接。</p>}</div></details>:<Link scroll={false} href={href}>{card.action} →</Link>}</div>
   </article>;
 }
 export function ResetStateCards({data,selectedKind,onKindChange}:{data:PublicData;selectedKind?:'automatic_reset'|'banked_reset';onKindChange?:(kind:'automatic_reset'|'banked_reset')=>void}) {
@@ -42,7 +38,7 @@ export function ResetStateCards({data,selectedKind,onKindChange}:{data:PublicDat
   const setSelected=(kind:'automatic_reset'|'banked_reset')=>{setLocalKind(kind);onKindChange?.(kind);};
   const card=model.cards.find(item=>item.kind===selected)!;
   return <section className="pub-reset-states" aria-label="额度重置和重置卡进展">
-    <div className="pub-reset-tabs" role="tablist" aria-label="重置类型">{model.cards.map(item=><button type="button" key={item.kind} id={`reset-tab-${item.kind}`} role="tab" aria-selected={item.kind===selected} tabIndex={item.kind===selected?0:-1} aria-controls="reset-state-panel" onKeyDown={event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const kind=event.key==='Home'?'automatic_reset':event.key==='End'?'banked_reset':selected==='automatic_reset'?'banked_reset':'automatic_reset';setSelected(kind);document.getElementById(`reset-tab-${kind}`)?.focus();}}} onClick={()=>setSelected(item.kind as 'automatic_reset'|'banked_reset')}><span>{item.kind==='banked_reset'?'重置卡发放':item.name}</span></button>)}</div>
+    <div className="pub-reset-tabs" role="tablist" aria-label="重置类型">{model.cards.map(item=><button type="button" key={item.kind} id={`reset-tab-${item.kind}`} role="tab" aria-selected={item.kind===selected} tabIndex={item.kind===selected?0:-1} aria-controls="reset-state-panel" onKeyDown={event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const kind=event.key==='Home'?'automatic_reset':event.key==='End'?'banked_reset':selected==='automatic_reset'?'banked_reset':'automatic_reset';setSelected(kind);document.getElementById(`reset-tab-${kind}`)?.focus();}}} onClick={()=>setSelected(item.kind as 'automatic_reset'|'banked_reset')}><img src={`/icons/${item.kind==='banked_reset'?'card':'reset'}.svg`} width="24" height="24" alt=""/><span className="pub-reset-tab-copy"><strong>{item.kind==='banked_reset'?'重置卡发放':item.name}</strong></span></button>)}</div>
     {model.sourceWarning&&<p className="pub-reset-source-warning" role="status">{model.sourceWarning}</p>}
     <div id="reset-state-panel" role="tabpanel" aria-labelledby={`reset-tab-${selected}`}><ResetStateCardView card={card}/></div>
     {model.untyped&&<div className="pub-reset-untyped"><p>类型暂未明确的公开线索</p><ResetStateCardView card={model.untyped}/></div>}

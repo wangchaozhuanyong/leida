@@ -14,7 +14,7 @@
     <view wx:if="{{historical}}" class="warning">当前公告为历史收录，不代表刚刚发放。</view>
     <view class="status-card">
     <view class="reset-states">
-      <view class="reset-tabs" role="tablist" aria-label="重置类型"><button wx:for="{{resetCards}}" wx:key="kind" data-kind="{{item.kind}}" bindtap="selectResetKind" class="{{selectedResetKind === item.kind ? 'selected' : ''}}" role="tab" aria-selected="{{selectedResetKind === item.kind}}"><text>{{item.kind==='banked_reset'?'重置卡发放':item.name}}</text></button></view>
+      <view class="reset-tabs" role="tablist" aria-label="重置类型"><button wx:for="{{resetCards}}" wx:key="kind" data-kind="{{item.kind}}" bindtap="selectResetKind" class="kind-{{item.kind}} {{selectedResetKind === item.kind ? 'selected' : ''}}" role="tab" aria-selected="{{selectedResetKind === item.kind}}"><image src="/assets/icons/{{item.kind==='banked_reset'?'card':'reset'}}.png" class="reset-tab-icon" aria-hidden="true"/><view class="reset-tab-copy"><text>{{item.kind==='banked_reset'?'重置卡发放':item.name}}</text></view></button></view>
       <view wx:if="{{stateWarning}}" class="reset-state-warning">{{stateWarning}}</view>
       <block wx:for="{{resetCards}}" wx:key="kind"><template wx:if="{{selectedResetKind === item.kind}}" is="reset-state" data="{{card:item,expanded:expandedSourceKind===item.kind}}"/></block>
       <view wx:if="{{untypedSignal}}" class="reset-untyped"><view>类型暂未明确的公开线索</view><template is="reset-state" data="{{card:untypedSignal,expanded:expandedSourceKind==='untyped'}}"/></view>
@@ -48,16 +48,31 @@
 </view>
 
 <template name="reset-state">
-  <view class="reset-state tone-{{card.tone}}">
-    <view class="reset-state-body">
-      <view class="reset-state-meta"><text>{{card.kind ? card.kind==='banked_reset'?'当前重置卡发放状态':'当前额度重置状态' : card.evidence}}</text><text class="reset-state-badge">{{card.badge}}</text></view>
-      <view class="reset-state-overview"><view class="reset-state-copy"><view class="reset-state-heading"><view>{{card.state==='waiting'?'等待下一次公开预告':card.title}}</view></view><view class="reset-state-description">{{card.description}}</view></view><view class="reset-state-visual visual-{{card.icon}}" aria-hidden="true"><view class="reset-state-icon icon-{{card.icon}}"><view/></view></view></view>
-      <view wx:if="{{card.window}}" class="reset-state-window"><text>信号发布时预计</text><view>{{card.window}}</view><text>不是承诺发放时间</text></view>
-      <view wx:if="{{card.metric}}" class="reset-state-metric"><text>{{card.metricLabel}}</text><view>{{card.metric}}</view></view>
-      <view wx:if="{{card.timeAt}}" class="reset-state-fact"><view><text>{{card.timeLabel}}</text><view>{{card.time}}</view><text wx:if="{{card.oldTime}}" class="reset-state-old">{{card.oldTime}}</text></view><text wx:if="{{card.timeAt}}" class="reset-state-zone">北京时间</text></view>
-      <view wx:if="{{card.kind}}" class="reset-progress" aria-label="当前事件进度"><view wx:for="{{card.progress}}" wx:key="label" class="reset-progress-step {{item.current?'current':''}}" aria-label="{{item.current?'当前阶段：':''}}{{item.label}}"><view class="reset-progress-dot"/><text>{{item.label}}</text></view></view>
+  <view class="reset-state reset-orbit tone-{{card.tone}} state-{{card.state}}" aria-label="{{card.title}}">
+    <view class="reset-orbit-body">
+      <view class="radar-scope radar-{{card.state}} kind-{{card.kind}}">
+        <view class="radar-disc" aria-hidden="true"><view class="radar-ring ring-outer"/><view class="radar-ring ring-middle"/><view class="radar-ring ring-inner"/><view wx:if="{{card.state!=='completed' && card.state!=='observed' && card.state!=='cancelled' && card.state!=='overdue'}}" class="radar-sweep"/></view>
+        <view class="radar-core">
+          <block wx:if="{{card.metric}}">
+            <view class="orbit-label">{{card.metricLabel}}</view>
+            <view class="orbit-digits {{card.clockParts.length===3?'with-days':''}} {{card.clockLong?'is-long':''}}" aria-label="{{card.metric}}">
+              <block wx:if="{{card.clockParts.length}}"><block wx:for="{{card.clockParts}}" wx:key="unit"><text wx:if="{{index>0}}" class="orbit-colon" aria-hidden="true">:</text><view class="orbit-part" aria-hidden="true"><text class="orbit-number">{{item.value}}</text><text class="orbit-unit">{{item.unit}}</text></view></block></block>
+              <text wx:else class="orbit-minute">{{card.metric}}</text>
+            </view>
+          </block>
+          <block wx:else>
+            <view wx:if="{{card.window}}" class="orbit-label">信号发布时预计</view>
+            <view class="orbit-title">{{card.window||card.dialTitle}}</view>
+            <view class="orbit-description">{{card.description}}</view>
+          </block>
+          <view class="orbit-status" aria-label="当前状态：{{card.badge}}">{{card.dialStatus}}</view>
+        </view>
+      </view>
+      <view wx:if="{{card.timeAt}}" class="orbit-schedule"><view><text class="orbit-date-label">{{card.timeLabel}}</text><text class="orbit-date">{{card.dateText||card.time}}</text></view><view wx:if="{{card.clockText}}" class="orbit-time"><text class="orbit-date-label">北京时间</text><view><text class="orbit-clock">{{card.clockText}}</text><text class="orbit-qualifier">{{card.timeQualifier}}</text></view></view></view>
+      <view wx:else class="orbit-waiting">收到明确预告后，将在这里展示时间。</view>
+      <view wx:if="{{card.oldTime}}" class="orbit-old">{{card.oldTime}} · 北京时间</view>
     </view>
-    <view class="reset-state-footer"><text>{{card.footer}}</text><button class="text-button" data-kind="{{card.kind || 'untyped'}}" bindtap="openStatusEvidence">{{card.action}} →</button></view>
+    <view class="reset-state-footer"><text>{{card.metric?'预计安排，以实际发放为准':card.window?'不是承诺发放时间 · '+card.footer:card.footer}}</text><button class="text-button" data-kind="{{card.kind || 'untyped'}}" bindtap="openStatusEvidence">{{card.action}} →</button></view>
     <view wx:if="{{expanded && card.sourceName}}" class="reset-state-source"><view>来源：{{card.sourceName}}{{card.sourceType === 'observed' ? ' · 观察记录' : ''}}</view><view wx:if="{{card.watchNote}}">{{card.watchNote}}</view><button wx:if="{{card.sourceUrl}}" class="text-button" data-url="{{card.sourceUrl}}" bindtap="copyStatusSource">复制来源原文链接 ↗</button><view wx:else>此观察记录没有公开原文链接。</view></view>
   </view>
 </template>

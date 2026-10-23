@@ -71,13 +71,29 @@ export function parseReferenceLatest(value:unknown,collectedAt:string):Incoming[
   return [{sourceId:REFERENCE_RESET_SOURCE.id,messageId:observed?`observed-${messageId}`:messageId,url:row.source.url,text:summary||'参考项目记录了公共额度重置，等待核对原文。',publishedAt:row.occurred_at,collectedAt,provenance:'archive',textOrigin:'archive_excerpt',contextComplete:false,metadata:{category:'reset',sourceGroup:'aiplanwatch',benefitKind:'automatic_reset',referenceReset:{eventId:row.event_id,snapshotAt:data.generated_at,occurredAt:row.occurred_at,referenceUrl:REFERENCE_RESET_SOURCE.url,summary}}}];
 }
 
+/** Replay a pinned historical latest.json. Its original timestamp is retained;
+ * it is never used as the current signal or current collection health. */
+export function parseReferenceHistoricalLatest(value:unknown,commit:string,collectedAt:string):Incoming[] {
+ if(!/^[a-f0-9]{40}$/.test(commit))throw new Error('REFERENCE_ARCHIVE_COMMIT_INVALID');
+ const data=latestSchema.parse(value);archiveSnapshot(data.generated_at,collectedAt);
+ return parseReferenceLatest(data,data.generated_at).map(row=>({...row,collectedAt,metadata:{...row.metadata,referenceReset:{...row.metadata!.referenceReset!,referenceUrl:`https://raw.githubusercontent.com/gdutxiaoxu/codex-reset-radar/${commit}/data/latest.json`}}}));
+}
+export function referenceCompletionText(text:string):boolean {
+ return /^(?:done(?: and dusted)?|(?:hi[.!]? )?(?:it is|it's) done|resets? all propagated[.!]?(?: that will be all[.!]? have a fantastic weekend[.!]?)?)[.!]?$/i.test(text.replace(/[’‘]/g,"'").replace(/\s+/g,' ').trim());
+}
+export function needsReferenceHistoryRecovery(evidence:Evidence):boolean {
+ return evidence.sourceId===REFERENCE_HISTORY_SOURCE.id&&evidence.provenance==='archive'&&evidence.textOrigin==='original'&&!evidence.parentId&&evidence.metadata?.sourceGroup==='aiplanwatch'&&referenceCompletionText(evidence.text)&&!referenceCompletionClaim(evidence);
+}
+
 /** The original post and the reference's typed classification must both agree.
  * This supplies a benefit type, never a fabricated reply or event relationship. */
 export function referenceCompletionClaim(evidence:Evidence):BenefitClaim|undefined {
   const proof=evidence.metadata?.referenceReset;
-  if(evidence.sourceId!==REFERENCE_RESET_SOURCE.id||evidence.provenance!=='archive'||evidence.textOrigin!=='original'||evidence.parentId||evidence.metadata?.sourceGroup!=='aiplanwatch'||evidence.metadata?.benefitKind!=='automatic_reset'||!proof||proof.referenceUrl!==REFERENCE_RESET_SOURCE.url||proof.occurredAt!==evidence.publishedAt||Date.parse(proof.snapshotAt)<Date.parse(proof.occurredAt)||Date.parse(proof.snapshotAt)>Date.parse(evidence.collectedAt)+60000||isTruncatedBenefitText(evidence.text)||!/^https:\/\/x\.com\/thsottiaux\/status\/\d{15,20}$/.test(evidence.url)||!evidence.url.endsWith('/'+evidence.messageId))return;
+  const pinned=!!proof&&/^https:\/\/raw\.githubusercontent\.com\/gdutxiaoxu\/codex-reset-radar\/[a-f0-9]{40}\/data\/latest\.json$/.test(proof.referenceUrl);
+  const allowedSource=evidence.sourceId===REFERENCE_RESET_SOURCE.id||evidence.sourceId===REFERENCE_HISTORY_SOURCE.id&&pinned;
+  if(!allowedSource||evidence.provenance!=='archive'||evidence.textOrigin!=='original'||evidence.parentId||evidence.metadata?.sourceGroup!=='aiplanwatch'||evidence.metadata?.benefitKind!=='automatic_reset'||!proof||(!pinned&&proof.referenceUrl!==REFERENCE_RESET_SOURCE.url)||![proof.occurredAt,proof.snapshotAt,evidence.publishedAt,evidence.collectedAt].every(at=>Number.isFinite(Date.parse(at)))||Math.abs(Date.parse(proof.occurredAt)-Date.parse(evidence.publishedAt))>1000||Date.parse(proof.snapshotAt)<Date.parse(proof.occurredAt)||Date.parse(proof.snapshotAt)>Date.parse(evidence.collectedAt)+60000||isTruncatedBenefitText(evidence.text)||!/^https:\/\/x\.com\/thsottiaux\/status\/\d{15,20}$/.test(evidence.url)||!evidence.url.endsWith('/'+evidence.messageId))return;
   const clean=(s:string)=>s.replace(/[’‘]/g,"'").replace(/\s+/g,' ').trim();
-  if(proof.summary&&clean(proof.summary)!==clean(evidence.text)||!/^(?:done(?: and dusted)?|(?:hi[.!]? )?(?:it is|it's) done|resets? all propagated[.!]?(?: that will be all[.!]? have a fantastic weekend[.!]?)?)[.!]?$/i.test(clean(evidence.text)))return;
+  if(proof.summary&&clean(proof.summary)!==clean(evidence.text)||!referenceCompletionText(evidence.text))return;
   return {kind:'automatic_reset',stage:'claimed_complete',scope:'public',eligibility:'公开额度重置（依据 AIPlanWatch 分类，适用套餐以原公告为准）',quote:evidence.text};
 }
 

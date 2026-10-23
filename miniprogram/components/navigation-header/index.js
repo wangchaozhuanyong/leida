@@ -4,6 +4,7 @@ Component({
   properties: {
     title: { type: String, value: '模钥重置雷达' },
     brand: { type: Boolean, value: false },
+    icon: { type: String, value: 'document' },
     back: { type: Boolean, value: false }
   },
   data: navigationMetrics(typeof wx === 'undefined' ? {} : wx),

@@ -1,4 +1,4 @@
-<navigation-header title="活动动态" back="{{true}}" />
+<navigation-header icon="activity" title="活动动态" back="{{true}}" />
 <page-loader wx:if="{{navigationLoading}}" />
 <view wx:else>
 <view class="page">

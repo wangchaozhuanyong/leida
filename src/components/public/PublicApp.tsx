@@ -54,6 +54,10 @@ function Icon({ name, className = '' }: { name: IconName; className?: string }) 
 }
 function Badge({ children, tone = '' }: { children: React.ReactNode; tone?: string }) { return <span className={`pub-badge ${tone}`}>{children}</span>; }
 function Empty({ title, detail }: { title: string; detail: string }) { return <div className="pub-empty"><Icon name="radar" /><h2>{title}</h2><p>{detail}</p></div>; }
+function PageSymbol({route}:{route:string}) {
+  const icon:Record<string,string>={news:'news',history:'history',settings:'reminder',more:'more',notices:'inbox',activities:'activity',methodology:'methodology'};
+  return <img className="pub-page-symbol" src={`/icons/${icon[route]||'document'}.svg`} alt="" width="34" height="34"/>;
+}
 function Brand({ name = '模钥重置雷达', subtitle }: { name?: string; subtitle?: string }) { return <div className="pub-brand"><span className="pub-brand-mark" aria-hidden="true"><img src="/brand/MOYAO_AI_Icon_Transparent.svg" alt="" width="40" height="40" /></span><div className="pub-brand-copy"><strong>{name}</strong>{subtitle && <p>{subtitle}</p>}</div></div>; }
 function TextLink({ href, children }: { href: string; children: React.ReactNode }) { return <Link scroll={false} className="pub-text-link" href={href}>{children}<Icon name="arrow" /></Link>; }
 function ExternalLink({ url, children }: { url: string; children: React.ReactNode }) {
@@ -173,7 +177,7 @@ export default function PublicApp() {
     <Suspense fallback={null}><PublicRouteReader onChange={onLocation} /></Suspense>
     <a className="pub-skip" href="#public-main">跳到主要内容</a>
     <header className="pub-topbar">
-      <div className="pub-topbar-identity">{route === 'home' ? <Link scroll={false} href="/" className="pub-brand-home" aria-label="模钥重置雷达首页"><Brand name={data?.site.name} /></Link> : <div className="pub-topbar-heading">{subpage && <Link scroll={false} className="pub-header-back" href={backHref} aria-label="返回上级"><Icon name="back" /></Link>}{['news', 'history', 'settings', 'more', 'notices'].includes(route) ? <h1 className="pub-topbar-title">{pageTitle}</h1> : <span className="pub-topbar-title">{pageTitle}</span>}{!navigationLoading && data && ['news', 'history'].includes(route) && <span className="pub-context-count" role="status" aria-live="polite" aria-atomic="true">{route === 'history' ? '近半年' : newsCategory === 'reset' ? `共${page?.total ?? historyPublications.length}个事件` : `共${page?.total ?? newsArticles.length}篇`}</span>}</div>}</div>
+      <div className="pub-topbar-identity">{route === 'home' ? <Link scroll={false} href="/" className="pub-brand-home" aria-label="模钥重置雷达首页"><Brand name={data?.site.name} /></Link> : <div className="pub-topbar-heading">{subpage && <Link scroll={false} className="pub-header-back" href={backHref} aria-label="返回上级"><Icon name="back" /></Link>}<PageSymbol route={route}/>{['news', 'history', 'settings', 'more', 'notices'].includes(route) ? <h1 className="pub-topbar-title">{pageTitle}</h1> : <span className="pub-topbar-title">{pageTitle}</span>}{!navigationLoading && data && ['news', 'history'].includes(route) && <span className="pub-context-count" role="status" aria-live="polite" aria-atomic="true">{route === 'history' ? '近半年' : newsCategory === 'reset' ? `共${page?.total ?? historyPublications.length}个事件` : `共${page?.total ?? newsArticles.length}篇`}</span>}</div>}</div>
       <nav className="pub-desktop-nav" aria-label="主导航">{navigation}</nav><div className="pub-sidebar-note"><span className="pub-status-dot" /> 公开消息追踪<small>所有时间 · 北京时间</small></div><Link scroll={false} className="pub-icon-button pub-more-button" href="/more" aria-label="关于与隐私"><Icon name="more" /></Link>
     </header>
     <div className={`pub-refresh-track${refreshing ? " is-active" : ""}`} role={refreshing ? "status" : undefined} aria-label={refreshing ? "正在更新" : undefined}><span/></div>

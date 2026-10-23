@@ -86,7 +86,7 @@ test('内部趋势读取失败不归咎第三方信号，保留公告状态与�
 test('旧接口单状态可显示，当前两类投影可靠时优先使用，两类切换入口不混成阶段线',()=>{
  const d=fixture();projected(d);d.forecasts!.outlook={status:'scheduled',active:{actionId:'a',eventId:'e',publicationId:'p',kind:'banked_reset',stage:'promised',statementAt:'2026-10-18T10:00:00Z',expectedAt:'2026-10-18T14:00:00Z'}};
  assert.equal(card(d,'banked_reset').state,'scheduled');assert.equal(card(d).state,'waiting');
- const html=renderToStaticMarkup(createElement(ResetStateCards,{data:d,selectedKind:'banked_reset'}));assert.match(html,/role="tablist"/);assert.match(html,/重置卡/);assert.match(html,/时间已公布/);assert.match(html,/aria-label="当前事件进度"/);assert.doesNotMatch(html,/较早的安排/);
+ const html=renderToStaticMarkup(createElement(ResetStateCards,{data:d,selectedKind:'banked_reset'}));assert.match(html,/role="tablist"/);assert.match(html,/重置卡/);assert.match(html,/时间已公布/);assert.match(html,/aria-label="当前状态：时间已公布"/);assert.doesNotMatch(html,/aria-label="当前事件进度"/);assert.doesNotMatch(html,/较早的安排/);
 });
 
 test('未验证的实验分类不能替未知信号归类，旧线索不盖过较新的完成；两个信号按发布时间选择',()=>{
@@ -151,4 +151,24 @@ test('历史计时无记录显示空态，阶段只点亮有依据的当前声�
  add(d,'done','automatic_reset','claimed_complete','2026-10-18T11:00:00Z');projected(d);
  const stages=card(d).progress;assert.deepEqual(stages.map(step=>step.current),[false,false,true]);
  const next=resetStateCards(d,'2026-10-18T12:00:01Z').lastReset!;assert.equal(next.days,0);assert.equal(next.hoursMinutes,'01:00');assert.equal(next.seconds,'01');
+});
+
+
+test('雷达倒计时跨天保持三列、一天内两列，不足一分钟与到点使用明确状态',()=>{
+ const d=fixture();add(d,'clock','automatic_reset','promised',undefined,'2026-10-20T00:45:00Z');projected(d);
+ assert.deepEqual(card(d).clockParts,[{unit:'天',value:'01'},{unit:'小时',value:'12'},{unit:'分钟',value:'45'}]);
+ assert.deepEqual(card(d,'automatic_reset','2026-10-20T00:00:00Z').clockParts,[{unit:'小时',value:'00'},{unit:'分钟',value:'45'}]);
+ const minute=card(d,'automatic_reset','2026-10-20T00:44:30Z');assert.equal(minute.metric,'不足1分钟');assert.deepEqual(minute.clockParts,[]);
+ const overdue=card(d,'automatic_reset','2026-10-20T00:45:00Z');assert.deepEqual(overdue.clockParts,[]);assert.equal(overdue.dialTitle,'等待确认');
+ const html=renderToStaticMarkup(createElement(ResetStateCardView,{card:overdue}));assert.doesNotMatch(html,/class="pub-radar-sweep"|class="pub-orbit-digits/);assert.match(html,/尚未看到额度重置完成声明/);
+});
+
+test('分列日期保留北京时间与截止限定词，长天数不截断',()=>{
+ for(const [timeNote,qualifier] of [['最晚之前','前'],['原文近似时间：around noon','左右']]){
+  const d=fixture();const p=add(d,'qualified','automatic_reset','promised',undefined,'2026-10-20T00:45:00Z');p.event.actions[0].timeNote=timeNote;projected(d);
+  const c=card(d);assert.equal(c.dateText,'2026年10月20日');assert.equal(c.clockText,'08:45');assert.equal(c.timeQualifier,qualifier);
+  const html=renderToStaticMarkup(createElement(ResetStateCardView,{card:c}));assert.match(html,/北京时间/);assert.ok(html.includes(qualifier));assert.match(html,/预计安排，以实际发放为准/);
+ }
+ const long=fixture();add(long,'long','automatic_reset','promised',undefined,new Date(Date.parse(now)+123*86400000).toISOString());projected(long);
+ assert.equal(card(long).clockParts[0].value,'123');assert.equal(card(long).clockLong,true);
 });

@@ -1,5 +1,5 @@
 <page-meta root-background-color="#f2f5fb" page-style="background-color:#f2f5fb" />
-<navigation-header title="{{navigationTitle || '动态'}}" />
+<navigation-header icon="news" title="{{navigationTitle || '动态'}}" />
 <view class="refresh-track {{refreshing ? 'is-active' : ''}}" aria-label="{{refreshing ? '正在更新' : ''}}"><view/></view>
 <view class="page">
     <view class="chips"><button wx:for="{{categories}}" wx:key="value" class="{{category === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectCategory">{{item.label}}</button></view>
