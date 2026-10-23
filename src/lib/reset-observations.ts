@@ -9,12 +9,20 @@ type EvidenceObservation=Omit<ResetObservation,'eventId'|'publicationId'>;
 const valid=(value:unknown):value is string=>typeof value==='string'&&Number.isFinite(Date.parse(value));
 const archive='https://codex-resets.com/zh-CN';
 const reference='https://raw.githubusercontent.com/gdutxiaoxu/codex-reset-radar/master/data/latest.json';
+const codexLimits='https://codexlimits.com/reset-history';
 export const observedResetText=(text:unknown)=>typeof text==='string'&&/^(?:Codex\s*使用限额已重置[。.!]?\s*(?:查看你的限额[。.!]?)?|Codex usage limits have been reset[.!]?(?:\s*Check your limits[.!]?)?)$/i.test(text.trim());
 
 // Worker runtime contains src and scripts. Keep this typed implementation inside
 // that boundary; the separately packaged native client is checked for parity.
 export function observedEvidence(e:Evidence|undefined,now:string):EvidenceObservation|null {
   if(!e||e.provenance!=='archive'||e.textOrigin!=='archive_excerpt'||!valid(now)||!valid(e.publishedAt)||!valid(e.collectedAt)||Date.parse(e.publishedAt)>Date.parse(e.collectedAt)||Date.parse(e.collectedAt)>Date.parse(now))return null;
+  if(e.sourceId==='codexlimits-observations'){
+    const proof=e.metadata?.referenceReset,date=new Date(e.publishedAt);
+    const stamp=`${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][date.getUTCMonth()]} ${date.getUTCDate()}, ${String(date.getUTCHours()).padStart(2,'0')}:${String(date.getUTCMinutes()).padStart(2,'0')} UTC.`;
+    const summary=`Third-party observation on ${stamp}`;
+    if(e.parentId||e.contextComplete||e.metadata?.category!=='reset'||e.metadata?.sourceGroup!=='codexlimits'||e.metadata?.benefitKind!=='automatic_reset'||e.url!==codexLimits||e.messageId!==`observed-codexlimits-${date.getTime()}`||date.toISOString()!==e.publishedAt||date.getUTCSeconds()!==0||date.getUTCMilliseconds()!==0||proof?.referenceUrl!==codexLimits||proof.eventId!==`codexlimits:automatic_reset:${e.publishedAt}`||proof.occurredAt!==e.publishedAt||proof.snapshotAt!==e.collectedAt||proof.summary!==summary||e.text!==`Usage reset landed\n${summary}`)return null;
+    return {kind:'automatic_reset',observedAt:e.publishedAt,collectedAt:e.collectedAt,evidenceId:e.id,sourceId:e.sourceId,sourceName:'Codex Limits',sourceUrl:codexLimits,referenceUrl:codexLimits,sourceType:'observed'};
+  }
   const id=e.messageId?.match(/^observed-(\d{15,20})$/)?.[1];
   if(!id||e.url!==`https://x.com/thsottiaux/status/${id}`||Date.parse(e.publishedAt)<Number((BigInt(id)>>22n)+1288834974657n))return null;
   const codex=e.sourceId==='reset-archive'&&e.metadata?.sourceGroup==='codex-resets'&&e.metadata?.category==='reset'&&observedResetText(e.text);
@@ -40,6 +48,6 @@ export function resetObservations(data:PublicFactsData):ResetObservation[] {
 }
 export function timelineObservation(outlook:{active?:unknown;latestObservation?:ResetObservation}|undefined,now:string,completion?:{statementAt:string}|null):ResetObservation|null {
   const o=outlook?.latestObservation;
-  if(outlook?.active||!o||!valid(now)||o.kind!=='automatic_reset'||o.sourceType!=='observed'||!['reset-archive','aiplanwatch-reference'].includes(o.sourceId)||o.sourceUrl!==(o.sourceId==='reset-archive'?archive:reference)||!valid(o.observedAt)||!valid(o.collectedAt)||Date.parse(o.observedAt)>Date.parse(o.collectedAt)||Date.parse(o.collectedAt)>Date.parse(now)||Date.parse(now)-Date.parse(o.observedAt)>=86400000||completion&&Date.parse(completion.statementAt)>=Date.parse(o.observedAt))return null;
+  if(outlook?.active||!o||!valid(now)||o.kind!=='automatic_reset'||o.sourceType!=='observed'||!['reset-archive','aiplanwatch-reference','codexlimits-observations'].includes(o.sourceId)||o.sourceUrl!==(o.sourceId==='reset-archive'?archive:o.sourceId==='codexlimits-observations'?codexLimits:reference)||!valid(o.observedAt)||!valid(o.collectedAt)||Date.parse(o.observedAt)>Date.parse(o.collectedAt)||Date.parse(o.collectedAt)>Date.parse(now)||Date.parse(now)-Date.parse(o.observedAt)>=86400000||completion&&Date.parse(completion.statementAt)>=Date.parse(o.observedAt))return null;
   return o;
 }

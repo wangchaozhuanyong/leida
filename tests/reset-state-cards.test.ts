@@ -159,8 +159,8 @@ test('雷达倒计时跨天保持三列、一天内两列，不足一分钟与�
  assert.deepEqual(card(d).clockParts,[{unit:'天',value:'01'},{unit:'小时',value:'12'},{unit:'分钟',value:'45'}]);
  assert.deepEqual(card(d,'automatic_reset','2026-10-20T00:00:00Z').clockParts,[{unit:'小时',value:'00'},{unit:'分钟',value:'45'}]);
  const minute=card(d,'automatic_reset','2026-10-20T00:44:30Z');assert.equal(minute.metric,'不足1分钟');assert.deepEqual(minute.clockParts,[]);
- const overdue=card(d,'automatic_reset','2026-10-20T00:45:00Z');assert.deepEqual(overdue.clockParts,[]);assert.equal(overdue.dialTitle,'等待确认');
- const html=renderToStaticMarkup(createElement(ResetStateCardView,{card:overdue}));assert.doesNotMatch(html,/class="pub-radar-sweep"|class="pub-orbit-digits/);assert.match(html,/尚未看到额度重置完成声明/);
+ const overdue=card(d,'automatic_reset','2026-10-20T00:45:00Z');assert.deepEqual(overdue.clockParts,[]);assert.equal(overdue.dialTitle,'完成情况待确认');
+ const html=renderToStaticMarkup(createElement(ResetStateCardView,{card:overdue}));assert.doesNotMatch(html,/class="pub-radar-sweep"|class="pub-orbit-digits/);assert.match(html,/尚未采集到额度重置完成声明/);assert.match(html,/刚到原预计时间/);
 });
 
 test('分列日期保留北京时间与截止限定词，长天数不截断',()=>{

@@ -57,7 +57,7 @@ Page(createPage((data, query, page, app) => {
   toggleFreshness() { this.setData({ freshnessOpen: !this.data.freshnessOpen }); },
   openPoster() { if (this.data.connected) wx.navigateTo({ url:'/packages/poster/index',fail(){wx.showToast({title:'海报页面加载失败，请重试。',icon:'none'});} }); },
   syncCountdown() {
-    if (!this.data.lastReset && !this.data.resetCards?.some(card=>['scheduled','revised','completed'].includes(card.state)) && !(this.data.pending && this.data.pending.counting) && !(this.data.timeline && (this.data.timeline.completed || this.data.timeline.scheduled))) { this.stopCountdown(); return; }
+    if (!this.data.lastReset && !this.data.resetCards?.some(card=>['scheduled','revised','completed','overdue'].includes(card.state)) && !(this.data.pending && this.data.pending.counting) && !(this.data.timeline && (this.data.timeline.completed || this.data.timeline.scheduled))) { this.stopCountdown(); return; }
     if (!this._countdownTimer) this._countdownTimer = setInterval(() => this.tickCountdown(), 1000);
   },
   tickCountdown() {
@@ -123,6 +123,10 @@ Page(createPage((data, query, page, app) => {
     else wx.switchTab({url:'/pages/news/index'});
   },
   openLastReset() { if(this.data.lastReset?.publicationId)wx.navigateTo({url:'/pages/detail/index?publicationId='+encodeURIComponent(this.data.lastReset.publicationId)}); },
+  openObservation(event) {
+    const card=this.data.resetCards?.find(item=>item.kind===event.currentTarget.dataset.kind);
+    if(card?.observationPublicationId)wx.navigateTo({url:'/pages/detail/index?publicationId='+encodeURIComponent(card.observationPublicationId),fail(){wx.showToast({title:'观测详情加载失败，请重试',icon:'none'});}});
+  },
   copyStatusSource(event) { const url=event.currentTarget.dataset.url;if(typeof url==='string'&&url.startsWith('https://')&&m.safeUrl(url))wx.setClipboardData({data:url,fail(){wx.showToast({title:'复制失败，请稍后重试',icon:'none'});}}); },
   copyWatchSource() {
     const url=this.data.timeline && this.data.timeline.sourceUrl;

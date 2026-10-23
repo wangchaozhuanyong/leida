@@ -158,6 +158,10 @@ function activeOutlookStatus(action, now) {
 function resetOutlookModel(data, kind) {
   const empty = { status: 'monitoring', active: null, latestCompletion: null, lastResolved: null };
   if (!data || !validTime(data.serverTime)) return empty;
+  // Rebuild observations from published evidence; an unchecked server projection
+  // must not turn an arbitrary timestamp into a reset observation.
+  const latestObservation = resetObservations(data).find(item => !kind || item.kind === kind);
+  const observation = latestObservation ? { latestObservation } : {};
   const supplied = kind ? data.forecasts?.outlook?.byKind?.[kind] : data.forecasts && data.forecasts.outlook;
   if (supplied !== undefined) {
     if (!supplied || !['scheduled', 'announced', 'in_progress', 'overdue', 'completed', 'cancelled', 'monitoring'].includes(supplied.status)) return empty;
@@ -165,7 +169,7 @@ function resetOutlookModel(data, kind) {
     const latestCompletion = matchesKind(supplied.latestCompletion) && validOutlookAction(supplied.latestCompletion) && supplied.latestCompletion.stage === 'claimed_complete' ? supplied.latestCompletion : null;
     const lastResolved = matchesKind(supplied.lastResolved) && validOutlookAction(supplied.lastResolved) && ['claimed_complete', 'cancelled'].includes(supplied.lastResolved.stage) && validTime(supplied.lastResolved.resolvedAt) ? supplied.lastResolved : null;
     const active = ['scheduled', 'announced', 'in_progress', 'overdue'].includes(supplied.status) && matchesKind(supplied.active) && validOutlookAction(supplied.active) && ['promised', 'in_progress'].includes(supplied.active.stage) ? supplied.active : null;
-    return { status: active ? activeOutlookStatus(active, data.serverTime) : ['completed', 'cancelled'].includes(supplied.status) ? supplied.status : 'monitoring', active, latestCompletion, lastResolved,
+    return { status: active ? activeOutlookStatus(active, data.serverTime) : ['completed', 'cancelled'].includes(supplied.status) ? supplied.status : 'monitoring', active, latestCompletion, lastResolved, ...observation,
       ...(supplied.latestResolutions?{latestResolutions:Object.fromEntries(['automatic_reset','banked_reset'].filter(kind=>validOutlookAction(supplied.latestResolutions[kind])&&['claimed_complete','cancelled'].includes(supplied.latestResolutions[kind].stage)).map(kind=>[kind,supplied.latestResolutions[kind]]))}:{}),
       ...(Array.isArray(supplied.pendingReview)?{pendingReview:supplied.pendingReview.filter(validOutlookAction)}:{}),
       ...(validTime(supplied.latestGlobalCompletionAt)?{latestGlobalCompletionAt:supplied.latestGlobalCompletionAt}:{}),evidenceCutoffAt: validTime(supplied.evidenceCutoffAt) ? supplied.evidenceCutoffAt : undefined };
@@ -180,7 +184,7 @@ function resetOutlookModel(data, kind) {
   facts.filter(item=>['claimed_complete','cancelled'].includes(item.action.stage)).forEach(item=>{latestResolutions[item.action.kind]??={...outlookAction(item),resolvedAt:item.action.statementAt};});
   const pendingAll=upcomingActions(data).filter(item=>!kind||item.action.kind===kind),needsReview=item=>!!latestResolutions[item.action.kind]&&Date.parse(latestResolutions[item.action.kind].statementAt)>Date.parse(item.action.statementAt);
   const pendingReview=pendingAll.filter(needsReview).map(item=>outlookAction(item,data)),pending=pendingAll.find(item=>!needsReview(item)&&(!resolved||Date.parse(item.action.statementAt)>=Date.parse(resolved.action.statementAt)||Date.parse(item.action.expectedAt||'')>=Date.parse(resolved.action.statementAt)));
-  return { ...empty,...(Object.keys(latestResolutions).length?{latestResolutions}:{}),...(pendingReview.length?{pendingReview}:{}),...(globalCompleted?{latestGlobalCompletionAt:globalCompleted.action.statementAt}:{}), status: pending ? activeOutlookStatus(pending.action, data.serverTime) : resolved ? resolved.action.stage === 'claimed_complete' ? 'completed' : 'cancelled' : 'monitoring', active: pending ? outlookAction(pending, data) : null, latestCompletion: completed ? outlookAction(completed) : null, lastResolved: resolved ? { ...outlookAction(resolved), resolvedAt: resolved.action.statementAt } : null };
+  return { ...empty,...observation,...(Object.keys(latestResolutions).length?{latestResolutions}:{}),...(pendingReview.length?{pendingReview}:{}),...(globalCompleted?{latestGlobalCompletionAt:globalCompleted.action.statementAt}:{}), status: pending ? activeOutlookStatus(pending.action, data.serverTime) : resolved ? resolved.action.stage === 'claimed_complete' ? 'completed' : 'cancelled' : 'monitoring', active: pending ? outlookAction(pending, data) : null, latestCompletion: completed ? outlookAction(completed) : null, lastResolved: resolved ? { ...outlookAction(resolved), resolvedAt: resolved.action.statementAt } : null };
 }
 /** @param {BenefitAction} action @param {string} now */
 const stageText = (action, now) => ['promised', 'in_progress'].includes(action.stage) && announcementCountdown(action, now).status === 'expired' ? '已过预计时间 · 等待确认' : ({ promised: '发放预告', in_progress: '进行中', claimed_complete: '公告称已完成', cancelled: '已取消' }[action.stage]);
