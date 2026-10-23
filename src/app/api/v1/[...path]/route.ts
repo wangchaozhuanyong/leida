@@ -53,7 +53,7 @@ export async function GET(request:Request,{params}:{params:Promise<{path:string[
   // Validate the round before any provider call. A later state never retargets an open poster.
   currentStatusPosterSvg(data,at,round,options.style);
   let code:StatusPosterCode|undefined;
-  const codePublication=round.startsWith('state:')?statusPosterSnapshot(data,at).publicationId:round==='waiting'?'':round;
+  const codePublication=round.startsWith('state:')||round==='waiting'?statusPosterSnapshot(data,at).codePublicationId:round;
   if(options.includeCode&&codePublication){try{code=await generateWechatCode(codePublication);}catch(error){if(!(error instanceof WechatServiceError))throw error;}}
   return new Response(currentStatusPosterSvg(data,at,round,options.style,code,`${requestShareOrigin(request)}/`),{headers:{'Content-Type':'image/svg+xml; charset=utf-8','Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox",'X-Poster-Code':code?'included':options.includeCode?'unavailable':'omitted'}});
  }

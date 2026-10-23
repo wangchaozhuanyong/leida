@@ -5,6 +5,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Script } from 'node:vm';
 import type { BenefitAction, PublicData, Publication } from '../src/lib/types';
+import {statusPosterSnapshot} from '../src/lib/status-timeline';
 import { currentStatusPosterSvg, assertStatusPosterRound } from '../src/server/status-poster';
 const require=createRequire(import.meta.url);
 const native=require('../miniprogram/packages/poster/status-poster.js');
@@ -88,4 +89,31 @@ test('固定海报十次切换和预览返回复用两张成品，撤回立即�
   for(let i=0;i<10;i++){const theme=i%2?'precision':'editorial';page.selectTheme({currentTarget:{dataset:{theme}}});await new Promise(r=>setImmediate(r));assert.equal(page.data.preview,theme);}
   page.hide();page.show();await new Promise(r=>setImmediate(r));assert.equal(renders,2);assert.equal(page.data.posterBusy,false);
   page._snapshot.publicationId='fixed-publication';data.articles[0].status='withdrawn';page.afterRender();assert.equal(page.data.preview,'');assert.match(page.data.blocked,/状态已变化/);assert.equal(Object.keys(page._artifacts).length,0);page.unload();
+});
+
+
+test('等待下一次公告时仍可使用最近公开消息的圆码，状态和完成时间保持独立',async()=>{
+  const data=fixture('claimed_complete');
+  for(const event of [data.events[0],data.publications[0].event])event.actions[0].statementAt='2026-10-10T20:00:00Z';
+  const input=native.statusPosterInput(data),snapshot=statusPosterSnapshot(data);
+  assert.equal(input.publicationId,'');assert.equal(input.codePublicationId,'fixed-publication');
+  assert.equal(snapshot.publicationId,'');assert.equal(snapshot.codePublicationId,input.codePublicationId);
+  assert.equal(input.value,'等待下一次 Reset');assert.equal(input.statementAt,'');
+  // One-pixel transport fixture only; not a simulated or scannable mini-code.
+  const sharp=createRequire(require.resolve('next/package.json'))('sharp');
+  const image=await sharp({create:{width:1,height:1,channels:4,background:'#fff'}}).png().toBuffer();
+  for(const style of ['precision','editorial'] as const){
+    const svg=currentStatusPosterSvg(data,now,snapshot.round,style,{publicationId:input.codePublicationId,image,contentType:'image/png'});
+    assert.match(svg,/data-poster-code="mini"/);assert.match(svg,/等待下一次 Reset/);assert.doesNotMatch(svg,/公告称已重置用量/);
+  }
+  assert.throws(()=>currentStatusPosterSvg(data,now,snapshot.round,'precision',{publicationId:'unrelated',image,contentType:'image/png'}),/版本不匹配/);
+  data.articles[0].status='withdrawn';
+  assert.equal(native.statusPosterAvailable(input,data),false);
+  assert.equal(statusPosterSnapshot(data).codePublicationId,'');
+});
+
+test('无可分享消息或只有已合并版本时，等待海报不制造扫码目标',()=>{
+  const empty=fixture();assert.equal(native.statusPosterInput(empty).codePublicationId,'');assert.equal(statusPosterSnapshot(empty).codePublicationId,'');
+  const merged=fixture('claimed_complete');merged.events[0].status='merged';
+  assert.equal(native.statusPosterInput(merged).codePublicationId,'');assert.equal(statusPosterSnapshot(merged).codePublicationId,'');
 });

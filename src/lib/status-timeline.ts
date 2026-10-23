@@ -1,3 +1,4 @@
+import {publicationWithdrawn} from './public-facts';
 import type {ResetOutlook} from './reset-outlook';
 import type {BenefitAction,PublicData} from './types';
 import type {ForecastPublicData} from './forecast';
@@ -82,10 +83,14 @@ export function currentStatusModel(data:PublicData,now=data.serverTime) {
 export function statusPosterSnapshot(data:PublicData,now=data.serverTime) {
   const model=currentStatusModel(data,now),latest=latestCompletedBenefits({...data,serverTime:now})[0];
   const publicationId=model.publicationId||(model.completed?latest?.publication.id??'':'');
+  // The entry code may open a visible recent message without making that
+  // message the current benefit announcement or changing the status round.
+  const entry=data.publications.find(p=>!publicationWithdrawn(data,p)&&p.event.status!=='merged'&&!data.events.some(e=>e.id===p.eventId&&e.status==='merged'));
+  const codePublicationId=publicationId||entry?.id||'';
   const minutes=model.completed?Math.max(0,Math.floor((Date.parse(now)-Date.parse(model.statementAt))/60000)):0;
   const value=model.completed?(minutes<1?'刚刚':String(minutes<60?minutes:minutes<1440?Math.floor(minutes/60):Math.floor(minutes/1440))):model.watching?'观察中':model.title;
   const unit=model.completed&&minutes>=1?(minutes<60?'分钟':minutes<1440?'小时':'天'):'';
-  return {round:statusTimelineRevision(model),publicationId,generatedAt:now,
+  return {round:statusTimelineRevision(model),publicationId,codePublicationId,generatedAt:now,
     title:model.scheduled?(model.kind==='banked_reset'?'重置卡发放预告':'用量重置预告'):model.completed?(model.kind==='banked_reset'?'公告称已发放重置卡':'公告称已重置用量'):model.title,
     label:model.completed?'距该公告':model.scheduled?model.lead:'当前公开状态',value,unit,statementAt:model.statementAt,statementLabel:model.watching?'信号时间':'公告时间',
     nextNote:model.watching?(model.forecastWindow?`发布时预计：${model.forecastWindow}${model.chanceLabel?` · ${model.chanceLabel}`:''}`:'公开信号记录，尚无明确发放时间。'):model.scheduled?model.note.replace(/ (\d{2}:\d{2})$/,'\n$1'):model.note,

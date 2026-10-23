@@ -1,6 +1,6 @@
 {
   "name": "moyao-reset-radar",
-  "version": "1.0.40",
+  "version": "1.0.41",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@9.15.9",
@@ -22,7 +22,7 @@
     "cheerio": "^1.1.2",
     "dotenv": "^17.2.3",
     "drizzle-orm": "0.45.4",
-    "next": "16.4.0",
+    "next": "16.4.1",
     "pg": "^8.16.3",
     "qrcode": "1.5.4",
     "react": "19.3.0",

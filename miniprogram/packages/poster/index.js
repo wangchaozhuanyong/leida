@@ -35,8 +35,9 @@ Page(createPage(data=>({available:!!data}),{
       this._artifact=null;this.setData({posterBusy:true,posterError:'',codeNote:''});
       this._posterTimeout=setTimeout(()=>{if(!current())return;stop(this);this._active=true;this.setData({posterBusy:false,posterError:'海报生成超时，请重试。'});},20000);
       try{
-        if(this._snapshot.publicationId){
-          try{if(!this._codeData){this._codeRequest=getApp().publicApi(`/api/v1/wechat/code/${encodeURIComponent(this._snapshot.publicationId)}`);const response=await this._codeRequest.promise;if(!current())return;this._codeData=response.data;}asset=await poster.writeCodeAsset(wx,this._codeData,this._snapshot.publicationId);}
+        const codePublicationId=this._snapshot.codePublicationId||this._snapshot.publicationId;
+        if(codePublicationId){
+          try{if(!this._codeData){this._codeRequest=getApp().publicApi(`/api/v1/wechat/code/${encodeURIComponent(codePublicationId)}`);const response=await this._codeRequest.promise;if(!current())return;this._codeData=response.data;}asset=await poster.writeCodeAsset(wx,this._codeData,codePublicationId);}
           catch(error){if(!current())return;if([404,409,410].includes(error.status))throw error;this.setData({codeNote:'微信官方小程序码暂不可用，本张海报未附扫码入口，可直接分享小程序。'});}
         }else this.setData({codeNote:'暂无关联公告，本张海报不带小程序码。'});
         if(!current())return;const canvas=await canvasNode(this);if(!current())return;
