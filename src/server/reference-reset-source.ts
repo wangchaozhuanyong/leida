@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import {observedResetText} from '../../miniprogram/utils/reset-observations.js';
+import {observedResetText} from '../lib/reset-observations';
 import type {Evidence,Source} from '../lib/types';
 import type {Incoming} from './ingestion';
 import type {BenefitClaim} from './benefit-rules';
