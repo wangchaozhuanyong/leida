@@ -34,7 +34,7 @@ export function buildAutomaticTemplate(evidence:Evidence[]):DraftContent|undefin
   if(hasCompleteContext(primary,evidence))evidence=evidence.filter(item=>hasCompleteContext(item,evidence)||isVerifiedCampaignCalendar(item,evidence));
   const base:DraftContent={title:'',summary:'',translation:'',category:'product',actions:[],evidenceIds:evidence.map(item=>item.id),publicationMode:'news_only',contentOrigin:'template'};
   const observation=observedEvidence(primary,primary.collectedAt);
-  if(observation)return {...base,title:'来源观测：Codex 用量已重置',category:'reset',summary:`${observation.sourceName} 记录用量重置观测，观测时间：${new Date(observation.observedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})}（北京时间）。这不是原作者的新完成公告，个人账户是否到账请查看实际额度。`};
+  if(observation)return {...base,title:'来源观测：Codex 用量重置记录',category:'reset',summary:`${observation.sourceName} 记录用量重置观测，观测时间：${new Date(observation.observedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})}（北京时间）。这不是原作者的新完成公告，个人账户是否到账请查看实际额度。`};
   const attachment=primary.metadata?.activity;
   if(attachment&&primary.metadata?.activityDay){base.activityId=attachment.id;base.activityDay=primary.metadata.activityDay;base.category='activity';}
   else if(membership){Object.assign(base,membership);base.category='activity';}

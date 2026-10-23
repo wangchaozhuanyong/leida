@@ -5,16 +5,17 @@ import type {Incoming} from './ingestion';
 import type {BenefitClaim} from './benefit-rules';
 import {isTruncatedBenefitText} from './benefit-rules';
 import {forecastSourceAvailable,referenceSnapshotFresh,type ReferencePublicSignal} from '../lib/forecast';
+import {CODEX_LIMITS_OBSERVATION_SOURCE} from './codexlimits-observation-source';
 
 export const REFERENCE_DATA_ROOT='https://raw.githubusercontent.com/gdutxiaoxu/codex-reset-radar/master/data';
 export const REFERENCE_RESET_SOURCE:Source={id:'aiplanwatch-reference',name:'AIPlanWatch 公开数据对账',kind:'archive',url:`${REFERENCE_DATA_ROOT}/latest.json`,enabled:false,validated:false,intervalMinutes:30,collectionPolicy:'manual',version:1,status:'unconnected'};
 export const REFERENCE_SIGNAL_SOURCE:Source={...REFERENCE_RESET_SOURCE,id:'aiplanwatch-signals',name:'AIPlanWatch 公开信号对账',url:`${REFERENCE_DATA_ROOT}/signals.json`};
 export const REFERENCE_HISTORY_SOURCE:Source={...REFERENCE_RESET_SOURCE,id:'aiplanwatch-history',name:'AIPlanWatch 重置与重置卡对账',url:`${REFERENCE_DATA_ROOT}/resets.json`,intervalMinutes:360};
-export const REFERENCE_SOURCES=[REFERENCE_RESET_SOURCE,REFERENCE_SIGNAL_SOURCE,REFERENCE_HISTORY_SOURCE];
+export const REFERENCE_SOURCES=[REFERENCE_RESET_SOURCE,REFERENCE_SIGNAL_SOURCE,REFERENCE_HISTORY_SOURCE,CODEX_LIMITS_OBSERVATION_SOURCE];
 /** The public Contents API serves the same fixed repository files. Keep the
  * canonical source URL/proof unchanged; never derive a request from user input. */
 export function referenceContentsURL(source:Source):string|undefined {
- const fixed=REFERENCE_SOURCES.find(item=>item.id===source.id&&item.kind===source.kind&&item.url===source.url);
+ const fixed=[REFERENCE_RESET_SOURCE,REFERENCE_SIGNAL_SOURCE,REFERENCE_HISTORY_SOURCE].find(item=>item.id===source.id&&item.kind===source.kind&&item.url===source.url);
  if(!fixed)return;
  return `https://api.github.com/repos/gdutxiaoxu/codex-reset-radar/contents/data/${fixed.url.slice(REFERENCE_DATA_ROOT.length+1)}?ref=master`;
 }

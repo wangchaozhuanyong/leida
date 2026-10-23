@@ -25,6 +25,13 @@ export function ResetStateCardView({card}:{card:ResetStateCard}) {
         </>}
         <p className="pub-orbit-status" aria-label={`当前状态：${card.badge}`}>{card.dialStatus}</p>
       </RadarScope>
+      {card.observationPublicationId&&<aside className="pub-orbit-observation" aria-label="独立第三方重置观测">
+        <div className="pub-orbit-observation-heading"><strong>第三方重置观测</strong><span>独立记录</span></div>
+        <p className="pub-orbit-observation-time"><time dateTime={card.observationAt}>{card.observationTime}</time> <small>北京时间</small></p>
+        <p className="pub-orbit-observation-source">{card.observationSourceName} · 不代表官方完成确认</p>
+        <Link scroll={false} href={`/events/${encodeURIComponent(card.observationEventId)}?version=${encodeURIComponent(card.observationPublicationId)}`}>查看观测依据 ↗</Link>
+      </aside>}
+      {card.expectedElapsed&&<p className="pub-orbit-elapsed">{card.expectedElapsed}</p>}
       {card.timeAt?<div className="pub-orbit-schedule"><div><span>{card.timeLabel}</span><time dateTime={card.timeAt}>{card.dateText||card.time}</time></div>{card.clockText&&<div className="pub-orbit-time"><span>北京时间</span><strong>{card.clockText}<small>{card.timeQualifier}</small></strong></div>}</div>:<p className="pub-orbit-waiting">收到明确预告后，将在这里展示时间。</p>}
       {card.oldTime&&<del className="pub-orbit-old">{card.oldTime} · 北京时间</del>}
     </div>

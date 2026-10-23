@@ -187,8 +187,24 @@ test('预告截止边界转等待确认，进行中也不凭时间自动完成�
     const data=withOutlook(fixture(),{status:stage==='promised'?'scheduled':'in_progress',active:outlookAction({stage})}),before=structuredClone(data);
     assert.equal(mini.announcementCountdown(outlookAction({stage}),outlookDeadline).status,'expired');
     data.serverTime=outlookDeadline;assert.equal(mini.resetOutlookModel(data).status,'overdue');
-    const h=nativeHarness(data),page=h.page('home');assert.equal(page.data.pending.countdown,'已过预计时间 · 等待确认');assert.equal(page.data.pending.counting,false);assert.equal(page._countdownTimer,null);assert.equal(page.data.latest,null);assert.equal(page.data.forecast,null);
+    const h=nativeHarness(data),page=h.page('home');assert.equal(page.data.pending.countdown,'已过预计时间 · 等待确认');assert.equal(page.data.pending.counting,false);if(stage==='promised')assert.ok(page._countdownTimer,'逾期卡片持续更新经过时长，但不继续倒计时');else assert.equal(page._countdownTimer,null);assert.equal(page.data.latest,null);assert.equal(page.data.forecast,null);
     h.replace(data);assert.equal(page.data.pending.countdown,'已过预计时间 · 等待确认');assert.equal((data.forecasts as unknown as {outlook:{active:{stage:string}}}).outlook.active.stage,stage);assert.equal(data.forecasts!.cases[0].snapshot!.p24,before.forecasts!.cases[0].snapshot!.p24);page.onUnload();
+  }
+});
+
+test('逾期经过时长更新仍保留原预计安排，隐藏和卸载释放计时器',()=>{
+  for(const kind of ['automatic_reset','banked_reset']){
+    const data=withOutlook(fixture(),{status:'scheduled',active:outlookAction({kind})});data.serverTime='2026-10-10T14:33:00Z';
+    const h=nativeHarness(data),page=h.page('home'),card=()=>page.data.resetCards.find((item:{kind:string})=>item.kind===kind);
+    try{
+      assert.equal(card().state,'overdue');assert.equal(card().timeAt,outlookDeadline);assert.equal(card().time,'2026-10-10 21:00');assert.equal(card().expectedElapsed,'原预计时间已过 1小时33分钟');assert.ok(page._countdownTimer);
+      data.serverTime='2026-10-10T14:34:00Z';page.tickCountdown();
+      assert.equal(card().expectedElapsed,'原预计时间已过 1小时34分钟');assert.equal(card().timeAt,outlookDeadline);assert.equal(card().time,'2026-10-10 21:00');assert.equal(card().publicationId,'live-publication');assert.equal(page.data.timeline.completed,false);assert.equal(page.data.pending.counting,false);
+      page.onHide();assert.equal(page._countdownTimer,null);assert.equal(h.subscriptions,0);
+      const hiddenCards=page.data.resetCards;data.serverTime='2026-10-10T14:35:00Z';page.tickCountdown();assert.equal(page.data.resetCards,hiddenCards,'隐藏后的迟到 tick 不更新页面');
+      page.onShow();assert.ok(page._countdownTimer);assert.equal(h.subscriptions,1);assert.equal(card().expectedElapsed,'原预计时间已过 1小时35分钟');assert.equal(card().timeAt,outlookDeadline);
+    }finally{page.onUnload();}
+    assert.equal(page._countdownTimer,null);assert.equal(h.subscriptions,0);
   }
 });
 

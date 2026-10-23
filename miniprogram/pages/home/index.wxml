@@ -68,6 +68,13 @@
           <view class="orbit-status" aria-label="当前状态：{{card.badge}}">{{card.dialStatus}}</view>
         </view>
       </view>
+      <view wx:if="{{card.observationPublicationId}}" class="orbit-observation">
+        <view class="orbit-observation-heading"><text>第三方重置观测</text><text class="orbit-observation-tag">独立记录</text></view>
+        <view class="orbit-observation-time">{{card.observationTime}} <text class="orbit-observation-zone">北京时间</text></view>
+        <view class="orbit-observation-source">{{card.observationSourceName}} · 不代表官方完成确认</view>
+        <button class="text-button orbit-observation-link" data-kind="{{card.kind}}" bindtap="openObservation">查看观测依据 ↗</button>
+      </view>
+      <view wx:if="{{card.expectedElapsed}}" class="orbit-elapsed">{{card.expectedElapsed}}</view>
       <view wx:if="{{card.timeAt}}" class="orbit-schedule"><view><text class="orbit-date-label">{{card.timeLabel}}</text><text class="orbit-date">{{card.dateText||card.time}}</text></view><view wx:if="{{card.clockText}}" class="orbit-time"><text class="orbit-date-label">北京时间</text><view><text class="orbit-clock">{{card.clockText}}</text><text class="orbit-qualifier">{{card.timeQualifier}}</text></view></view></view>
       <view wx:else class="orbit-waiting">收到明确预告后，将在这里展示时间。</view>
       <view wx:if="{{card.oldTime}}" class="orbit-old">{{card.oldTime}} · 北京时间</view>
