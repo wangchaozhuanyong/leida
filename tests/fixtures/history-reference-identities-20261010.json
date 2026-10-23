@@ -1,0 +1,24 @@
+{
+  "purpose": "Frozen research identities and source times; not live prediction or coverage proof.",
+  "provenance": {
+    "originalFile": "outputs/implementation-qa/history-prediction-replay-20261010.json",
+    "sha256": "985975dd9f731c53768995f5de4c672c5641d50a1af8820981582482d40e95ff"
+  },
+  "cases": [
+    {
+      "incident_id": "01KK26XE1W536H7DQV2EXM3GHE",
+      "signal_first_public_at": "2026-03-06T18:35:00Z",
+      "first_matched_announcement_public_at": "2026-03-08T02:42:13Z"
+    },
+    {
+      "incident_id": "01KS88SRADTWQW27NYRAXMBAQN",
+      "signal_first_public_at": "2026-05-22T16:37:00Z",
+      "first_matched_announcement_public_at": "2026-05-23T20:14:35Z"
+    },
+    {
+      "incident_id": "01KW2E6W0503W4NXJNCVAG8V6T",
+      "signal_first_public_at": "2026-06-26T17:04:00Z",
+      "first_matched_announcement_public_at": "2026-06-26T23:39:48Z"
+    }
+  ]
+}

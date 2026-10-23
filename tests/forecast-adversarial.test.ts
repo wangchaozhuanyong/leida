@@ -36,7 +36,7 @@ test('历史三例参考严格复算30/80%，可信区间不是准确率',()=>{
   assert.ok(!('accuracy' in reference),'概率参考不能添加虚构准确率字段');
 });
 test('参考身份与时间保留冻结研究，不能升级为真实预测或已验证覆盖',()=>{
-  const saved=JSON.parse(readFileSync(new URL('../outputs/implementation-qa/history-prediction-replay-20261010.json',import.meta.url),'utf8')) as {cases:{incident_id:string;signal_first_public_at:string;first_matched_announcement_public_at:string}[]};
+  const saved=JSON.parse(readFileSync(new URL('./fixtures/history-reference-identities-20261010.json',import.meta.url),'utf8')) as {cases:{incident_id:string;signal_first_public_at:string;first_matched_announcement_public_at:string}[]};
   assert.deepEqual(FORECAST_REFERENCE_SAMPLES.map(s=>({id:s.id,signal:s.signalAt,announcement:s.announcementAt})),saved.cases.map(s=>({id:s.incident_id,signal:s.signal_first_public_at,announcement:s.first_matched_announcement_public_at})));
   assert.deepEqual(referenceForecast().sampleIds,FORECAST_REFERENCE_SAMPLES.map(s=>s.id));
 });

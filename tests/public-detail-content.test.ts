@@ -80,8 +80,9 @@ test('来源折叠保留原文、真实出处与片段提示，隐藏内部辅�
   assert.equal(JSON.stringify(data), before);
 });
 
-test('相同正文同时间来源去重并优先官方，内容不同的来源保留', () => {
+test('同一原文相同正文同时间去重并优先官方，内容不同的来源保留', () => {
   const data = fixture();
+  data.evidence[0].url = 'https://example.com/official';
   data.evidence.push({ ...evidence, id: 'official', provenance: 'official', contextComplete: true, textOrigin: 'original', url: 'https://example.com/official' });
   data.evidence.push({ ...evidence, id: 'different', text: 'A different claim.', url: 'https://example.com/different' });
   data.articles[0].evidenceIds.push('official', 'different');

@@ -1,5 +1,6 @@
 import { publicArticleSummary } from '@/lib/public-content';
 export { publicArticleSummary } from '@/lib/public-content';
+export { uniqueDisplayEvidence } from '../../../miniprogram/utils/evidence-display';
 import type { Article, BenefitAction, Notice, PublicData, Publication, RadarEvent } from '@/lib/types';
 import { pendingPublicActions, publicActions, completedPublicActions } from '@/lib/public-facts';
 export {recentCompletedBenefits} from '@/lib/public-facts';

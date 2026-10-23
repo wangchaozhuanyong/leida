@@ -4,6 +4,7 @@
 /** @typedef {import('../../src/lib/types').Article} Article */
 /** @typedef {import('../../src/lib/types').RadarEvent} RadarEvent */
 const {publicNewsGroups, homeNewsGroups} = require('./public-feed');
+const {uniqueDisplayEvidence} = require('./evidence-display');
 const {resetObservations,observedEvidence}=require('./reset-observations');
 const dayMs = 86400000;
 const actionLabels = { automatic_reset: '用量重置', banked_reset: '重置卡' };
@@ -285,12 +286,8 @@ function resolveDetail(data, query) {
   const isOld = (newsOnly ? currentArticle.publicationId : currentEvent.publicationId) !== publication.id;
   const current = newsOnly ? data.publications.find(item => item.id === currentArticle.publicationId) : currentPublication(data, currentEvent);
   const ids = new Set([...(isNewsOnly(publication) ? publication.article.evidenceIds : publication.event.evidenceIds), ...(publication.article.contextEvidenceIds || [])]);
-  const seenSources = new Set();
-  const evidence = data.evidence.filter(item => ids.has(item.id)).sort((a,b) => Number(b.provenance === 'official') - Number(a.provenance === 'official')).filter(item => {
-    const key = `${item.publishedAt}:${item.text.replace(/\s+/g, ' ').trim()}`;
-    if (seenSources.has(key)) return false;
-    seenSources.add(key); return true;
-  });
+  const evidence = uniqueDisplayEvidence(data.evidence.filter(item => ids.has(item.id))
+    .sort((a,b) => Number(b.provenance === 'official') - Number(a.provenance === 'official')));
   return {
     missing: false, publicationId: publication.id, title: publication.article.title, ...publicArticleContent(publication.article), reviewStatus: publication.article.reviewStatus || '', reviewReasons: publicReviewMessage(publication.article),
     time: displayTime(articleSourceTime(publication.article)),

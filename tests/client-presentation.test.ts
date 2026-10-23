@@ -42,6 +42,7 @@ test('详情页属于原有导航分类',()=>{
 });
 test('详情只展示一份重复来源，动作独有的不同原文仍可达',()=>{
   const data=fixture();
+  data.evidence[1].url=data.evidence[0].url;
   data.evidence.push({...evidence('action-only'),text:'动作独有的补充原文。'});
   data.publications[0].event.actions[0].evidenceIds.push('action-only');
   const html=renderToStaticMarkup(createElement(SearchParamsContext.Provider,{value:new URLSearchParams()},createElement(EventPage,{data,id:'event',onPoster(){},onShare:async()=>{}})));
