@@ -31,7 +31,7 @@ test('完整后台任务模块在没有小程序目录的运行边界中仍能�
   cpSync(resolve('src'),join(isolated,'src'),{recursive:true});
   const code=`await import(${JSON.stringify(pathToFileURL(join(isolated,'src/server/worker.ts')).href)});const {pool}=await import(${JSON.stringify(pathToFileURL(join(isolated,'src/db/index.ts')).href)});await pool.end();`;
   const result=spawnSync(process.execPath,['--import','tsx','--input-type=module','-e',code],{encoding:'utf8',timeout:10000,env:{...process.env,NODE_ENV:'test',DATABASE_URL:'postgresql://radar@127.0.0.1:1/runtime_gate'}});
-  assert.equal(result.status,0,result.stderr);
+  assert.equal(result.status,0,JSON.stringify({status:result.status,signal:result.signal,errorCode:result.error&&'code' in result.error?result.error.code:null,stderr:result.stderr}));
  }finally{rmSync(isolated,{recursive:true});}
 });
 test('服务器与原生小程序的观测投影及时间线保持一致',()=>{

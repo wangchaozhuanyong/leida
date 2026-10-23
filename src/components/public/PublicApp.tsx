@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useSearchParams, usePathname } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {WechatEntryGuide} from './WechatEntryGuide';
-import {sourceStatus} from './model';
+import {openPublicDialog} from './dialog-lifecycle';
+import {sourceStatus, uniqueDisplayEvidence} from './model';
 import { publicNewsGroups, homeNewsGroups, type NewsGroup } from '@/lib/public-feed';
 import { publicReviewMessage, publicSourceNotes, publicEligibility, publicNoticeSummary } from '@/lib/public-content';
 import { customerNotice } from '@/lib/notice-display';
@@ -335,12 +336,7 @@ const evidenceSourceName = (evidence: Evidence, sources: PublicData['sources']) 
 function EvidenceList({ evidence, collapsed = false, actions = [], sources = [], notes = [] }: { evidence: Evidence[]; collapsed?: boolean; actions?: BenefitAction[]; sources?: PublicData['sources']; notes?: string[] }) {
   const priority = (item: Evidence) => actions.some(action => action.stage === 'claimed_complete' && action.evidenceIds.includes(item.id) && Date.parse(action.statementAt) === Date.parse(item.publishedAt)) ? 1 : 0;
   const rows = evidence.slice().sort((a, b) => priority(b) - priority(a) || Date.parse(b.publishedAt) - Date.parse(a.publishedAt) || Number(b.provenance === 'official') - Number(a.provenance === 'official'));
-  const grouped = new Map<string, Evidence>();
-  for (const item of rows) {
-    const key = `${item.publishedAt}:${item.text.replace(/\s+/g, ' ').trim()}`;
-    if (!grouped.has(key) || (grouped.get(key)?.provenance !== 'official' && item.provenance === 'official')) grouped.set(key, item);
-  }
-  const contents = rows.length ? [...grouped.values()].map(item => {
+  const contents = rows.length ? uniqueDisplayEvidence(rows).map(item => {
     const observation=observedEvidence(item,item.collectedAt);
     return <div className="pub-source-row" key={item.id}><div><strong>{observation?.sourceName??evidenceSourceName(item,sources)}</strong><span>{observation?'观测时间：':''}{briefTime(item.publishedAt)} · 北京时间 · {observation?'来源观测':evidenceKind(item)}</span><p className="pub-source-excerpt" dir="auto">{item.text}</p>{observation?<p className="pub-muted">来源记录了用量重置，个人到账尚未核验；关联原帖与观测时间分别保留。</p>:(!item.contextComplete || item.textOrigin==='archive_excerpt')&&<p className="pub-muted">这里只收录了部分原文，请打开来源查看完整内容。</p>}<ExternalLink url={observation?.sourceUrl??item.url}>{observation?'查看观测来源':'打开原文'}</ExternalLink>{observation&&<ExternalLink url={observation.referenceUrl}>查看关联原帖</ExternalLink>}</div></div>;
   }) : <p className="pub-muted">暂未提供可展示的原文。</p>;
@@ -421,13 +417,13 @@ export function Methodology({data,snapshotId,cadenceId,target='automatic_reset',
 }
 function WechatReminderModal({onClose,data,codeAvailable}:{data:PublicData|null;dataError:string;onRetryData:()=>void;entry:WechatEntryState;codeAvailable:boolean;onRetryEntry:()=>void;onClose:()=>void}) {
   const dialog=useRef<HTMLDialogElement>(null);
-  useEffect(()=>{dialog.current?.showModal();const previous=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.body.style.overflow=previous;};},[]);
+  useEffect(() => dialog.current ? openPublicDialog(dialog.current) : undefined, []);
   return <dialog className="pub-dialog" ref={dialog} onClose={onClose} onCancel={onClose}><div className="pub-dialog-heading"><h2>微信提醒</h2><button className="pub-icon-button" aria-label="关闭窗口" onClick={onClose}><Icon name="close"/></button></div><div className="pub-dialog-body"><p>在小程序的提醒页开启，每次成功授权增加一次提醒机会。</p><p>可分别选择重置预告、重置完成提醒和重要更正。每成功发送一条使用一次，也可以随时关闭。</p><WechatEntryGuide publicationId={data?.publications.find(p=>!publicationWithdrawn(data,p))?.id} codeAvailable={codeAvailable}/><TextLink href="/notices">查看全部站内提醒</TextLink><button className="pub-button full" onClick={onClose}>知道了</button></div></dialog>;
 }
 function ShareLinkModal({ url, onClose }: { url: string; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null), input = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState('复制链接后发送给朋友。');
-  useEffect(() => { dialog.current?.showModal(); const previous = document.body.style.overflow; document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = previous; }; }, []);
+  useEffect(() => dialog.current ? openPublicDialog(dialog.current) : undefined, []);
   const copy = async () => { try { await navigator.clipboard.writeText(url); setMessage('链接已复制'); } catch { input.current?.select(); setMessage('请长按或选中链接复制。'); } };
   return <dialog className="pub-dialog" ref={dialog} onClose={onClose} onCancel={onClose} aria-labelledby="pub-share-title"><div className="pub-dialog-heading"><h2 id="pub-share-title">转发给朋友</h2><button className="pub-icon-button" aria-label="关闭分享" onClick={onClose}><Icon name="close" /></button></div><div className="pub-dialog-body"><label className="pub-share-link-label" htmlFor="pub-share-url">此版本链接</label><input className="pub-share-link-input" id="pub-share-url" ref={input} value={url} readOnly onClick={event => event.currentTarget.select()} /><button className="pub-button primary full" onClick={() => void copy()}>复制链接</button><p className="pub-dialog-note" role="status">{message}</p>{isLocalShareUrl(url) && <p className="pub-dialog-note">当前为本机链接，其他设备需通过正式网站地址访问。</p>}</div></dialog>;
 }
@@ -450,7 +446,7 @@ function PosterModal({ target, name, blocked:externalBlocked, note, statusDesign
   const [expired,setExpired]=useState(false);
   const blocked=externalBlocked||(expired?'公开状态已变化，请关闭后重新生成海报。':'');
   useEffect(()=>{setExpired(false);if(!target.validUntil)return;const remaining=Date.parse(target.validUntil)-Date.parse(target.cutoffAt);if(remaining<=0){setExpired(true);return;}const timer=window.setTimeout(()=>setExpired(true),Math.min(2147483647,remaining+20));return()=>clearTimeout(timer);},[target.id,target.cutoffAt,target.validUntil]);
-  useEffect(() => { dialog.current?.showModal(); const previous = document.body.style.overflow; document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = previous; }; }, []);
+  useEffect(() => dialog.current ? openPublicDialog(dialog.current) : undefined, []);
   useEffect(() => () => {
     for (const image of cache.current.values()) URL.revokeObjectURL(image.url);
     cache.current.clear();

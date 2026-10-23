@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {pool,list,one,put,transaction} from '../src/db';
-import {sourceDefinitions} from '../src/server/ingestion';
+import {sourceDefinitions,validateSource} from '../src/server/ingestion';
 import {queueJob} from '../src/server/service';
-import {runOne} from '../src/server/worker';
+import {runOne,sourceCollectionDue} from '../src/server/worker';
 import type {Audit,Job,Source,Evidence} from '../src/lib/types';
 
 test('隔离库：通用来源重试、持久安全诊断、终端失败与后续恢复',{skip:process.env.RADAR_INTEGRATION!=='1'},async()=>{
@@ -27,6 +27,15 @@ test('隔离库：通用来源重试、持久安全诊断、终端失败与后�
   assert.equal(calls,6);const audit=(await list<Audit>('audits')).find(a=>a.objectId===failed.id&&a.action==='job.failed');assert.ok(audit);assert.equal((audit.after as {kind:string}).kind,'collect');
   assert.equal((await one<Source>('sources',source.id))?.status,'failed');assert.equal((await one<Source>('sources',source.id))?.validated,true);
   phase='healthy';const healthy=await collect();assert.equal(healthy.status,'succeeded');assert.equal((await one<Source>('sources',source.id))?.consecutiveFailures,0);
+  phase='failed';await assert.rejects(validateSource(source.id,'qa'),/暂时连接失败/);
+  const waiting=(await one<Source>('sources',source.id))!;
+  assert.equal(waiting.validated,true);assert.equal(waiting.cursor,source.cursor);
+  assert.ok(Date.parse(waiting.nextRunAt!)>Date.now());
+  assert.equal(sourceCollectionDue(waiting,Date.parse(waiting.nextRunAt!)+1),true,'验证时短暂失败保留原来源的自动恢复能力');
+  await put('sources',{...waiting,validated:false});
+  await assert.rejects(validateSource(source.id,'qa'),/暂时连接失败/);
+  assert.equal((await one<Source>('sources',source.id))?.validated,false,'首次验证失败不能凭空取得已验证资格');
+  phase='healthy';await validateSource(source.id,'qa');assert.equal((await one<Source>('sources',source.id))?.validated,true);
   assert.equal((await list<Evidence>('evidence')).length,evidenceCount,'空状态接口不新增或删除业务证据');
  }finally{globalThis.fetch=beforeFetch;await pool.end();}
 });

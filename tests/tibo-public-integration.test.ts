@@ -55,7 +55,14 @@ test('隔离数据库：免费新帖发现→预告时间→完成回复→同�
   await publish(completed);publications=await list<Publication>('publications');assert.equal(publications.length,3);const latest=publications[0];assert.equal(latest.event.actions[0].stage,'claimed_complete');assert.equal(latest.event.id,publications[1].event.id);assert.equal(latest.event.actions[0].id,publications[1].event.actions[0].id);
   assert.equal(publications[2].event.actions.length,0,'较早产品事件继续只保存产品新闻');
   assert.equal(publicResetOutlook({events:[latest.event],articles:await list<Article>('articles'),publications,evidence:await list<Evidence>('evidence'),serverTime:new Date().toISOString()}).status,'completed');
-  phase='transient';await assert.rejects(validateSource(source.id,'qa'),/暂不可用/);assert.equal((await one<Source>('sources',source.id))?.validated,true);
+  const beforeTransient=(await one<Source>('sources',source.id))!;
+  phase='transient';await assert.rejects(validateSource(source.id,'qa'),/暂不可用/);
+  const retryable=(await one<Source>('sources',source.id))!;
+  assert.equal(retryable.validated,true);assert.equal(retryable.enabled,beforeTransient.enabled);
+  assert.equal(retryable.publicationPaused,beforeTransient.publicationPaused);
+  assert.deepEqual(retryable.timelineScan,beforeTransient.timelineScan,'短暂连接失败不改变已确认的采集断点');
+  assert.ok(Date.parse(retryable.nextRunAt!)>Date.now());
+  assert.equal(sourceCollectionDue(retryable,Date.parse(retryable.nextRunAt!)+1),true,'原已验证来源须在退避后恢复自动采集');
   const permanent=await transaction(c=>queueJob('collect',{sourceId:source.id},c));await put('jobs',{...permanent,availableAt:'2000-01-01T00:00:00.000Z'});await runOne(deps);
   assert.equal((await one<Job>('jobs',permanent.id))?.status,'failed','重试耗尽必须保留失败任务与持久审计');
   assert.ok((await list<Audit>('audits')).some(a=>a.objectId===permanent.id&&a.action==='job.failed'));
