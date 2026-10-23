@@ -194,7 +194,13 @@ function writeCodeAsset(wxApi,value,publicationId){
   if(typeof encoded!=='string'||encoded.length>3000000||encoded.length%4!==0||!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)||encoded.length*3/4-(encoded.endsWith('==')?2:encoded.endsWith('=')?1:0)>2097152||!(value.contentType==='image/png'?encoded.startsWith('iVBORw0KGgo'):encoded.startsWith('/9j/')))return Promise.reject(new PosterError('image','小程序码图片格式不正确，请重新生成。'));
   if(typeof wxApi.getFileSystemManager!=='function'||!wxApi.env||!wxApi.env.USER_DATA_PATH)return Promise.reject(new PosterError('unsupported','当前微信不能读取小程序码，请更新微信。'));
   const fs=wxApi.getFileSystemManager(),path=`${wxApi.env.USER_DATA_PATH}/moyao-code-${value.scene}-${Date.now()}-${++assetCounter}.${value.contentType==='image/png'?'png':'jpg'}`;
-  return new Promise((resolve,reject)=>fs.writeFile({filePath:path,data:encoded,encoding:'base64',success(){let disposed=false;resolve({status:'ready',publicationId,filePath:path,dispose(){if(disposed)return Promise.resolve();disposed=true;return new Promise(done=>fs.unlink({filePath:path,success:done,fail:done}));}});},fail(){reject(new PosterError('image','小程序码图片未能读取，请重试。'));}}));
+  return new Promise((resolve,reject)=>fs.writeFile({filePath:path,data:encoded,encoding:'base64',success(){let disposed=false;resolve({status:'ready',publicationId,filePath:path,dispose(){
+    if(disposed)return Promise.resolve();disposed=true;
+    // Cleanup must not delay completion or error handling: a missing unlink
+    // callback must not keep either poster page busy or replace its result.
+    try{fs.unlink({filePath:path,success(){},fail(){}});}catch(_){/* Cleanup is best effort and must preserve the generation result. */}
+    return Promise.resolve();
+  }});},fail(){reject(new PosterError('image','小程序码图片未能读取，请重试。'));}}));
 }
 let assetCounter=0;
 // Official APIs: canvasToTempFilePath, Canvas.createImage, Canvas.requestAnimationFrame,

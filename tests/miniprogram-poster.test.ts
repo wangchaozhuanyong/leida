@@ -158,6 +158,17 @@ test('JPEG真码合同按jpg写入沙盒，画布最终仍导出PNG',async()=>{
   assert.ok(path.endsWith('.jpg'));await asset.dispose();
 });
 
+test('码文件清理回调丢失、失败或同步抛错都不阻塞成品，重复清理只尝试一次',async()=>{
+  for(const behavior of ['missing','fail','throw']){
+    let calls=0,settled=false;const removed:string[]=[];
+    const wx={env:{USER_DATA_PATH:'wxfile://fixture-user'},getFileSystemManager(){return{writeFile(options:Record<string,any>){options.success();},unlink(options:Record<string,any>){calls++;removed.push(options.filePath);if(behavior==='throw')throw new Error('isolated cleanup failure');if(behavior==='fail')options.fail({});}};}};
+    const asset=await p.writeCodeAsset(wx,{publicationId:'fixture-publication',scene,imageBase64,contentType:'image/png'},'fixture-publication');
+    const finished=asset.dispose().then(()=>{settled=true;});await Promise.resolve();
+    assert.equal(settled,true,behavior);await finished;await asset.dispose();
+    assert.equal(calls,1);assert.deepEqual(removed,[asset.filePath]);
+  }
+});
+
 test('导出失败与用户取消、相册拒绝、隐私未同意分别提示，不回显底层信息',async()=>{
   const canvas=canvasMock();await assert.rejects(p.renderPoster({wxApi:{canvasToTempFilePath(options:Record<string,any>){options.fail({errMsg:'private-details'});}},canvas:canvas.canvas,data:data(),publicationId:'fixture-publication'}),/导出失败/);
   const artifact=await p.renderPoster({wxApi:{canvasToTempFilePath(options:Record<string,any>){options.success({tempFilePath:'wxfile://fixture-poster.png'});}},canvas:canvas.canvas,data:data(),publicationId:'fixture-publication'});
