@@ -9,7 +9,7 @@ type EvidenceObservation=Omit<ResetObservation,'eventId'|'publicationId'>;
 const valid=(value:unknown):value is string=>typeof value==='string'&&Number.isFinite(Date.parse(value));
 const archive='https://codex-resets.com/zh-CN';
 const reference='https://raw.githubusercontent.com/gdutxiaoxu/codex-reset-radar/master/data/latest.json';
-const observedResetText=(text:unknown)=>typeof text==='string'&&/^(?:Codex\s*使用限额已重置[。.!]?\s*(?:查看你的限额[。.!]?)?|Codex usage limits have been reset[.!]?(?:\s*Check your limits[.!]?)?)$/i.test(text.trim());
+export const observedResetText=(text:unknown)=>typeof text==='string'&&/^(?:Codex\s*使用限额已重置[。.!]?\s*(?:查看你的限额[。.!]?)?|Codex usage limits have been reset[.!]?(?:\s*Check your limits[.!]?)?)$/i.test(text.trim());
 
 // Worker runtime contains src and scripts. Keep this typed implementation inside
 // that boundary; the separately packaged native client is checked for parity.
