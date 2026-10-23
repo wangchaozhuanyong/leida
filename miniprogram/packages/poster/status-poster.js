@@ -13,11 +13,13 @@ function statusPosterInput(data){
   const now=data.serverTime,latest=m.latestCompletedBenefits(data)[0];
   const model=statusTimelineModel(m.resetOutlookModel(data),now,latest?.action??null,data.forecasts);
   const publicationId=model.publicationId||(model.completed?latest?.publication.id??'':'');
+  const entry=data.publications.find(p=>m.resolveDetail(data,{publicationId:p.id}).canShare);
+  const codePublicationId=publicationId||entry?.id||'';
   const minutes=model.completed?Math.max(0,Math.floor((Date.parse(now)-Date.parse(model.statementAt))/60000)):0;
   const value=model.completed?(minutes<1?'刚刚':String(minutes<60?minutes:minutes<1440?Math.floor(minutes/60):Math.floor(minutes/1440))):model.watching?'观察中':model.title;
   const unit=model.completed&&minutes>=1?(minutes<60?'分钟':minutes<1440?'小时':'天'):'';
   const date=dateTime(model.statementAt),generated=dateTime(now);
-  return {name:data.site.name||'模钥重置雷达',round:statusTimelineRevision(model),publicationId,generatedAt:now,
+  return {name:data.site.name||'模钥重置雷达',round:statusTimelineRevision(model),publicationId,codePublicationId,generatedAt:now,
     title:model.scheduled?(model.kind==='banked_reset'?'重置卡发放预告':'用量重置预告'):model.completed?(model.kind==='banked_reset'?'公告称已发放重置卡':'公告称已重置用量'):model.title,
     label:model.completed?'距该公告':model.scheduled?model.lead:'当前公开状态',value,unit,date:date.date,time:date.time,generated:`${generated.date} ${generated.time}`,statementAt:model.statementAt,statementLabel:model.watching?'信号时间':'公告时间',
     nextNote:model.watching?(model.forecastWindow?`发布时预计：${model.forecastWindow}${model.chanceLabel?` · ${model.chanceLabel}`:''}`:'公开信号记录，尚无明确发放时间。'):model.scheduled?model.note.replace(/ (\d{2}:\d{2})$/,'\n$1'):model.note,
@@ -28,7 +30,7 @@ function statusPosterInput(data){
 function statusPosterAvailable(input,data){
   if(!input||!data)return false;
   if(input.round&&input.round!==statusPosterInput(data).round)return false;
-  return !input.publicationId||m.resolveDetail(data,{publicationId:input.publicationId}).canShare;
+  return !input.codePublicationId&&!input.publicationId||m.resolveDetail(data,{publicationId:input.codePublicationId||input.publicationId}).canShare;
 }
 function createStatusPosterLayout(input,measure,theme='precision',includeCode=false){
   if(!['precision','editorial'].includes(theme))throw new PosterError('layout','海报风格无效。');
@@ -74,7 +76,7 @@ function createStatusPosterLayout(input,measure,theme='precision',includeCode=fa
 }
 async function renderStatusPoster({wxApi,canvas,page,input,theme='precision',code,isCurrent=()=>true}){
   const ctx=canvas.getContext('2d');if(!ctx)throw new PosterError('canvas','海报画布暂不可用。');
-  if(code&&(code.publicationId!==input.publicationId||!code.filePath))throw new PosterError('code_version','小程序码与当前海报不匹配。');
+  if(code&&(code.publicationId!==(input.codePublicationId||input.publicationId)||!code.filePath))throw new PosterError('code_version','小程序码与当前海报不匹配。');
   const layout=createStatusPosterLayout(input,(value,size,weight)=>{ctx.font=`${weight} ${size}px Songti SC,STSong,serif`;return ctx.measureText(value).width;},theme,!!code);
   const images={background:await loadCanvasImage(canvas,layout.background),brand:await loadCanvasImage(canvas,assets.brand)};
   if(code){images.code=await loadCanvasImage(canvas,code.filePath);if(!images.code.width||images.code.width!==images.code.height)throw new PosterError('image','小程序码格式不正确。');}
