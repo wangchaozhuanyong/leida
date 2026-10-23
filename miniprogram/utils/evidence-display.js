@@ -4,8 +4,9 @@
 function displayEvidenceKey(item) {
   const text = item.text.replace(/\s+/g, ' ').trim();
   const url = item.url.trim();
-  // A source observation has its own time and meaning even when it links to a post.
-  if (/^observed-\d+$/.test(item.messageId) || item.metadata?.referenceReset) {
+  // The reserved observation ID retains its own time and meaning. referenceReset
+  // is also historical proof attached to original posts, not an observation flag.
+  if (/^observed-\d+$/.test(item.messageId)) {
     return JSON.stringify(['observation', item.sourceId, item.messageId, item.publishedAt, url, text]);
   }
   // Post identity survives archive precision, URL aliases and share parameters.

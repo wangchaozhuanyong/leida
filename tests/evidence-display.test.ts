@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
+import {readFileSync} from 'node:fs';
 import {createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {SearchParamsContext} from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import type {Evidence, PublicData, Publication} from '../src/lib/types';
 import {uniqueDisplayEvidence} from '../src/components/public/model';
 import {EventPage} from '../src/components/public/PublicApp';
+import {observedEvidence} from '../src/lib/reset-observations';
 
 const {resolveDetail}=createRequire(import.meta.url)('../miniprogram/utils/model.js');
 const time='2026-10-17T21:12:21.000Z', url='https://x.com/thsottiaux/status/2111566005684289735';
@@ -19,8 +21,12 @@ function fixture(rows:Evidence[]):PublicData {
   return {events:[event],articles:[article],publications:[publication],evidence:rows,notices:[],activities:[],sources:[{id:'tibo-public',name:'Tibo',status:'healthy'},{id:'aiplanwatch-history',name:'历史来源',status:'healthy'}],site:{name:'重置雷达',description:'',autoPublish:true,version:1},serverTime:'2026-10-23T02:00:00.000Z'};
 }
 
-test('同一原帖跨来源与毫秒精度只呈现一次，网站详情与小程序一致且不改历史数据',()=>{
-  const data=fixture([evidence('original'),evidence('archive',{sourceId:'aiplanwatch-history',publishedAt:'2026-10-17T21:12:21.411Z'})]);
+test('真实原帖带历史 referenceReset 证明仍只呈现一次，两端一致且不改历史元数据',()=>{
+  const rows=JSON.parse(readFileSync(new URL('./fixtures/source-original-duplicates-20261018.json',import.meta.url),'utf8')) as Evidence[];
+  assert.equal(rows.length,2);
+  assert.ok(rows.some(row=>row.sourceId==='aiplanwatch-history'&&row.metadata?.referenceReset));
+  assert.ok(rows.every(row=>row.textOrigin==='original'&&observedEvidence(row,row.collectedAt)===null));
+  const data=fixture(rows);
   const before=structuredClone(data);
   const html=renderToStaticMarkup(createElement(SearchParamsContext.Provider,{value:new URLSearchParams()},createElement(EventPage,{data,id:'event',onPoster(){},onShare:async()=>{}})));
   assert.equal((html.match(/class="pub-source-row"/g)||[]).length,1);
@@ -50,10 +56,17 @@ test('非帖子来源按地址、正文和时间保留；无有效地址的独�
   assert.equal(uniqueDisplayEvidence([rows[0],{...rows[0],id:'same-instant',publishedAt:'2026-10-18T05:12:21+08:00'}]).length,1);
 });
 
-test('来源观测与原帖声明分开，不把同帖不同观测时刻或来源混成一条',()=>{
-  const observed=evidence('observation',{messageId:'observed-2111566005684289735',sourceId:'reset-archive'});
-  const rows=[evidence('original'),observed,{...observed,id:'later',publishedAt:'2026-10-18T00:00:00Z'},{...observed,id:'other-source',sourceId:'aiplanwatch-reference'}];
+test('真实 referenceReset 观测契约和原帖分开，同帖不同观测时刻及来源继续保留',()=>{
+  const text='Codex usage limits have been reset. Check your limits.';
+  const observed=evidence('observation',{messageId:'observed-2111566005684289735',sourceId:'aiplanwatch-reference',text,textOrigin:'archive_excerpt',publishedAt:'2026-10-18T00:00:00Z',metadata:{sourceGroup:'aiplanwatch',benefitKind:'automatic_reset',referenceReset:{eventId:'observation',occurredAt:'2026-10-18T00:00:00Z',snapshotAt:'2026-10-18T01:00:00Z',summary:text,referenceUrl:'https://raw.githubusercontent.com/gdutxiaoxu/codex-reset-radar/master/data/latest.json'}}});
+  const later:Evidence={...observed,id:'later',publishedAt:'2026-10-18T02:00:00Z',metadata:{...observed.metadata,referenceReset:{...observed.metadata!.referenceReset!,occurredAt:'2026-10-18T02:00:00Z',snapshotAt:'2026-10-18T03:00:00Z'}}};
+  const other:Evidence={...observed,id:'other-source',sourceId:'reset-archive',metadata:{sourceGroup:'codex-resets',category:'reset'}};
+  const original=evidence('original',{text,metadata:observed.metadata});
+  assert.equal(observedEvidence(original,original.collectedAt),null);
+  for(const row of [observed,later,other])assert.ok(observedEvidence(row,row.collectedAt),row.id);
+  const rows=[original,observed,later,other],before=structuredClone(rows);
   assert.deepEqual(uniqueDisplayEvidence(rows).map(row=>row.id),rows.map(row=>row.id));
+  assert.deepEqual(rows,before);
 });
 
 test('同帖选择官方副本但保持原分组位置，输入对象与排列不变',()=>{

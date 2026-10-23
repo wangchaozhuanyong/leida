@@ -1,0 +1,47 @@
+[
+  {
+    "id": "evidence_6ced5e6e25e50975394551abee1f4735f8fe790966c62ab8246dc61e46c7b817",
+    "url": "https://x.com/thsottiaux/status/2111566005684289735",
+    "hash": "7e1f4f9276bcbac2978928da790d059774ea9792fb1136ef05e08e92438b6a6a",
+    "text": "Done",
+    "metadata": {
+      "category": "product",
+      "sourceGroup": "fxembed:thsottiaux"
+    },
+    "sourceId": "tibo-public",
+    "messageId": "2111566005684289735",
+    "historical": true,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "collectedAt": "2026-10-23T03:13:11.766Z",
+    "publishedAt": "2026-10-17T21:12:21.000Z",
+    "contextComplete": false
+  },
+  {
+    "id": "evidence_cba6b6d1183b855fea6d8ec626b02ebaa4a90bf871298f8b0b7b2b3cc9b06d28",
+    "url": "https://x.com/thsottiaux/status/2111566005684289735",
+    "hash": "9e5b9c123304db9ea734f8a166a6135220be432725d8f66f71e505714d29ef9b",
+    "text": "Done",
+    "metadata": {
+      "summary": "参考项目历史记录，等待核对原文、福利类型及事件阶段。",
+      "category": "reset",
+      "benefitKind": "automatic_reset",
+      "sourceGroup": "aiplanwatch",
+      "referenceReset": {
+        "eventId": "57205f59-83a4-43e2-99bc-07916b1046d0",
+        "summary": "Done",
+        "occurredAt": "2026-10-17T21:12:21.000Z",
+        "snapshotAt": "2026-10-17T21:41:52.431Z",
+        "referenceUrl": "https://raw.githubusercontent.com/gdutxiaoxu/codex-reset-radar/1ccf5ec6f08d1b17e79c5234918e270ccaf53de7/data/latest.json"
+      }
+    },
+    "sourceId": "aiplanwatch-history",
+    "messageId": "2111566005684289735",
+    "historical": true,
+    "provenance": "archive",
+    "textOrigin": "original",
+    "collectedAt": "2026-10-23T15:32:36.217Z",
+    "publishedAt": "2026-10-17T21:12:21.411Z",
+    "contextComplete": false
+  }
+]
