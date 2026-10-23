@@ -5,6 +5,7 @@ import type {ForecastPublicData} from './forecast';
 import {activeResetWatch,activeResetSchedule,resetWatchWindow} from './reset-watch';
 import {announcementCountdown,completionElapsed,latestCompletedBenefits} from '../components/public/model';
 import {publicResetOutlook} from './reset-outlook';
+import {timelineObservation} from '../../miniprogram/utils/reset-observations.js';
 const beijing=(value:string)=>new Date(Date.parse(value)+8*3600_000).toISOString().slice(0,16).replace('T',' ');
 
 export type Completion = Pick<BenefitAction, 'kind' | 'stage' | 'statementAt'> | null | undefined;
@@ -67,6 +68,11 @@ function statusPresentation(model:ReturnType<typeof resolveStatusTimeline>) {
   return {tone:'muted',badge:'等待新消息',heading:'等待下一次 Reset',kind:'公开动态追踪'};
 }
 export function statusTimelineModel(outlook:ResetOutlook,now:string,completion:Completion=outlook.latestCompletion,forecasts?:ForecastPublicData) {
+  const observation=timelineObservation(outlook,now,completion);
+  if(observation&&!activeResetSchedule(forecasts?.watch,now)){
+    const model=resolveStatusTimeline(outlook,now,{kind:'automatic_reset',stage:'claimed_complete',statementAt:observation.observedAt},forecasts?{...forecasts,referenceSignal:undefined,watch:undefined}:undefined);
+    return {...model,sourceName:observation.sourceName,sourceUrl:observation.sourceUrl,sourceType:'observed' as const,sourceCredit:true,publicationId:observation.publicationId,statementAt:observation.observedAt,note:'第三方来源记录了用量重置；个人到账尚未核验。',presentation:{tone:'green',badge:'来源观测',heading:'来源观测：用量已重置',kind:'额度重置'}};
+  }
   const model=resolveStatusTimeline(outlook,now,completion,forecasts);
   return {...model,presentation:statusPresentation(model)};
 }
@@ -91,8 +97,8 @@ export function statusPosterSnapshot(data:PublicData,now=data.serverTime) {
   const value=model.completed?(minutes<1?'刚刚':String(minutes<60?minutes:minutes<1440?Math.floor(minutes/60):Math.floor(minutes/1440))):model.watching?'观察中':model.title;
   const unit=model.completed&&minutes>=1?(minutes<60?'分钟':minutes<1440?'小时':'天'):'';
   return {round:statusTimelineRevision(model),publicationId,codePublicationId,generatedAt:now,
-    title:model.scheduled?(model.kind==='banked_reset'?'重置卡发放预告':'用量重置预告'):model.completed?(model.kind==='banked_reset'?'公告称已发放重置卡':'公告称已重置用量'):model.title,
-    label:model.completed?'距该公告':model.scheduled?model.lead:'当前公开状态',value,unit,statementAt:model.statementAt,statementLabel:model.watching?'信号时间':'公告时间',
+    title:model.scheduled?(model.kind==='banked_reset'?'重置卡发放预告':'用量重置预告'):model.completed?(model.sourceType==='observed'?'来源观测：用量已重置':model.kind==='banked_reset'?'公告称已发放重置卡':'公告称已重置用量'):model.title,
+    label:model.completed?(model.sourceType==='observed'?'距来源观测':'距该公告'):model.scheduled?model.lead:'当前公开状态',value,unit,statementAt:model.statementAt,statementLabel:model.completed&&model.sourceType==='observed'?'观测时间':model.watching?'信号时间':'公告时间',
     nextNote:model.watching?(model.forecastWindow?`发布时预计：${model.forecastWindow}${model.chanceLabel?` · ${model.chanceLabel}`:''}`:'公开信号记录，尚无明确发放时间。'):model.scheduled?model.note.replace(/ (\d{2}:\d{2})$/,'\n$1'):model.note,
     sourceLabel:model.sourceCredit?model.sourceType==='observed'?`来源：${model.sourceName} 观察记录`:`来源：${model.sourceName} · Tibo 公开动态`:model.completed?'依据：所选公开完成公告':'依据：当前公开状态',
     validUntil:model.scheduled?model.expectedAt:model.watching?model.expiresAt:model.completed?new Date(Date.parse(model.statementAt)+24*3600_000).toISOString():'',

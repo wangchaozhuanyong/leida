@@ -8,6 +8,7 @@ import type {WechatDelivery,WechatGrant,WechatReader,WechatReminderPreferences} 
 import {createWechatService,defaultWechat,publicationScene,publicationForScene,wechatTemplateData,WECHAT_DISPATCH_BATCH_SIZE,WECHAT_SEND_MAX_PER_SECOND,type WechatStore} from '../src/server/wechat';
 import {createWechatProvider,WechatServiceError} from '../src/server/wechat-provider';
 import {validateWechatImage} from '../src/server/wechat-image';
+import {apiError} from '../src/server/http';
 const actualPng=await QRCode.toBuffer('https://example.invalid/actual-decodable-fixture',{type:'png',width:430});
 // Locally generated, decodable 16x16 RGB JPEG; no external image request is used.
 const actualJpeg=Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAQABADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD6pooooA//2Q==','base64');
@@ -58,7 +59,8 @@ async function fixture(overrides:{apiLimit?:number;send?:'ok'|'reject'|'timeout'
   const publication:Publication={id:event.publicationId,eventId:event.id,articleId:article.id,event,article,cutoffAt:new Date(time).toISOString(),publishedAt:new Date(time).toISOString(),reason:'fixture'};
   const evidence:Evidence={id:'ev',sourceId:'fixture',messageId:'msg',url:'https://example.invalid/source',text:'Original evidence',publishedAt:new Date(time).toISOString(),collectedAt:new Date(time).toISOString(),hash:'fixture',contextComplete:true,historical:false,provenance:'official'};
   await store.put('events',event);await store.put('articles',article);await store.insert('publications',publication);await store.insert('evidence',evidence);
-  async function login(code='first-code'){return service.wechatLogin(code);}
+  let loginSequence=0;
+  async function login(code=`first-code-${++loginSequence}`){return service.wechatLogin(code,code);}
   async function accept(token:string) {const challenge=await service.wechatSubscriptionChallenge(token);assert.ok(challenge.nonce);return {challenge,state:await service.confirmWechatSubscription(token,{nonce:challenge.nonce,templateId:challenge.templateId,result:'accept'})};}
   async function notice(patch:Partial<Notice>={}) {time+=1000;const value:Notice={id:`notice-${time}`,eventId:event.id,publicationId:publication.id,semanticKey:`fact-${time}`,title:'重置公告中文标题',summary:'对应公开变化',categories:['result'],status:'active',createdAt:new Date(time).toISOString(),...patch};await store.insert('notices',value);return value;}
   async function queued() {await service.scheduleWechatDeliveries();return (await store.list<Job>('jobs')).filter(job=>job.kind==='wechat_send');}
@@ -667,7 +669,7 @@ test('匿名登录分钟限频与日额度分离，不耗尽二维码/发送总�
   await f.service.generateWechatCode(f.publication.id);assert.equal((await f.service.adminWechat()).codesToday,1);
   const limited=await fixture({apiLimit:4});await limited.login();await assert.rejects(limited.login(),/登录调用已达限制/);await limited.service.generateWechatCode(limited.publication.id);assert.equal((await limited.service.adminWechat()).callsToday,3);
   const store=memory();let failures=0;const failed=createWechatService({store,encryptionKey:()=>Buffer.alloc(32,7),clock:f.now,fetcher:async()=>{failures++;return Response.json({errcode:40029});}});
-  const original=await f.store.one<{id:string}>('settings','wechat');await store.put('settings',original!);for(let index=0;index<10;index++)await assert.rejects(failed.wechatLogin('invalid-code'));await assert.rejects(failed.wechatLogin('invalid-code'),/登录调用已达限制/);assert.equal(failures,10);
+  const original=await f.store.one<{id:string}>('settings','wechat');await store.put('settings',original!);for(let index=0;index<250;index++)await assert.rejects(failed.wechatLogin('invalid-code','noisy-connection'));assert.equal(failures,1);assert.equal((await failed.adminWechat()).callsToday,1);
 });
 
 test('JPEG必须有合法尺寸/扫描和完整EOI，响应类型不靠声明猜测',async()=>{
@@ -757,4 +759,23 @@ test('跨事件新完成在入队和最终发送前都拦截旧预告，并退�
   assert.equal(f.calls.filter(call=>call.url.includes('/message/subscribe/send')).length,0);
   assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,1);
  }
+});
+
+
+test('单连接失败被隔离，重复凭证不会再消耗微信预算；其他连接可以登录',async()=>{
+ const f=await fixture({apiLimit:1000});let requests=0;
+ const service=createWechatService({store:f.store,clock:f.now,encryptionKey:()=>Buffer.alloc(32,7),fetcher:async input=>{requests++;const code=new URL(String(input)).searchParams.get('js_code');return Response.json(code?.startsWith('bad')?{errcode:40029}:{openid:'fixture_openid_123456789'});}});
+ for(let i=0;i<5;i++)await assert.rejects(service.wechatLogin(`bad-${i}`,'noisy-connection'));
+ await assert.rejects(service.wechatLogin('bad-next','noisy-connection'),(e:any)=>e.status===429&&e.retryAt===new Date(f.now()+15*60_000).toISOString());
+ assert.equal(requests,5);assert.ok((await service.wechatLogin('fresh-valid','another-connection')).sessionToken);assert.equal(requests,6);
+ const stored=JSON.stringify(await f.store.one('settings','wechat_login_admission'));assert.doesNotMatch(stored,/bad-0|noisy-connection|fresh-valid|another-connection/);
+ f.advance(15*60_000+1);assert.ok((await service.wechatLogin('fresh-after-wait','noisy-connection')).sessionToken);
+});
+test('预算错误返回明确恢复时间和Retry-After，普通错误不能伪装成限流回执',async()=>{
+ const retryAt=new Date(Date.now()+60_000).toISOString();
+ const response=apiError(new WechatServiceError('登录过于频繁，请一分钟后重试','budget',undefined,retryAt));
+ assert.equal(response.status,429);assert.equal((await response.json()).retryAt,retryAt);
+ assert.ok(Number(response.headers.get('retry-after'))>=1);assert.equal(response.headers.get('cache-control'),'no-store');
+ const unknown=apiError({status:429,message:'请稍后重试',retryAt:'https://example.invalid/untrusted'});
+ assert.equal((await unknown.json()).retryAt,undefined);assert.equal(unknown.headers.get('retry-after'),null);
 });

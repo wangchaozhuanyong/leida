@@ -1,7 +1,7 @@
 import type { ActionKind, ActionStage, BenefitAction } from '../lib/types';
 
 /** Change only when fact interpretation changes, so unchanged inputs are evaluated once. */
-export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261018-3';
+export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261023-1';
 export interface BenefitClaim {
   kind: ActionKind; stage: ActionStage; eligibility: string; scope: BenefitAction['scope'];
   quote: string; expectedAt?: string; timeNote?: string;
@@ -90,7 +90,7 @@ export function benefitStage(text: string): ActionStage | undefined {
   if (/(?:not|never|won't|haven't|hasn't|didn't|cannot|can't|not yet).{0,35}(?:reset|giv|add|load|credit|grant|land|propagat|complet|cancel|withdraw)|(?:尚未|没有|并未|未曾|不会|不再|不).{0,15}(?:发放|重置|添加|存入|到账|落地|取消|撤回)/i.test(s) && !/不再发放/.test(s)) return;
   if (/\b(?:cancelled|canceled|withdrawn|withdrew|cancel|withdraw)\b|取消|撤回|不再发放/i.test(s)) return 'cancelled';
   if (/\b(?:will|(?:we|i|they)'ll|going to|scheduled to|plan to|should|expect(?:ed)?)\b.{0,80}(?:reset|giv|add|load|credit|grant|land|propagat|complet|be there|be showing)|将(?:会|于)?|计划|预计|安排|承诺|(?:改为|调整为)(?:稍后|之后|以后).{0,12}(?:发放|重置)/i.test(s)) return 'promised';
-  if (/\blanding\b.{0,60}(?:\btomorrow\b|\btoday\b|\bsoon\b|\bin\b|\bwithin\b|\bby\b|\d{1,2}(?::\d{2})?\s*[ap]m\b)/i.test(s)) return 'promised';
+  if (/\b(?:landing|lands?)\b.{0,60}(?:\btomorrow\b|\btoday\b|\bsoon\b|\bin\b|\bwithin\b|\bby\b|\d{1,2}(?::\d{2})?\s*[ap]m\b)/i.test(s)) return 'promised';
   if (/\b(?:are|is|we're)\s+(?:(?:now|once\s+again)\s+)?(?:giving|loading|crediting|granting|reset{1,2}ing)|\b(?:loading|rolling out|propagating|in progress)\b|正在|发放中|传播中|加载中/i.test(s)) return 'in_progress';
   if (deicticCompletion.test(s)) return 'claimed_complete';
   // This exact all-paid announcement describes already reset limits. A bare

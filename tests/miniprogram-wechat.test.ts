@@ -13,12 +13,13 @@ const config={mode:'https',baseUrl:'https://public.example.org',cloudEnv:'',serv
 const now=Date.parse('2026-10-10T04:00:00Z'),scene='a'.repeat(32);
 const safe=(state='none')=>({configured:true,enabled:true,state,templateId:'fixture-template'});
 type Options=Record<string,any>;
-function mock(options:{state?:string;challengeState?:string;result?:string;privacy?:boolean;failConfirm?:boolean;failState?:boolean;failRevoke?:boolean;codeStatus?:number;sessionMs?:number;challengeMs?:number;legacyPreferences?:boolean;failPreferencesAfterSave?:boolean;invalidPreferences?:boolean}={}){
+function mock(options:{state?:string;challengeState?:string;result?:string;privacy?:boolean;failConfirm?:boolean;failState?:boolean;failRevoke?:boolean;codeStatus?:number;sessionMs?:number;challengeMs?:number;legacyPreferences?:boolean;failPreferencesAfterSave?:boolean;invalidPreferences?:boolean;cancelRevoke?:boolean}={}){
   let state=options.state||'none',login=0,subscribe=0,clock=now,count=['available','reserved'].includes(state)?1:0,challenges=0;
   let preferences={announcement:true,result:true,correction:true};
   const confirmed=new Set<string>();const current=()=>({...safe(state),remainingCount:count,pendingCount:state==='reserved'?1:0,...(options.legacyPreferences?{}:{preferencesSupported:true,reminderPreferences:options.invalidPreferences?{...preferences,result:'yes'}:preferences})});
   const requests:Options[]=[];
   const wx={
+    showModal(option:Options){queueMicrotask(()=>option.success({confirm:!options.cancelRevoke,cancel:!!options.cancelRevoke}));},
     login(option:Options){login++;queueMicrotask(()=>option.success({code:'fixture-login-code'}));},
     getPrivacySetting(option:Options){queueMicrotask(()=>option.success({needAuthorization:!!options.privacy}));},
     requestSubscribeMessage(option:Options){subscribe++;queueMicrotask(()=>option.success({[option.tmplIds[0]]:options.result||'accept'}));},
@@ -172,7 +173,7 @@ test('页面声明真实canvas、主动授权和隐私入口，场景解析不�
   assert.doesNotThrow(()=>new Script(code));
 });
 
-function pageHarness(reader?:Options,initialFeed:Options={}) {
+function pageHarness(reader?:Options,initialFeed:Options={},wxOverrides:Options={}) {
   const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
   const publication:Publication={id:'fixture-old',articleId:'fixture-article',eventId:'fixture-event',publishedAt:'2026-10-10T01:00:00Z',cutoffAt:'2026-10-10T01:00:00Z',reason:'隔离页面输入',mode:'news_only',article:{id:'fixture-article',eventId:'fixture-event',title:'测试旧版本标题',summary:'测试旧版本正文',translation:'',category:'product',version:1,status:'published',publicationId:'fixture-old',evidenceIds:[],publishedAt:'2026-10-10T01:00:00Z',updatedAt:'2026-10-10T01:00:00Z'},event:{id:'fixture-event',title:'测试事件',version:1,status:'published',publicationId:'fixture-old',actions:[],evidenceIds:[],updatedAt:'2026-10-10T01:00:00Z'}};
   const latest=structuredClone(publication);latest.id='fixture-new';latest.article.publicationId=latest.id;latest.article.title='测试最新版本标题';latest.article.version=2;latest.event.publicationId=latest.id;
@@ -183,7 +184,7 @@ function pageHarness(reader?:Options,initialFeed:Options={}) {
   if(reader)app.wechat=reader as typeof app.wechat;
   function page(name:string,query:Record<string,string>={}){
     let definition:Options|undefined;const cache=new Map<string,{exports:Options}>();
-    function load(filename:string):Options{const existing=cache.get(filename);if(existing)return existing.exports;const module={exports:{}};cache.set(filename,module);new Script(readFileSync(filename,'utf8'),{filename}).runInNewContext({module,exports:module.exports,wx:{showShareMenu(){},hideShareMenu(){},showToast(){},switchTab(options:Options){navigation.push({method:'switchTab',url:options.url});},navigateTo(options:Options){navigation.push({method:'navigateTo',url:options.url});}},getApp(){return app;},setTimeout,clearTimeout,setInterval(){return 1;},clearInterval(){},Date,Page(value:Options){definition=value;},require(path:string){const target=resolve(dirname(filename),path.endsWith('.js')?path:`${path}.js`);assert.ok(target.startsWith(resolve(root,'miniprogram')+'/'));return load(target);}});return module.exports;}
+    function load(filename:string):Options{const existing=cache.get(filename);if(existing)return existing.exports;const module={exports:{}};cache.set(filename,module);new Script(readFileSync(filename,'utf8'),{filename}).runInNewContext({module,exports:module.exports,wx:{showModal(options:Options){options.success({confirm:true});},...wxOverrides,showShareMenu(){},hideShareMenu(){},showToast(){},switchTab(options:Options){navigation.push({method:'switchTab',url:options.url});},navigateTo(options:Options){navigation.push({method:'navigateTo',url:options.url});}},getApp(){return app;},setTimeout,clearTimeout,setInterval(){return 1;},clearInterval(){},Date,Page(value:Options){definition=value;},require(path:string){const target=resolve(dirname(filename),path.endsWith('.js')?path:`${path}.js`);assert.ok(target.startsWith(resolve(root,'miniprogram')+'/'));return load(target);}});return module.exports;}
     load(resolve(root,`miniprogram/pages/${name}/index.js`));assert.ok(definition);const instance:Options={...definition,data:structuredClone(definition.data),setData(patch:Options){for(const [key,value] of Object.entries(patch)){const path=key.split('.');let target=this.data;for(const part of path.slice(0,-1)){target[part]??={};target=target[part];}target[path.at(-1)!]=structuredClone(value);}}};instance.onLoad(query);instance.onShow();return instance;
   }
   return{page,requests,calls,navigation,data,feed(patch:Options){Object.assign(feedState,patch);listeners.forEach(fn=>fn(feedState));},get subscriptions(){return listeners.size;}};
@@ -359,7 +360,7 @@ test('增加和关闭各自保持操作状态，连续点击不会重复授权�
     await page.addWechat();await page.revokeWechat();await flush();assert.ok(held);assert.equal(h.subscribe,1);
     assert.equal(page.data.settingsReady,true);assert.equal(page.data.wechat.remainingCount,1);
     request(held!);held=undefined;await adding;assert.equal(page.data.wechatAction,'');assert.equal(page.data.wechat.remainingCount,2);
-    const closing=page.revokeWechat();assert.equal(page.data.wechatAction,'revoke');await page.addWechat();await page.revokeWechat();await flush();
+    const closing=page.revokeWechat();assert.equal(page.data.wechatAction,'confirm-revoke');await page.addWechat();await page.revokeWechat();await flush();
     assert.ok(held);assert.equal((held as Options|undefined)?.method,'DELETE');assert.equal(h.subscribe,1);assert.equal(page.data.wechat.remainingCount,2);
     request(held!);held=undefined;await closing;assert.equal(page.data.wechatAction,'');assert.equal(page.data.wechat.safe.state,'revoked');assert.equal(page.data.wechat.remainingCount,0);
   }finally{if(held)request(held);await flush();page.onUnload();}
@@ -590,4 +591,11 @@ test('旧后台隐私读取晚于新授权返回时，不重新读取次数或�
  await h.reader.authorize({userInitiated:true});const requests=h.requests.length;
  privacy!.success({needAuthorization:false});await background;
  assert.equal(h.requests.length,requests);assert.equal(h.reader.getState().remainingCount,2);assert.equal(h.reader.getState().ready,true);
+});
+
+
+test('取消关闭确认不撤销次数；确认文案写明作废次数和保留次数的暂停路径',async()=>{
+ const h=mock({state:'available',sessionMs:600000,challengeMs:300000});let content='';
+ const page=pageHarness(h.reader,{}, {showModal(options:Options){content=options.content;options.success({confirm:false,cancel:true});}}).page('settings');
+ try{await flush();const before=h.requests.length;await page.revokeWechat();assert.equal(h.requests.length,before);assert.equal(page.data.wechat.remainingCount,1);assert.match(content,/剩余 1 次提醒授权将作废/);assert.match(content,/次数会保留/);assert.equal(page.data.wechatAction,'');}finally{page.onUnload();}
 });

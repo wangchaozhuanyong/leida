@@ -4,6 +4,7 @@
 /** @typedef {import('../../src/lib/types').Article} Article */
 /** @typedef {import('../../src/lib/types').RadarEvent} RadarEvent */
 const {publicNewsGroups, homeNewsGroups} = require('./public-feed');
+const {resetObservations,observedEvidence}=require('./reset-observations');
 const dayMs = 86400000;
 const actionLabels = { automatic_reset: '用量重置', banked_reset: '重置卡' };
 const preferenceDefaults = { announcement: true, result: true, activity: false, correction: true };
@@ -94,7 +95,7 @@ function comparePublications(a, b) {
 /** @param {PublicData} data */
 const sortedPublications = data => data.events.filter(item => item.status !== 'merged').map(item => currentPublication(data, item)).filter(Boolean).sort(comparePublications);
 /** @param {PublicData} data */
-const sortedStatePublications = data => data.events.filter(item => item.status !== 'merged').map(item => statePublication(data, item)).filter(Boolean).sort(comparePublications);
+const sortedStatePublications = data => {const observed=new Set(resetObservations(data).map(o=>o.publicationId));return data.events.filter(item=>item.status!=='merged').map(item=>data.publications.find(p=>p.id===item.publicationId&&(observed.has(p.id)||!isNewsOnly(p)))||data.publications.filter(p=>p.eventId===item.id&&(observed.has(p.id)||!isNewsOnly(p))).sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt))[0]).filter(Boolean).sort(comparePublications);};
 /** @param {PublicData} data */
 function publicActions(data) {
   const seen = new Set();
@@ -299,7 +300,10 @@ function resolveDetail(data, query) {
     actions: newsOnly ? [] : publication.event.actions.map(action => ({ id: action.id, label: actionLabels[action.kind], stage: stageText(action, isOld || merged ? publication.cutoffAt : data.serverTime), eligibility: publicEligibility(action), scope: { public: '普发', targeted: '定向', private: '私人' }[action.scope], expectedAt: action.expectedAt ? displayTime(action.expectedAt) : '暂未明确', quote: action.evidenceQuote || '' })),
     sourceNotes: publicSourceNotes(publication.article, newsOnly ? [] : publication.event.actions),
     updates: (publicNewsGroups(data).find(group=>group.updates.some(p=>p.id===publication.id))?.updates || []).filter(p=>p.id!==publication.id).map(p=>({id:p.id,title:p.article.title,time:displayTime(publicationSourceTime(p)),path:sharePath(p)})),
-    evidence: evidence.map(item => ({ id: item.id, name: (data.sources.find(source=>source.id===item.sourceId)?.name || '原文记录').replace('（辅助来源）','').replace('（免费）',''), label: { official: '官方原文', archive: '第三方收录', manual: '补充来源' }[item.provenance], text: item.text, origin: item.textOrigin === 'archive_excerpt' ? '仅收录原文片段' : item.textOrigin === 'structured' ? '来源摘要' : '', complete: item.contextComplete, time: displayTime(item.publishedAt), url: safeUrl(item.url) || '' }))
+    evidence: evidence.map(item => {
+      const observation=observedEvidence(item,item.collectedAt);
+      return {id:item.id,name:observation?.sourceName||(data.sources.find(source=>source.id===item.sourceId)?.name||'原文记录').replace('（辅助来源）','').replace('（免费）',''),label:observation?'来源观测':{official:'官方原文',archive:'第三方收录',manual:'补充来源'}[item.provenance],text:item.text,origin:observation?'来源记录了用量重置，个人到账尚未核验；观测时间与原帖发布时间分别保留。':item.textOrigin==='archive_excerpt'?'仅收录原文片段':item.textOrigin==='structured'?'来源摘要':'',complete:item.contextComplete,observed:!!observation,time:displayTime(item.publishedAt),url:observation?.sourceUrl||safeUrl(item.url)||'',referenceUrl:observation?.referenceUrl||''};
+    })
   };
 }
 /** Count calendar dates in the configured zone, without assuming every device has Intl. */

@@ -1,5 +1,6 @@
 import type { ActionKind, ActionStage } from './types';
 import { pendingPublicActions, publicActions, isNewsOnly, type PublicFactsData } from './public-facts';
+import {resetObservations,type ResetObservation} from './reset-observations';
 
 export interface ResetOutlookRound {
   actionId: string; eventId: string; publicationId: string; kind: ActionKind; stage: ActionStage;
@@ -12,6 +13,8 @@ export interface ResetOutlook {
   status: 'scheduled' | 'announced' | 'in_progress' | 'overdue' | 'completed' | 'cancelled' | 'monitoring';
   active?: ResetOutlookRound; latestCompletion?: ResetOutlookRound; lastResolved?: ResolvedResetRound;
   evidenceCutoffAt?: string; latestGlobalCompletionAt?: string;
+  /** Auxiliary observation, separate from public announcement facts and training. */
+  latestObservation?:ResetObservation;
   latestResolutions?: Partial<Record<ActionKind, ResolvedResetRound>>;
   pendingReview?: ResetOutlookRound[];
   /** Independent public states; optional for compatibility with existing clients. */
@@ -21,6 +24,7 @@ export interface ResetOutlook {
 /** Consumer forecast follows one published round, never a historical interval or another round's completion. */
 export function publicResetOutlook(data: PublicFactsData, kind?: ActionKind): ResetOutlook {
   const now = Date.parse(data.serverTime);
+  const observation=resetObservations(data).find(o=>!kind||o.kind===kind);
   const facts = publicActions(data).filter(({ action, publication }) => (!kind || action.kind === kind) && Number.isFinite(Date.parse(action.statementAt)) && Date.parse(action.statementAt) <= now && Date.parse(publication.publishedAt) <= now)
     .sort((a, b) => Date.parse(b.action.statementAt) - Date.parse(a.action.statementAt));
   const round = (item: typeof facts[number]): ResetOutlookRound => ({
@@ -41,7 +45,8 @@ export function publicResetOutlook(data: PublicFactsData, kind?: ActionKind): Re
   const pendingAll=pendingPublicActions(data).filter(item=>!kind||item.action.kind===kind);
   const needsReview=(item:typeof pendingAll[number])=>announcementNeedsReview(item.action,latestResolutions[item.action.kind]);
   const pendingReview=pendingAll.filter(needsReview).map(round);
-  const pending=pendingAll.find(item=>!needsReview(item)&&(!resolved||Date.parse(item.action.statementAt)>=Date.parse(resolved.action.statementAt)||Date.parse(item.action.expectedAt??'')>=Date.parse(resolved.action.statementAt)));
+  const observedRound=(item:typeof pendingAll[number])=>observation&&Date.parse(item.action.statementAt)<=Date.parse(observation.observedAt)&&item.action.evidenceIds.some(id=>data.evidence.some(e=>e.id===id&&e.url===observation.referenceUrl));
+  const pending=pendingAll.find(item=>!needsReview(item)&&!observedRound(item)&&(!resolved||Date.parse(item.action.statementAt)>=Date.parse(resolved.action.statementAt)||Date.parse(item.action.expectedAt??'')>=Date.parse(resolved.action.statementAt)));
   let lastResolved: ResolvedResetRound | undefined;
   if (resolved) {
     // Only matching immutable versions of this same action establish its preannouncement.
@@ -61,9 +66,9 @@ export function publicResetOutlook(data: PublicFactsData, kind?: ActionKind): Re
   if (pending) {
     const deadline = Date.parse(pending.action.expectedAt ?? '');
     const status = Number.isFinite(deadline) && deadline <= now ? 'overdue' : pending.action.stage === 'in_progress' ? 'in_progress' : Number.isFinite(deadline) ? 'scheduled' : 'announced';
-    return { ...base, status, active: round(pending) };
+    return { ...base, ...(observation?{latestObservation:observation}:{}), status, active: round(pending) };
   }
-  return { ...base, status: resolved ? resolved.action.stage === 'claimed_complete' ? 'completed' : 'cancelled' : 'monitoring' };
+  return { ...base, ...(observation?{latestObservation:observation}:{}), status: resolved ? resolved.action.stage === 'claimed_complete' ? 'completed' : 'cancelled' : 'monitoring' };
 }
 
 /** Shared by page selection and delivery checks; it never mutates the old event. */

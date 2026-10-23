@@ -5,6 +5,7 @@ import { projectPublicHistory } from '../lib/history';
 import { publicActions, publicationSourceTime, recentCompletedBenefits } from '../lib/public-facts';
 import { publicNewsGroups, homeNewsGroups } from '../lib/public-feed';
 import { publicResetOutlook } from '../lib/reset-outlook';
+import {resetObservations} from '../lib/reset-observations';
 import { activityDayNumber } from '../lib/activity-display';
 import { getPublicForecast, forecastTablesAvailable } from './forecast';
 import { hash } from './domain';
@@ -90,11 +91,13 @@ export async function getLightPublicVersion() {
 // Compatibility facts contain dates, qualifications and actions, but no original bodies.
 const articleSummary = `(payload - 'translation' - 'summary') || jsonb_build_object('translation','', 'summary',left(payload->>'summary',360))`;
 const thinPublication = `(payload - 'article') || jsonb_build_object('article', ((payload->'article') - 'translation' - 'summary') || jsonb_build_object('translation','', 'summary',left(payload->'article'->>'summary',360)))`;
+// Retain bounded observation proof in compact reads; ordinary original bodies stay omitted.
+const thinEvidence = `CASE WHEN payload->>'sourceId' IN ('reset-archive','aiplanwatch-reference') AND payload->>'messageId' LIKE 'observed-%' THEN payload ELSE (payload - 'text' - 'metadata') || jsonb_build_object('text','') END`;
 export async function readPublicFacts(client: Client, timestamp: string): Promise<PublicData> {
   const events = (await client.query('SELECT payload FROM radar_events ORDER BY created_at DESC,id')).rows.map(row => row.payload as RadarEvent);
   const articles = (await client.query(`SELECT ${articleSummary} AS payload FROM radar_articles ORDER BY created_at DESC,id`)).rows.map(row => row.payload as Article);
   const publications = (await client.query(`SELECT ${thinPublication} AS payload FROM radar_publications ORDER BY created_at DESC,id`)).rows.map(row => row.payload as Publication);
-  const evidence = (await client.query("SELECT (payload - 'text' - 'metadata') || jsonb_build_object('text','') AS payload FROM radar_evidence WHERE id IN (SELECT jsonb_array_elements_text(payload->'article'->'evidenceIds') FROM radar_publications)")).rows.map(row => row.payload as Evidence);
+  const evidence = (await client.query(`SELECT ${thinEvidence} AS payload FROM radar_evidence WHERE id IN (SELECT jsonb_array_elements_text(payload->'article'->'evidenceIds') FROM radar_publications)`)).rows.map(row => row.payload as Evidence);
   return projectPublicHistory({ events, articles, publications, evidence, activities: [], notices: [], sources: [], site: { name: '模钥重置雷达', description: '', autoPublish: false, version: 1 }, serverTime: timestamp });
 }
 
@@ -127,7 +130,7 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
     const site = (await client.query("SELECT payload FROM radar_settings WHERE id='site'")).rows[0]?.payload;
     const empty: PublicData = { events: [], articles: [], publications: [], evidence: [], notices: [], activities: [], sources: state.sources, site: site || { name: '模钥重置雷达', description: '', autoPublish: false, version: 1 }, serverTime: now };
     if (options.view === 'state') return { data: empty, version: state.version, contentVersion: state.contentVersion };
-    const facts = ['home','methodology','calendar','news'].includes(options.view) ? await readPublicFacts(client, now) : {...empty};
+    const facts = ['home','methodology','calendar','news','history'].includes(options.view) ? await readPublicFacts(client, now) : {...empty};
     const activities: Activity[] = (await client.query('SELECT payload FROM radar_activities')).rows.map(row => row.payload);
     const selected = new Set<string>();
     let page: PublicReadEnvelope['page'];
@@ -139,20 +142,20 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
       page = grouped.page;
     } else if (options.view === 'history') {
       // Filtering, ordering and the 20-row window happen in SQL, never Array.slice pagination.
-      const cursor = decodeCursor(options.cursor, options), args: unknown[] = [options.filter || 'all'];
+      const cursor = decodeCursor(options.cursor, options), args: unknown[] = [options.filter || 'all',resetObservations(facts).map(o=>o.publicationId)];
       const history = options.view === 'history';
-      const from = history ? `FROM radar_events e LEFT JOIN radar_publications current ON current.id=e.payload->>'publicationId' JOIN LATERAL (SELECT CASE WHEN current.id IS NOT NULL AND coalesce(current.payload->>'mode',current.payload->'article'->>'publicationMode','state_change')<>'news_only' THEN current.payload ELSE (SELECT p.payload FROM radar_publications p WHERE p.payload->>'eventId'=e.id AND coalesce(p.payload->>'mode',p.payload->'article'->>'publicationMode','state_change')<>'news_only' ORDER BY (p.payload->>'publishedAt')::timestamptz DESC,p.id LIMIT 1) END AS payload) p ON p.payload IS NOT NULL` : 'FROM radar_articles a JOIN radar_publications p ON p.id=a.payload->>\'publicationId\'';
+      const from = history ? `FROM radar_events e LEFT JOIN radar_publications current ON current.id=e.payload->>'publicationId' JOIN LATERAL (SELECT CASE WHEN current.id IS NOT NULL AND (current.id=ANY($2::text[]) OR coalesce(current.payload->>'mode',current.payload->'article'->>'publicationMode','state_change')<>'news_only') THEN current.payload ELSE (SELECT p.payload FROM radar_publications p WHERE p.payload->>'eventId'=e.id AND (p.payload->>'id'=ANY($2::text[]) OR coalesce(p.payload->>'mode',p.payload->'article'->>'publicationMode','state_change')<>'news_only') ORDER BY (p.payload->>'publishedAt')::timestamptz DESC,p.id LIMIT 1) END AS payload) p ON p.payload IS NOT NULL` : 'FROM radar_articles a JOIN radar_publications p ON p.id=a.payload->>\'publicationId\'';
       const at = history ? `coalesce(greatest((p.payload->'article'->>'sourcePublishedAt')::timestamptz, (SELECT max((action->>'statementAt')::timestamptz) FROM jsonb_array_elements(p.payload->'event'->'actions') action)), (p.payload->'article'->>'publishedAt')::timestamptz)` : `coalesce((a.payload->>'sourcePublishedAt')::timestamptz,(a.payload->>'publishedAt')::timestamptz)`;
-      const where = history ? `e.payload->>'status'<>'merged' AND jsonb_array_length(p.payload->'event'->'actions')>0 AND ($1='all' OR EXISTS (SELECT 1 FROM jsonb_array_elements(p.payload->'event'->'actions') action WHERE action->>'kind'=$1))` : `($1='all' OR a.payload->>'category'=$1)`;
+      const where = history ? `e.payload->>'status'<>'merged' AND (jsonb_array_length(p.payload->'event'->'actions')>0 OR p.payload->>'id'=ANY($2::text[])) AND ($1='all' OR ($1='automatic_reset' AND p.payload->>'id'=ANY($2::text[])) OR EXISTS (SELECT 1 FROM jsonb_array_elements(p.payload->'event'->'actions') action WHERE action->>'kind'=$1))` : `($1='all' OR a.payload->>'category'=$1)`;
       const base = `SELECT p.payload->>'id' AS id, ${at} AS at, (p.payload->>'publishedAt')::timestamptz AS published ${from} WHERE ${where}`;
       const count = await client.query(`SELECT count(*)::int AS total FROM (${base}) records`, args);
-      const after = cursor ? (args.push(cursor.at,cursor.publishedAt,cursor.id), ' WHERE (at<$2::timestamptz OR (at=$2::timestamptz AND (published<$3::timestamptz OR (published=$3::timestamptz AND id>$4))))') : '';
+      const after = cursor ? (args.push(cursor.at,cursor.publishedAt,cursor.id), ' WHERE (at<$3::timestamptz OR (at=$3::timestamptz AND (published<$4::timestamptz OR (published=$4::timestamptz AND id>$5))))') : '';
       const rows = (await client.query(`SELECT * FROM (${base}) records${after} ORDER BY at DESC, published DESC, id ASC LIMIT 21`, args)).rows;
       const visible = rows.slice(0, 20); visible.forEach(row => selected.add(row.id));
       page = { ids: visible.map(row => row.id), total: count.rows[0].total, nextCursor: rows.length > 20 ? encodePublicCursor({ at: new Date(visible.at(-1)!.at).toISOString(), publishedAt:new Date(visible.at(-1)!.published).toISOString(), id: visible.at(-1)!.id, view: options.view, filter: options.filter || 'all' }) : null };
     } else if (options.view === 'home' || options.view === 'methodology') {
       const outlook = publicResetOutlook(facts);
-      for (const lane of Object.values(outlook.byKind ?? {})) for (const round of [lane.active,lane.latestCompletion,lane.lastResolved]) if (round) selected.add(round.publicationId);
+      for (const lane of Object.values(outlook.byKind ?? {})) for (const round of [lane.active,lane.latestCompletion,lane.lastResolved,lane.latestObservation]) if (round) selected.add(round.publicationId);
       for (const id of [outlook.active?.publicationId, outlook.latestCompletion?.publicationId, outlook.lastResolved?.publicationId]) if (id) selected.add(id);
       const actions = publicActions(facts).sort((a,b) => Date.parse(b.action.statementAt)-Date.parse(a.action.statementAt));
       recentCompletedBenefits(facts).forEach(item=>selected.add(item.publication.id));
@@ -197,7 +200,7 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
     empty.articles = (await client.query(`SELECT ${articleSql} AS payload FROM radar_articles WHERE id=ANY($1::text[])`, [articleIds])).rows.map(row => row.payload);
     empty.publications = (await client.query(`SELECT ${pubSql} AS payload FROM radar_publications WHERE id=ANY($1::text[])`, [[...selected]])).rows.map(row => row.payload);
     const evidenceIds = [...new Set([...extraEvidence, ...selectedFacts.flatMap(p => [...p.article.evidenceIds, ...p.event.evidenceIds, ...p.event.actions.flatMap(a=>a.evidenceIds), ...(p.article.contextEvidenceIds || [])])])];
-    empty.evidence = (await client.query(`SELECT ${detailed ? 'payload' : "(payload - 'text' - 'metadata') || jsonb_build_object('text','')"} AS payload FROM radar_evidence WHERE id=ANY($1::text[])`, [evidenceIds])).rows.map(row => row.payload);
+    empty.evidence = (await client.query(`SELECT ${detailed ? 'payload' : thinEvidence} AS payload FROM radar_evidence WHERE id=ANY($1::text[])`, [evidenceIds])).rows.map(row => row.payload);
     if (detailed) { const parentIds = empty.evidence.map(e => e.parentId).filter(Boolean); if (parentIds.length) { const parents = await client.query('SELECT payload FROM radar_evidence WHERE id=ANY($1::text[]) OR payload->>\'messageId\'=ANY($1::text[])', [parentIds]); const ids = new Set(empty.evidence.map(e => e.id)); empty.evidence.push(...parents.rows.map(row => row.payload as Evidence).filter(e => !ids.has(e.id))); } }
     if(page){const positions=new Map(page.ids.map((id,index)=>[id,index]));empty.publications.sort((a,b)=>(positions.get(a.id)??0)-(positions.get(b.id)??0));empty.articles.sort((a,b)=>(positions.get(a.publicationId)??0)-(positions.get(b.publicationId)??0));}
     empty.activities = activities;

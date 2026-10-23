@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {observedResetText} from '../../miniprogram/utils/reset-observations.js';
 import type {Evidence,Source} from '../lib/types';
 import type {Incoming} from './ingestion';
 import type {BenefitClaim} from './benefit-rules';
@@ -64,8 +65,10 @@ export function parseReferenceLatest(value:unknown,collectedAt:string):Incoming[
   const matches=!!signal&&row.source.url===signal.source.url&&row.source.url.endsWith('/'+signal.signal_id)&&Math.abs(Date.parse(row.occurred_at)-Date.parse(signal.recorded_at))<=1000;
   const summary=matches?signal!.summary:'',messageId=row.source.url.split('/').at(-1)!;
   const snowflake=Number((BigInt(messageId)>>22n)+1288834974657n);
-  if(Math.abs(snowflake-Date.parse(row.occurred_at))>1000)throw new Error('REFERENCE_TIME_MISMATCH');
-  return [{sourceId:REFERENCE_RESET_SOURCE.id,messageId,url:row.source.url,text:summary||'参考项目记录了公共额度重置，等待核对原文。',publishedAt:row.occurred_at,collectedAt,provenance:'archive',textOrigin:'archive_excerpt',contextComplete:false,metadata:{category:'reset',sourceGroup:'aiplanwatch',benefitKind:'automatic_reset',referenceReset:{eventId:row.event_id,snapshotAt:data.generated_at,occurredAt:row.occurred_at,referenceUrl:REFERENCE_RESET_SOURCE.url,summary}}}];
+  if(snowflake>Date.parse(row.occurred_at)+1000)throw new Error('REFERENCE_TIME_MISMATCH');
+  const observed=Math.abs(snowflake-Date.parse(row.occurred_at))>1000;
+  if(observed&&(!matches||!observedResetText(summary)))throw new Error('REFERENCE_TIME_MISMATCH');
+  return [{sourceId:REFERENCE_RESET_SOURCE.id,messageId:observed?`observed-${messageId}`:messageId,url:row.source.url,text:summary||'参考项目记录了公共额度重置，等待核对原文。',publishedAt:row.occurred_at,collectedAt,provenance:'archive',textOrigin:'archive_excerpt',contextComplete:false,metadata:{category:'reset',sourceGroup:'aiplanwatch',benefitKind:'automatic_reset',referenceReset:{eventId:row.event_id,snapshotAt:data.generated_at,occurredAt:row.occurred_at,referenceUrl:REFERENCE_RESET_SOURCE.url,summary}}}];
 }
 
 /** The original post and the reference's typed classification must both agree.

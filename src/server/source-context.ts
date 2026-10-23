@@ -155,11 +155,13 @@ function campaignProof(item:Evidence,all:Evidence[]):Evidence[]|undefined {
 export function campaignClaim(item:Evidence,all:Evidence[]):BenefitClaim|undefined {
   if(item.textOrigin!=='original'||isTruncatedText(item.text)||originalConflict(item,all))return;
   const processed=item.text.match(/(?:Therefore\s*\.\.\.\s*)?(the reset has been processed[.!]?)/i);
+  const daily=/(?:^|\n)\s*Day\s+\d+\s*\//i.test(item.text)&&/\b(?:it[’']s reset day today|that[’']s a reset)[.!]?|\band reset\.\s*Enjoy\./i.test(item.text);
   const lineage=gatherExplicitEvidenceContext(item,all);
-  const dayItem=isCampaignResetShorthand(item)?item:processed?lineage.slice(1).find(e=>/(?:^|\n)\s*(?:Roundup of )?Day\s+\d+\s*\//i.test(e.text)):undefined;
+  const dayItem=isCampaignResetShorthand(item)||daily?item:processed?lineage.slice(1).find(e=>/(?:^|\n)\s*(?:Roundup of )?Day\s+\d+\s*\//i.test(e.text)):undefined;
   if(!dayItem||!campaignProof(dayItem,all))return;
-  if(processed&&/\b(?:not|never|only|except|if|maybe|banked|cancelled)\b/i.test(item.text))return;
-  return {kind:'automatic_reset',stage:processed?'claimed_complete':'promised',scope:'public',eligibility:'活动中的Codex/Work用户（原帖未列明具体套餐及到账资格）',quote:processed?processed[1]:item.text};
+  const resetParagraph=item.text.split(/\n\s*\n/).find(p=>/it[’']s reset day today|that[’']s a reset|and reset\.\s*Enjoy\./i.test(p))??item.text;
+  if((processed||daily)&&/\b(?:not|never|except|if|maybe|banked|cancelled)\b|\bonly\s+for\b/i.test(processed?processed[1]:resetParagraph))return;
+  return {kind:'automatic_reset',stage:processed||daily&&/\band reset\.\s*Enjoy\./i.test(item.text)?'claimed_complete':'promised',scope:'public',eligibility:'活动中的Codex/Work用户（原帖未列明具体套餐及到账资格）',quote:processed?processed[1]:item.text};
 }
 export function directEvidenceBenefitClaims(item:Evidence,all:Evidence[]):BenefitClaim[] {
   const reference=referenceCompletionClaim(item);

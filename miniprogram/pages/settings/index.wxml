@@ -28,7 +28,7 @@
     <view wx:if="{{wechat.safe && wechat.safe.state === 'unknown'}}" class="small muted lead">上次发送的结果未确认，该消息不会重复发送。重新授权后只接收新消息，未确认的次数不计入可用次数。</view>
     <view class="small muted lead reminder-help">每次在微信中同意接收，增加一次提醒机会。</view>
     <button class="secondary full reminder-close {{wechat.busy || wechatAction || !wechat.canRevoke ? 'is-disabled' : ''}} {{wechatAction === 'revoke' ? 'is-pending' : ''}}" loading="{{wechatAction === 'revoke'}}" disabled="{{wechat.busy || wechatAction || !wechat.canRevoke}}" bindtap="revokeWechat">{{wechatAction === 'revoke' ? '正在关闭' : '关闭微信提醒'}}</button></block>
-    <view class="small muted lead">关闭后停止后续提醒，已提交微信的消息可能仍会收到。</view>
+    <view class="small muted lead">关闭后剩余授权次数作废并停止后续提醒，已提交微信的消息可能仍会收到。</view>
   </view>
   <button class="row-button" open-type="contact" binderror="contactError"><text>联系小程序客服</text><text>→</text></button>
   <button class="row-button" data-path="/pages/privacy/index" bindtap="navigate"><text>关于与隐私</text><text>→</text></button>

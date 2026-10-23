@@ -1,4 +1,5 @@
 import { apiError, body, json } from '@/server/http';
+import {isIP} from 'node:net';
 import { confirmWechatSubscription, revokeWechatSubscription, saveWechatReminderPreferences, wechatLogin, wechatSubscriptionChallenge, wechatSubscriptionState } from '@/server/wechat';
 
 export const dynamic = 'force-dynamic';
@@ -22,7 +23,9 @@ export async function POST(request: Request, context: { params: Promise<{ path: 
     switch (path.join('/')) {
       case 'login': {
         const input = await body(request);
-        return json(await wechatLogin(input?.code));
+        // Best-effort admission bucket only; forwarded addresses never grant access.
+        const address=request.headers.get('x-forwarded-for')?.split(',').at(-1)?.trim();
+        return json(await wechatLogin(input?.code,address&&isIP(address)?address:'anonymous'));
       }
       case 'subscription/challenge': return json(await wechatSubscriptionChallenge(readerToken(request),subscriptionView(request)));
       case 'subscription/confirm': return json(await confirmWechatSubscription(readerToken(request), await body(request)));

@@ -64,7 +64,7 @@ function response(bundle:Bundle,options:PublicReadOptions|{view:'legacy'},timest
   const page=news?.page??(options.view==='legacy'?undefined:pageFrom(bundle,options));
   if(options.view==='home'||options.view==='methodology'){
     const outlook=publicResetOutlook(facts);
-      for (const lane of Object.values(outlook.byKind ?? {})) for (const round of [lane.active,lane.latestCompletion,lane.lastResolved]) if (round) selected.add(round.publicationId);
+      for (const lane of Object.values(outlook.byKind ?? {})) for (const round of [lane.active,lane.latestCompletion,lane.lastResolved,lane.latestObservation]) if (round) selected.add(round.publicationId);
     for(const id of [outlook.active?.publicationId,outlook.latestCompletion?.publicationId,outlook.lastResolved?.publicationId])if(id)selected.add(id);
     const actions=publicActions(facts).sort((a,b)=>Date.parse(b.action.statementAt)-Date.parse(a.action.statementAt));
     recentCompletedBenefits(facts).forEach(item=>selected.add(item.publication.id));

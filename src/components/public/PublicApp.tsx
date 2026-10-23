@@ -1,4 +1,5 @@
 'use client';
+import {resetObservations,observedEvidence} from '@/lib/reset-observations';
 
 import Link from 'next/link';
 import { useSearchParams, usePathname } from 'next/navigation';
@@ -149,7 +150,7 @@ export default function PublicApp() {
     catch (cause) { dayPosterError = cause instanceof Error ? cause.message : '所选版本暂时不可分享。'; }
   }
   const newsArticles = route === 'news' && data ? sortedArticles(data.articles.filter(article => newsCategory === 'all' || article.category === newsCategory)) : [];
-  const historyPublications = route === 'news' && newsCategory === 'reset' && data ? sortedStatePublications(data).filter(p => p.event.actions.length && (historyFilter === 'all' || p.event.actions.some(action => action.kind === historyFilter))) : [];
+  const historyPublications = route === 'news' && newsCategory === 'reset' && data ? sortedStatePublications(data).filter(p => (p.event.actions.length>0 && (historyFilter === 'all' || p.event.actions.some(action => action.kind === historyFilter)) || ['all','automatic_reset'].includes(historyFilter) && resetObservations(data).some(o=>o.publicationId===p.id))) : [];
   const pageTitle = ({ history: '重置记录', news: '动态', settings: '提醒', more: '关于与隐私', notices: '站内提醒', methodology: '观察记录', events: '事件详情', articles: '动态详情', sources: '原文来源', activities: '活动动态' } as Record<string, string>)[route] ?? '重置雷达';
   const failure = <div className="pub-empty" role="alert"><Icon name="info" /><h2>资料暂时无法加载</h2><p>{error || '请稍后重试。'}</p><button className="pub-button primary" onClick={() => void refresh()} disabled={loading}>{loading ? '正在重试…' : '重新加载'}</button></div>;
   const pending = error ? failure : <ContentPlaceholder />;
@@ -209,7 +210,7 @@ export function Home({ data, onWechatReminders, onPoster, onShare, historical, w
   const activityDay = activity ? activityDayNumber(activity, data.serverTime) : undefined;
   const activityPhase = activityDay === undefined ? '活动动态' : activityDay < 1 ? '尚未开始' : activity && activityDay > activity.days ? '活动已结束' : `第${activityDay}天 / 共${activity?.days}天`;
   const latestRecord = completions.length ? <section className="pub-home-completions" aria-label="最近五条公开完成公告">
-    <div className="pub-home-completions-heading"><h2>最近完成</h2><Link scroll={false} href="/history">全部记录 →</Link></div>
+    <div className="pub-home-completions-heading"><h2>最近完成公告</h2><Link scroll={false} href="/history">全部记录 →</Link></div>
     {completions.map(item => <Link scroll={false} className="pub-home-completion" key={item.action.id} href={`/events/${encodeURIComponent(item.event.id)}`} aria-label={`公告称已${item.action.kind === 'banked_reset' ? '发放重置卡' : '重置用量'}，${completionTime(item.action.statementAt)}，查看公开依据`}>
       <Icon name="check"/><span className="pub-home-completion-name">{item.action.kind === 'banked_reset' ? '重置卡发放' : '用量重置'}</span>
       <time dateTime={item.action.statementAt} title={`${displayTime(item.action.statementAt)} · 北京时间`}>{completionTime(item.action.statementAt).replace(/^(\d{4})\/(\d{2})\/(\d{2}) /, (_, year: string, month: string, day: string) => `${year === dateKey(data.serverTime).slice(0, 4) ? '' : `${year}年`}${Number(month)}月${Number(day)}日 `)}</time>
@@ -243,7 +244,7 @@ function History({ publications, filter, onFilter, data, hasMore, onMore, loadin
     const month = dateKey(publicationSourceTime(publication)).slice(0, 7);
     months.set(month, [...(months.get(month) ?? []), publication]);
   }
-  return <><RecordKindFilter value={filter as import('./public-navigation').HistoryFilter} onChange={onFilter}/>{pending ?? (publications.length ? [...months].map(([month, rows]) => <section className="pub-history-month" key={month}><h2>{month.replace('-', '年')}月</h2><div className="pub-history-list">{rows.map(publication => <article className={`pub-history-item${publicationWithdrawn(data!, publication) ? ' is-withdrawn' : ''}`} key={publication.id} data-reading-id={publication.eventId}><time dateTime={publicationSourceTime(publication)}>{briefTime(publicationSourceTime(publication))}</time><div><h3><Link scroll={false} href={`/events/${encodeURIComponent(publication.eventId)}`}>{publication.article.title}</Link></h3><div className="pub-history-status">{publication.event.actions.map(action => <Badge key={action.id} tone={action.stage === 'claimed_complete' ? 'cyan' : 'amber'}>{actionLabels[action.kind]} · {stageText(action, data!.serverTime)}</Badge>)}{publicationWithdrawn(data!, publication) && <Badge>已撤回</Badge>}{publication.article.historical && <span>历史收录</span>}</div><p>{publicArticleSummary(publication.article)}</p><TextLink href={`/events/${encodeURIComponent(publication.eventId)}`}>查看依据与进展</TextLink></div></article>)}</div></section>) : <Empty title="暂无相关公告" detail="这个分类还没有已发布的事件。" />)}{hasMore && <button className="pub-button full" disabled={loading} onClick={onMore}>{loading ? '正在加载…' : '加载更多'}</button>}</>;
+  return <><RecordKindFilter value={filter as import('./public-navigation').HistoryFilter} onChange={onFilter}/>{pending ?? (publications.length ? [...months].map(([month, rows]) => <section className="pub-history-month" key={month}><h2>{month.replace('-', '年')}月</h2><div className="pub-history-list">{rows.map(publication => <article className={`pub-history-item${publicationWithdrawn(data!, publication) ? ' is-withdrawn' : ''}`} key={publication.id} data-reading-id={publication.eventId}><time dateTime={publicationSourceTime(publication)}>{briefTime(publicationSourceTime(publication))}</time><div><h3><Link scroll={false} href={`/events/${encodeURIComponent(publication.eventId)}`}>{publication.article.title}</Link></h3><div className="pub-history-status">{resetObservations(data!).some(o=>o.publicationId===publication.id)&&<Badge tone="cyan">来源观测 · 个人到账未核验</Badge>}{publication.event.actions.map(action => <Badge key={action.id} tone={action.stage === 'claimed_complete' ? 'cyan' : 'amber'}>{actionLabels[action.kind]} · {stageText(action, data!.serverTime)}</Badge>)}{publicationWithdrawn(data!, publication) && <Badge>已撤回</Badge>}{publication.article.historical && <span>历史收录</span>}</div><p>{publicArticleSummary(publication.article)}</p><TextLink href={`/events/${encodeURIComponent(publication.eventId)}`}>查看依据与进展</TextLink></div></article>)}</div></section>) : <Empty title="暂无相关公告" detail="这个分类还没有已发布的事件。" />)}{hasMore && <button className="pub-button full" disabled={loading} onClick={onMore}>{loading ? '正在加载…' : '加载更多'}</button>}</>;
 }
 
 function NewsProgress({ updates, currentId }: { updates: Publication[]; currentId: string }) {
@@ -335,7 +336,10 @@ function EvidenceList({ evidence, collapsed = false, actions = [], sources = [],
     const key = `${item.publishedAt}:${item.text.replace(/\s+/g, ' ').trim()}`;
     if (!grouped.has(key) || (grouped.get(key)?.provenance !== 'official' && item.provenance === 'official')) grouped.set(key, item);
   }
-  const contents = rows.length ? [...grouped.values()].map(item => <div className="pub-source-row" key={item.id}><div><strong>{evidenceSourceName(item, sources)}</strong><span>{briefTime(item.publishedAt)} · 北京时间 · {evidenceKind(item)}</span><p className="pub-source-excerpt" dir="auto">{item.text}</p>{(!item.contextComplete || item.textOrigin === 'archive_excerpt') && <p className="pub-muted">这里只收录了部分原文，请打开来源查看完整内容。</p>}<ExternalLink url={item.url}>打开原文</ExternalLink></div></div>) : <p className="pub-muted">暂未提供可展示的原文。</p>;
+  const contents = rows.length ? [...grouped.values()].map(item => {
+    const observation=observedEvidence(item,item.collectedAt);
+    return <div className="pub-source-row" key={item.id}><div><strong>{observation?.sourceName??evidenceSourceName(item,sources)}</strong><span>{observation?'观测时间：':''}{briefTime(item.publishedAt)} · 北京时间 · {observation?'来源观测':evidenceKind(item)}</span><p className="pub-source-excerpt" dir="auto">{item.text}</p>{observation?<p className="pub-muted">来源记录了用量重置，个人到账尚未核验；关联原帖与观测时间分别保留。</p>:(!item.contextComplete || item.textOrigin==='archive_excerpt')&&<p className="pub-muted">这里只收录了部分原文，请打开来源查看完整内容。</p>}<ExternalLink url={observation?.sourceUrl??item.url}>{observation?'查看观测来源':'打开原文'}</ExternalLink>{observation&&<ExternalLink url={observation.referenceUrl}>查看关联原帖</ExternalLink>}</div></div>;
+  }) : <p className="pub-muted">暂未提供可展示的原文。</p>;
   return collapsed ? <details className="pub-card pub-disclosure"><summary><span>查看来源{rows[0] && <small className="pub-source-preview">{evidenceSourceName(rows[0],sources)} · {briefTime(rows[0].publishedAt)}</small>}</span></summary>{contents}{notes.length > 0 && <div className="pub-source-notes"><h3>来源补充说明</h3>{notes.map(note => <p key={note}>{note}</p>)}</div>}</details> : <section className="pub-card"><h2>来源</h2>{contents}</section>;
 }
 
