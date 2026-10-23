@@ -1,7 +1,7 @@
 <navigation-header icon="document" title="公告详情" back="{{true}}" />
 <page-loader wx:if="{{navigationLoading}}" />
 <view wx:else>
-<view class="page">
+<view class="page" bindtouchstart="nativeReturnTouched">
   <view wx:if="{{sceneLoading}}" class="card empty">正在读取小程序码对应的发布版本。</view>
   <view wx:if="{{sceneError}}" class="warning">{{sceneError}}<button wx:if="{{sceneCanRetry}}" class="secondary full" style="margin-top:12px" bindtap="retryScene">重新读取</button><button class="secondary full" style="margin-top:12px" data-path="/pages/announcements/index" bindtap="navigate">查看公开公告</button></view>
   <status-panel wx:if="{{!connected}}" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />

@@ -1,3 +1,4 @@
+const {preserveNativeReturn}=require('../../utils/entry-navigation');
 const {createPage}=require('../../utils/page');
 const {statusPosterInput,statusPosterAvailable,renderStatusPoster}=require('./status-poster');
 const poster=require('../../utils/poster');
@@ -48,15 +49,15 @@ Page(createPage(data=>({available:!!data}),{
       }catch(error){if(current())this.setData({posterError:error.message||'海报生成失败，请重试。'});}
       finally{if(asset)await asset.dispose();if(current()){clearTimeout(this._posterTimeout);this.setData({posterBusy:false});}}
     },
-    previewImage(){if(this.data.preview&&!this.data.posterBusy)wx.previewImage({current:this.data.preview,urls:[this.data.preview]});},
+    previewImage(){if(this.data.preview&&!this.data.posterBusy){const guard=preserveNativeReturn();try{wx.previewImage({current:this.data.preview,urls:[this.data.preview],fail:()=>guard.cancel()});}catch(_){guard.cancel();}}},
     async save(){
       if(!this._artifact||this.data.posterBusy||this.data.posterSaving||!statusPosterAvailable(this._snapshot,currentData()))return;
       this.setData({posterSaving:true,posterError:'',privacyNeeded:false});
-      try{if(await privacyRequired(wx)){this.setData({privacyNeeded:true});return;}await poster.savePoster(wx,this._artifact,{userInitiated:true});wx.showToast({title:'已保存到相册',icon:'success'});}
+      try{if(await privacyRequired(wx)){this.setData({privacyNeeded:true});return;}const guard=preserveNativeReturn();try{await poster.savePoster(wx,this._artifact,{userInitiated:true});}finally{guard.finish();}wx.showToast({title:'已保存到相册',icon:'success'});}
       catch(error){this.setData({posterError:error.message||'保存失败，请重试。'});}
       finally{this.setData({posterSaving:false});}
     },
-    openPrivacyContract(){if(typeof wx.openPrivacyContract==='function')wx.openPrivacyContract({fail(){wx.showToast({title:'隐私指引暂不可用',icon:'none'});}});},
+    openPrivacyContract(){if(typeof wx.openPrivacyContract==='function'){const guard=preserveNativeReturn();try{wx.openPrivacyContract({fail(){guard.cancel();wx.showToast({title:'隐私指引暂不可用',icon:'none'});}});}catch(_){guard.cancel();}}},
     onShareAppMessage(){return{title:this._snapshot&&!this.data.blocked?this._snapshot.title:'模钥重置雷达',path:!this.data.blocked&&this._snapshot&&this._snapshot.publicationId?`/pages/detail/index?publicationId=${encodeURIComponent(this._snapshot.publicationId)}`:'/pages/home/index'};}
   }
 }));

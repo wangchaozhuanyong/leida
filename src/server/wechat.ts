@@ -8,7 +8,7 @@ import type {WechatSettings,WechatReader,WechatGrant,WechatCredit,WechatDelivery
 import {reminderContentCurrent,reminderStatementAt} from '../lib/reminder-lifecycle';
 import {isHistoricalArticle} from '../lib/history';
 import {DomainError,id} from './domain';
-import {createWechatProvider,WechatServiceError} from './wechat-provider';
+import {createWechatProvider,WechatServiceError,WECHAT_CODE_PAGE} from './wechat-provider';
 import {validateWechatImage} from './wechat-image';
 import {prepareNotificationPublicPage} from './notification-public-page';
 
@@ -199,7 +199,7 @@ export function createWechatService(dependencies:WechatDependencies={}) {
   async function generateWechatCode(publicationId:string):Promise<{image:Buffer;contentType:string;scene:string;publicationId:string}> {
     await publication(publicationId);const settings=await config();if(!ready(settings,'qr'))throw new WechatServiceError('微信小程序码尚未配置','configuration');
     const scene=publicationScene(publicationId);if(publicationForScene(scene,await store.list<Publication>('publications')).id!==publicationId)throw new DomainError('小程序码标识冲突',409);
-    const cacheId=`wechat_code_${digest(`${settings.appId}:${settings.envVersion}:pages/detail/index:${publicationId}`)}`;
+    const cacheId=`wechat_code_${digest(`${settings.appId}:${settings.envVersion}:${WECHAT_CODE_PAGE}:${publicationId}`)}`;
     const pending=codeFlights.get(cacheId);if(pending)return pending;
     const generating=(async()=>{
       const claimId=randomBytes(16).toString('hex');

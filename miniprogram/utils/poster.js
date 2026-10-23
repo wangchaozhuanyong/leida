@@ -104,12 +104,12 @@ function createPosterLayout(input, measure, code = {status:'not_configured'}, op
     let copyY=textAt('资料截至',margin,y,copyWidth,20,palette.muted,600);
     copyY+=10*scale;copyY=textAt(`${input.cutoff} 北京时间`,margin,copyY,copyWidth,25,palette.text,500,1.5);
     copyY+=24*scale;copyY=textAt(input.newsOnly?'仅新闻更新，福利状态以已确认记录为准':'公开声明不代表个人到账',margin,copyY,copyWidth,23,palette.body,400,1.6);
-    copyY+=18*scale;copyY=textAt('原文与更新记录，见此发布版本',margin,copyY,copyWidth,20,palette.muted);
+    copyY+=18*scale;copyY=textAt('原文与更新记录，可在小程序中查看',margin,copyY,copyWidth,20,palette.muted);
     // Store the image rectangle itself, never the surrounding decorative plate.
     codeRect={x:cx-size/2,y:cy-size/2,width:size,height:size};
     commands.push({type:'circle',x:cx,y:cy,r,color:'#ffffff',stroke:palette.line});
     commands.push({type:'image',...codeRect});
-    const caption='扫码查看此发布版本',captionWidth=measure(caption,20*scale,500,'sans-serif');
+    const caption='扫码进入小程序首页',captionWidth=measure(caption,20*scale,500,'sans-serif');
     const captionEnd=textAt(caption,cx-captionWidth/2,plateTop+r*2+18*scale,r*2,20,palette.muted,500);
     y=Math.max(copyY,captionEnd);
   } else {

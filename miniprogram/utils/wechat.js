@@ -1,4 +1,5 @@
 const {configurationError,createWechatTransport}=require('./transport');
+const {preserveNativeReturn}=require('./entry-navigation');
 const labels={unavailable:'微信提醒暂不可用',none:'开启后接收重置消息',challenged:'开启后接收重置消息',available:'微信提醒已开启',reserved:'微信提醒已开启',consumed:'提醒次数已用完，可继续增加',rejected:'微信暂未允许提醒，可重新开启',revoked:'微信提醒已关闭',unknown:'上次发送未确认，可重新授权增加提醒'};
 const reminderKeys=['announcement','result','correction'];
 const reminderPreferences=value=>Object.fromEntries(reminderKeys.map(key=>[key,value?.[key]!==false]));
@@ -106,7 +107,10 @@ function createWechatReader({wxApi,config,now=()=>Date.now()}){
       if(typeof wxApi.requestSubscribeMessage!=='function'){emit({error:'当前微信不支持订阅消息，请更新微信。'});return Promise.resolve();}
       const selected=challenge;++generation;challenge=undefined;emit({busy:true,refreshing:false,ready:false,error:''});
       // Invoke authorization synchronously in this tap, before any network await.
-      const choice=new Promise((resolve,reject)=>wxApi.requestSubscribeMessage({tmplIds:[selected.templateId],success(result){const value=result&&result[selected.templateId];['accept','reject','ban','filter'].includes(value)?resolve(value):reject(new Error('微信未返回明确订阅选择，请重新准备。'));},fail(){reject(new Error('微信订阅未完成，请稍后重新准备。'));}}));
+      const choice=new Promise((resolve,reject)=>{
+        const guard=preserveNativeReturn();
+        try{wxApi.requestSubscribeMessage({tmplIds:[selected.templateId],success(result){guard.finish();const value=result&&result[selected.templateId];['accept','reject','ban','filter'].includes(value)?resolve(value):reject(new Error('微信未返回明确订阅选择，请重新准备。'));},fail(){guard.cancel();reject(new Error('微信订阅未完成，请稍后重新准备。'));}});}catch(error){guard.cancel();reject(error);}
+      });
       const work=(async()=>{let chosen=false;try{const result=await choice;chosen=true;confirmation={nonce:selected.nonce,templateId:selected.templateId,result};await confirmChoice();}
         catch(error){if(chosen&&error.status!==401)emit({error:'这次提醒次数尚未确认，请点击重试。'});else failed(error);}finally{emit({busy:false});}})();
       pending=work;work.finally(()=>{if(pending===work)pending=undefined;});return work;

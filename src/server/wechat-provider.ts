@@ -3,6 +3,7 @@ export { WechatServiceError } from './wechat-errors';
 export type { WechatFailure } from './wechat-errors';
 import { validateWechatImage } from './wechat-image';
 
+export const WECHAT_CODE_PAGE='pages/home/index';
 const origin='https://api.weixin.qq.com';
 function connectionFailure(error:unknown):WechatServiceError {
   const pending:unknown[]=[error],seen=new Set<unknown>(),codes=new Set<string>();let timedOut=false;
@@ -70,7 +71,7 @@ export function createWechatProvider(fetcher:typeof fetch=fetch) {
       // Trial/development pages may exist before the first formal release.
       // Keep the destination fixed; formal release codes still require a published page.
       const checkPath=envVersion!=='trial'&&envVersion!=='develop';
-      const response=await request(`/wxa/getwxacodeunlimit?access_token=${encodeURIComponent(token)}`,{scene,page:'pages/detail/index',check_path:checkPath,env_version:envVersion,width:430});
+      const response=await request(`/wxa/getwxacodeunlimit?access_token=${encodeURIComponent(token)}`,{scene,page:WECHAT_CODE_PAGE,check_path:checkPath,env_version:envVersion,width:430});
       const image=await bytes(response,2_000_000);
       if(image[0]===123||image[0]===91) {
         let errcode:number|undefined;try {const data=JSON.parse(image.toString('utf8'));if(typeof data.errcode==='number')errcode=data.errcode;}catch{}
