@@ -1,5 +1,5 @@
 const m=require('../../utils/model');
-const {statusTimelineModel,statusTimelineRevision}=require('../../utils/status-timeline');
+const {selectedHomeStatus,validKind}=require('../../utils/home-reset-status');
 const {PosterError,loadCanvasImage,exportCanvas}=require('../../utils/poster');
 const assets={precision:'/assets/posters/precision.jpg',editorial:'/assets/posters/editorial.jpg',brand:'/packages/poster/brand.png'};
 function dateTime(value){
@@ -8,29 +8,23 @@ function dateTime(value){
   return{date:`${d.getUTCFullYear()}.${pad(d.getUTCMonth()+1)}.${pad(d.getUTCDate())}`,time:`${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`};
 }
 /** Freeze the same current status used by the homepage, never a different old completion. */
-function statusPosterInput(data){
+function statusPosterInput(data,kind='automatic_reset'){
   if(!data||!Number.isFinite(Date.parse(data.serverTime)))throw new PosterError('missing','请先加载公开状态。');
-  const now=data.serverTime,latest=m.latestCompletedBenefits(data)[0];
-  const model=statusTimelineModel(m.resetOutlookModel(data),now,latest?.action??null,data.forecasts);
-  const publicationId=model.publicationId||(model.completed?latest?.publication.id??'':'');
-  const entry=data.publications.find(p=>m.resolveDetail(data,{publicationId:p.id}).canShare);
-  const codePublicationId=publicationId||entry?.id||'';
-  const minutes=model.completed?Math.max(0,Math.floor((Date.parse(now)-Date.parse(model.statementAt))/60000)):0;
-  const value=model.completed?(minutes<1?'刚刚':String(minutes<60?minutes:minutes<1440?Math.floor(minutes/60):Math.floor(minutes/1440))):model.watching?'观察中':model.title;
-  const unit=model.completed&&minutes>=1?(minutes<60?'分钟':minutes<1440?'小时':'天'):'';
-  const date=dateTime(model.statementAt),generated=dateTime(now);
-  return {name:data.site.name||'模钥重置雷达',round:statusTimelineRevision(model),publicationId,codePublicationId,generatedAt:now,
-    title:model.scheduled?(model.kind==='banked_reset'?'重置卡发放预告':'用量重置预告'):model.completed?(model.sourceType==='observed'?'来源观测：用量已重置':model.kind==='banked_reset'?'公告称已发放重置卡':'公告称已重置用量'):model.title,
-    label:model.completed?(model.sourceType==='observed'?'距来源观测':'距该公告'):model.scheduled?model.lead:'当前公开状态',value,unit,date:date.date,time:date.time,generated:`${generated.date} ${generated.time}`,statementAt:model.statementAt,statementLabel:model.completed&&model.sourceType==='observed'?'观测时间':model.watching?'信号时间':'公告时间',
-    nextNote:model.watching?(model.forecastWindow?`发布时预计：${model.forecastWindow}${model.chanceLabel?` · ${model.chanceLabel}`:''}`:'公开信号记录，尚无明确发放时间。'):model.scheduled?model.note.replace(/ (\d{2}:\d{2})$/,'\n$1'):model.note,
-    sourceLabel:model.sourceCredit?model.sourceType==='observed'?`来源：${model.sourceName} 观察记录`:`来源：${model.sourceName} · Tibo 公开动态`:model.completed?'依据：所选公开完成公告':'依据：当前公开状态',
-    validUntil:model.scheduled?model.expectedAt:model.watching?model.expiresAt:model.completed?new Date(Date.parse(model.statementAt)+24*3600_000).toISOString():'',
-  };
+  const card=selectedHomeStatus(data,validKind(kind)),hero=card.hero;
+  const date=dateTime(card.timeAt),generated=dateTime(data.serverTime);
+  const publicationId=card.publicationId||'';
+  const shareable=publicationId&&m.resolveDetail(data,{publicationId}).canShare;
+  const sourceLabel=card.evidenceType==='observation'?'来源：'+card.sourceName+' · 第三方观测':card.declarationAt?'依据：发布者公开完成声明':card.sourceName?'来源：'+card.sourceName:'依据：当前公开状态';
+  return {name:data.site.name||'模钥重置雷达',kind:card.kind,round:card.revision,publicationId,codePublicationId:shareable?publicationId:'',sharePath:card.sharePath,shareTitle:card.shareTitle,generatedAt:data.serverTime,
+    title:hero.title||card.title,label:hero.label,value:hero.metric||hero.title,unit:'',date:date.date,time:date.time+(card.timeQualifier?' '+card.timeQualifier:''),generated:generated.date+' '+generated.time,
+    statementAt:card.timeAt,statementLabel:hero.timeLabel||'公开状态',nextNote:(card.oldTime?card.oldTime+' · 北京时间。 ':'')+hero.description+' '+hero.footnote+(card.declarationTime?' 发布者声明：'+card.declarationTime+' · 北京时间。':''),
+    sourceLabel,validUntil:card.validUntil||''};
 }
 function statusPosterAvailable(input,data){
   if(!input||!data)return false;
-  if(input.round&&input.round!==statusPosterInput(data).round)return false;
-  return !input.codePublicationId&&!input.publicationId||m.resolveDetail(data,{publicationId:input.codePublicationId||input.publicationId}).canShare;
+  const current=statusPosterInput(data,input.kind);
+  if(input.round!==current.round||input.codePublicationId!==current.codePublicationId)return false;
+  return !input.publicationId||m.resolveDetail(data,{publicationId:input.publicationId}).canShare;
 }
 function createStatusPosterLayout(input,measure,theme='precision',includeCode=false){
   if(!['precision','editorial'].includes(theme))throw new PosterError('layout','海报风格无效。');

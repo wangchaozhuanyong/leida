@@ -8,12 +8,13 @@ function currentData(){const state=getApp().client.getState(),data=state.data;if
 function stop(page){clearTimeout(page._stateExpiryTimer);clearTimeout(page._posterTimeout);page._active=false;page._generation=(page._generation||0)+1;if(page._codeRequest)page._codeRequest.abort();}
 Page(createPage(data=>({available:!!data}),{
   view:()=>({view:'home'}),
+  load(query){this._selectedKind=query.kind==='banked_reset'?'banked_reset':'automatic_reset';this._expectedRevision=typeof query.revision==='string'?query.revision:'';},
   data:{available:false,theme:'precision',preview:'',posterBusy:false,posterSaving:false,posterError:'',codeNote:'',blocked:'',privacyNeeded:false},
   show(){this._active=true;if(this._snapshot)void this.generate();},hide(){stop(this);},unload(){stop(this);this.clearPosters();this._codeData=null;},
   afterRender(){
     const data=currentData();
     if(this._snapshot&&data&&!statusPosterAvailable(this._snapshot,data)){stop(this);this.clearPosters();this.setData({preview:'',posterBusy:false,blocked:'公开状态已变化，请返回首页重新生成。'});return;}
-    if(this._active&&!this.data.navigationLoading&&data&&!this._snapshot){this._snapshot=statusPosterInput(data);void this.generate();}
+    if(this._active&&!this.data.navigationLoading&&data&&!this._snapshot){const snapshot=statusPosterInput(data,this._selectedKind);if(this._expectedRevision&&snapshot.round!==this._expectedRevision){this.setData({blocked:'公开状态已变化，请返回首页重新生成。'});return;}this._snapshot=snapshot;void this.generate();}
     clearTimeout(this._stateExpiryTimer);
     if(this._active&&data&&this._snapshot&&this._snapshot.validUntil){const remaining=Date.parse(this._snapshot.validUntil)-Date.parse(data.serverTime);if(remaining>0){this._stateExpiryTimer=setTimeout(()=>this.afterRender(),Math.min(2147483647,remaining+20));this._stateExpiryTimer.unref?.();}}
   },
@@ -58,6 +59,6 @@ Page(createPage(data=>({available:!!data}),{
       finally{this.setData({posterSaving:false});}
     },
     openPrivacyContract(){if(typeof wx.openPrivacyContract==='function'){const guard=preserveNativeReturn();try{wx.openPrivacyContract({fail(){guard.cancel();wx.showToast({title:'隐私指引暂不可用',icon:'none'});}});}catch(_){guard.cancel();}}},
-    onShareAppMessage(){return{title:this._snapshot&&!this.data.blocked?this._snapshot.title:'模钥重置雷达',path:!this.data.blocked&&this._snapshot&&this._snapshot.publicationId?`/pages/detail/index?publicationId=${encodeURIComponent(this._snapshot.publicationId)}`:'/pages/home/index'};}
+    onShareAppMessage(){const available=this._snapshot&&!this.data.blocked&&statusPosterAvailable(this._snapshot,currentData());if(!available&&this._snapshot)this.afterRender();return{title:available?this._snapshot.shareTitle:'模钥重置雷达',path:available?this._snapshot.sharePath:'/pages/home/index'};}
   }
 }));

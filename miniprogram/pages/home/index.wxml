@@ -1,85 +1,53 @@
 <page-meta root-background-color="#f2f5fb" page-style="background-color:#f2f5fb" />
 <navigation-header title="模钥重置雷达" brand="{{true}}" />
 <view class="refresh-track {{refreshing ? 'is-active' : ''}}" aria-label="{{refreshing ? '正在更新' : ''}}"><view/></view>
-<view class="page home-page">
+<view class="page home-page {{motionActive && connected && !error && !sourceDelayed ? 'motion-live' : ''}}">
   <view class="home-heading">
-    <image class="home-atmosphere" src="/assets/neural/codex-reset-hero.jpg" mode="aspectFill" aria-hidden="true" />
-    <view class="home-atmosphere-fade" aria-hidden="true" />
-    <view class="home-heading-copy"><view class="home-heading-title"><view class="home-heading-topic"><text class="home-heading-product">Codex</text><text>重置</text></view><view class="home-heading-accent">一目了然</view></view><view class="home-heading-subtitle">不要错过每一次重置。</view></view><view class="freshness-summary" bindtap="toggleFreshness" role="button" aria-label="公开资料状态" aria-expanded="{{freshnessOpen}}"><view class="health-dot {{sourceDelayed || error ? 'delayed' : ''}}"></view><text>{{error ? connected ? '更新暂时中断' : '暂时无法连接' : connected ? sourceStatusLabel : loading ? '加载中' : '等待连接公开资料'}}</text><text class="info-symbol">ⓘ</text></view>
+    <view class="home-heading-title">Codex 重置，一目了然</view>
+    <button class="freshness-summary" bindtap="toggleFreshness" aria-label="公开资料状态" aria-expanded="{{freshnessOpen}}"><view class="health-dot {{sourceDelayed || error ? 'delayed' : ''}}" aria-hidden="true"/><text>{{error ? connected ? '更新暂时中断' : '暂时无法连接' : connected ? sourceStatusLabel : loading ? '正在读取公开消息' : '等待连接公开资料'}}</text><text class="info-symbol" aria-hidden="true">ⓘ</text></button>
   </view>
-  <view wx:if="{{freshnessOpen && connected}}" class="freshness-detail"><view>最近采集成功：{{collectedAt}} · 北京时间</view><view>最新消息发布于：{{latestSourceTime}} · 北京时间</view><view class="muted">成功时间来自最近成功的来源，不代表所有来源同时更新。</view></view>
-  <view wx:if="{{!connected}}" class="status-card reset-state tone-slate"><view class="reset-state-body"><view class="reset-state-meta"><text>公开动态追踪</text><text>{{error || unconfigured ? '连接异常' : '读取中'}}</text></view><view class="reset-state-heading"><view>{{error || unconfigured ? '暂时无法获取动态' : '正在获取公开动态'}}</view></view><view class="reset-state-description">{{error || unconfigured ? '当前没有可展示的缓存，连接恢复后更新。' : '正在读取公开消息和已确认记录。'}}</view><view wx:if="{{loading}}" class="refresh-track is-active"><view/></view></view><view class="reset-state-footer"><text>{{error || unconfigured ? '暂不能判断是否出现新消息' : '读取完成后显示来源'}}</text><button wx:if="{{error || unconfigured}}" class="text-button" bindtap="retry" disabled="{{loading}}">{{loading ? '正在重试…' : '重新获取 →'}}</button></view></view>
+  <view wx:if="{{freshnessOpen && connected}}" class="freshness-detail"><view>最近来源采集成功：{{collectedAt}} · 北京时间</view><view>最新消息发布于：{{latestSourceTime}} · 北京时间</view><view class="muted">采集时间来自最近成功的来源，不代表所有来源同时更新，也不代表账户额度已重置。</view></view>
+  <view wx:if="{{!connected}}" class="connection-card"><view class="connection-symbol" aria-hidden="true">◎</view><view class="connection-title">{{error || unconfigured ? '暂时无法获取动态' : '正在获取公开动态'}}</view><view class="connection-description">{{error || unconfigured ? '连接恢复后更新，暂不能判断是否出现新消息。' : '正在读取公开消息和已确认记录。'}}</view><view wx:if="{{loading}}" class="refresh-track is-active"><view/></view><button wx:if="{{error || unconfigured}}" class="primary" bindtap="retry" disabled="{{loading}}">{{loading ? '正在重试…' : '重新获取'}}</button></view>
   <block wx:else>
     <view wx:if="{{error}}" class="warning">连接暂时中断，保留最近读取的资料。<button class="text-button" bindtap="retry" loading="{{loading}}">重新连接 →</button></view>
     <view wx:if="{{historical}}" class="warning">当前公告为历史收录，不代表刚刚发放。</view>
-    <view class="status-card">
-    <view class="reset-states">
-      <view class="reset-tabs" role="tablist" aria-label="重置类型"><button wx:for="{{resetCards}}" wx:key="kind" data-kind="{{item.kind}}" bindtap="selectResetKind" class="kind-{{item.kind}} {{selectedResetKind === item.kind ? 'selected' : ''}}" role="tab" aria-selected="{{selectedResetKind === item.kind}}"><image src="/assets/icons/{{item.kind==='banked_reset'?'card':'reset'}}.png" class="reset-tab-icon" aria-hidden="true"/><view class="reset-tab-copy"><text>{{item.kind==='banked_reset'?'重置卡发放':item.name}}</text></view></button></view>
-      <view wx:if="{{stateWarning}}" class="reset-state-warning">{{stateWarning}}</view>
-      <block wx:for="{{resetCards}}" wx:key="kind"><template wx:if="{{selectedResetKind === item.kind}}" is="reset-state" data="{{card:item,expanded:expandedSourceKind===item.kind}}"/></block>
-      <view wx:if="{{untypedSignal}}" class="reset-untyped"><view>类型暂未明确的公开线索</view><template is="reset-state" data="{{card:untypedSignal,expanded:expandedSourceKind==='untyped'}}"/></view>
-      <view wx:if="{{signalExpiredNote}}" class="reset-expired">{{signalExpiredNote}}</view>
-    </view>
-    </view>
-    <view class="last-reset-card" aria-label="{{lastReset.sourceType==='observed'?'距最近重置观测已经过去':selectedResetKind==='banked_reset'?'上次重置卡发放已经过去':'上次额度重置已经过去'}}">
-      <view class="last-reset-heading-row"><view class="last-reset-icon" aria-hidden="true"><view/></view><text class="last-reset-heading">{{lastReset.sourceType==='observed'?'最近重置观测':selectedResetKind==='banked_reset'?'上次重置卡发放':'上次额度重置'}}</text><text class="last-reset-caption">已经过去</text></view>
-      <block wx:if="{{lastReset}}">
-        <view class="last-reset-value" aria-label="{{lastReset.elapsed}}">
-          <view class="last-reset-part last-reset-days {{lastReset.days >= 1000 ? 'is-long' : lastReset.days >= 100 ? 'is-medium' : ''}}" aria-hidden="true"><text class="last-reset-number">{{lastReset.days}}</text><text class="last-reset-unit">天</text></view>
-          <view class="last-reset-part" aria-hidden="true"><text class="last-reset-number">{{lastReset.hours}}</text><text class="last-reset-unit">小时</text></view>
-          <view class="last-reset-part" aria-hidden="true"><text class="last-reset-number">{{lastReset.minutes}}</text><text class="last-reset-unit">分钟</text></view>
-          <view class="last-reset-part last-reset-seconds" aria-hidden="true"><text class="last-reset-number">{{lastReset.seconds}}</text><text class="last-reset-unit">秒</text></view>
-        </view>
-        <view class="last-reset-record">
-          <view class="last-reset-time"><text>{{lastReset.sourceType==='observed'?'来源观测时间':selectedResetKind==='banked_reset'?'上次发放时间':'上次重置时间'}}</text><view class="last-reset-date"><text>{{lastReset.displayTime}}</text><text class="last-reset-zone">北京时间</text></view></view>
-          <view class="last-reset-footer"><view class="last-reset-basis">{{lastReset.sourceType==='observed'?lastReset.sourceName+' 观测 · 个人到账未核验':selectedResetKind==='banked_reset'?'依据公开发放完成消息记录':'依据公开完成消息记录'}}</view><button class="text-button last-reset-link" bindtap="openLastReset" aria-label="{{selectedResetKind==='banked_reset'?'查看这次发卡记录':'查看这次重置记录'}}">查看记录 <text aria-hidden="true">↗</text></button></view>
-        </view>
-      </block>
-      <block wx:else><view class="last-reset-empty">暂无已确认记录</view><view class="last-reset-basis">收到公开完成记录后开始计时</view></block>
-    </view>
-    <view class="home-card-actions"><button class="primary" bindtap="openWechatSettings">微信提醒</button><button class="secondary" bindtap="openPoster">分享重置动态</button></view>
-    <view wx:if="{{completions.length}}" class="home-records"><view class="recent-complete"><view class="completion-heading"><view class="section-overline">最近完成公告</view><button class="text-button" data-path="/pages/announcements/index" bindtap="navigate">全部记录 →</button></view><view wx:for="{{completions}}" wx:key="id" class="completion-line" data-path="{{item.path}}" bindtap="navigate" hover-class="completion-line-pressed" role="button" aria-label="{{item.title}}，{{item.time}}，查看公告"><text class="completion-check" aria-hidden="true">✓</text><text class="completion-label">{{item.label}}</text><text class="completion-date">{{item.shortTime}}</text></view></view></view>
-    <view wx:if="{{activity}}" class="activity-entry" data-path="{{activity.path}}" bindtap="navigate" role="button"><image src="/assets/neural/calendar-blue.png" class="action-icon" aria-hidden="true"/><view class="grow"><view class="activity-title">{{activity.title}}</view><view class="small muted">{{activity.phase}}</view></view></view>
-    <view class="row section"><view class="heading">重置动态</view><button class="text-button" data-path="/pages/news/index" bindtap="navigate">全部动态 →</button></view>
-    <publication-card wx:for="{{recent}}" wx:key="id" item="{{item}}" />
-    <view wx:if="{{!recent.length}}" class="card empty">暂无公开公告。</view>
+    <view class="reset-tabs" role="tablist" aria-label="重置类型"><button wx:for="{{resetCards}}" wx:key="kind" data-kind="{{item.kind}}" bindtap="selectResetKind" class="reset-tab kind-{{item.kind}} {{selectedResetKind === item.kind ? 'selected' : ''}}" role="tab" aria-selected="{{selectedResetKind === item.kind}}" hover-class="tab-pressed"><image src="/assets/icons/{{item.kind==='banked_reset'?'card':'reset'}}.png" class="reset-tab-icon" aria-hidden="true"/><text>{{item.kind==='banked_reset'?'重置卡发放':'额度重置'}}</text></button></view>
+    <view wx:if="{{stateWarning}}" class="reset-state-warning">{{stateWarning}}</view>
+    <block wx:for="{{resetCards}}" wx:key="kind"><template wx:if="{{selectedResetKind === item.kind}}" is="reset-state" data="{{card:item,expanded:expandedSourceKind===item.kind,collectedAt:collectedAt}}"/></block>
+    <view wx:if="{{untypedSignal}}" class="untyped-signal"><view class="untyped-title">类型暂未明确的公开线索</view><view>{{untypedSignal.description}}</view><view wx:if="{{untypedSignal.window}}">信号发布时推测：{{untypedSignal.window}}</view><button class="text-button" data-kind="untyped" bindtap="openStatusEvidence">查看信号依据 →</button><view wx:if="{{expandedSourceKind==='untyped'}}" class="reset-state-source"><view>来源：{{untypedSignal.sourceName}}</view><view>{{untypedSignal.watchNote}}</view><button wx:if="{{untypedSignal.sourceUrl}}" class="text-button" data-url="{{untypedSignal.sourceUrl}}" bindtap="copyStatusSource">复制来源原文链接 ↗</button></view></view>
+    <view wx:if="{{signalExpiredNote}}" class="reset-expired">{{signalExpiredNote}}</view>
+    <view class="home-card-actions"><button class="primary home-action" bindtap="openWechatSettings">微信提醒</button><button class="secondary home-action" bindtap="openPoster">分享动态</button></view>
+    <view wx:if="{{activity}}" class="activity-entry" data-path="{{activity.path}}" bindtap="navigate" role="button" hover-class="entry-pressed"><image src="/assets/neural/calendar-blue.png" class="action-icon" aria-hidden="true"/><view class="grow"><view class="activity-title">{{activity.title}}</view><view class="small muted">{{activity.phase}}</view></view><text aria-hidden="true">→</text></view>
+    <view class="row home-news-heading"><view class="heading">重置动态</view><button class="text-button" data-path="/pages/news/index" bindtap="navigate">全部 →</button></view>
+    <publication-card wx:for="{{recent}}" wx:key="id" item="{{item}}" compact="{{true}}" />
+    <view wx:if="{{!recent.length}}" class="card empty">暂无公开公告，有新消息后会在这里更新。</view>
     <view class="foot"><view>所有时间均为北京时间</view><button class="text-button footer-link" data-path="/pages/privacy/index" bindtap="navigate">隐私说明</button></view>
   </block>
 </view>
 
 <template name="reset-state">
-  <view class="reset-state reset-orbit tone-{{card.tone}} state-{{card.state}}" aria-label="{{card.title}}">
-    <view class="reset-orbit-body">
-      <view class="radar-scope radar-{{card.state}} kind-{{card.kind}}">
-        <view class="radar-disc" aria-hidden="true"><view class="radar-ring ring-outer"/><view class="radar-ring ring-middle"/><view class="radar-ring ring-inner"/><view wx:if="{{card.state!=='completed' && card.state!=='observed' && card.state!=='cancelled' && card.state!=='overdue'}}" class="radar-sweep"/></view>
-        <view class="radar-core">
-          <block wx:if="{{card.metric}}">
-            <view class="orbit-label">{{card.metricLabel}}</view>
-            <view class="orbit-digits {{card.clockParts.length===3?'with-days':''}} {{card.clockLong?'is-long':''}}" aria-label="{{card.metric}}">
-              <block wx:if="{{card.clockParts.length}}"><block wx:for="{{card.clockParts}}" wx:key="unit"><text wx:if="{{index>0}}" class="orbit-colon" aria-hidden="true">:</text><view class="orbit-part" aria-hidden="true"><text class="orbit-number">{{item.value}}</text><text class="orbit-unit">{{item.unit}}</text></view></block></block>
-              <text wx:else class="orbit-minute">{{card.metric}}</text>
-            </view>
-          </block>
-          <block wx:else>
-            <view wx:if="{{card.window}}" class="orbit-label">信号发布时预计</view>
-            <view class="orbit-title">{{card.window||card.dialTitle}}</view>
-            <view class="orbit-description">{{card.description}}</view>
-          </block>
-          <view class="orbit-status" aria-label="当前状态：{{card.badge}}">{{card.dialStatus}}</view>
-        </view>
+  <view class="reset-orbit tone-{{card.hero.tone}} state-{{card.state}} kind-{{card.kind}}" aria-label="{{card.hero.title || card.title}}">
+    <view class="orbit-stage {{card.hero.animated ? 'can-animate' : ''}}">
+      <view class="orbit-light" aria-hidden="true"/>
+      <image class="orbit-art" src="/assets/neural/silver-orbit.png" mode="aspectFit" aria-hidden="true"/>
+      <view class="orbit-path" aria-hidden="true"><view class="orbit-satellite"/></view>
+      <view class="orbit-core">
+        <view wx:if="{{card.hero.title && card.hero.metric}}" class="orbit-result">{{card.hero.title}}</view>
+        <view class="orbit-label">{{card.hero.label}}</view>
+        <block wx:if="{{card.hero.metric}}">
+          <view class="orbit-digits {{card.hero.parts.length===3?'with-days':''}} {{card.hero.long?'is-long':''}}" aria-label="{{card.hero.label}}，{{card.hero.metric}}"><block wx:if="{{card.hero.parts.length}}"><view wx:for="{{card.hero.parts}}" wx:key="unit" class="orbit-part" aria-hidden="true"><text class="orbit-number">{{item.value}}</text><text class="orbit-unit">{{item.unit}}</text></view></block><text wx:else class="orbit-minute">{{card.hero.metric}}</text></view>
+        </block>
+        <view wx:else class="orbit-title">{{card.hero.title}}</view>
+        <view class="orbit-status"><text class="orbit-status-symbol" aria-hidden="true">{{card.hero.symbol}}</text><text>{{card.hero.badge}}</text></view>
       </view>
-      <view wx:if="{{card.observationPublicationId}}" class="orbit-observation">
-        <view class="orbit-observation-heading"><text>第三方重置观测</text><text class="orbit-observation-tag">独立记录</text></view>
-        <view class="orbit-observation-time">{{card.observationTime}} <text class="orbit-observation-zone">北京时间</text></view>
-        <view class="orbit-observation-source">{{card.observationSourceName}} · 不代表官方完成确认</view>
-        <button class="text-button orbit-observation-link" data-kind="{{card.kind}}" bindtap="openObservation">查看观测依据 ↗</button>
-      </view>
-      <view wx:if="{{card.expectedElapsed}}" class="orbit-elapsed">{{card.expectedElapsed}}</view>
-      <view wx:if="{{card.timeAt}}" class="orbit-schedule"><view><text class="orbit-date-label">{{card.timeLabel}}</text><text class="orbit-date">{{card.dateText||card.time}}</text></view><view wx:if="{{card.clockText}}" class="orbit-time"><text class="orbit-date-label">北京时间</text><view><text class="orbit-clock">{{card.clockText}}</text><text class="orbit-qualifier">{{card.timeQualifier}}</text></view></view></view>
-      <view wx:else class="orbit-waiting">收到明确预告后，将在这里展示时间。</view>
-      <view wx:if="{{card.oldTime}}" class="orbit-old">{{card.oldTime}} · 北京时间</view>
     </view>
-    <view class="reset-state-footer"><text>{{card.metric?'预计安排，以实际发放为准':card.window?'不是承诺发放时间 · '+card.footer:card.footer}}</text><button class="text-button" data-kind="{{card.kind || 'untyped'}}" bindtap="openStatusEvidence">{{card.action}} →</button></view>
-    <view wx:if="{{expanded && card.sourceName}}" class="reset-state-source"><view>来源：{{card.sourceName}}{{card.sourceType === 'observed' ? ' · 观察记录' : ''}}</view><view wx:if="{{card.watchNote}}">{{card.watchNote}}</view><button wx:if="{{card.sourceUrl}}" class="text-button" data-url="{{card.sourceUrl}}" bindtap="copyStatusSource">复制来源原文链接 ↗</button><view wx:else>此观察记录没有公开原文链接。</view></view>
+    <view class="orbit-message"><view class="orbit-description">{{card.hero.description}}</view><view class="orbit-footnote">{{card.hero.footnote}}</view></view>
+    <view wx:if="{{card.timeAt}}" class="orbit-schedule"><image class="fact-icon" src="/assets/neural/calendar-blue.png" aria-hidden="true"/><view class="orbit-date-copy"><view class="orbit-date-label">{{card.hero.timeLabel}}<text class="orbit-zone">北京时间</text></view><view class="orbit-date">{{card.dateText || card.time}}<text wx:if="{{card.clockText}}" class="orbit-clock">{{card.clockText}}<text class="orbit-qualifier">{{card.timeQualifier}}</text></text></view></view></view>
+    <view wx:else class="orbit-waiting">收到明确预告后，将在这里展示时间。</view>
+    <view wx:if="{{card.declarationTime}}" class="orbit-old">发布者完成声明：{{card.declarationTime}} · 北京时间；计时沿用观测记录。</view>
+    <view wx:if="{{card.oldTime}}" class="orbit-old">{{card.oldTime}} · 北京时间</view>
+    <view wx:if="{{card.observationPublicationId}}" class="independent-evidence"><view>另有第三方观测 · {{card.observationSourceName}}</view><view>{{card.observationTime}} · 北京时间</view><button class="text-button" data-kind="{{card.kind}}" bindtap="openObservation">查看独立观测 →</button></view>
+    <view class="orbit-evidence"><view class="orbit-check"><view class="orbit-date-label">最近来源采集</view><text>{{collectedAt}}</text></view><button class="text-button" data-kind="{{card.kind}}" bindtap="openStatusEvidence">{{card.action}} →</button></view>
+    <view wx:if="{{expanded && card.sourceName}}" class="reset-state-source"><view>来源：{{card.sourceName}}{{card.sourceType === 'observed' ? ' · 第三方观察记录' : ''}}</view><view wx:if="{{card.watchNote}}">{{card.watchNote}}</view><button wx:if="{{card.sourceUrl}}" class="text-button" data-url="{{card.sourceUrl}}" bindtap="copyStatusSource">复制来源原文链接 ↗</button><view wx:else>此观察记录没有公开原文链接。</view></view>
   </view>
 </template>

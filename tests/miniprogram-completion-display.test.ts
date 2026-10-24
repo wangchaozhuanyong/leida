@@ -26,7 +26,7 @@ function nativeHome(data:PublicData) {
  function load(filename:string):any {
   if(cache.has(filename))return cache.get(filename).exports;
   const module={exports:{}};cache.set(filename,module);
-  new Script(readFileSync(filename,'utf8'),{filename}).runInNewContext({module,exports:module.exports,Date:Clock,wx:{navigateTo:({url}:{url:string})=>navigations.push(url)},getApp:()=>app,Page:(value:any)=>{definition=value;},setInterval:(fn:()=>void)=>{timers.set(++timerId,fn);return timerId;},clearInterval:(id:number)=>timers.delete(id),require:(path:string)=>load(resolve(dirname(filename),path.endsWith('.js')?path:`${path}.js`))});
+  new Script(readFileSync(filename,'utf8'),{filename}).runInNewContext({module,exports:module.exports,Date:Clock,wx:{navigateTo:({url}:{url:string})=>navigations.push(url)},getApp:()=>app,Page:(value:any)=>{definition=value;},setInterval:(fn:()=>void)=>{timers.set(++timerId,fn);return timerId;},clearInterval:(id:number)=>timers.delete(id),setTimeout:()=>++timerId,clearTimeout(){},require:(path:string)=>load(resolve(dirname(filename),path.endsWith('.js')?path:`${path}.js`))});
   return module.exports;
  }
  load(resolve(root,'miniprogram/pages/home/index.js'));
@@ -74,23 +74,23 @@ test('未来、个人、仅新闻、撤回和未完成公告不作为小程序�
   assert.deepEqual(mini.latestCompletedBenefits(fixture([reset,p])).map((row:any)=>row.action.id),['action-reset']);
  }
 });
-test('跨24小时主状态恢复等待，秒计时持续推进',()=>{
+test('跨24小时主状态恢复等待，最近消息保留日期并更新相对时长',()=>{
  const data=fixture([publication('reset','automatic_reset','2026-10-12T08:00:01Z'),publication('card','banked_reset','2026-10-10T04:00:00Z')]);
  const h=nativeHome(data);
  assert.equal(h.page.data.timeline.completed,true);assert.equal(h.timers.size,1);assert.equal(h.page.data.completions.length,2);
  h.advance(1000);
- assert.equal(h.page.data.timeline.completed,false);assert.equal(h.page.data.timeline.title,'等待下一次 Reset');assert.equal(h.timers.size,1);assert.equal(h.page.data.lastReset.elapsed,'1天0小时0分钟0秒');assert.equal(h.page.data.completions.length,2);
+ assert.equal(h.page.data.timeline.completed,false);assert.equal(h.page.data.timeline.title,'等待下一次 Reset');assert.equal(h.timers.size,1);assert.equal(h.page.data.lastReset.relativeTime,'距今 1天');assert.equal(h.page.data.completions.length,2);
  assert.equal(h.page.data.completions[0].time,'2026/10/12 16:00');
  h.refresh();assert.equal(h.page.data.timeline.completed,false,'刷新不重开24小时');
  h.page.onUnload();assert.equal(h.timers.size,0);
 });
 test('最近发卡与重置独立计时，分享原文绑定最近完成；隐藏页面停止并在显示时恢复',()=>{
  const h=nativeHome(fixture([publication('reset','automatic_reset','2026-10-13T05:45:00Z'),publication('card','banked_reset','2026-10-13T07:25:00Z')]));
- assert.match(h.page.data.lastReset.elapsed,/2小时15分钟0秒/);assert.equal(h.page.data.timeline.title,'已确认发放重置卡');
+ assert.equal(h.page.data.lastReset.relativeTime,'距今 2小时15分钟');assert.equal(h.page.data.timeline.title,'已确认发放重置卡');
  assert.equal(h.page.data.completions[1].time,'2026/10/13 13:45');
- assert.equal(h.page.onShareAppMessage().path,'/pages/detail/index?publicationId=card');
+ assert.match(h.page.onShareAppMessage().path,/^\/pages\/detail\/index\?publicationId=reset&kind=automatic_reset&revision=home-[a-f0-9]{16}$/);
  h.page.onHide();assert.equal(h.timers.size,0);
- h.advance(60000);h.page.onShow();assert.match(h.page.data.lastReset.elapsed,/2小时16分钟0秒/);assert.equal(h.timers.size,1);
+ h.advance(60000);h.page.onShow();assert.equal(h.page.data.lastReset.relativeTime,'距今 2小时16分钟');assert.equal(h.timers.size,1);
  h.page.onUnload();assert.equal(h.timers.size,0);
 });
 test('首页公告入口有预告时对应当前轮次，无预告时对应最近完成，无记录时进入历史',()=>{
@@ -117,52 +117,50 @@ test('首页紧凑完成记录使用北京时间，跨年保留年份且不冒�
  assert.equal(h.page.data.completions[0].title,'公告称已重置用量');h.page.onUnload();
 });
 
-test('首页每秒只更新经过时长字段，不跨原生桥重发列表、整张状态卡或正文',()=>{
+test('最近消息不为秒数跨原生桥发更新，分钟变化只传主卡与相对时长',()=>{
  const h=nativeHome(fixture([publication('reset','automatic_reset','2026-10-13T05:45:00Z')]));
  const changes:Record<string,unknown>[]=[],original=h.page.setData.bind(h.page),before=h.page.data.completions;
  h.page.setData=(patch:Record<string,unknown>)=>{changes.push(patch);original(patch);};
- h.advance(1000);
- assert.ok(changes.some(p=>'lastReset.elapsed'in p));assert.ok(changes.every(p=>Object.keys(p).every(key=>['lastReset.elapsed','lastReset.days','lastReset.hours','lastReset.minutes','lastReset.hoursMinutes','lastReset.seconds'].includes(key))));
- assert.equal(h.page.data.completions,before);assert.equal(h.page.data.lastReset.elapsed,'2小时15分钟1秒');h.page.onUnload();
+ h.advance(1000);assert.equal(changes.length,0);assert.equal(h.page.data.lastReset.relativeTime,'距今 2小时15分钟');
+ h.advance(59000);assert.equal(changes.length,1);assert.deepEqual(Object.keys(changes[0]),['resetCards','lastReset.relativeTime']);assert.equal(h.page.data.resetCards[0].metric,'2小时16分钟');
+ assert.equal(h.page.data.completions,before);assert.equal(h.page.data.lastReset.relativeTime,'距今 2小时16分钟');h.page.onUnload();
 });
 
-test('四列计时跨秒、分、小时和天边界时同步进位，补零且不更换公告起点',()=>{
+test('跨天相对时长进位时不更换消息日期和公告起点',()=>{
  const h=nativeHome(fixture([publication('reset','automatic_reset','2026-10-12T08:00:01Z')]));
- assert.equal(h.page.data.lastReset.days,0);assert.equal(h.page.data.lastReset.hours,'23');assert.equal(h.page.data.lastReset.minutes,'59');assert.equal(h.page.data.lastReset.seconds,'59');
+ assert.equal(h.page.data.lastReset.relativeTime,'距今 23小时59分钟');
+ assert.equal(h.page.data.lastReset.dateText,'10月12日');assert.equal(h.page.data.lastReset.clockText,'16:00');
  h.advance(1000);
- assert.equal(h.page.data.lastReset.days,1);assert.equal(h.page.data.lastReset.hours,'00');assert.equal(h.page.data.lastReset.minutes,'00');assert.equal(h.page.data.lastReset.seconds,'00');
- assert.equal(h.page.data.lastReset.hoursMinutes,'00:00');assert.equal(h.page.data.lastReset.publicationId,'reset');
- h.page.onUnload();
+ assert.equal(h.page.data.lastReset.relativeTime,'距今 1天');
+ assert.equal(h.page.data.lastReset.dateText,'10月12日');assert.equal(h.page.data.lastReset.clockText,'16:00');
+ assert.equal(h.page.data.lastReset.publicationId,'reset');h.page.onUnload();
 });
 
-
-test('原生首页切换类型同时切换历史计时和记录链接，返回与刷新保持所选类别',()=>{
+test('原生首页切换类型同时切换最近消息和链接，返回与刷新保持所选类别',()=>{
  const h=nativeHome(fixture([publication('reset','automatic_reset','2026-10-11T19:14:52Z'),publication('card','banked_reset','2026-10-13T07:25:00Z')]));
- assert.equal(h.page.data.dial,undefined);assert.equal(h.page.data.lastReset.days,1);
- assert.equal(h.page.data.lastReset.hoursMinutes,'12:45');assert.equal(h.page.data.lastReset.seconds,'08');
+ assert.equal(h.page.data.dial,undefined);assert.equal(h.page.data.lastReset.relativeTime,'距今 1天12小时');
  h.page.selectResetKind({currentTarget:{dataset:{kind:'banked_reset'}}});
- assert.equal(h.page.data.selectedResetKind,'banked_reset');assert.equal(h.page.data.lastReset.days,0);assert.equal(h.page.data.lastReset.hoursMinutes,'00:35');assert.equal(h.page.data.lastReset.seconds,'00');
+ assert.equal(h.page.data.selectedResetKind,'banked_reset');assert.equal(h.page.data.lastReset.relativeTime,'距今 35分钟');
  h.page.openLastReset();assert.equal(h.navigations.at(-1),'/pages/detail/index?publicationId=card');
  const changes:Record<string,unknown>[]=[],original=h.page.setData.bind(h.page);h.page.setData=(patch:Record<string,unknown>)=>{changes.push(patch);original(patch);};
- h.advance(1000);assert.equal(h.page.data.lastReset.seconds,'01');assert.equal(h.page.data.lastReset.elapsed,'0小时35分钟1秒');
- assert.ok(changes.some(p=>'lastReset.seconds'in p));assert.ok(changes.every(p=>Object.keys(p).every(key=>['lastReset.elapsed','lastReset.days','lastReset.hours','lastReset.minutes','lastReset.hoursMinutes','lastReset.seconds'].includes(key))),'发卡每秒更新同样只传输变化的计时字段');
+ h.advance(1000);assert.equal(h.page.data.lastReset.relativeTime,'距今 35分钟');assert.equal(changes.length,0);
  h.page.onHide();h.advance(60000);h.page.onShow();
- assert.equal(h.page.data.selectedResetKind,'banked_reset');assert.equal(h.page.data.lastReset.hoursMinutes,'00:36');assert.equal(h.page.data.lastReset.seconds,'01');
- h.refresh();assert.equal(h.page.data.lastReset.publicationId,'card');assert.equal(h.page.data.lastReset.hoursMinutes,'00:36');
+ assert.equal(h.page.data.selectedResetKind,'banked_reset');assert.equal(h.page.data.lastReset.relativeTime,'距今 36分钟');
+ h.refresh();assert.equal(h.page.data.lastReset.publicationId,'card');assert.equal(h.page.data.lastReset.relativeTime,'距今 36分钟');
  h.page.selectResetKind({currentTarget:{dataset:{kind:'automatic_reset'}}});
- assert.equal(h.page.data.lastReset.days,1);assert.equal(h.page.data.lastReset.hoursMinutes,'12:46');assert.equal(h.page.data.lastReset.seconds,'09');
+ assert.equal(h.page.data.lastReset.relativeTime,'距今 1天12小时');
  h.page.openLastReset();assert.equal(h.navigations.at(-1),'/pages/detail/index?publicationId=reset');
  h.page.onUnload();assert.equal(h.timers.size,0);
 });
 
-test('原生所选类别无历史时清空旧时长，切换到有历史的类别能重新启动计时',()=>{
+test('原生所选类别无历史时清空旧消息，切换到有历史的类别能恢复相对时间',()=>{
  const h=nativeHome(fixture([publication('reset','automatic_reset','2026-10-11T19:14:52Z')]));
  h.page.selectResetKind({currentTarget:{dataset:{kind:'banked_reset'}}});assert.equal(h.page.data.lastReset,null);assert.equal(h.timers.size,0);
  h.page.openLastReset();assert.equal(h.navigations.length,0);
  h.advance(2000);h.page.selectResetKind({currentTarget:{dataset:{kind:'automatic_reset'}}});
- assert.equal(h.page.data.lastReset.seconds,'10');assert.equal(h.timers.size,1);h.page.onUnload();
+ assert.equal(h.page.data.lastReset.relativeTime,'距今 1天12小时');assert.equal(h.timers.size,1);h.page.onUnload();
  const banked=nativeHome(fixture([publication('card','banked_reset','2026-10-08T03:44:55Z')]));
  assert.equal(banked.page.data.lastReset,null);assert.equal(banked.timers.size,0);
- banked.page.selectResetKind({currentTarget:{dataset:{kind:'banked_reset'}}});assert.equal(banked.page.data.lastReset.days,5);assert.equal(banked.page.data.lastReset.seconds,'05');assert.equal(banked.timers.size,1);
- banked.advance(1000);assert.equal(banked.page.data.lastReset.seconds,'06');banked.page.onUnload();
+ banked.page.selectResetKind({currentTarget:{dataset:{kind:'banked_reset'}}});assert.equal(banked.page.data.lastReset.relativeTime,'距今 5天4小时');assert.equal(banked.timers.size,1);
+ banked.advance(1000);assert.equal(banked.page.data.lastReset.relativeTime,'距今 5天4小时');banked.page.onUnload();
 });

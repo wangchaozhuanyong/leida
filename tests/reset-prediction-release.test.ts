@@ -17,6 +17,7 @@ const require=createRequire(import.meta.url);
 const native=require('../miniprogram/utils/status-timeline.js');
 const nativeModel=require('../miniprogram/utils/model.js');
 const nativePoster=require('../miniprogram/packages/poster/status-poster.js');
+const {selectedHomeStatus}=require('../miniprogram/utils/home-reset-status.js');
 const now='2026-10-17T04:00:00.000Z';
 const source={type:'x_post',author:'thsottiaux',url:'https://x.com/thsottiaux/status/2111176111111111111'};
 function response():any {return {meta:{api_version:'v1',generated_at:now},data:{latest_reset:{reset_type:'regular',announced_at:'2026-10-15T06:28:13Z'},scheduled_reset:null,active_watch:{level:'elevated',reset_chance_percent:73,forecast_window:'within 10 hours',observed_at:'2026-10-16T19:00:00Z',expires_at:'2026-10-17T05:00:00Z',text:'A possible reset, not a commitment.',source}}};}
@@ -70,27 +71,29 @@ test('观察来源允许无链接并始终署名，旧推文响应兼容；两�
 test('两款网页/小程序海报跟随同一状态，旧完成不遮盖新预告和观察，状态变更拒绝旧图',()=>{
   const empty=response();empty.data.active_watch=null;
   for(const value of [data(empty),data(),data(schedule()),addCompletion(data(empty)),addCompletion(data(schedule()))]){
-    const web=statusPosterSnapshot(value),mini=nativePoster.statusPosterInput(value);
-    for(const key of ['round','publicationId','generatedAt','title','label','value','unit','statementAt','statementLabel','nextNote','sourceLabel','validUntil'] as const)assert.equal(mini[key],web[key],key);
+    const web=statusPosterSnapshot(value),kind=value.forecasts?.watch?.scheduledReset?.kind||'automatic_reset',mini=nativePoster.statusPosterInput(value,kind),home=selectedHomeStatus(value,kind);
+    assert.equal(mini.round,home.revision);assert.equal(mini.publicationId,home.publicationId);assert.equal(mini.title,home.hero.title||home.title);assert.equal(mini.value,home.hero.metric||home.hero.title);
     assert.ok(nativePoster.statusPosterAvailable(mini,value));
     for(const style of ['precision','editorial'] as const){
       const svg=currentStatusPosterSvg(value,now,web.round,style);assert.ok(svg.includes(web.title));assert.ok(svg.includes(web.value));
       const layout=nativePoster.createStatusPosterLayout(mini,(t:string,size:number)=>t.length*size,style);assert.ok(layout.commands.filter((c:any)=>c.type==='text').map((c:any)=>c.value).join('').includes(mini.title));
     }
     const changed=data();changed.forecasts!.watch={status:'none',checkedAt:now};
-    if(web.round!==statusPosterSnapshot(changed).round){assert.throws(()=>assertStatusPosterRound(changed,web.round),/已变化/);assert.equal(nativePoster.statusPosterAvailable(mini,changed),false);}
+    if(web.round!==statusPosterSnapshot(changed).round){assert.throws(()=>assertStatusPosterRound(changed,web.round),/已变化/);assert.equal(nativePoster.statusPosterAvailable(mini,changed),mini.round===nativePoster.statusPosterInput(changed,mini.kind).round);}
   }
   const value=data(),snap=statusPosterSnapshot(value);assert.equal(snap.publicationId,'');
   assert.throws(()=>currentStatusPosterSvg({...value,serverTime:'2026-10-17T05:00:00Z'},now,snap.round),/已变化/);
 });
 test('原生海报在信号到期时主动清除预览和缓存，不能切换风格或继续保存旧图',()=>{
   let definition:any,clock=Date.parse(now);const timers:any[]=[];
-  const value=data(),state={data:value,receivedAt:clock};
+  const value=data();value.forecasts!.cases=[{id:'typed-signal',url:source.url,target:'automatic_reset',status:'watching',coverage:{status:'verified'},signalEvidenceIds:[]}] as any;const state={data:value,receivedAt:clock};
   class ClockDate extends Date {static now(){return clock;}}
   new Script(readFileSync('miniprogram/packages/poster/index.js','utf8')).runInNewContext({Date:ClockDate,Page(d:any){definition=d;},wx:{},getApp:()=>({client:{getState:()=>state}}),setTimeout(fn:()=>void,delay:number){const timer={fn,delay,unref(){}};timers.push(timer);return timer;},clearTimeout(){},require(path:string){if(path.endsWith('/page'))return {createPage:(_build:unknown,extra:any)=>({...extra,...extra.methods})};if(path.endsWith('/status-poster'))return nativePoster;if(path.endsWith('/poster'))return {};return {privacyRequired:async()=>false};}});
   const page={...definition,data:{...definition.data},_active:true,_artifacts:{precision:{artifact:{tempFilePath:'old.png'}}},setData(patch:any){Object.assign(this.data,patch);},generate(){}};
   page.afterRender();assert.ok(page._snapshot);assert.ok(timers.some(t=>t.delay===3600020));
-  page.data.preview='old.png';clock+=3600020;timers.find(t=>t.delay===3600020).fn();
+  page.data.preview='old.png';clock+=3600020;
+  assert.equal(page.onShareAppMessage().path,'/pages/home/index','到期回调尚未运行时，转发也不能继续使用旧结论');
+  timers.find(t=>t.delay===3600020).fn();
   assert.equal(page.data.preview,'');assert.match(page.data.blocked,/状态已变化/);assert.equal(Object.keys(page._artifacts).length,0);
   assert.equal(page.onShareAppMessage().path,'/pages/home/index');
 });
@@ -134,17 +137,17 @@ test('即使类型和时间相同，新的上游预告ID也使上一轮海报失
   const original=data(schedule()),snapshot=statusPosterSnapshot(original);
   const changed=data(schedule());changed.forecasts!.watch!.scheduledReset!.id='pending-bank-2';
   assert.notEqual(snapshot.round,statusPosterSnapshot(changed).round);assert.throws(()=>assertStatusPosterRound(changed,snapshot.round),/已变化/);
-  assert.equal(nativePoster.statusPosterAvailable(nativePoster.statusPosterInput(original),changed),false);
+  assert.equal(nativePoster.statusPosterAvailable(nativePoster.statusPosterInput(original,'banked_reset'),changed),false);
 });
 
 test('预告海报圈内标签保留安全宽度，单位随数字显示，预计时刻不拆成单个数字',()=>{
-  const value=data(schedule()),snapshot=statusPosterSnapshot(value),mini=nativePoster.statusPosterInput(value);
+  const value=data(schedule()),snapshot=statusPosterSnapshot(value),mini=nativePoster.statusPosterInput(value,'banked_reset');
   assert.match(snapshot.nextNote,/\n13:00$/);
   const measure=(text:string,size:number)=>Array.from(text).reduce((n,c)=>n+(/[a-z0-9 :]/i.test(c)?.56:1)*size,0);
   for(const style of ['precision','editorial'] as const){
     const svg=currentStatusPosterSvg(value,now,snapshot.round,style);assert.match(svg,/>13:00<\/text>/);assert.ok(svg.includes(snapshot.value));assert.equal(snapshot.unit,'');
     const layout=nativePoster.createStatusPosterLayout(mini,measure,style);
-    assert.ok(layout.commands.some((c:any)=>c.value==='13:00'));
+    assert.ok(layout.commands.some((c:any)=>c.value==='13:00'||c.value==='13:00 · 北京时间'));
     if(style==='precision'){const label=layout.commands.find((c:any)=>c.value===mini.label);assert.ok(measure(label.value,label.size)<=390.01);const duration=layout.commands.find((c:any)=>c.value===mini.value);assert.ok(measure(duration.value,duration.size)<=730.01);}
   }
 });

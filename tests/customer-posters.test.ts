@@ -19,7 +19,7 @@ function fixture(stage?:BenefitAction['stage'],expectedAt?:string):PublicData {
 }
 const measure=(text:string,size:number)=>Array.from(text).reduce((n,c)=>n+(c.charCodeAt(0)<128?.56:1)*size,0);
 test('两款固定海报在无公告、预告、进行中和逾期时均可用，不捏造完成或经过天数',()=>{
-  for(const [stage,time,value]of [[undefined,undefined,'等待下一次 Reset'],['promised','2026-10-15T03:00:00Z','3小时0分钟'],['in_progress',undefined,'重置进行中'],['promised','2026-10-14T23:00:00Z','等待确认']] as const){
+  for(const [stage,time,value]of [[undefined,undefined,'等待下一次预告'],['promised','2026-10-15T03:00:00Z','3小时0分钟'],['in_progress',undefined,'额度重置进行中'],['promised','2026-10-14T23:00:00Z','1小时0分钟']] as const){
     const data=fixture(stage,time),input=native.statusPosterInput(data);
     assert.equal(input.value,value);assert.notEqual(input.label,'距该公告');assert.ok(native.statusPosterAvailable(input,data));
     for(const theme of ['precision','editorial']){const layout=native.createStatusPosterLayout(input,measure,theme);assert.equal(layout.width,1080);assert.equal(layout.height,1920);assert.match(layout.background,new RegExp(theme+'\\.jpg$'));assert.ok(layout.commands.some((c:any)=>c.value===value));assert.equal(layout.commands.some((c:any)=>c.asset==='code'||c.asset==='website'),false);}
@@ -27,7 +27,7 @@ test('两款固定海报在无公告、预告、进行中和逾期时均可用�
 });
 test('完成海报冻结声明和生成时间；布局切换不改事实，撤回后不能保存',()=>{
   const data=fixture('claimed_complete'),input=native.statusPosterInput(data);
-  assert.equal(input.value,'4');assert.equal(input.unit,'小时');assert.equal(input.label,'距该公告');
+  assert.equal(input.value,'4小时0分钟');assert.equal(input.unit,'');assert.equal(input.label,'距完成声明');
   const dark=native.createStatusPosterLayout(input,measure,'precision',true),light=native.createStatusPosterLayout(input,measure,'editorial',true);
   assert.notDeepEqual(dark.commands,light.commands);assert.equal(input.generatedAt,now);
   for(const layout of [dark,light]){const circle=layout.commands.find((c:any)=>c.type==='circle'),code=layout.commands.find((c:any)=>c.asset==='code');for(const x of [code.x,code.x+code.width])for(const y of [code.y,code.y+code.height])assert.ok(Math.hypot(x-circle.x,y-circle.y)<circle.r);assert.ok(layout.commands.filter((c:any)=>c.type==='text').map((c:any)=>c.value).join('').includes(input.title));}
@@ -92,24 +92,14 @@ test('固定海报十次切换和预览返回复用两张成品，撤回立即�
 });
 
 
-test('等待下一次公告时仍可使用最近公开消息的圆码，状态和完成时间保持独立',async()=>{
+test('小程序完成历史持续计时并绑定本轮圆码，网页仍维持既有24小时展示',()=>{
   const data=fixture('claimed_complete');
   for(const event of [data.events[0],data.publications[0].event])event.actions[0].statementAt='2026-10-10T20:00:00Z';
   const input=native.statusPosterInput(data),snapshot=statusPosterSnapshot(data);
-  assert.equal(input.publicationId,'');assert.equal(input.codePublicationId,'fixed-publication');
-  assert.equal(snapshot.publicationId,'');assert.equal(snapshot.codePublicationId,input.codePublicationId);
-  assert.equal(input.value,'等待下一次 Reset');assert.equal(input.statementAt,'');
-  // One-pixel transport fixture only; not a simulated or scannable mini-code.
-  const sharp=createRequire(require.resolve('next/package.json'))('sharp');
-  const image=await sharp({create:{width:1,height:1,channels:4,background:'#fff'}}).png().toBuffer();
-  for(const style of ['precision','editorial'] as const){
-    const svg=currentStatusPosterSvg(data,now,snapshot.round,style,{publicationId:input.codePublicationId,image,contentType:'image/png'});
-    assert.match(svg,/data-poster-code="mini"/);assert.match(svg,/等待下一次 Reset/);assert.doesNotMatch(svg,/公告称已重置用量/);
-  }
-  assert.throws(()=>currentStatusPosterSvg(data,now,snapshot.round,'precision',{publicationId:'unrelated',image,contentType:'image/png'}),/版本不匹配/);
-  data.articles[0].status='withdrawn';
-  assert.equal(native.statusPosterAvailable(input,data),false);
-  assert.equal(statusPosterSnapshot(data).codePublicationId,'');
+  assert.equal(input.publicationId,'fixed-publication');assert.equal(input.codePublicationId,'fixed-publication');
+  assert.equal(input.value,'4天4小时0分钟');assert.equal(input.statementAt,'2026-10-10T20:00:00Z');
+  assert.equal(snapshot.publicationId,'');assert.equal(snapshot.value,'等待下一次 Reset');
+  data.articles[0].status='withdrawn';assert.equal(native.statusPosterAvailable(input,data),false);
 });
 
 test('无可分享消息或只有已合并版本时，等待海报不制造扫码目标',()=>{
