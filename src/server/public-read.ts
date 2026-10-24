@@ -161,6 +161,9 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
       recentCompletedBenefits(facts).forEach(item=>selected.add(item.publication.id));
       for (const kind of ['automatic_reset','banked_reset']) { const item = actions.find(item => item.action.kind === kind && item.action.stage === 'claimed_complete' && Date.parse(item.action.statementAt) <= Date.parse(now) && Date.parse(item.publication.publishedAt) <= Date.parse(now)); if (item) selected.add(item.publication.id); }
       homeNewsGroups(facts).forEach(group => selected.add(group.latest.id));
+      // Keep bounded proof beyond the three news cards, so a later source's
+      // report cannot hide an earlier observation needed by the same round.
+      resetObservations(facts).slice(0,10).forEach(item=>selected.add(item.publicationId));
     } else if (options.view === 'calendar') {
       publicActions(facts).forEach(item => selected.add(item.publication.id));
       resetObservations(facts).forEach(item => selected.add(item.publicationId));
