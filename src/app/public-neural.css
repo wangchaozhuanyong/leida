@@ -721,3 +721,14 @@ html:has(.public-surface) body { background: #f2f5fb; color: #14263e; }
 @keyframes radar-scan{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @media(max-width:350px){.public-surface .pub-home-current{padding-left:15px;padding-right:15px}.pub-radar-scope{width:236px;height:236px}.pub-orbit-part strong{font-size:47px}.pub-reset-tab-copy strong{font-size:12px}.pub-reset-tabs button img{width:22px;height:22px}.pub-orbit-schedule time{font-size:14px}.pub-page-symbol{width:30px;height:30px}}
 @media(prefers-reduced-motion:reduce){.pub-radar-sweep{animation:none!important}.public-surface .pub-home-current .pub-reset-tabs button{transition:none}}
+
+/* Keep source observations distinct from completed reset statements. */
+.pub-record-dot.observed{background:transparent;border:1px solid #b27820;box-sizing:border-box;width:6px;height:6px}
+.pub-month-days .selected .pub-record-dot.observed{background:transparent;border-color:#fff}
+.pub-record-legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin:12px 0 0;color:#6c7c91;font-size:10px;line-height:1.6}
+.pub-record-legend>span{display:flex;align-items:center;gap:5px}
+.pub-record-seal.observed{background:#fff3df;color:#a36c18}
+.pub-record-meta{flex-wrap:wrap;gap:5px 8px}
+.pub-record-status{font-size:10px;color:#607895;background:#edf2f9;padding:2px 5px;border-radius:4px;line-height:1.5}
+.pub-record-status.observed{color:#946016;background:#fff1d9}
+.pub-record-source{display:block;margin-top:5px;font-size:11px;line-height:1.6;color:#7b6b50;overflow-wrap:anywhere}

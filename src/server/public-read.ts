@@ -2,7 +2,7 @@ import { transaction, type Client } from '../db';
 import type { Activity, Article, Evidence, PublicData, Publication, RadarEvent, Source } from '../lib/types';
 import type { PublicReadEnvelope, PublicReadOptions, PublicView } from '../lib/public-read';
 import { projectPublicHistory } from '../lib/history';
-import { publicActions, publicationSourceTime, recentCompletedBenefits } from '../lib/public-facts';
+import { publicActions, completedPublicActions, publicationSourceTime, recentCompletedBenefits } from '../lib/public-facts';
 import { publicNewsGroups, homeNewsGroups } from '../lib/public-feed';
 import { publicResetOutlook } from '../lib/reset-outlook';
 import {resetObservations} from '../lib/reset-observations';
@@ -92,7 +92,7 @@ export async function getLightPublicVersion() {
 const articleSummary = `(payload - 'translation' - 'summary') || jsonb_build_object('translation','', 'summary',left(payload->>'summary',360))`;
 const thinPublication = `(payload - 'article') || jsonb_build_object('article', ((payload->'article') - 'translation' - 'summary') || jsonb_build_object('translation','', 'summary',left(payload->'article'->>'summary',360)))`;
 // Retain bounded observation proof in compact reads; ordinary original bodies stay omitted.
-const thinEvidence = `CASE WHEN payload->>'sourceId' IN ('reset-archive','aiplanwatch-reference') AND payload->>'messageId' LIKE 'observed-%' THEN payload ELSE (payload - 'text' - 'metadata') || jsonb_build_object('text','') END`;
+const thinEvidence = `CASE WHEN payload->>'sourceId' IN ('reset-archive','aiplanwatch-reference','codexlimits-observations') AND payload->>'messageId' LIKE 'observed-%' THEN payload ELSE (payload - 'text' - 'metadata') || jsonb_build_object('text','') END`;
 export async function readPublicFacts(client: Client, timestamp: string): Promise<PublicData> {
   const events = (await client.query('SELECT payload FROM radar_events ORDER BY created_at DESC,id')).rows.map(row => row.payload as RadarEvent);
   const articles = (await client.query(`SELECT ${articleSummary} AS payload FROM radar_articles ORDER BY created_at DESC,id`)).rows.map(row => row.payload as Article);
@@ -163,6 +163,13 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
       homeNewsGroups(facts).forEach(group => selected.add(group.latest.id));
     } else if (options.view === 'calendar') {
       publicActions(facts).forEach(item => selected.add(item.publication.id));
+      resetObservations(facts).forEach(item => selected.add(item.publicationId));
+      // Cross-source display dedup can choose A while a completion cites B.
+      // Retain B's published proof so clients can verify that direct citation.
+      const cited = new Set(completedPublicActions(facts).flatMap(item => item.action.evidenceIds));
+      for (const evidence of facts.evidence.filter(item => cited.has(item.id))) {
+        resetObservations({...facts, evidence:[evidence]}).forEach(item => selected.add(item.publicationId));
+      }
     } else if (options.view === 'activity') {
       const activity = activities.find(item => item.id === options.id);
       const day = options.day || (activity ? Math.max(1, Math.min(activity.days, activityDayNumber(activity, now) || 1)) : 1);

@@ -44,6 +44,8 @@ test('默认最新完成、北京时间归档；排除未完成、定向、未�
   assert.equal(model.selected,'2026-10-15');assert.equal(model.days.length,35);
   assert.deepEqual(completedRecords(data).map(item=>item.action.id),['oct15','oct13','oct8','midnight']);
   assert.equal(model.automaticCount,2);assert.equal(model.bankedCount,1);
+  assert.equal(model.confirmedCount,3);assert.equal(model.observedCount,0);assert.equal(model.selectedConfirmedCount,1);assert.equal(model.selectedObservedCount,0);
+  assert.equal(model.selectedItems[0].evidenceType,'confirmed');assert.equal(model.selectedItems[0].statusLabel,'完成确认');assert.equal(model.selectedItems[0].sourceName,'');
   assert.equal(recordCalendar(data,{date:'2026-04-17'}).selectedItems[0].id,'midnight');
   assert.equal(recordCalendar(data,{date:'2026-10-08'}).selectedItems[0].time,'11:44');
   assert.deepEqual(data,before);
