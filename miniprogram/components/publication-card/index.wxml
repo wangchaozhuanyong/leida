@@ -1,4 +1,4 @@
-<view class="card publication-card">
+<view class="card publication-card {{compact ? 'is-compact' : ''}}">
   <view class="row wrap"><text class="badge {{item.tone}}">{{item.historical ? '历史收录 · ' : ''}}{{item.label}}</text><text class="time">{{item.time}}</text></view>
   <view class="announcement-title">{{item.title}}</view><view class="prose publication-summary">{{item.summary}}</view>
   <view wx:if="{{item.reviewStatus}}" class="publication-context"><view>{{item.reviewReasons}}</view></view>

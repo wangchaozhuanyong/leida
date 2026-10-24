@@ -469,14 +469,16 @@ test('提醒页结果未知时可准备新授权，过期会话重入恢复但�
   await h.reader.loadForPage();assert.equal(h.login,2);assert.equal(h.reader.getState().ready,true);assert.equal(h.subscribe,0);
 });
 
-test('首页没有完成记录时，海报分享最新公开动态的固定版本，点击前不调用微信',()=>{
+test('首页没有重置安排时，海报携带当前空状态版本，不借用产品动态圆码或调用微信',()=>{
   const h=pageHarness(),page=h.page('home');
   assert.equal(page.data.latest,null);
   assert.equal(page.data.posterPath,'/pages/detail/index?publicationId=fixture-new');
   assert.match(page.data.posterDescription,/黑金或水墨/);
   assert.equal(h.requests.length,0);assert.deepEqual(h.calls,[]);
   page.openPoster();
-  assert.deepEqual(h.navigation,[{method:'navigateTo',url:'/packages/poster/index'}]);
+  assert.equal(h.navigation.length,1);assert.equal(h.navigation[0].method,'navigateTo');
+  const entry=new URL(h.navigation[0].url,'https://isolated.test');assert.equal(entry.pathname,'/packages/poster/index');assert.equal(entry.searchParams.get('kind'),'automatic_reset');assert.equal(entry.searchParams.get('revision'),page.data.resetCards[0].revision);
+  assert.match(page.onShareAppMessage().path,/^\/pages\/home\/index\?kind=automatic_reset&revision=home-[a-f0-9]{16}$/);
   assert.equal(h.data.publications[1].mode,'news_only');assert.equal(h.data.events[0].actions.length,0);
   page.onUnload();
 });
@@ -505,7 +507,7 @@ test('首页海报跳过撤回、合并和关联缺失的动态；无有效记�
   }
   const empty=pageHarness();empty.data.publications=[];empty.data.events=[];empty.data.articles=[];
   const page=empty.page('home');assert.equal(page.data.posterPath,'');assert.match(page.data.posterDescription,/分享当前公开状态/);
-  page.openPoster();assert.deepEqual(empty.navigation,[{method:'navigateTo',url:'/packages/poster/index'}]);assert.equal(empty.requests.length,0);page.onUnload();
+  page.openPoster();assert.equal(empty.navigation.length,1);assert.equal(empty.navigation[0].method,'navigateTo');assert.match(empty.navigation[0].url,/^\/packages\/poster\/index\?kind=automatic_reset&revision=/);assert.equal(empty.requests.length,0);page.onUnload();
 });
 
 test('首页微信提醒切换到设置标签页，不打开动态记录或自动发起微信登录授权',()=>{

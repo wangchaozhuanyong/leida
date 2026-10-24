@@ -80,7 +80,7 @@ test('前台信号只预约一次到期更新，后台取消；无额外轮询�
   class ClockDate extends RealDate {static now(){return clock;}}
   runInNewContext(readFileSync(new URL('../miniprogram/pages/home/index.js',import.meta.url),'utf8'),{
     Page(value:any){registration=value;},Date:ClockDate,getApp:()=>({client:{getState:()=>state}}),
-    require(path:string){return path.endsWith('/page')?{createPage:(_build:unknown,extra:unknown)=>extra}:path.endsWith('/status-timeline')?{statusTimelineModel}:path.endsWith('/reset-state-cards')?require('../miniprogram/utils/reset-state-cards.js'):path.endsWith('/dial')?require('../miniprogram/utils/dial.js'):m;},
+    require(path:string){return path.endsWith('/page')?{createPage:(_build:unknown,extra:unknown)=>extra}:path.endsWith('/status-timeline')?{statusTimelineModel}:path.endsWith('/home-reset-status')?require('../miniprogram/utils/home-reset-status.js'):path.endsWith('/reset-state-cards')?require('../miniprogram/utils/reset-state-cards.js'):path.endsWith('/home-orbit')?require('../miniprogram/utils/home-orbit.js'):path.endsWith('/dial')?require('../miniprogram/utils/dial.js'):m;},
     setTimeout(callback:()=>void,delay:number){pending.set(++nextId,{callback,delay});return nextId;},clearTimeout(id:number){pending.delete(id);},
     setInterval(){intervals++;return 1;},clearInterval(){},wx:{}
   });
@@ -91,5 +91,6 @@ test('前台信号只预约一次到期更新，后台取消；无额外轮询�
   clock=Date.parse(expiry)+20;pending.clear();timer.callback();
   assert.equal(writes,1);assert.equal(page.data.timeline.watching,false);assert.equal(page.data.timeline.title,'等待下一次 Reset');assert.equal(pending.size,0);
   clock=Date.parse(now);registration.afterRender.call(page);assert.equal(pending.size,1);
-  page._visible=false;registration.hide.call(page);assert.equal(pending.size,0);
+  registration.show.call(page);assert.equal(page.data.motionActive,true);
+  page._visible=false;registration.hide.call(page);assert.equal(pending.size,0);assert.equal(page.data.motionActive,false);
 });
