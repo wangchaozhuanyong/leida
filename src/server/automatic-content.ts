@@ -15,7 +15,10 @@ export function isClearlyUnrelated(evidence:Evidence):boolean {
 
 export function evidenceFingerprint(evidence:Evidence[]):string {
   const inputs=createHash('sha256').update(JSON.stringify(evidence.map(item=>({id:item.id,hash:item.hash,parentId:item.parentId,contextComplete:item.contextComplete,textOrigin:item.textOrigin,metadata:item.metadata})).sort((a,b)=>a.id.localeCompare(b.id)))).digest('hex');
-  return `${AUTOMATIC_RULES_VERSION}:${inputs}`;
+  // A changed observation template must re-evaluate persisted machine drafts,
+  // even when the upstream text is unchanged. Keep other fact rules untouched.
+  const observation=evidence[0]&&observedEvidence(evidence[0],evidence[0].collectedAt);
+  return `${AUTOMATIC_RULES_VERSION}${observation?'-observation-template-2':''}:${inputs}`;
 }
 
 export function classifyBlockers(reasons:string[],evidence:Evidence[]):CandidateAutomation {

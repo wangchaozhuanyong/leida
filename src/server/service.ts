@@ -16,6 +16,7 @@ import {getPublicForecast} from './forecast';
 import {gatherEvidenceContext,hasCompleteContext} from './source-context';
 import {TIBO_PUBLIC_SOURCE} from './tibo-public';
 import {configuredPublicRpc} from './cloudbase/public-config';
+import {observedEvidence} from '../lib/reset-observations';
 export const defaultSite:SiteSettings = { name:'模钥重置雷达',description:'跟踪公开重置公告与重置卡动态',autoPublish:true,version:1 };
 const str=(x:unknown)=>z.string().min(1).max(200).parse(x);
 export async function audit(actor:string,action:string,objectId:string,reason:string,before:unknown,after:unknown,c:Client) { await insert('audits',{id:id('audit'),actor,action,objectId,reason,createdAt:now(),before,after} satisfies Audit,c); }
@@ -48,6 +49,11 @@ function actionContent(actions:RadarEvent['actions']):{title:string;summary:stri
 interface PublishOptions { actor:string; reason:string; existingArticle?:Article; correction?:boolean; suppressNotice?:boolean; withdrawn?:boolean; automatic?:boolean; eventTitle?:string; }
 
 export function providerIdentity(evidence:Evidence):string {
+ const observation=observedEvidence(evidence,evidence.collectedAt);
+ // The borrowed announcement URL is a reference, not this observation's
+ // identity. Keep verified cross-source copies together without reusing the
+ // original announcement's article, actions or manual protections.
+ if(observation)return `observation:${observation.kind}:${evidence.messageId}:${observation.observedAt}`;
  const match=evidence.url.match(/^https:\/\/(?:x|twitter)\.com\/([^/?#]+)\/status\/(\d+)(?:[?#].*)?$/i);
  return match?`x:${match[1].toLowerCase()}:${match[2]}`:`${evidence.sourceId}:${evidence.messageId}`;
 }
