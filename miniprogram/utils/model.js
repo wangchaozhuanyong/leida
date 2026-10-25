@@ -343,14 +343,20 @@ function activityModel(data, id, day) {
     const evidence=data.evidence.filter(e=>publication.article.evidenceIds.includes(e.id));
     const actions=isNewsOnly(publication)?[]:publication.event.actions;
     const observed=evidence.some(e=>observedEvidence(e,data.serverTime));
+    const primary=data.evidence.find(e=>e.id===publication.article.evidenceIds[0]);
+    // Context proves a relationship, not another product update on this activity day.
+    const currentEvidence=primary?evidence.filter(e=>e.id===primary.id||e.messageId===primary.messageId&&e.url===primary.url):[];
     const types=[];
-    if(article.category==='product'||evidence.some(e=>e.metadata?.category==='product'))types.push({kind:'improvement',label:'改进',tone:'blue'});
     if(observed||actions.some(a=>a.kind==='automatic_reset'))types.push({kind:'automatic_reset',label:'额度重置',tone:'teal'});
     if(actions.some(a=>a.kind==='banked_reset'))types.push({kind:'banked_reset',label:'重置卡',tone:'violet'});
-    if(!types.length)types.push(evidence.some(e=>e.metadata?.category==='reset')?{kind:'automatic_reset',label:'重置消息',tone:'teal'}:{kind:'unknown',label:'活动动态',tone:'slate'});
+    if(!types.length){
+      if(article.category==='reset'||currentEvidence.some(e=>e.metadata?.category==='reset'))types.push({kind:'reset_message',label:'重置消息',tone:'teal'});
+      else if(article.category==='product'||currentEvidence.some(e=>e.metadata?.category==='product'))types.push({kind:'improvement',label:'改进',tone:'blue'});
+      else types.push({kind:'unknown',label:'活动动态',tone:'slate'});
+    }
     const withdrawn=publicationWithdrawn(data,publication);
     const stages=[...new Set(actions.map(a=>a.stage==='claimed_complete'?'发布者完成声明':a.stage==='promised'?'已预告':a.stage==='in_progress'?'已宣布开始':a.stage==='cancelled'?'已取消':'待核对'))];
-    const stage=withdrawn?'已撤回':observed?'来源观测':stages.join(' · ')|| (types.some(t=>t.kind==='automatic_reset')?'完成情况待核对':'公开产品消息');
+    const stage=withdrawn?'已撤回':observed?'来源观测':stages.join(' · ')|| (types.some(t=>t.kind==='reset_message')?'完成情况待核对':types.some(t=>t.kind==='improvement')?'公开产品消息':'公开活动消息');
     const entry={...publicationCard(data,publication),types,stage,sourceTime:Date.parse(publicationSourceTime(publication))||0};
     byDay.set(item.day,[...(byDay.get(item.day)||[]),entry]);
   }
