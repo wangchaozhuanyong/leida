@@ -117,7 +117,7 @@ export async function getCadenceSnapshot(id:string,client:Client):Promise<Stored
 
 export function projectCadenceForecast(snapshot:StoredCadenceForecast|undefined,sources:Source[],timestamp:string):ResetCadenceForecast|undefined {
  if(!snapshot)return;
- if(snapshot.modelVersion!==RESET_CADENCE_MODEL_VERSION||!snapshot.target)return {...snapshot,status:'paused',p24:null,p48:null,predictedAt:null,windowStart:null,windowEnd:null,explanation:'当前模型已按用量重置与重置卡拆分；旧混合模型只保留历史记录，不作为当前预测。'};
+ if(snapshot.modelVersion!==RESET_CADENCE_MODEL_VERSION||!snapshot.target)return {...snapshot,status:'paused',p24:null,p48:null,predictedAt:null,windowStart:null,windowEnd:null,explanation:'预测依据规则已更新；旧版本只保留历史记录，不作为当前预测。'};
  if(!snapshot.sourceIds.length?!(snapshot.status==='insufficient'&&cadenceSourcesAvailable(sources,[],timestamp)):snapshot.sourceIds.some(id=>!forecastSourceAvailable(sources.find(s=>s.id===id),timestamp)))return {...snapshot,status:'paused',p24:null,p48:null,predictedAt:null,windowStart:null,windowEnd:null,explanation:'历史重置来源暂停、失效或采集延迟，暂不提供当前估计；固定预测记录继续保留。'};
  if(!Number.isFinite(Date.parse(timestamp))||!Number.isFinite(Date.parse(snapshot.generatedAt))||!Number.isFinite(Date.parse(snapshot.validUntil))||Date.parse(snapshot.generatedAt)>Date.parse(timestamp)||Date.parse(snapshot.validUntil)<=Date.parse(timestamp))return {...snapshot,status:'paused',p24:null,p48:null,predictedAt:null,windowStart:null,windowEnd:null,explanation:'预测更新已超时，等待后台重新计算；旧记录不会冒充当前预测。'};
  return snapshot;

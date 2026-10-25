@@ -13,7 +13,7 @@ import { automationRows, workerRuntimeStatus } from '../lib/automation';
 import {activityHideDate} from '../lib/activity-display';
 import { isHistoricalContent, projectPublicHistory } from '../lib/history';
 import {getPublicForecast} from './forecast';
-import {gatherEvidenceContext,hasCompleteContext} from './source-context';
+import {gatherEvidenceContext,hasCompleteContext,originalConflict} from './source-context';
 import {TIBO_PUBLIC_SOURCE} from './tibo-public';
 import {configuredPublicRpc} from './cloudbase/public-config';
 import {observedEvidence} from '../lib/reset-observations';
@@ -325,10 +325,13 @@ export async function publishCandidate(candidateId:string,version:number,actor:s
     const matchingArticle=newsUpgrade?.article??articleForPrimary(candidate,content,primary,evidence,articles,automatic);
     const previousArticle=matchingArticle?await one<Article>('articles',matchingArticle.id,c,true):undefined;
     if(enrichment&&!previousArticle)throw new DomainError('模板文章不存在，不能补充另一文章');
-    // A later translated excerpt of the same post cannot replace an already
-    // qualified full-original article with an untyped news/pending shell.
+    // A copy can keep the original body while losing its reply relationship.
+    // Missing context is not a correction to an already qualified statement.
     const canonical=previousArticle&&evidence.find(item=>item.id===previousArticle.evidenceIds[0]);
-    if(automatic&&primary?.textOrigin==='archive_excerpt'&&content.publicationMode==='news_only'&&previousArticle?.publicationMode==='state_change'&&canonical?.textOrigin==='original'&&providerIdentity(primary)===providerIdentity(canonical)&&hasCompleteContext(canonical,gatherEvidenceContext(canonical,evidence))){
+    const sameQualifiedPost=automatic&&primary&&previousArticle?.publicationMode==='state_change'&&existing?.status==='published'&&canonical?.textOrigin==='original'&&providerIdentity(primary)===providerIdentity(canonical);
+    if(sameQualifiedPost&&content.publicationMode==='news_only'&&originalConflict(primary,[primary,canonical]))throw new DomainError('同一原帖正文或父帖存在冲突，不能用待确认副本替换已核验文章',409);
+    const incompleteOriginalCopy=sameQualifiedPost&&primary.textOrigin==='original'&&!originalConflict(primary,[primary,canonical])&&!hasCompleteContext(primary,gatherEvidenceContext(primary,evidence));
+    if(sameQualifiedPost&&content.publicationMode==='news_only'&&(primary.textOrigin==='archive_excerpt'||incompleteOriginalCopy)&&hasCompleteContext(canonical,gatherEvidenceContext(canonical,evidence))){
       const retained=await one<Publication>('publications',previousArticle.publicationId,c);
       if(!retained||retained.mode==='news_only')throw new DomainError('完整原文的发布快照缺失，不能替换为摘要',409);
       if(content.activityId&&content.activityDay){const activity=await one<Activity>('activities',content.activityId,c,true);if(activity&&!activity.items.some(item=>item.articleId===previousArticle.id&&item.day===content.activityDay))await put('activities',{...activity,version:activity.version+1,items:[...activity.items,{day:content.activityDay,articleId:previousArticle.id,eventId:previousArticle.eventId}]},c);}

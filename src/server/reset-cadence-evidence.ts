@@ -226,6 +226,7 @@ export function extractCadenceObservations(evidence: Evidence[], sources: Source
     if(versions.some(version=>!trustedEvidence(version,bySource.get(version.sourceId)!)))continue;
     const statements = versions.map((version):CadenceStatement|undefined => {
       const directKind = statementKind(version);
+      if(directKind==='unspecified')return contextStatement(version,latest,calendars,latestEvidence)??{kind:directKind,evidenceIds:[version.id]};
       return directKind ? { kind: directKind, evidenceIds: [version.id] } : contextStatement(version, latest,calendars,latestEvidence);
     });
     const kinds = statements.map(statement => statement?.kind);
