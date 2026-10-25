@@ -243,7 +243,7 @@ test('活动按来源日期和时区选日，空记录不伪造每日进展，�
   assert.equal(current.selected, 2); assert.equal(current.entries.length, 1); assert.equal(current.recordedDays, 1);
   assert.equal(current.entries[0].path, '/pages/detail/index?publicationId=pub-done');
   const empty = mini.activityModel(data, 'fixture-activity', 1);
-  assert.equal(empty.entries.length, 0); assert.match(empty.emptyText, /暂无已收录/);
+  assert.equal(empty.entries.length, 0); assert.match(empty.emptyText, /暂无|来源更新延迟/);
   assert.equal(mini.activityModel(data, 'fixture-activity', 100).selected, 2);
   data.activities[0].timezone = 'Unknown/Zone';
   assert.match(mini.activityModel(data, 'fixture-activity').phase, /手动/);
@@ -551,7 +551,7 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   // Bundled client source version. Backend-only releases must not relabel an installed client.
-  const buildVersion='1.0.54';
+  const buildVersion='1.0.55';
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);assert.equal(news.data.navigationTitle,'动态 · 共42篇');news.onUnload();
   const records=h.page('announcements');assert.equal(records.data.navigationTitle,'重置记录');records.onUnload();
@@ -779,4 +779,23 @@ test('缓存时钟回拨或跨越24小时后不继续显示旧光环计时，恢
     const clientState:Record<string,unknown>={snapshotPending:true,receivedAt};const h=nativeHarness(fixture(),{clientState}),page=h.page('home');
     try{assert.equal(page.data.clockUntrusted,true);assert.equal(page.data.connected,false);assert.equal(page.currentHomeStatus(),null);clientState.snapshotPending=false;h.replace(fixture());assert.equal(page.data.clockUntrusted,false);assert.equal(page.data.connected,true);}finally{page.onUnload?.();}
   }
+});
+
+test('活动整月本地选日，混合类型、预告、待公布和未开始互不混淆',()=>{
+ const data=fixture();data.sources.push({id:'activity-archive',name:'辅助活动归档',status:'healthy',lastSuccessAt:now});
+ data.activities[0].days=28;data.activities[0].startsOn='2026-10-09';
+ const product=addRound(data,'product',[]);product.mode='news_only';product.article.category='product';product.article.publicationMode='news_only';
+ data.articles.find(a=>a.id===product.articleId)!.category='product';
+ data.activities[0].items.push({day:2,articleId:product.articleId,eventId:product.eventId},{day:3,articleId:'article-promise',eventId:'promise'});
+ const view=mini.activityModel(data,'fixture-activity',2);
+ assert.equal(view.days[1].label,'多项');assert.deepEqual(view.days[1].types.map((t:any)=>t.label),['额度重置','重置卡','改进']);
+ assert.equal(view.entries.length,2);assert.equal(view.days[0].state,'unverified');assert.equal(view.days[3].state,'future');
+ const promise=mini.activityModel(data,'fixture-activity',3);assert.equal(promise.entries[0].stage,'已预告');assert.equal(promise.days[2].label,'重置卡');
+ data.activities[0].items=[];assert.equal(mini.activityModel(data,'fixture-activity',2).days[1].state,'waiting');
+ data.sources.at(-1)!.status='failed';assert.equal(mini.activityModel(data,'fixture-activity',2).days[1].state,'unverified');
+ const harness=nativeHarness(data),page=harness.page('activity',{id:'fixture-activity',day:'3'});
+ let reloads=0;page.reloadView=()=>{reloads++;throw Error('本地选日不得重新加载')};
+ for(let i=0;i<10;i++)page.selectDay({currentTarget:{dataset:{day:i%2+1}}});
+ assert.equal(reloads,0);assert.equal(harness.refreshes,0);assert.equal(page.data.navigationLoading,false);assert.equal(page.data.activity.selected,2);
+ page.onHide();assert.equal(page._dayTimer,null);page.onUnload();assert.equal(harness.subscriptions,0);
 });

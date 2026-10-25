@@ -43,8 +43,11 @@ export function resetObservations(data:PublicFactsData):ResetObservation[] {
     const key=e.sourceId+':'+e.messageId,previous=current.get(key);
     if(!previous||Date.parse(previous.collectedAt)<Date.parse(e.collectedAt))current.set(key,{...observation,eventId:publication.eventId,publicationId:publication.id});
   }
+  // Normal record links prefer the current publication of the same observation.
+  const currentRank=(o:ResetObservation)=>Number((data.articles||[]).some(a=>a.publicationId===o.publicationId));
+  const published=(o:ResetObservation)=>Date.parse((data.publications||[]).find(p=>p.id===o.publicationId)?.publishedAt||'')||0;
   const seen=new Set<string>();
-  return [...current.values()].sort((a,b)=>Date.parse(b.observedAt)-Date.parse(a.observedAt)||a.evidenceId.localeCompare(b.evidenceId)).filter(o=>{const key=o.kind+':'+o.observedAt;if(seen.has(key))return false;seen.add(key);return true;});
+  return [...current.values()].sort((a,b)=>Date.parse(b.observedAt)-Date.parse(a.observedAt)||currentRank(b)-currentRank(a)||published(b)-published(a)||a.evidenceId.localeCompare(b.evidenceId)).filter(o=>{const key=o.kind+':'+o.observedAt;if(seen.has(key))return false;seen.add(key);return true;});
 }
 export function timelineObservation(outlook:{active?:unknown;latestObservation?:ResetObservation}|undefined,now:string,completion?:{statementAt:string}|null):ResetObservation|null {
   const o=outlook?.latestObservation;

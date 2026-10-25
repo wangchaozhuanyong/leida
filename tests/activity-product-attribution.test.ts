@@ -73,3 +73,18 @@ test('新规则指纹让已等待 Day7 可重评，仍保持相同证据输入',
   const fingerprint=evidenceFingerprint([excerpt()]),old='benefit-rules-20261012-4:'+fingerprint.split(':')[1];
   assert.equal(fingerprintChange(old,fingerprint),'rules');assert.equal(buildAutomaticTemplate([excerpt()])?.publicationMode,'news_only');
 });
+
+test('活动归档的完整署名摘要可展示，不把标签或回复当成完成证据',()=>{
+ const e=excerpt({messageId:'2113770862860222611',url:'https://x.com/thsottiaux/status/2113770862860222611',parentId:'2113770573994299544',text:'Codex CLI 现已支持提示词预设，并修复恢复长会话时的失败问题。'});
+ e.metadata={...e.metadata,activityDay:19,title:'Codex CLI 提示词预设与可靠性更新',summary:e.text};
+ const draft=buildAutomaticTemplate([e])!;assert.ok(draft);assert.match(draft.summary,/辅助归档/);assert.equal(draft.activityDay,19);assert.equal(draft.reviewStatus,'pending');assert.deepEqual(draft.actions,[]);assert.deepEqual(validateDraft(draft,[e],true),[]);
+ const future=excerpt({text:'“在午夜 PST 之前”',metadata:{...e.metadata,category:'reset',activityDay:20,title:'所有人的用量额度已重置',summary:'“在午夜 PST 之前”'}});
+ const plan=buildAutomaticTemplate([future])!;assert.ok(plan);assert.equal(plan.reviewStatus,'pending');assert.doesNotMatch(plan.title,/已重置|完成/);assert.deepEqual(plan.actions,[]);
+});
+
+test('归档缺失摘要、身份不符、混合福利或更正不能走产品消息兜底',()=>{
+ const value='Codex CLI 现已支持提示词预设。',base=excerpt({text:value});base.metadata={...base.metadata,title:'CLI 更新',summary:value};
+ for(const extra of [{sourceId:'unknown'},{url:'https://x.com/other/status/'+base.messageId},{text:value+' 已发放重置卡。',metadata:{...base.metadata,summary:value+' 已发放重置卡。'}},{text:value+' 该更新已撤回。',metadata:{...base.metadata,summary:value+' 该更新已撤回。'}},{metadata:{...base.metadata,summary:undefined}},{metadata:{...base.metadata,summary:'不一致摘要'}},{metadata:{...base.metadata,activity:{...base.metadata!.activity!,startsOn:'2026-10-04'}}}]){
+  const draft=buildAutomaticTemplate([{...base,...extra}]);assert.ok(!draft||!draft.summary.startsWith('辅助归档'),JSON.stringify(extra));
+ }
+});

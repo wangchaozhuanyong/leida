@@ -36,8 +36,11 @@ function resetObservations(data) {
     const key=e.sourceId+':'+e.messageId,previous=current.get(key);
     if(!previous||Date.parse(previous.collectedAt)<Date.parse(e.collectedAt))current.set(key,{...observation,eventId:publication.eventId,publicationId:publication.id});
   }
+  // Normal record links prefer the current publication of the same observation.
+  const currentRank=(o)=>Number((data.articles||[]).some(a=>a.publicationId===o.publicationId));
+  const published=(o)=>Date.parse((data.publications||[]).find(p=>p.id===o.publicationId)?.publishedAt||'')||0;
   const seen=new Set();
-  return [...current.values()].sort((a,b)=>Date.parse(b.observedAt)-Date.parse(a.observedAt)||a.evidenceId.localeCompare(b.evidenceId)).filter(o=>{const key=o.kind+':'+o.observedAt;if(seen.has(key))return false;seen.add(key);return true;});
+  return [...current.values()].sort((a,b)=>Date.parse(b.observedAt)-Date.parse(a.observedAt)||currentRank(b)-currentRank(a)||published(b)-published(a)||a.evidenceId.localeCompare(b.evidenceId)).filter(o=>{const key=o.kind+':'+o.observedAt;if(seen.has(key))return false;seen.add(key);return true;});
 }
 function timelineObservation(outlook,now,completion) {
  const o=outlook?.latestObservation;

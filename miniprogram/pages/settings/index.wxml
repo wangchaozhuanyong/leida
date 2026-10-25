@@ -9,6 +9,7 @@
     <button wx:for="{{notices}}" wx:key="id" class="inbox-preview" data-id="{{item.id}}" bindtap="openNotice"><view class="grow"><view class="row top"><text>{{item.title}}</text><view wx:if="{{!item.read}}" class="dot"></view></view><view class="inbox-summary">{{item.summary}}</view><view class="small muted">{{item.time}}</view></view></button>
     <view wx:if="{{connected && !notices.length}}" class="inbox-empty">暂无提醒，有新消息会显示在这里。</view>
   </view>
+  <button class="support-card" open-type="contact" bindtap="contactStart" bindcontact="contactReturn" binderror="contactError" aria-label="联系小程序客服"><view class="support-icon" aria-hidden="true"><image src="/assets/icons/inbox.png" mode="aspectFit" /></view><view class="support-copy"><view class="support-title">联系小程序客服</view><view class="support-caption">记录缺失、提醒问题，都可以告诉我们</view></view><view class="support-arrow" aria-hidden="true">→</view></button>
   <view wx:if="{{!settingsReady}}" class="card reminder-skeleton" role="status"><view class="heading">微信提醒</view><view class="small muted lead">正在核对次数和可用操作</view><view class="reminder-skeleton-count"/><view class="reminder-skeleton-line"/><view class="reminder-skeleton-line"/><view class="reminder-skeleton-button"/></view>
   <view wx:else class="card reminder-card"><view class="row"><view class="heading">微信提醒</view><text class="badge muted">{{!wechat.safe ? (wechat.busy ? '加载中' : '未连接') : !wechat.safe.configured || !wechat.safe.enabled ? '暂不可用' : wechat.safe.state === 'revoked' ? '已关闭' : wechat.safe.state === 'unknown' || wechat.allTypesOff ? '已暂停' : wechat.remainingCount > 0 ? '已开启' : '按次提醒'}}</text></view>
     <view class="reminder-count"><text class="muted">剩余提醒</text><text class="reminder-number">{{wechat.safe ? wechat.remainingCount : '—'}}</text><text class="muted">次</text></view>
@@ -30,7 +31,6 @@
     <button class="secondary full reminder-close {{wechat.busy || wechatAction || !wechat.canRevoke ? 'is-disabled' : ''}} {{wechatAction === 'revoke' ? 'is-pending' : ''}}" loading="{{wechatAction === 'revoke'}}" disabled="{{wechat.busy || wechatAction || !wechat.canRevoke}}" bindtap="revokeWechat">{{wechatAction === 'revoke' ? '正在关闭' : '关闭微信提醒'}}</button></block>
     <view class="small muted lead">关闭后剩余授权次数作废并停止后续提醒，已提交微信的消息可能仍会收到。</view>
   </view>
-  <button class="row-button" open-type="contact" bindtap="contactStart" bindcontact="contactReturn" binderror="contactError"><text>联系小程序客服</text><text>→</text></button>
   <button class="row-button" data-path="/pages/privacy/index" bindtap="navigate"><text>关于与隐私</text><text>→</text></button>
   <view class="foot">版本 {{clientVersion}}</view>
 </view>

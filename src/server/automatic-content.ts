@@ -18,7 +18,7 @@ export function evidenceFingerprint(evidence:Evidence[]):string {
   // A changed observation template must re-evaluate persisted machine drafts,
   // even when the upstream text is unchanged. Keep other fact rules untouched.
   const observation=evidence[0]&&observedEvidence(evidence[0],evidence[0].collectedAt);
-  return `${AUTOMATIC_RULES_VERSION}${observation?'-observation-template-2':''}:${inputs}`;
+  return `${AUTOMATIC_RULES_VERSION}${observation?'-observation-template-2':''}${evidence[0]&&attributedActivityExcerpt(evidence[0])?'-activity-attribution-1':''}:${inputs}`;
 }
 
 export function classifyBlockers(reasons:string[],evidence:Evidence[]):CandidateAutomation {
@@ -77,6 +77,8 @@ export function buildAutomaticTemplate(evidence:Evidence[]):DraftContent|undefin
   // evidence remains auxiliary. Never turn a mixed benefit statement into news.
   const contextLengthExcerpt=attributedContextLengthUpdate(primary);
   if(contextLengthExcerpt)return {...base,title:'活动产品动态：默认上下文长度提升',summary:`公开归档收录产品动态：“${contextLengthExcerpt}”。此条仅作产品消息记录，完整细节请查看原文。`};
+  const activityExcerpt=attributedActivityExcerpt(primary);
+  if(activityExcerpt)return {...base,...activityExcerpt};
   if(!/[\u3400-\u9fff]/.test(primary.text)){
     const summary=primary.metadata?.summary;
     if(primary.provenance==='archive'&&summary&&/[\u3400-\u9fff]/.test(summary)&&!isTruncated(summary)&&/重置|额度|发卡|落地|传播|发放/.test(summary))return attributedNews({...primary,text:summary},base);
@@ -85,6 +87,32 @@ export function buildAutomaticTemplate(evidence:Evidence[]):DraftContent|undefin
   if(complete&&hasStandaloneContext(primary.text,'product'))return {...base,title:primary.metadata?.title&&/[\u3400-\u9fff]/.test(primary.metadata.title)?primary.metadata.title.slice(0,160):'Codex 产品功能更新',summary:`${primary.provenance==='archive'?'公开归档收录的产品动态':'公开产品动态'}：${primary.text.slice(0,1800)}`,translation:primary.text.slice(0,12000)};
   // A full Chinese excerpt may be reported as an attributed message, never as a new distribution.
   if(primary.provenance==='archive'&&/重置|额度|发卡|落地|传播|发放/.test(primary.text))return attributedNews(primary,base);
+}
+
+/** Display the saved archive's wording as attributed news, not a new benefit fact.
+ * The title is deliberately ours: archive headings may claim completion even
+ * when their quoted body is only a deadline. Parent gaps remain visible. */
+function attributedActivityExcerpt(primary:Evidence):Partial<DraftContent>|undefined {
+  const meta=primary.metadata,activity=meta?.activity,day=meta?.activityDay;
+  const excerpt=meta?.summary?.trim(),title=meta?.title?.trim();
+  if(primary.sourceId!=='activity-archive'||primary.provenance!=='archive'||meta?.sourceGroup!=='codex-resets'||
+    primary.url!==`https://x.com/thsottiaux/status/${primary.messageId}`||!/^\d{15,20}$/.test(primary.messageId)||
+    activity?.id!=='challenge-28'||activity.days!==28||activity.startsOn!=='2026-10-05'||activity.timezone!=='America/Los_Angeles'||
+    typeof day!=='number'||!Number.isInteger(day)||day<1||day>activity.days||!['product','reset'].includes(meta.category??'')||
+    !title||!excerpt||title.length>150||excerpt.length>1700||!/[\u3400-\u9fff]/.test(excerpt)||
+    isTruncated(title)||isTruncated(excerpt)||isTruncated(primary.text)||
+    !['archive_excerpt','original'].includes(primary.textOrigin??'')||
+    primary.textOrigin==='archive_excerpt'&&primary.text.trim()!==excerpt)return;
+  // A product label cannot hide benefit or contradictory/corrected content.
+  const combined=[title,excerpt,primary.text].join('\n');
+  if(meta.category==='product'&&(/\b(?:reset|banked)\b|重置|发卡|存卡/i.test(combined)||
+    /\b(?:correction|withdrawn|cancelled|rumor|rumour)\b|撤回|取消|不实|传言|谣言|并非|尚未实施|消息错误/i.test(combined)))return;
+  const product=meta.category==='product';
+  return {title:product?`活动归档：${title}`:'活动归档：重置相关消息待核对',category:'activity',
+    summary:`辅助归档将此条列为第 ${day} 天${product?'产品动态':'重置相关消息'}。归档摘录：“${excerpt}”。${product?'这是来源消息，完整细节以原帖为准。':'仅记录消息，不据此认定已完成；具体福利、时间和完成情况仍需核对。'}`,
+    ...(!product?{reviewStatus:'pending' as const,reviewReasons:['活动归档分类不能证明完成，保留摘录等待原文与后续依据。']}:{}),
+    ...(primary.parentId?{reviewStatus:'pending' as const,reviewReasons:['这是归档摘录，原帖回复上下文仍待核对。']}:{}),
+    actions:[],publicationMode:'news_only'};
 }
 
 function attributedContextLengthUpdate(primary:Evidence):string|undefined {

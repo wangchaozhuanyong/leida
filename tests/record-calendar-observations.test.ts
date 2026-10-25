@@ -1,4 +1,6 @@
 import test from 'node:test';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url);
 import assert from 'node:assert/strict';
 import type {BenefitAction,Evidence,Publication,PublicData} from '../src/lib/types';
 import {recordCalendar,completedRecords} from '../miniprogram/utils/record-calendar';
@@ -36,16 +38,41 @@ test('三条来源观测覆盖两个日期，条数与日期数分别表达且�
  assert.equal(view.recentRecords[0].path,view.selectedItems[0].path);
 });
 
-test('近期最多十条，混排额度、重置卡和观测；切月不丢近期记录，切类型同步筛选',()=>{
+test('半年列表首屏十条，混排额度、重置卡和观测；切月不丢近期记录，切类型同步筛选',()=>{
  const data=fixture();addCompletion(data,'banked-recent','2026-10-23T19:00:00.000Z','banked_reset');
  for(let i=0;i<12;i++)addCompletion(data,'history-'+i,new Date(Date.parse('2026-10-22T12:00:00Z')-i*3600000).toISOString());
  const before=structuredClone(data),view=recordCalendar(data);
  assert.equal(view.recentRecords.length,10);assert.equal(view.recentRecords[0].recordTitle,'重置卡发放');assert.equal(view.recentRecords[0].timeLabel,'声明时间');
+ assert.equal(view.recentTotal,15);assert.equal(view.recentHasMore,true);
+ const expanded=recordCalendar(data,{recentLimit:20});
+ assert.equal(expanded.recentRecords.length,15);assert.equal(expanded.recentHasMore,false);
+ assert.equal(new Set(expanded.recentRecords.map(r=>r.id)).size,15);
+ assert.deepEqual(expanded.recentRecords.slice(0,10),view.recentRecords);
+ assert.deepEqual(expanded.days,view.days,'展开列表不改变日历和统计');
  assert.equal(view.recentRecords.filter(r=>r.evidenceType==='observed').length,2);
  assert.ok(view.recentRecords.every((r,i,all)=>!i||Date.parse(all[i-1].at)>=Date.parse(r.at)));
  assert.deepEqual(recordCalendar(data,{month:'2026-09'}).recentRecords,view.recentRecords);
  const banked=recordCalendar(data,{kind:'banked_reset'});assert.equal(banked.recentRecords.length,1);assert.equal(banked.recentRecords[0].kind,'banked_reset');
  assert.ok(recordCalendar(data,{kind:'automatic_reset'}).recentRecords.every(r=>r.kind==='automatic_reset'));
+ assert.deepEqual(data,before);
+});
+
+test('逐批展开可以到达半年起点，半年外资料保留但不进入当前展示',()=>{
+ const data=empty();
+ for(let i=0;i<27;i++)addCompletion(data,'six-month-'+i,new Date(Date.parse('2026-10-23T12:00:00Z')-i*6*86400000).toISOString(),i%3?'automatic_reset':'banked_reset');
+ addCompletion(data,'boundary','2026-04-23T16:00:00.000Z');
+ addCompletion(data,'outside','2026-04-23T15:59:59.000Z');
+ addObservation(data);
+ const before=structuredClone(data),first=recordCalendar(data),second=recordCalendar(data,{recentLimit:20}),last=recordCalendar(data,{recentLimit:30});
+ assert.deepEqual([first.recentRecords.length,second.recentRecords.length,last.recentRecords.length],[10,20,29]);
+ assert.equal(last.recentTotal,29);assert.equal(last.recentHasMore,false);
+ assert.equal(last.recentRecords.at(-1)!.id,'action-boundary');
+ assert.deepEqual(second.recentRecords.slice(0,10),first.recentRecords);
+ assert.deepEqual(last.recentRecords.slice(0,20),second.recentRecords);
+ assert.equal(new Set(last.recentRecords.map(r=>r.id)).size,29);
+ assert.equal(last.recentRecords.some(r=>r.id==='action-outside'),false);
+ assert.equal(data.events.some(e=>e.id==='event-outside'),true);
+ for(const limit of [-1,0,NaN,Infinity,1.5])assert.equal(recordCalendar(data,{recentLimit:limit}).recentRecords.length,10);
  assert.deepEqual(data,before);
 });
 
@@ -151,4 +178,16 @@ test('未完成、撤回或未来完成不能提前移除观测，完成撤回�
     (d:PublicData,p:Publication)=>{d.events.find(e=>e.id===p.eventId)!.status='withdrawn';},
     (d:PublicData,p:Publication)=>{p.event.actions[0].statementAt='2026-10-24T05:00:00.000Z';},
   ]){const data=empty(),e=limits();addObservation(data,e);const p=addCompletion(data,'confirmed','2026-10-24T03:00:00.000Z','automatic_reset',[],[e.id]);mutate(data,p);const view=recordCalendar(data);assert.equal(view.confirmedCount,0);assert.equal(view.observedCount,1);}
+});
+
+test('同一观测多版本的普通列表入口选当前版本，旧分享仍能打开且保留补充提示',()=>{
+ const data=empty(),e=limits(),old=addObservation(data,e,'old');
+ const newer=structuredClone(old);newer.id='current';newer.publishedAt='2026-10-24T03:00:00.000Z';newer.article.publicationId=newer.id;
+ const extra={...e,id:'supplement',collectedAt:'2026-10-24T02:20:00.000Z'};data.evidence.push(extra);newer.article.evidenceIds.push(extra.id);
+ data.publications.push(newer);data.articles[0]={...newer.article};data.events[0].publicationId=newer.id;
+ assert.equal(resetObservations(data)[0].publicationId,'current');assert.equal(recordCalendar(data).selectedItems[0].path,'/pages/detail/index?publicationId=current');
+ const mini=require('../miniprogram/utils/model.js');const native=require('../miniprogram/utils/reset-observations.js');
+ assert.deepEqual(native.resetObservations(data),resetObservations(data));
+ const detail=mini.resolveDetail(data,{publicationId:'old'});assert.equal(detail.isOld,true);assert.equal(detail.observationSourceUpdate,true);assert.equal(detail.publicationId,'old');
+ newer.article.evidenceIds=[];assert.equal(mini.resolveDetail(data,{publicationId:'old'}).observationSourceUpdate,false);
 });
