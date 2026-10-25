@@ -345,13 +345,12 @@ function activityModel(data, id, day) {
     const observed=evidence.some(e=>observedEvidence(e,data.serverTime));
     const primary=data.evidence.find(e=>e.id===publication.article.evidenceIds[0]);
     // Context proves a relationship, not another product update on this activity day.
-    const currentEvidence=primary?evidence.filter(e=>e.id===primary.id||e.messageId===primary.messageId&&e.url===primary.url):[];
     const types=[];
     if(observed||actions.some(a=>a.kind==='automatic_reset'))types.push({kind:'automatic_reset',label:'额度重置',tone:'teal'});
     if(actions.some(a=>a.kind==='banked_reset'))types.push({kind:'banked_reset',label:'重置卡',tone:'violet'});
     if(!types.length){
-      if(article.category==='reset'||currentEvidence.some(e=>e.metadata?.category==='reset'))types.push({kind:'reset_message',label:'重置消息',tone:'teal'});
-      else if(article.category==='product'||currentEvidence.some(e=>e.metadata?.category==='product'))types.push({kind:'improvement',label:'改进',tone:'blue'});
+      if(article.category==='reset'||primary?.metadata?.category==='reset')types.push({kind:'reset_message',label:'重置消息',tone:'teal'});
+      else if(article.category==='product'||primary?.metadata?.category==='product')types.push({kind:'improvement',label:'改进',tone:'blue'});
       else types.push({kind:'unknown',label:'活动动态',tone:'slate'});
     }
     const withdrawn=publicationWithdrawn(data,publication);
