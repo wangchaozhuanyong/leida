@@ -551,7 +551,7 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   // Bundled client source version. Backend-only releases must not relabel an installed client.
-  const buildVersion='1.0.55';
+  const buildVersion='1.0.56';
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);assert.equal(news.data.navigationTitle,'动态 · 共42篇');news.onUnload();
   const records=h.page('announcements');assert.equal(records.data.navigationTitle,'重置记录');records.onUnload();
@@ -798,4 +798,23 @@ test('活动整月本地选日，混合类型、预告、待公布和未开始�
  for(let i=0;i<10;i++)page.selectDay({currentTarget:{dataset:{day:i%2+1}}});
  assert.equal(reloads,0);assert.equal(harness.refreshes,0);assert.equal(page.data.navigationLoading,false);assert.equal(page.data.activity.selected,2);
  page.onHide();assert.equal(page._dayTimer,null);page.onUnload();assert.equal(harness.subscriptions,0);
+});
+
+
+test('活动日期分类只使用本条原帖，不被历史背景或同原帖弱副本覆盖',()=>{
+ const data=fixture();const publication=data.publications.find(p=>p.articleId==='article-done')!;
+ const primary=data.evidence.find(e=>e.id===publication.article.evidenceIds[0])!;
+ primary.metadata={...primary.metadata,category:'reset'};
+ const background={...primary,id:'historical-product-background',messageId:'different-past-post',metadata:{...primary.metadata,category:'product' as const}};
+ const weakerCopy={...primary,id:'weak-product-copy',metadata:{...primary.metadata,category:'product' as const}};
+ data.evidence.push(background,weakerCopy);publication.article.evidenceIds.push(background.id,weakerCopy.id);
+ let view=mini.activityModel(data,'fixture-activity',2);
+ assert.deepEqual(view.entries[0].types.map((t:any)=>t.kind),['automatic_reset','banked_reset']);
+ publication.mode='news_only';publication.article.publicationMode='news_only';
+ view=mini.activityModel(data,'fixture-activity',2);
+ assert.deepEqual(view.entries[0].types.map((t:any)=>t.label),['重置消息']);
+ assert.equal(view.entries[0].stage,'完成情况待核对');assert.equal(view.days[1].label,'重置消息');
+ primary.metadata.category='product';weakerCopy.metadata.category='product';data.articles.find(a=>a.id===publication.articleId)!.category='product';publication.article.category='product';
+ view=mini.activityModel(data,'fixture-activity',2);
+ assert.deepEqual(view.entries[0].types.map((t:any)=>t.label),['改进']);
 });
