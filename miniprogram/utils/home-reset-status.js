@@ -55,15 +55,23 @@ function roundsFor(data, kind, now) {
   return rounds.sort((a,b)=>millis(b.startAt)-millis(a.startAt)||millis(b.statementAt)-millis(a.statementAt)||keyOf(a).localeCompare(keyOf(b)));
 }
 function assignObservations(rounds, observations) {
-  const assignments = new Map(), independent = [];
+  const assignments = new Map(), independent = [], unassigned = [];
   for(const observation of observations){
-    const explicit = rounds.filter(r=>r.stage!=='cancelled' && (!r.hasPromise||millis(observation.observedAt)>=millis(r.startAt)) && (r.eventId===observation.eventId || r.urls.includes(observation.referenceUrl)));
+    // A shared source/index URL is provenance, not an occurrence identity.
+    // Only a distinct referenced post can explicitly bind different records.
+    const postReference=observation.referenceUrl&&observation.referenceUrl!==observation.sourceUrl;
+    const explicit = rounds.filter(r=>r.stage!=='cancelled' && (!r.hasPromise||millis(observation.observedAt)>=millis(r.startAt)) && (r.eventId===observation.eventId || postReference&&r.urls.includes(observation.referenceUrl)));
     const candidates = explicit.length ? explicit : rounds.filter(r=>r.stage!=='cancelled' && r.hasPromise && millis(observation.observedAt)>=millis(r.startAt) &&
       (valid(r.expectedAt) ? millis(observation.observedAt)<=millis(r.expectedAt)+DAY : ['promised','in_progress'].includes(r.stage)));
     if(candidates.length===1){const key=keyOf(candidates[0]);assignments.set(key,[...(assignments.get(key)||[]),observation]);}
-    else independent.push(observation);
+    else {
+      independent.push(observation);
+      // Ambiguous evidence can be shown alongside an arrangement, but must not
+      // be promoted into a separate later round while it still matches one.
+      if(!candidates.length)unassigned.push(observation);
+    }
   }
-  return {assignments,independent};
+  return {assignments,independent,unassigned};
 }
 function completedCard(base, kind, round, observations, now) {
   // Source-observation time stays the clock anchor when a later declaration upgrades evidence.
@@ -74,19 +82,19 @@ function completedCard(base, kind, round, observations, now) {
   const banked=kind==='banked_reset',early=!!round?.expectedAt && millis(at)<millis(round.expectedAt) && millis(at)>=millis(round.startAt);
   const title=banked?'重置卡已发放':'额度已重置';
   const card={...base,kind,state:declared?'completed':'observed',tone:declared?'green':'teal',title,badge:declared?'发布者已确认':'第三方报告',completedDisplay:true,expiredRound:false,
-    ...clock(at,now),...dateFields(at),timeLabel:observation?'来源记录时间':'完成消息时间',metricLabel:banked?'距上次发放':'距上次重置',
+    ...clock(at,now),...dateFields(at),timeLabel:observation?'来源观测时间':'完成消息时间',metricLabel:observation?round?'距本轮最早观测':'距来源观测':banked?'距上次发放':'距上次重置',
     clockAt:at,expectedAt:round?.expectedAt||'',roundKey:round?keyOf(round):'observation:'+observation.eventId,publicationId,eventId:declared?round.eventId:observation.eventId,
     declarationAt:declared?round.statementAt:'',declarationTime:declared&&observation?m.displayTime(round.statementAt):'',evidenceType:declared?'declaration':'observation',
     sourceName:declared?'':observation.sourceName,sourceType:declared?'announcement':'observed',sourceUrl:'',
     dialStatus:declared?'依据公开完成声明':'依据第三方观测',description:'持续关注下一次安排。',footer:declared?'公开完成消息，个人账户以实际显示为准':observation.sourceName+' · 第三方观测',
     action:'查看记录',oldTime:'',expectedElapsed:'',observationPublicationId:'',observationSourceName:'',observationTime:'',observationAt:'',watchNote:'',validUntil:'',early};
   card.hero=homeOrbitPresentation(card,now);
-  card.hero.title=early ? banked?'重置卡已提前发放':'额度已提前重置' : declared?banked?'重置卡发放已确认':'额度重置已确认':banked?'已有发卡观测':'已有重置观测';
+  card.hero.title=declared ? early ? banked?'重置卡已提前发放':'额度已提前重置' : banked?'重置卡发放已确认':'额度重置已确认' : banked?'已有发卡观测':'已有重置观测';
   card.hero.badge=declared?'发布者已确认':'第三方报告';
-  card.hero.label=observation?'距本轮观测':'距完成声明';
+  card.hero.label=observation?round?'距本轮最早观测':'距来源观测':'距完成声明';
   card.hero.timeLabel=card.timeLabel;
-  card.hero.description=early?'已在预计时间前收到完成依据，持续关注下一次安排。':declared?'本轮已有公开完成声明，持续关注下一次安排。':'第三方来源已记录重置，持续关注后续公开消息。';
-  card.hero.footnote=declared?'个人到账以账户为准；确认声明不会重新开始计时。':'尚未采集到发布者完成声明，个人账户以实际显示为准。';
+  card.hero.description=early ? declared?'本轮已有公开完成声明，已收录预计时间前的完成依据。':'预计时间前已有第三方重置观测，持续核对完成消息。' : declared?'本轮已有公开完成声明，持续关注下一次安排。':'第三方来源已记录重置，持续关注后续公开消息。';
+  card.hero.footnote=declared?'个人到账以账户为准；确认声明不会重新开始计时。':'尚无发布者完成声明；按'+(round?'本轮最早':'所示来源')+'观测计时，不是采集时间，也不代表实际到账的精确时间。';
   if(round?.expectedAt && millis(at)>millis(round.expectedAt))card.hero.footnote+=' 记录时间晚于预计时间，不代表实际到账一定延期。';
   return card;
 }
@@ -142,11 +150,17 @@ function historyMessage(record) {
 function homeResetStatus(data, now=data.serverTime) {
   const input={...data,serverTime:now},states=resetStateCards(input,now),observations=resetObservations(input);
   states.cards=states.cards.map(base=>{
-    const kind=base.kind,rounds=roundsFor(input,kind,now),{assignments,independent}=assignObservations(rounds,observations.filter(o=>o.kind===kind));
+    const kind=base.kind,rounds=roundsFor(input,kind,now),{assignments,independent,unassigned}=assignObservations(rounds,observations.filter(o=>o.kind===kind));
     const latest=rounds[0],record=kind==='banked_reset'?states.lastCard:states.lastReset;
     let card;
     const bound=latest?assignments.get(keyOf(latest))||[]:[];
-    if(latest?.stage==='claimed_complete'||bound.length){const newer=independent.find(o=>millis(o.observedAt)>millis(latest.statementAt));card=newer&&!bound.length?completedCard(base,kind,null,[newer],now):completedCard(base,kind,latest,bound,now);}
+    if(latest?.stage==='claimed_complete'||bound.length){
+      // Select the current occurrence before choosing its clock anchor. Keeping
+      // the earliest proof inside one round must not pin every future reset to it.
+      const resolvedAt=Math.max(millis(latest.statementAt),...bound.map(o=>millis(o.observedAt)));
+      const newer=unassigned.find(o=>millis(o.observedAt)>resolvedAt);
+      card=newer?completedCard(base,kind,null,[newer],now):completedCard(base,kind,latest,bound,now);
+    }
     else if(latest&&['promised','in_progress'].includes(latest.stage)){
       card=pendingCard(base,latest,now);
       const newer=independent.find(o=>millis(o.observedAt)>millis(latest.expectedAt)+DAY);

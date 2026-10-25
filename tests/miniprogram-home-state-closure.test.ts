@@ -23,6 +23,12 @@ function observation(data:PublicData,id:string,at:string,tweet='2113162413008884
  data.evidence.push({id:eid,sourceId:'reset-archive',messageId:'observed-'+tweet,url,text:'Codex 使用限额已重置。查看你的限额。',publishedAt:at,collectedAt:data.serverTime,contextComplete:false,historical:false,hash:id,provenance:'archive',textOrigin:'archive_excerpt',metadata:{sourceGroup:'codex-resets',category:'reset'}});
  const p=action(data,id,'promised',at,undefined,'automatic_reset',id,data.serverTime);p.mode='news_only';p.article.publicationMode='news_only';p.article.evidenceIds=[eid];p.event.actions=[];p.event.evidenceIds=[eid];data.events.find(e=>e.id===p.eventId)!.actions=[];return {eid,url,p};
 }
+function limitsObservation(data:PublicData,id:string,at:string){
+ const o=observation(data,id,at),e=data.evidence.find(e=>e.id===o.eid)!,date=new Date(at),url='https://codexlimits.com/reset-history';
+ const summary=`Third-party observation on ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][date.getUTCMonth()]} ${date.getUTCDate()}, ${String(date.getUTCHours()).padStart(2,'0')}:${String(date.getUTCMinutes()).padStart(2,'0')} UTC.`;
+ Object.assign(e,{url,sourceId:'codexlimits-observations',messageId:'observed-codexlimits-'+date.getTime(),publishedAt:date.toISOString(),text:'Usage reset landed\n'+summary,metadata:{sourceGroup:'codexlimits',category:'reset',benefitKind:'automatic_reset',referenceReset:{referenceUrl:url,eventId:'codexlimits:automatic_reset:'+date.toISOString(),occurredAt:date.toISOString(),snapshotAt:e.collectedAt,summary}}});
+ return o;
+}
 const card=(data:PublicData,at=data.serverTime,kind='automatic_reset')=>selectedHomeStatus(data,kind,at);
 
 // Execute the actual native page and its local modules with a controlled wall clock.
@@ -55,9 +61,74 @@ function nativeHome(data:PublicData|null,at:number,kind='automatic_reset') {
 
 test('提前完成结束倒计时；同轮补采更早的完成声明只升级确认、沿用观测计时',()=>{
  const d=fixture();action(d,'promise');observation(d,'observation','2026-10-24T01:40:00Z');
- const observed=card(d);assert.equal(observed.state,'observed');assert.equal(observed.early,true);assert.equal(observed.hero.title,'额度已提前重置');assert.equal(observed.hero.badge,'第三方报告');assert.equal(observed.clockAt,'2026-10-24T01:40:00Z');
+ const observed=card(d);assert.equal(observed.state,'observed');assert.equal(observed.early,true);assert.equal(observed.hero.title,'已有重置观测');assert.equal(observed.hero.badge,'第三方报告');assert.equal(observed.clockAt,'2026-10-24T01:40:00Z');assert.match(observed.hero.description,/预计时间前.*第三方/);assert.match(observed.hero.footnote,/不是采集时间/);
  action(d,'declared','claimed_complete','2026-10-24T01:30:00Z',undefined,'automatic_reset','promise',NOW);
  const declared=card(d);assert.equal(declared.state,'completed');assert.equal(declared.hero.badge,'发布者已确认');assert.equal(declared.clockAt,observed.clockAt);assert.equal(declared.hero.metric,observed.hero.metric);assert.equal(declared.publicationId,'pub-declared');assert.match(declared.declarationTime,/09:30/);assert.notEqual(declared.revision,observed.revision);
+});
+test('同轮两个来源采用最早有效观测计时，较晚采集和刷新不把计时推迟',()=>{
+ const d=fixture();action(d,'promise');observation(d,'later','2026-10-24T01:40:00Z','2113492502355562875');observation(d,'earlier','2026-10-24T01:00:00Z');
+ const view=card(d);assert.equal(view.clockAt,'2026-10-24T01:00:00Z');assert.equal(view.hero.label,'距本轮最早观测');assert.equal(view.hero.title,'已有重置观测');assert.equal(view.publicationId,'pub-earlier');assert.match(view.hero.metric,/2小时/);
+ const poster=statusPosterInput(d);assert.equal(poster.publicationId,view.publicationId);assert.equal(poster.value,view.hero.metric);assert.equal(poster.sharePath,view.sharePath);
+ d.evidence.forEach(e=>e.collectedAt='2026-10-24T02:59:00Z');assert.equal(card(d).clockAt,view.clockAt);
+ action(d,'declared','claimed_complete','2026-10-24T01:30:00Z',undefined,'automatic_reset','promise',NOW);
+ assert.equal(card(d).clockAt,view.clockAt);assert.equal(card(d).hero.badge,'发布者已确认');assert.equal(card(d).hero.title,'额度已提前重置');
+});
+test('旧轮已有最早观测，不阻挡匹配窗口之外的新独立重置；首页、海报与转发一起接替',()=>{
+ const d=fixture();d.serverTime='2026-10-25T06:43:39Z';
+ action(d,'old-promise','promised','2026-10-23T04:47:34Z','2026-10-23T18:00:00Z');
+ observation(d,'old-first','2026-10-23T17:00:00Z');observation(d,'old-second','2026-10-23T17:40:00Z','2113492502355562875');
+ const old=card(d),snapshot=statusPosterInput(d);assert.equal(old.clockAt,'2026-10-23T17:00:00Z');
+ observation(d,'new-reset','2026-10-25T06:10:00Z','2114200291319124163');
+ const current=card(d),poster=statusPosterInput(d);
+ assert.equal(current.clockAt,'2026-10-25T06:10:00Z');assert.equal(current.publicationId,'pub-new-reset');
+ assert.equal(current.hero.title,'已有重置观测');assert.equal(current.hero.label,'距来源观测');assert.equal(current.expectedAt,'');assert.equal(current.early,false);
+ assert.notEqual(current.roundKey,old.roundKey);assert.notEqual(current.revision,old.revision);assert.equal(statusPosterAvailable(snapshot,d),false);
+ assert.equal(poster.statementAt,current.clockAt);assert.equal(poster.publicationId,current.publicationId);assert.equal(poster.sharePath,current.sharePath);
+ for(const theme of ['precision','editorial'])assert.ok(createStatusPosterLayout(poster,(s:string,n:number)=>s.length*n,theme).commands.some((c:any)=>c.value===poster.value));
+ assert.match(current.sharePath,/publicationId=pub-new-reset/);
+ const h=nativeHome(d,Date.parse(d.serverTime));try{assert.equal(h.page.data.resetCards[0].clockAt,current.clockAt);assert.equal(h.page.onShareAppMessage().path,current.sharePath);}finally{h.page.onUnload();}
+});
+test('连续多轮独立观测按发生时间接替，采集乱序、旧声明补采与数组顺序不能复活旧轮',()=>{
+ const d=fixture();d.serverTime='2026-10-28T03:00:00Z';action(d,'promise');observation(d,'first','2026-10-24T01:00:00Z');
+ for(const [index,[id,at]] of [['second','2026-10-25T03:00:00Z'],['third','2026-10-26T03:00:00Z'],['fourth','2026-10-27T03:00:00Z']].entries()){
+  observation(d,id,at,String(2113492502355562875n+BigInt(index)));assert.equal(card(d).clockAt,at);assert.equal(card(d).publicationId,'pub-'+id);
+ }
+ action(d,'late-declaration','claimed_complete','2026-10-24T01:30:00Z',undefined,'automatic_reset','promise',d.serverTime);
+ d.evidence[0].collectedAt=d.serverTime;
+ for(const key of ['publications','articles','events','evidence'] as const)d[key].reverse();
+ assert.equal(card(d).clockAt,'2026-10-27T03:00:00Z');assert.equal(card(d).publicationId,'pub-fourth');
+});
+test('新独立观测撤回后恢复上一条有效依据，不保留失效结论',()=>{
+ const d=fixture();d.serverTime='2026-10-26T03:00:00Z';action(d,'promise');observation(d,'first','2026-10-24T01:00:00Z');
+ observation(d,'second','2026-10-25T03:00:00Z','2113492502355562875');assert.equal(card(d).publicationId,'pub-second');
+ d.articles.find(a=>a.id==='article-second')!.status='withdrawn';assert.equal(card(d).publicationId,'pub-first');
+});
+test('存在竞争轮次的未归属观测不能替换已绑定的同轮依据',()=>{
+ const d=fixture();action(d,'older');const newest=action(d,'newest','promised','2026-10-23T15:00:00Z','2026-10-24T04:00:00Z');
+ const owned=observation(d,'owned','2026-10-24T01:00:00Z');newest.event.actions[0].evidenceIds=[owned.eid];
+ observation(d,'ambiguous','2026-10-24T01:40:00Z','2113492502355562875');
+ assert.equal(card(d).clockAt,'2026-10-24T01:00:00Z');assert.equal(card(d).publicationId,'pub-owned');
+});
+test('新独立额度观测不覆盖重置卡，也不挤掉更新的待执行预告',()=>{
+ const d=fixture();d.serverTime='2026-10-26T03:00:00Z';action(d,'old');observation(d,'first','2026-10-24T01:00:00Z');
+ action(d,'banked','claimed_complete','2026-10-23T00:00:00Z',undefined,'banked_reset');
+ observation(d,'second','2026-10-25T03:00:00Z','2113492502355562875');assert.equal(card(d).publicationId,'pub-second');assert.equal(card(d,d.serverTime,'banked_reset').publicationId,'pub-banked');
+ action(d,'next','promised','2026-10-25T04:00:00Z','2026-10-27T02:00:00Z');
+ assert.equal(card(d).publicationId,'pub-next');assert.equal(card(d).state,'scheduled');
+});
+test('来源历史页网址相同只是出处相同，不能把下一次观测永久归入旧轮',()=>{
+ const d=fixture();d.serverTime='2026-10-26T03:00:00Z';const promise=action(d,'promise');
+ const first=limitsObservation(d,'limits-first','2026-10-24T01:00:00Z');promise.event.actions[0].evidenceIds=[first.eid];
+ assert.equal(card(d).clockAt,'2026-10-24T01:00:00.000Z');
+ limitsObservation(d,'limits-new','2026-10-25T03:00:00Z');
+ assert.equal(card(d).clockAt,'2026-10-25T03:00:00.000Z');assert.equal(card(d).publicationId,'pub-limits-new');
+});
+test('同轮匹配窗口的24小时边界包含等值，超过边界的新独立观测另行显示',()=>{
+ for(const offset of [0,1]){
+  const d=fixture();d.serverTime='2026-10-25T03:00:00Z';action(d,'promise');observation(d,'first','2026-10-24T01:00:00Z');
+  const at=new Date(Date.parse(T)+86400000+offset).toISOString();observation(d,'later',at,'2113492502355562875');
+  assert.equal(card(d).clockAt,offset?at:'2026-10-24T01:00:00Z');
+ }
 });
 test('旧观测、不同类别及竞争轮次不冒充当前预告的完成；原帖关联优先',()=>{
  const d=fixture(),oldPromise=action(d,'one'),old=observation(d,'old','2026-10-23T13:00:00Z');assert.equal(card(d).state,'overdue');oldPromise.event.actions[0].evidenceIds=[old.eid];assert.equal(card(d).state,'overdue','引用同一原帖也不能把预告之前的旧观测当成提前完成');

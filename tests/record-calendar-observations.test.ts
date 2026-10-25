@@ -26,6 +26,29 @@ function addObservation(data:PublicData,e=limits(),id=`p-${e.id}`){return addPub
 function addCompletion(data:PublicData,id='confirmed',at='2026-10-23T18:10:00.000Z',kind:BenefitAction['kind']='automatic_reset',evidence:Evidence[]=[],actionEvidenceIds=evidence.map(e=>e.id),eventId=`event-${id}`){return addPublication(data,id,at,[{id:`action-${id}`,kind,stage:'claimed_complete',scope:'public',statementAt:at,eligibility:'公开',evidenceIds:actionEvidenceIds}],evidence,eventId);}
 function fixture(){const data=empty();addObservation(data,archive());addObservation(data);return data;}
 
+test('三条来源观测覆盖两个日期，条数与日期数分别表达且最近列表保留全部依据',()=>{
+ const data=fixture();addObservation(data,limits('2026-10-22T17:10:00.000Z','old-limits'));
+ const view=recordCalendar(data);
+ assert.equal(view.observedCount,3);assert.equal(view.observedDateCount,2);assert.equal(view.days.filter(d=>d.observed).length,2);
+ assert.equal(view.days.find(d=>d.date==='2026-10-23')!.observedCount,2);
+ assert.equal(view.recentRecords.length,3);assert.deepEqual(view.recentRecords.map(r=>r.time),['01:40','01:10','01:00']);
+ assert.ok(view.recentRecords.every(r=>r.evidenceType==='observed'&&r.timeLabel==='观测时间'&&r.recordTitle==='额度重置'));
+ assert.equal(view.recentRecords[0].path,view.selectedItems[0].path);
+});
+
+test('近期最多十条，混排额度、重置卡和观测；切月不丢近期记录，切类型同步筛选',()=>{
+ const data=fixture();addCompletion(data,'banked-recent','2026-10-23T19:00:00.000Z','banked_reset');
+ for(let i=0;i<12;i++)addCompletion(data,'history-'+i,new Date(Date.parse('2026-10-22T12:00:00Z')-i*3600000).toISOString());
+ const before=structuredClone(data),view=recordCalendar(data);
+ assert.equal(view.recentRecords.length,10);assert.equal(view.recentRecords[0].recordTitle,'重置卡发放');assert.equal(view.recentRecords[0].timeLabel,'声明时间');
+ assert.equal(view.recentRecords.filter(r=>r.evidenceType==='observed').length,2);
+ assert.ok(view.recentRecords.every((r,i,all)=>!i||Date.parse(all[i-1].at)>=Date.parse(r.at)));
+ assert.deepEqual(recordCalendar(data,{month:'2026-09'}).recentRecords,view.recentRecords);
+ const banked=recordCalendar(data,{kind:'banked_reset'});assert.equal(banked.recentRecords.length,1);assert.equal(banked.recentRecords[0].kind,'banked_reset');
+ assert.ok(recordCalendar(data,{kind:'automatic_reset'}).recentRecords.every(r=>r.kind==='automatic_reset'));
+ assert.deepEqual(data,before);
+});
+
 test('23日01:00与24日01:40独立按北京时间归档，默认定位最近观测',()=>{
   const data=fixture(),before=structuredClone(data),latest=recordCalendar(data);
   assert.equal(resetObservations(data).length,2);assert.equal(latest.selected,'2026-10-24');assert.equal(latest.recentDate,'2026-10-24');

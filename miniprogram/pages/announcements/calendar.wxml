@@ -5,12 +5,14 @@
     <view class="record-sheet">
       <view class="month-calendar">
         <view class="month-heading">
-          <view><picker mode="selector" range="{{months}}" range-key="label" value="{{monthIndex}}" bindchange="selectMonth"><view class="month-select">{{months[monthIndex].label}} ⌄</view></picker><view class="month-subtitle">完成确认 {{confirmedCount}} · 来源观测 {{observedCount}}</view></view>
+          <view><picker mode="selector" range="{{months}}" range-key="label" value="{{monthIndex}}" bindchange="selectMonth"><view class="month-select">{{months[monthIndex].label}} ⌄</view></picker></view>
           <view class="month-controls"><button aria-label="上个月" disabled="{{monthIndex===months.length-1}}" bindtap="previousMonth">‹</button><button aria-label="下个月" disabled="{{monthIndex===0}}" bindtap="nextMonth">›</button></view>
         </view>
+        <view class="month-subtitle">本月全部 · 完成声明 {{confirmedCount}} 条 · 观测记录 {{observedCount}} 条</view>
+        <view wx:if="{{observedCount}}" class="month-count-note">观测记录分布在 {{observedDateCount}} 个日期；同日可有多个来源，不代表重置多次。</view>
         <view class="record-kinds"><button wx:for="{{kinds}}" wx:key="value" aria-pressed="{{kind===item.value}}" class="{{kind===item.value?'active':''}}" data-value="{{item.value}}" bindtap="selectKind"><view wx:if="{{item.value!=='all'}}" class="record-dot {{item.value}}" />{{item.label}}<text class="kind-count">{{item.value==='all'?automaticCount+bankedCount:item.value==='automatic_reset'?automaticCount:bankedCount}}</text></button></view>
         <view class="month-week"><text>一</text><text>二</text><text>三</text><text>四</text><text>五</text><text>六</text><text>日</text></view>
-        <view class="month-days"><block wx:for="{{days}}" wx:key="date"><view wx:if="{{item.blank}}" class="blank-day" /><button wx:else class="{{item.selected?'selected':''}} {{item.today?'today':''}}" disabled="{{item.disabled}}" aria-label="{{item.date}}，完成确认{{item.confirmedCount}}条，来源观测{{item.observedCount}}条" aria-pressed="{{item.selected}}" data-date="{{item.date}}" bindtap="selectDay"><text>{{item.day}}</text><view class="day-markers"><view wx:if="{{item.confirmedAutomatic}}" class="record-dot automatic_reset"/><view wx:if="{{item.confirmedBanked}}" class="record-dot banked_reset"/><view wx:if="{{item.observed}}" class="record-dot observed"/></view></button></block></view>
+        <view class="month-days"><block wx:for="{{days}}" wx:key="date"><view wx:if="{{item.blank}}" class="blank-day" /><button wx:else class="{{item.selected?'selected':''}} {{item.today?'today':''}}" disabled="{{item.disabled}}" aria-label="{{item.date}}，完成确认{{item.confirmedCount}}条，来源观测{{item.observedCount}}条" aria-pressed="{{item.selected}}" data-date="{{item.date}}" bindtap="selectDay"><text>{{item.day}}</text><view class="day-markers"><view wx:if="{{item.confirmedAutomatic}}" class="record-dot automatic_reset"/><view wx:if="{{item.confirmedBanked}}" class="record-dot banked_reset"/><text wx:if="{{item.observedCount>1}}" class="day-observation-count">{{item.observedCount}}</text><view wx:elif="{{item.observed}}" class="record-dot observed"/></view></button></block></view>
         <view class="record-legend"><view><view class="record-dot automatic_reset"/>额度确认</view><view><view class="record-dot banked_reset"/>重置卡确认</view><view><view class="record-dot observed"/>来源观测</view></view>
       </view>
       <view class="record-detail">
@@ -18,6 +20,16 @@
         <button wx:for="{{selectedItems}}" wx:key="id" class="date-record" aria-label="{{item.title}}，{{item.time}}，{{item.statusLabel}}，查看依据" data-path="{{item.path}}" bindtap="navigate"><text class="record-seal {{item.kind}} {{item.evidenceType}}" aria-hidden="true">{{item.evidenceType==='observed'?'◎':'✓'}}</text><view class="record-copy"><view class="record-meta"><text class="record-label {{item.kind}}">{{item.label}}</text><text class="record-status {{item.evidenceType}}">{{item.statusLabel}}</text><text class="record-time">{{item.time}}</text></view><view class="record-title">{{item.title}}</view><view wx:if="{{item.evidenceType==='observed'}}" class="record-source">{{item.sourceName}} · 官方完成确认待补充</view></view><text class="record-chevron" aria-hidden="true">›</text></button>
         <view wx:if="{{!selectedItems.length}}" class="date-empty"><view>这一天暂无已收录记录</view><view class="small muted">选择有标记的日期，查看完成声明或来源观测。</view><button wx:if="{{recentDate && recentDate!==selected}}" class="text-button" bindtap="recentRecord">查看最近一次记录 →</button></view>
       </view>
+    </view>
+    <view class="recent-reset-sheet">
+      <view class="recent-reset-heading"><text>近期重置记录</text><text class="recent-reset-count">最近 {{recentRecords.length}} 条</text></view>
+      <view class="recent-reset-note">含完成声明与来源观测 · 北京时间</view>
+      <button wx:for="{{recentRecords}}" wx:key="id" class="recent-reset-row" data-path="{{item.path}}" bindtap="navigate" aria-label="{{item.recordTitle}}，{{item.date}} {{item.time}}，{{item.statusLabel}}，查看依据" hover-class="recent-reset-pressed">
+        <view class="recent-reset-icon {{item.kind}}"><image src="/assets/icons/{{item.kind==='banked_reset'?'card':'reset'}}.png" aria-hidden="true"/></view>
+        <view class="recent-reset-copy"><view class="recent-reset-title"><text>{{item.recordTitle}}</text><text class="record-status {{item.evidenceType}}">{{item.evidenceType==='observed'?'来源观测':'完成声明'}}</text></view><view class="recent-reset-time">{{item.date}} {{item.time}}<text> · {{item.timeLabel}}</text></view><view wx:if="{{item.sourceName}}" class="recent-reset-source">{{item.sourceName}}</view></view>
+        <text class="record-chevron" aria-hidden="true">›</text>
+      </button>
+      <view wx:if="{{!recentRecords.length}}" class="recent-reset-empty">当前类型暂无已收录记录</view>
     </view>
     <view class="record-notes"><button aria-expanded="{{recordNotesOpen}}" bindtap="toggleRecordNotes"><text>近半年记录</text><text>收录说明 {{recordNotesOpen?'⌃':'⌄'}}</text></button><view wx:if="{{recordNotesOpen}}" class="record-note-copy">{{periodLabel}}<view>按完成声明或来源观测的北京时间归档，分别标记与统计。类型数字为已收录条目数，不代表个人到账次数。仅有预告、预计时间已到，不计为完成；有明确同轮依据时关联观测与完成声明。未收录不代表当日没有发生重置。</view></view></view>
   </block>

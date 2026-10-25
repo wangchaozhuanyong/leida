@@ -1,7 +1,7 @@
 <page-meta root-background-color="#f2f5fb" page-style="background-color:#f2f5fb" />
 <navigation-header title="模钥重置雷达" brand="{{true}}" />
 <view class="refresh-track {{refreshing ? 'is-active' : ''}}" aria-label="{{refreshing ? '正在更新' : ''}}"><view/></view>
-<view class="page home-page {{motionActive && connected && !error && !sourceDelayed ? 'motion-live' : ''}}">
+<view class="page home-page {{motionActive && connected && !error ? 'motion-live' : ''}}">
   <view class="home-heading">
     <view class="home-heading-title">Codex 重置，一目了然</view>
     <button class="freshness-summary" bindtap="toggleFreshness" aria-label="公开资料状态" aria-expanded="{{freshnessOpen}}"><view class="health-dot {{sourceDelayed || error ? 'delayed' : ''}}" aria-hidden="true"/><text>{{error ? connected ? '更新暂时中断' : '暂时无法连接' : connected ? sourceStatusLabel : loading ? '正在读取公开消息' : '等待连接公开资料'}}</text><text class="info-symbol" aria-hidden="true">ⓘ</text></button>
@@ -30,6 +30,7 @@
     <view class="orbit-stage {{card.hero.animated ? 'can-animate' : ''}}">
       <view class="orbit-light" aria-hidden="true"/>
       <image class="orbit-art" src="/assets/neural/silver-orbit.png" mode="aspectFit" aria-hidden="true"/>
+      <view class="orbit-scan" aria-hidden="true"/>
       <view class="orbit-path" aria-hidden="true"><view class="orbit-satellite"/></view>
       <view class="orbit-core">
         <view wx:if="{{card.hero.title && card.hero.metric}}" class="orbit-result">{{card.hero.title}}</view>
