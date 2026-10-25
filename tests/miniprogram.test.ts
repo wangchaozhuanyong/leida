@@ -806,7 +806,7 @@ test('活动日期分类只使用本条原帖，不被历史背景或同原帖�
  const primary=data.evidence.find(e=>e.id===publication.article.evidenceIds[0])!;
  primary.metadata={...primary.metadata,category:'reset'};
  const background={...primary,id:'historical-product-background',messageId:'different-past-post',metadata:{...primary.metadata,category:'product' as const}};
- const weakerCopy={...primary,id:'weak-product-copy',metadata:{...primary.metadata,category:'product' as const}};
+ const weakerCopy:typeof primary={...primary,id:'weak-product-copy',metadata:{...primary.metadata,category:'product'}};
  data.evidence.push(background,weakerCopy);publication.article.evidenceIds.push(background.id,weakerCopy.id);
  let view=mini.activityModel(data,'fixture-activity',2);
  assert.deepEqual(view.entries[0].types.map((t:any)=>t.kind),['automatic_reset','banked_reset']);
@@ -814,7 +814,7 @@ test('活动日期分类只使用本条原帖，不被历史背景或同原帖�
  view=mini.activityModel(data,'fixture-activity',2);
  assert.deepEqual(view.entries[0].types.map((t:any)=>t.label),['重置消息']);
  assert.equal(view.entries[0].stage,'完成情况待核对');assert.equal(view.days[1].label,'重置消息');
- primary.metadata.category='product';weakerCopy.metadata.category='product';data.articles.find(a=>a.id===publication.articleId)!.category='product';publication.article.category='product';
+ primary.metadata.category='product';weakerCopy.metadata!.category='reset';data.articles.find(a=>a.id===publication.articleId)!.category='product';publication.article.category='product';
  view=mini.activityModel(data,'fixture-activity',2);
  assert.deepEqual(view.entries[0].types.map((t:any)=>t.label),['改进']);
 });
