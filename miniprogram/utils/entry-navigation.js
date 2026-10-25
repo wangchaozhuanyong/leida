@@ -3,23 +3,27 @@ const HOME = 'pages/home/index';
 // their explicit destination. See WeChat's LaunchShowOption scene definitions.
 const homeScenes = new Set([1001,1017,1023,1024,1027,1054,1089,1090,1103,1104,1256,1257,1271,1273]);
 const codeScenes = new Set([1011,1012,1013,1047,1048,1049]);
+const queryKey=query=>JSON.stringify(Object.entries(query||{}).sort(([a],[b])=>a.localeCompare(b)));
 function createEntryNavigation(wxApi) {
-  let pendingHome=false, nativeReturn=null,entryKey='';
+  let pendingHome=false, nativeReturn=null,entryKey='',entryScene;
   return {
     show(options={}) {
       const returning=nativeReturn;nativeReturn=null;
       const nextKey=JSON.stringify([options.scene,options.path,options.query||{}]);
+      const path=(options.path||'').replace(/^\//,'');
+      // Share-sheet returns may report the triggering page, not the original
+      // launch path. Match its exact route/query and original scene only.
+      const ownerReturn=returning?.owner&&returning.scene===options.scene&&path===returning.owner.route&&queryKey(options.query)===queryKey(returning.owner._params);
       // Native UI can reuse the original entrance scene. Consume this protection
       // once, before interpreting that scene as another launch from Recents.
-      entryKey=nextKey;
-      if(returning?.hidden&&returning.entryKey===nextKey){pendingHome=false;return;}
-      const path=(options.path||'').replace(/^\//,'');
+      entryKey=nextKey;entryScene=options.scene;
+      if(returning?.hidden&&(returning.entryKey===nextKey||ownerReturn)){pendingHome=false;return;}
       pendingHome=homeScenes.has(options.scene)||
         (codeScenes.has(options.scene)&&path==='pages/detail/index'&&typeof options.query?.scene==='string');
     },
     hide(){if(nativeReturn)nativeReturn.hidden=true;pendingHome=false;},
     preserveNativeReturn(owner){
-      const token={hidden:false,owner,pageHidden:false,entryKey};nativeReturn=token;
+      const token={hidden:false,owner,pageHidden:false,entryKey,scene:entryScene};nativeReturn=token;
       return {
         finish(){if(nativeReturn===token&&!token.hidden)nativeReturn=null;},
         cancel(){if(nativeReturn===token)nativeReturn=null;}

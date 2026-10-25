@@ -4,7 +4,7 @@ const kinds = [{value:'all',label:'全部'},{value:'automatic_reset',label:'额�
 function createRecordPage(back = false) {
   return createPage((data, query, page) => data ? recordCalendar(data,{date:page.selected,kind:page.kind}) : {}, {
     view:()=>({view:'calendar'}), title:()=> '重置记录',
-    data:{calendarBack:back,recordNotesOpen:false,kind:'all',kinds,selected:'',selectedItems:[],days:[],months:[],monthIndex:0},
+    data:{calendarBack:back,recordNotesOpen:false,kind:'all',kinds,selected:'',selectedItems:[],recentRecords:[],days:[],months:[],monthIndex:0},
     load(query) { if (query.date) this.setData({selected:query.date}); },
     methods:{
       toggleRecordNotes() { this.setData({recordNotesOpen:!this.data.recordNotesOpen}); },

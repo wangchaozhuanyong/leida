@@ -60,7 +60,7 @@ function harness(wxOverrides:Options={}){
     pages=[instance];instance.onLoad?.(params);return instance;
   }
   function page(route:string,params:Options={}){const file=resolve(miniRoot,route+'.js');load(file);return instantiate(definitions.get(file)!,route,params);}
-  function common(route:string,view:Options={view:'home'}){const {createPage}=load(resolve(miniRoot,'utils/page.js'));return instantiate(createPage(()=>({}),{view:()=>view}),route);}
+  function common(route:string,view:Options={view:'home'},methods:Options={}){const {createPage}=load(resolve(miniRoot,'utils/page.js'));return instantiate(createPage(()=>({}),{view:()=>view,methods}),route);}
   function startAtHome(){app.onShow(ordinary);const home=common(HOME);home.onShow();home.onHide();}
   return{app,wx,state,load,page,common,startAtHome,requests,switches,toasts,previews,privacy,calls,views,readers:readerState,
     get subscriptions(){return listeners.size;},get timerCount(){return timers.size;}};
@@ -163,6 +163,57 @@ for(const route of [DETAIL,'packages/poster/index'])test(`${route} 真实预览�
   page.setData(route===DETAIL?{posterPreview:'wxfile://isolated.png'}:{preview:'wxfile://isolated.png'});
   (route===DETAIL?page.previewPoster:page.previewImage).call(page);assert.equal(h.previews.length,1);
   page.onHide();h.app.onHide();h.app.onShow(ordinary);page.onShow();assert.equal(h.switches.length,0);assert.equal(h.subscriptions,1);
+  page.onHide();h.app.onHide();h.app.onShow(ordinary);page.onShow();assert.equal(h.switches.length,1);page.onUnload();
+});
+
+for(const route of [DETAIL,'packages/poster/index'])test(`${route} 原生转发取消或完成返回原页，下一次主入口仍回首页`,()=>{
+  const h=harness();h.startAtHome();h.state.data=null;
+  const page=h.page(route,{publicationId:'fixture-old'});page.onShow();
+  const share=page.onShareAppMessage();assert.equal(typeof share.title,'string');assert.equal(typeof share.path,'string');
+  page.onHide();h.app.onHide();h.app.onShow(ordinary);page.onShow();
+  assert.equal(h.switches.length,0,'原生转发使用原入口参数恢复时必须留在触发页');assert.equal(h.subscriptions,1);
+  page.onHide();h.app.onHide();h.app.onShow(ordinary);page.onShow();
+  assert.equal(h.switches.length,1,'保护仅消费一次，不能吞掉真正的主入口重入');page.onUnload();assert.equal(h.subscriptions,0);
+});
+
+for(const route of [DETAIL,'packages/poster/index'])test(`${route} 转发只触发Page生命周期时不残留保护`,()=>{
+  const h=harness();h.startAtHome();h.state.data=null;
+  const page=h.page(route,{publicationId:'fixture-old'});page.onShow();page.onShareAppMessage();
+  page.onHide();page.onShow();assert.equal(h.switches.length,0);
+  page.onHide();h.app.onHide();h.app.onShow(ordinary);page.onShow();assert.equal(h.switches.length,1);page.onUnload();
+});
+
+for(const route of [DETAIL,'packages/poster/index'])test(`${route} 转发返回携带触发页路径参数时保留原页，保护不延续`,()=>{
+  const h=harness();h.startAtHome();h.state.data=null;
+  const params=route===DETAIL?{publicationId:'fixture-old'}:{kind:'banked_reset',revision:'home-isolated'};
+  const page=h.page(route,params);page.onShow();page.onShareAppMessage();page.onHide();h.app.onHide();
+  h.app.onShow({scene:ordinary.scene,path:route,query:Object.fromEntries(Object.entries(params).reverse())});page.onShow();
+  assert.equal(h.switches.length,0,'微信可以把原入口路径改为当前触发页路径');assert.equal(h.subscriptions,1);
+  page.onHide();h.app.onHide();h.app.onShow({scene:ordinary.scene,path:route,query:params});page.onShow();
+  assert.equal(h.switches.length,1,'原生返回保护只能消费一次');page.onUnload();
+});
+
+test('转发返回保护拒绝相同页面但不同参数的新主入口',()=>{
+  const h=harness();h.startAtHome();h.state.data=null;
+  const page=h.page(DETAIL,{publicationId:'fixture-old'});page.onShow();page.onShareAppMessage();page.onHide();h.app.onHide();
+  h.app.onShow({scene:ordinary.scene,path:DETAIL,query:{publicationId:'fixture-new'}});page.onShow();
+  assert.equal(h.switches.length,1);page.onUnload();
+});
+
+test('转发保护不吞掉新扫码入口或通知详情',()=>{
+  for(const notification of [false,true]){
+    const h=harness();h.startAtHome();h.state.data=null;
+    const page=h.page(DETAIL,{publicationId:'fixture-old'});page.onShow();page.onShareAppMessage();page.onHide();h.app.onHide();
+    h.app.onShow(notification?{scene:1107,path:DETAIL,query:{publicationId:'fixture-new'}}:{scene:1047,path:DETAIL,query:{scene:SCENE}});
+    const target=h.page(DETAIL,notification?{publicationId:'fixture-new'}:{scene:SCENE});target.onShow();
+    assert.equal(h.switches.length,notification?0:1);target.onUnload();
+  }
+});
+
+test('转发构建同步抛错时释放原生保护，并保留原错误',()=>{
+  const h=harness();h.startAtHome();const error=new Error('isolated share build failure');
+  const page=h.common(DETAIL,{view:'home'},{onShareAppMessage(){throw error;}});page.onShow();
+  assert.throws(()=>page.onShareAppMessage(),(actual:unknown)=>actual===error);
   page.onHide();h.app.onHide();h.app.onShow(ordinary);page.onShow();assert.equal(h.switches.length,1);page.onUnload();
 });
 

@@ -51,7 +51,7 @@ test('可信观测使首页进入已重置并从来源时间计时，主按钮�
     const card=h.page.data.resetCards.find((item:{kind:string})=>item.kind==='automatic_reset');
     assert.equal(card.state,'observed');assert.equal(card.completedDisplay,true);assert.equal(card.title,'额度已重置');
     assert.equal(card.publicationId,'observed-reset');assert.equal(card.timeAt,observedAt);assert.equal(card.clockText,'01:40');
-    assert.equal(card.metric,'1小时53分钟');assert.equal(card.metricLabel,'距上次重置');assert.equal(card.dialStatus,'依据第三方观测');
+    assert.equal(card.metric,'1小时53分钟');assert.equal(card.metricLabel,'距本轮最早观测');assert.equal(card.dialStatus,'依据第三方观测');
     assert.equal(card.expectedElapsed,'');assert.equal(card.observationPublicationId,'');
     assert.doesNotMatch(card.description+card.footer,/等待.*声明|待核实|官方确认/);
     h.page.openStatusEvidence(tap());assert.equal(h.navigations[0].url,'/pages/detail/index?publicationId=observed-reset');

@@ -75,14 +75,19 @@ function recordCalendar(data, options = {}) {
       confirmedCount:confirmed.length,observedCount,observed:observedCount>0,
       confirmedAutomatic:confirmed.some(item=>item.kind==='automatic_reset'),confirmedBanked:confirmed.some(item=>item.kind==='banked_reset') };
   });
-  const selectedItems = (byDate.get(selected) || []).map(({ id,kind,at,publication,evidenceType,statusLabel,sourceName }) => ({ id, kind,
+  const present = ({ id,kind,at,publication,evidenceType,statusLabel,sourceName }) => ({ id, kind,
     label: kind==='banked_reset'?'重置卡':'额度重置', title: publication.article.title, time: displayTime(at).slice(11), at,evidenceType,statusLabel,sourceName,
+    date: displayTime(at).slice(0,10),
+    recordTitle:kind==='banked_reset'?'重置卡发放':'额度重置',timeLabel:evidenceType==='observed'?'观测时间':'声明时间',
     path: `/pages/detail/index?publicationId=${encodeURIComponent(publication.id)}`,
-    href: `/events/${encodeURIComponent(publication.eventId)}?version=${encodeURIComponent(publication.id)}` }));
+    href: `/events/${encodeURIComponent(publication.eventId)}?version=${encodeURIComponent(publication.id)}` });
+  const selectedItems = (byDate.get(selected) || []).map(present);
   const monthly = records.filter(item => dateKey(item.at).startsWith(month));
   return { start, end, selected, month, months, monthIndex: months.findIndex(item=>item.value===month), days, selectedItems, recentDate,
+    recentRecords:filtered.slice(0,10).map(present),
     automaticCount: monthly.filter(item=>item.kind==='automatic_reset').length, bankedCount: monthly.filter(item=>item.kind==='banked_reset').length,
     confirmedCount:monthly.filter(item=>item.evidenceType==='confirmed').length,observedCount:monthly.filter(item=>item.evidenceType==='observed').length,
+    observedDateCount:new Set(monthly.filter(item=>item.evidenceType==='observed').map(item=>dateKey(item.at))).size,
     selectedConfirmedCount:selectedItems.filter(item=>item.evidenceType==='confirmed').length,selectedObservedCount:selectedItems.filter(item=>item.evidenceType==='observed').length,
     selectedLabel: `${Number(selected.slice(5,7))}月${Number(selected.slice(8))}日`,
     periodLabel: `${start.replace(/-/g,'.')}—${end.replace(/-/g,'.')}` };

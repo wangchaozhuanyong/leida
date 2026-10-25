@@ -30,11 +30,11 @@ test('到点不足一分钟及异常时间不产生负数NaN或完成状态',()=
     assert.deepEqual(view.parts,[]);assert.equal(view.metric,'时间待核对');assert.doesNotMatch(JSON.stringify(view),/NaN/);assert.equal(view.badge,'完成消息待确认');
   }
 });
-test('来源观测与公开完成声明保持不同证据等级、时间语义和停止动效',()=>{
+test('来源观测与公开完成声明保持不同证据等级、时间语义，均保留装饰动效',()=>{
   const observed=homeOrbitPresentation(card('observed'),now),completed=homeOrbitPresentation(card('completed','banked_reset'),now);
-  assert.equal(observed.title,'已有重置观测');assert.equal(observed.badge,'第三方报告');assert.equal(observed.timeLabel,'来源记录时间');assert.match(observed.footnote,/不等于官方/);
+  assert.equal(observed.title,'已有重置观测');assert.equal(observed.badge,'第三方报告');assert.equal(observed.timeLabel,'来源观测时间');assert.match(observed.footnote,/不等于官方/);
   assert.equal(completed.title,'重置卡发放已确认');assert.equal(completed.badge,'公开完成声明');assert.equal(completed.label,'距完成声明');
-  assert.equal(observed.animated,false);assert.equal(completed.animated,false);
+  assert.equal(observed.animated,true);assert.equal(completed.animated,true);
 });
 test('信号推测保留发布时范围不生成倒计时，独立观测不冒充本轮完成',()=>{
   const input=card('estimated','automatic_reset',{window:'未来1至2天'});

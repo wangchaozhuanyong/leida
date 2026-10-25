@@ -98,10 +98,10 @@ test('未关联观测保留现有预告及逾期状态，不把另一轮预告�
 test('小程序海报从实际 model 入口显示观测标题和时间，和网站语义一致',()=>{
   const data=fixture();supplied(data);
   const poster=statusPosterInput(data),web=statusPosterSnapshot({...data,forecasts:{...data.forecasts!,outlook:publicResetOutlook(data)}});
-  assert.equal(poster.title,'已有重置观测');assert.equal(poster.label,'距本轮观测');assert.equal(poster.statementLabel,'来源记录时间');
+  assert.equal(poster.title,'已有重置观测');assert.equal(poster.label,'距来源观测');assert.equal(poster.statementLabel,'来源观测时间');
   assert.equal(poster.statementAt,observedAt);assert.equal(poster.publicationId,'observed-publication');
   assert.equal(poster.statementAt,web.statementAt);assert.equal(poster.publicationId,web.publicationId);
-  assert.match(poster.sourceLabel,/Codex Resets.*第三方观测/);assert.match(poster.nextNote,/发布者完成声明.*账户以实际/);
+  assert.match(poster.sourceLabel,/Codex Resets.*第三方观测/);assert.match(poster.nextNote,/发布者完成声明/);assert.match(poster.nextNote,/不是采集时间/);
   assert.equal(poster.value,'13小时0分钟');assert.equal(poster.unit,'');
   assert.doesNotMatch(`${poster.title} ${poster.label} ${poster.statementLabel}`,/公告称|公告时间|距该公告/);
 });
@@ -111,7 +111,7 @@ test('两款小程序海报的真实布局命令均使用观测标签',()=>{
   for(const theme of ['precision','editorial']){
     const layout=createStatusPosterLayout(input,(value:string,size:number)=>value.length*size,theme,true);
     const texts=layout.commands.filter((c:{type:string})=>c.type==='text').map((c:{value:string})=>c.value);
-    assert.ok(texts.includes('已有重置观测'),theme);assert.ok(texts.includes('来源记录时间'),theme);assert.ok(texts.includes('距本轮观测'),theme);
+    assert.ok(texts.includes('已有重置观测'),theme);assert.ok(texts.includes('来源观测时间'),theme);assert.ok(texts.includes('距来源观测'),theme);
     assert.ok(!texts.includes('公告称已重置用量'),theme);assert.ok(!texts.includes('公告时间'),theme);
   }
 });

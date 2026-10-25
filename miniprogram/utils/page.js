@@ -1,5 +1,5 @@
 const { displayTime } = require('./model');
-const {enterPage,suspendEntry}=require('./entry-navigation');
+const {enterPage,suspendEntry,preserveNativeReturn}=require('./entry-navigation');
 function setWindowBackground() {
   // iOS has separate native top/bottom backdrops outside the page's CSS surface.
   if (typeof wx === 'undefined' || typeof wx.setBackgroundColor !== 'function') return;
@@ -80,7 +80,16 @@ function createPage(build, extra = {}) {
       if (['/pages/home/index', '/pages/settings/index', '/pages/news/index', '/pages/announcements/index'].includes(route)) wx.switchTab({ url: route });
       else wx.navigateTo({ url: path });
     },
-    ...(extra.methods || {})
+    ...(extra.methods || {}),
+    ...(typeof extra.methods?.onShareAppMessage==='function'?{
+      onShareAppMessage(...args) {
+        // The native share sheet can restore the original launch scene. Preserve
+        // this page once, just as for native image/authorization windows.
+        const guard=preserveNativeReturn();
+        try{return extra.methods.onShareAppMessage.apply(this,args);}
+        catch(error){guard.cancel();throw error;}
+      }
+    }:{})
   };
 }
 module.exports = { createPage };
