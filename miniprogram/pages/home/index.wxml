@@ -22,7 +22,7 @@
     <view class="row home-news-heading"><view class="heading">重置动态</view><button class="text-button" data-path="/pages/news/index" bindtap="navigate">全部 →</button></view>
     <publication-card wx:for="{{recent}}" wx:key="id" item="{{item}}" compact="{{true}}" />
     <view wx:if="{{!recent.length}}" class="card empty">暂无公开公告，有新消息后会在这里更新。</view>
-    <view class="foot"><view>所有时间均为北京时间</view><button class="text-button footer-link" data-path="/pages/privacy/index" bindtap="navigate">隐私说明</button></view>
+    <view class="foot"><view>所有时间均为北京时间</view></view>
   </block>
 </view>
 

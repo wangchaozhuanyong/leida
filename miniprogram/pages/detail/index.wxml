@@ -11,7 +11,8 @@
     <block wx:else>
       <view wx:if="{{detail.withdrawn}}" class="warning">这条内容已撤回，以下保留原发布版本，不能作为当前发放依据。</view>
       <view wx:if="{{detail.merged}}" class="warning">此事件已合并，以下为原发布版本。<button wx:if="{{detail.mergePath}}" class="secondary full" style="margin-top:12px" data-path="{{detail.mergePath}}" bindtap="navigate">查看合并后的事件</button><view wx:else>合并目标暂时缺少公开记录。</view></view>
-      <view wx:if="{{detail.isOld}}" class="warning">正在查看指定历史版本。<button wx:if="{{detail.latestPath}}" class="secondary full" style="margin-top:12px" data-path="{{detail.latestPath}}" bindtap="navigate">查看最新公开版本</button></view>
+      <view wx:if="{{detail.isOld && !detail.observationSourceUpdate}}" class="warning">正在查看指定历史版本。<button wx:if="{{detail.latestPath}}" class="secondary full" style="margin-top:12px" data-path="{{detail.latestPath}}" bindtap="navigate">查看最新公开版本</button></view>
+      <view wx:if="{{detail.observationSourceUpdate}}" class="small muted observation-source-update">这条观测后来补充了来源，观测时间未变。此链接保留原分享内容。<button wx:if="{{detail.latestPath}}" class="text-button" data-path="{{detail.latestPath}}" bindtap="navigate">查看补充来源 →</button></view>
       <view wx:if="{{detail.reviewStatus}}" class="warning">{{detail.reviewReasons}}</view>
       <view class="title">{{detail.title}}</view><view class="muted lead" style="margin-bottom:18px">{{detail.historical ? '历史收录 · ' : ''}}{{detail.time}}</view>
       <view class="card"><view class="heading">{{detail.hasAdditionalContent ? '中文摘要' : '公告内容'}}</view><view class="prose">{{detail.summary || '暂无可展示的公告内容。'}}</view><view wx:if="{{detail.newsOnly}}" class="warning" style="margin-top:16px;margin-bottom:0">来源消息，具体内容以原文为准。</view></view>

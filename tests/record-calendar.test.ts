@@ -123,3 +123,31 @@ test('预取期间离开日历或进入后台，迟到响应不能改写当前�
   // A later failed prefetch is cancelled on app hide; its delayed success has no effect.
   client.stop();assert.equal(client.getState().loading,false);
 });
+
+test('展开半年记录不请求网络，返回和刷新保留展开数量，切换类型恢复首批',()=>{
+  const data=fixture();
+  for(let i=0;i<24;i++){
+    const p=structuredClone(data.publications[0]),id=`expanded-${i}`,at=new Date(Date.parse('2026-10-10T01:00:00Z')-i*86400000).toISOString();
+    p.id=`pub-${id}`;p.eventId=id;p.articleId=`article-${id}`;p.publishedAt=at;
+    Object.assign(p.event,{id,publicationId:p.id});Object.assign(p.article,{id:p.articleId,eventId:id,publicationId:p.id});
+    Object.assign(p.event.actions[0],{id:`action-${id}`,statementAt:at});
+    data.events.push(structuredClone(p.event));data.articles.push(structuredClone(p.article));data.publications.push(p);
+  }
+  let reads=0;const definition=createRecordPage(),previous=(globalThis as any).getApp,previousWx=(globalThis as any).wx;
+  const client={setView(){reads++;return Promise.resolve();},getState(){return {data,receivedAt:Date.now(),loading:false};},subscribe(fn:any){fn(this.getState());return()=>{};}};
+  (globalThis as any).wx={};(globalThis as any).getApp=()=>({client});
+  const page:any={...definition,data:structuredClone(definition.data),setData(patch:any,callback?:()=>void){Object.assign(this.data,patch);callback?.();}};
+  try{
+    page.onLoad({});page.onShow();assert.equal(page.data.recentTotal,28);assert.equal(page.data.recentRecords.length,10);
+    page.moreRecords();assert.equal(page.data.recentRecords.length,20);assert.equal(reads,1);
+    page.moveToMonth(1);assert.equal(page.data.recentRecords.length,20);
+    page.onHide();page.onShow();assert.equal(page.data.recentRecords.length,20);
+    page.redraw();assert.equal(page.data.recentRecords.length,20);
+    page.moreRecords();page.moreRecords();assert.equal(page.data.recentRecords.length,28);assert.equal(page.data.recentLimit,30);assert.equal(page.data.recentHasMore,false);
+    page.selectKind({currentTarget:{dataset:{value:'all'}}});assert.equal(page.data.recentRecords.length,28,'重复点击当前类型不折叠');
+    page.selectKind({currentTarget:{dataset:{value:'banked_reset'}}});assert.equal(page.data.recentLimit,10);assert.equal(page.data.recentTotal,1);assert.equal(page.data.recentHasMore,false);
+    page.selectKind({currentTarget:{dataset:{value:'automatic_reset'}}});assert.equal(page.data.recentTotal,27);assert.equal(page.data.recentRecords.length,10);
+    page.moreRecords();page.moreRecords();assert.equal(page.data.recentRecords.length,27);
+    assert.ok(page.data.recentRecords.every((r:any)=>r.kind==='automatic_reset'));
+  }finally{page.onUnload();(globalThis as any).getApp=previous;(globalThis as any).wx=previousWx;}
+});

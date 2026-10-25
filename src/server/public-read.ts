@@ -176,10 +176,13 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
     } else if (options.view === 'activity') {
       const activity = activities.find(item => item.id === options.id);
       const day = options.day || (activity ? Math.max(1, Math.min(activity.days, activityDayNumber(activity, now) || 1)) : 1);
-      const items=activity?.items.filter(item=>item.day===day) || [];
+      // Keep the small activity calendar in one coherent read. Selecting a day
+      // is a local filter; fixed daily shares still validate against that day.
+      const items=activity?.items || [];
+      const dayItems=items.filter(item=>item.day===day);
       const rows=await client.query("SELECT payload->>'publicationId' AS publication FROM radar_articles WHERE id=ANY($1::text[])",[items.map(item=>item.articleId)]);
       rows.rows.forEach(row=>selected.add(row.publication));
-      if(options.publications?.length){const fixed=await client.query("SELECT id FROM radar_publications WHERE id=ANY($1::text[]) AND payload->>'articleId'=ANY($2::text[])",[options.publications,items.map(item=>item.articleId)]);fixed.rows.forEach(row=>selected.add(row.id));}
+      if(options.publications?.length){const fixed=await client.query("SELECT id FROM radar_publications WHERE id=ANY($1::text[]) AND payload->>'articleId'=ANY($2::text[])",[options.publications,dayItems.map(item=>item.articleId)]);fixed.rows.forEach(row=>selected.add(row.id));}
     } else if (options.view === 'notices') {
       empty.notices = (await client.query('SELECT payload FROM radar_notices')).rows.map(row => row.payload);
       empty.notices.forEach(notice => selected.add(notice.publicationId));

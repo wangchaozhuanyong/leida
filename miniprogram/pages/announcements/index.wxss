@@ -84,17 +84,24 @@
 .recent-reset-heading{display:flex;align-items:baseline;justify-content:space-between;gap:8px;color:#20344f;font-size:17px;font-weight:700;line-height:1.5}
 .recent-reset-count{font-size:10px;font-weight:400;color:#8493a8;white-space:nowrap}
 .recent-reset-note{font-size:10px;color:#8493a8;line-height:1.8;margin:4px 0 8px}
-.recent-reset-row{display:flex;align-items:center;gap:10px;min-height:80px;width:100%;margin:0;padding:14px 0;background:transparent;border-radius:0;line-height:1.5;text-align:left;font-weight:400;box-sizing:border-box}
+.recent-reset-row{display:flex;align-items:center;gap:10px;min-height:72px;width:100%;margin:0;padding:14px 0;background:transparent;border-radius:0;line-height:1.5;text-align:left;font-weight:400;box-sizing:border-box}
 .recent-reset-row::after{border:0}
 .recent-reset-row+.recent-reset-row{border-top:1px solid #edf1f7}
-.recent-reset-icon{display:flex;align-items:center;justify-content:center;flex:none;width:34px;height:34px;border-radius:11px;background:#edf4ff}
+.recent-reset-icon{display:flex;align-items:center;justify-content:center;flex:none;width:32px;height:32px;border-radius:10px;background:#edf4ff}
 .recent-reset-icon.banked_reset{background:#f2edfb}
 .recent-reset-icon image{width:23px;height:23px}
 .recent-reset-copy{flex:1;min-width:0}
-.recent-reset-title{display:flex;align-items:center;flex-wrap:wrap;gap:5px 8px;font-size:14px;font-weight:600;color:#20344f}
-.recent-reset-title .record-status{font-weight:400}
-.recent-reset-time{font-size:11px;line-height:1.8;color:#536a89;margin-top:5px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-.recent-reset-time text{font-size:10px;color:#8a98ab}
-.recent-reset-source{font-size:10px;line-height:1.6;color:#8a98ab;margin-top:2px;overflow-wrap:anywhere}
+.recent-reset-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;white-space:nowrap}
+.recent-reset-title{flex:none;font-size:14px;line-height:21px;font-weight:600;color:#20344f}
+.recent-reset-time{flex:none;font-size:11px;line-height:18px;color:#687c97;font-variant-numeric:tabular-nums}
+.recent-reset-clock{margin-left:6px;color:#536a89}
+.recent-reset-meta{display:flex;align-items:center;gap:8px;min-width:0;margin-top:5px}
+.recent-reset-meta .record-status{flex:none;white-space:nowrap;font-weight:400}
+.recent-reset-source{display:block;min-width:0;flex:1;font-size:11px;line-height:19px;color:#687c97;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.recent-reset-row .record-chevron{font-size:20px}
+@media(max-width:360px){.recent-reset-row{gap:8px}.recent-reset-icon{width:28px;height:28px;border-radius:9px}.recent-reset-icon image{width:21px;height:21px}.recent-reset-head{gap:6px}.recent-reset-title{font-size:13px}.recent-reset-time{font-size:10px}.recent-reset-clock{margin-left:4px}}
 .recent-reset-pressed{opacity:.7}
 .recent-reset-empty{padding:22px 0;font-size:12px;color:#8493a8;text-align:center}
+.recent-reset-more{width:100%;min-height:46px;margin:0;padding:12px 0;background:transparent;color:#3467c5;font-size:13px;font-weight:500;line-height:22px;border-radius:0;border-top:1px solid #edf1f7}
+.recent-reset-more::after{border:0}
+.recent-reset-end{padding:16px 0;font-size:11px;color:#8493a8;text-align:center;border-top:1px solid #edf1f7;line-height:1.6}

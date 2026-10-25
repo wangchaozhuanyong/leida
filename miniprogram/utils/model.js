@@ -289,13 +289,16 @@ function resolveDetail(data, query) {
   const newsOnly = isNewsOnly(publication);
   const isOld = (newsOnly ? currentArticle.publicationId : currentEvent.publicationId) !== publication.id;
   const current = newsOnly ? data.publications.find(item => item.id === currentArticle.publicationId) : currentPublication(data, currentEvent);
+  const observationKeys=p=>p&&isNewsOnly(p)?[...new Set(data.evidence.filter(e=>p.article.evidenceIds.includes(e.id)).map(e=>observedEvidence(e,data.serverTime)).filter(Boolean).map(o=>o.kind+':'+o.observedAt))].sort():[];
+  const oldObservations=observationKeys(publication),newObservations=observationKeys(current);
+  const observationSourceUpdate=!!(isOld&&!withdrawn&&!merged&&current&&current.articleId===publication.articleId&&current.eventId===publication.eventId&&oldObservations.length&&JSON.stringify(oldObservations)===JSON.stringify(newObservations));
   const ids = new Set([...(isNewsOnly(publication) ? publication.article.evidenceIds : publication.event.evidenceIds), ...(publication.article.contextEvidenceIds || [])]);
   const evidence = uniqueDisplayEvidence(data.evidence.filter(item => ids.has(item.id))
     .sort((a,b) => Number(b.provenance === 'official') - Number(a.provenance === 'official')));
   return {
     missing: false, publicationId: publication.id, title: publication.article.title, ...publicArticleContent(publication.article), reviewStatus: publication.article.reviewStatus || '', reviewReasons: publicReviewMessage(publication.article),
     time: displayTime(articleSourceTime(publication.article)),
-    historical: isHistoricalArticle(publication.article, data.evidence), newsOnly, withdrawn, merged, isOld,
+    historical: isHistoricalArticle(publication.article, data.evidence), newsOnly, withdrawn, merged, isOld, observationSourceUpdate,
     version: newsOnly ? publication.article.version : publication.event.version, cutoff: displayTime(publication.cutoffAt), publishedAt: displayTime(publication.publishedAt),
     canShare: !withdrawn && !merged, mergePath: targetPublication ? sharePath(targetPublication) : '', latestPath: !merged && isOld && current ? sharePath(current) : '',
     actions: newsOnly ? [] : publication.event.actions.map(action => ({ id: action.id, label: actionLabels[action.kind], stage: stageText(action, isOld || merged ? publication.cutoffAt : data.serverTime), eligibility: publicEligibility(action), scope: { public: '普发', targeted: '定向', private: '私人' }[action.scope], expectedAt: action.expectedAt ? displayTime(action.expectedAt) : '暂未明确', quote: action.evidenceQuote || '' })),
@@ -329,11 +332,46 @@ function activityModel(data, id, day) {
   if (!activity) return { missing: true };
   const actualDay = activityDayNumber(activity, data.serverTime) ?? null;
   const selected = Math.max(1, Math.min(activity.days, Number(day) || (actualDay === null ? 1 : actualDay)));
-  const recorded = new Set(activity.items.map(item => item.day));
-  const entries = activity.items.filter(item => item.day === selected).map(item => data.articles.find(article => article.id === item.articleId)).filter(Boolean).map(article => data.publications.find(item => item.id === article.publicationId)).filter(Boolean);
+  const source=data.sources.find(s=>s.id==='activity-archive');
+  const sourceDelayed=!source||source.status!=='healthy';
+  const byDay=new Map(), seen=new Set();
+  for(const item of activity.items){
+    const article=data.articles.find(a=>a.id===item.articleId&&a.eventId===item.eventId);
+    const publication=article&&data.publications.find(p=>p.id===article.publicationId&&p.articleId===article.id&&p.eventId===item.eventId);
+    if(!publication||seen.has(item.day+':'+article.id))continue;
+    seen.add(item.day+':'+article.id);
+    const evidence=data.evidence.filter(e=>publication.article.evidenceIds.includes(e.id));
+    const actions=isNewsOnly(publication)?[]:publication.event.actions;
+    const observed=evidence.some(e=>observedEvidence(e,data.serverTime));
+    const types=[];
+    if(article.category==='product'||evidence.some(e=>e.metadata?.category==='product'))types.push({kind:'improvement',label:'改进',tone:'blue'});
+    if(observed||actions.some(a=>a.kind==='automatic_reset'))types.push({kind:'automatic_reset',label:'额度重置',tone:'teal'});
+    if(actions.some(a=>a.kind==='banked_reset'))types.push({kind:'banked_reset',label:'重置卡',tone:'violet'});
+    if(!types.length)types.push(evidence.some(e=>e.metadata?.category==='reset')?{kind:'automatic_reset',label:'重置消息',tone:'teal'}:{kind:'unknown',label:'活动动态',tone:'slate'});
+    const withdrawn=publicationWithdrawn(data,publication);
+    const stages=[...new Set(actions.map(a=>a.stage==='claimed_complete'?'发布者完成声明':a.stage==='promised'?'已预告':a.stage==='in_progress'?'已宣布开始':a.stage==='cancelled'?'已取消':'待核对'))];
+    const stage=withdrawn?'已撤回':observed?'来源观测':stages.join(' · ')|| (types.some(t=>t.kind==='automatic_reset')?'完成情况待核对':'公开产品消息');
+    const entry={...publicationCard(data,publication),types,stage,sourceTime:Date.parse(publicationSourceTime(publication))||0};
+    byDay.set(item.day,[...(byDay.get(item.day)||[]),entry]);
+  }
+  const recorded=new Set([...byDay].filter(([,entries])=>entries.some(e=>!e.withdrawn)).map(([day])=>day));
+  const dateFor=value=>{const date=new Date(Date.parse(activity.startsOn+'T00:00:00Z')+(value-1)*86400000);return Number.isFinite(date.getTime())?`${date.getUTCMonth()+1}/${date.getUTCDate()}`:'';};
+  const days=Array.from({length:activity.days},(_,index)=>{
+    const value=index+1,entries=byDay.get(value)||[],types=[...new Map(entries.filter(e=>!e.withdrawn).flatMap(e=>e.types).map(t=>[t.kind,t])).values()];
+    const future=actualDay!==null&&value>actualDay;
+    const missing=activity.items.some(i=>i.day===value)&&!entries.length;
+    const state=types.length?'recorded':future?'future':actualDay===value&&!sourceDelayed&&!missing?'waiting':'unverified';
+    const label=types.length>1?'多项':types.length?types[0].kind==='automatic_reset'?'重置':types[0].label:state==='future'?'未开始':state==='waiting'?'待公布':'待核对';
+    return {value,selected:selected===value,today:actualDay===value,recorded:recorded.has(value),date:dateFor(value),state,label,tone:types.length>1?'blue':types[0]?.tone||(state==='waiting'?'amber':'slate'),types,accessibility:`第${value}天，${dateFor(value)}，${types.length?types.map(t=>t.label).join('、'):label}`};
+  });
+  const entries=(byDay.get(selected)||[]).sort((a,b)=>a.sourceTime-b.sourceTime||a.id.localeCompare(b.id));
+  const selectedState=days[selected-1].state;
   return { missing: false, id: activity.id, title: activity.title, rules: activity.rules, startsOn: activity.startsOn, timezone: activity.timezone === 'Asia/Shanghai' ? '北京时间' : activity.timezone === 'America/Los_Angeles' ? '美国西部时间' : '活动指定时区', selected,
     phase: actualDay === null ? '此设备暂不支持活动时区，请手动选日期' : actualDay < 1 ? '尚未开始' : actualDay > activity.days ? '活动已结束' : `第${actualDay}天 / 共${activity.days}天`,
-    recordedDays: recorded.size, days: Array.from({ length: activity.days }, (_, index) => ({ value: index + 1, selected: selected === index + 1, recorded: recorded.has(index + 1) })), entries: entries.map(item => publicationCard(data, item)), emptyText: actualDay !== null && selected > actualDay ? '这一天尚未到来，有公开进展后更新。' : '暂无已收录进展，不代表活动没有发生。' };
+    recordedDays: recorded.size,days,entries,selectedDate:dateFor(selected),sourceDelayed,lastSuccessAt:source?.lastSuccessAt?displayTime(source.lastSuccessAt):'',
+    progress:actualDay===null?0:Math.max(0,Math.min(100,actualDay/activity.days*100)),
+    emptyTitle:selectedState==='future'?'这一天尚未开始':selectedState==='waiting'?'等待当天公布':'当日资料待核对',
+    emptyText:selectedState==='future'?'这一天尚未到来，有公开进展后更新。':selectedState==='waiting'?'暂未收录当天公开结果，收到有效消息后更新。':sourceDelayed?'来源更新延迟，暂不能判断当天是否已公布结果。':'暂无完整已收录进展，不代表活动没有发生。' };
 }
 const validProbability = value => value === null || typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
 const validInterval = value => value === null || Array.isArray(value) && value.length === 2 && value.every(item => typeof item === 'number' && Number.isFinite(item) && item >= 0 && item <= 1) && value[0] <= value[1];

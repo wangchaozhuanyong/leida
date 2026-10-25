@@ -45,10 +45,13 @@ function calendarRecords(data) {
   }
   return records.sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)||a.id.localeCompare(b.id));
 }
-/** @param {import('../../src/lib/types').PublicData} data @param {{date?:string,kind?:RecordKind,month?:string}} [options] */
+/** @param {import('../../src/lib/types').PublicData} data @param {{date?:string,kind?:RecordKind,month?:string,recentLimit?:number}} [options] */
 function recordCalendar(data, options = {}) {
   const { start, end } = recordRange(data.serverTime), kind = options.kind || 'all';
   const records = calendarRecords(data), filtered = records.filter(item => kind === 'all' || item.kind === kind);
+  // Limit rendering only. The complete half-year history still supplies the calendar.
+  const recentLimit = Number.isSafeInteger(options.recentLimit) && options.recentLimit >= 10 ? options.recentLimit : 10;
+  const recentRecords = filtered.slice(0, recentLimit);
   const recentDate = filtered.length ? dateKey(filtered[0].at) : '';
   let selected = options.date || recentDate || end;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(selected) || dateKey(`${selected}T04:00:00Z`) !== selected || selected < start || selected > end) selected = recentDate || end;
@@ -84,7 +87,7 @@ function recordCalendar(data, options = {}) {
   const selectedItems = (byDate.get(selected) || []).map(present);
   const monthly = records.filter(item => dateKey(item.at).startsWith(month));
   return { start, end, selected, month, months, monthIndex: months.findIndex(item=>item.value===month), days, selectedItems, recentDate,
-    recentRecords:filtered.slice(0,10).map(present),
+    recentRecords:recentRecords.map(present), recentTotal:filtered.length, recentHasMore:recentRecords.length<filtered.length,
     automaticCount: monthly.filter(item=>item.kind==='automatic_reset').length, bankedCount: monthly.filter(item=>item.kind==='banked_reset').length,
     confirmedCount:monthly.filter(item=>item.evidenceType==='confirmed').length,observedCount:monthly.filter(item=>item.evidenceType==='observed').length,
     observedDateCount:new Set(monthly.filter(item=>item.evidenceType==='observed').map(item=>dateKey(item.at))).size,

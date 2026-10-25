@@ -22,14 +22,19 @@
       </view>
     </view>
     <view class="recent-reset-sheet">
-      <view class="recent-reset-heading"><text>近期重置记录</text><text class="recent-reset-count">最近 {{recentRecords.length}} 条</text></view>
-      <view class="recent-reset-note">含完成声明与来源观测 · 北京时间</view>
-      <button wx:for="{{recentRecords}}" wx:key="id" class="recent-reset-row" data-path="{{item.path}}" bindtap="navigate" aria-label="{{item.recordTitle}}，{{item.date}} {{item.time}}，{{item.statusLabel}}，查看依据" hover-class="recent-reset-pressed">
+      <view class="recent-reset-heading"><text>近半年重置记录</text><text class="recent-reset-count">已显示 {{recentRecords.length}} / {{recentTotal}} 条</text></view>
+      <view class="recent-reset-note">{{periodLabel}} · 北京时间</view>
+      <button wx:for="{{recentRecords}}" wx:key="id" class="recent-reset-row" data-path="{{item.path}}" bindtap="navigate" aria-label="{{item.recordTitle}}，{{item.timeLabel}} {{item.date}} {{item.time}}，{{item.statusLabel}}{{item.sourceName ? '，'+item.sourceName : ''}}，查看依据" hover-class="recent-reset-pressed">
         <view class="recent-reset-icon {{item.kind}}"><image src="/assets/icons/{{item.kind==='banked_reset'?'card':'reset'}}.png" aria-hidden="true"/></view>
-        <view class="recent-reset-copy"><view class="recent-reset-title"><text>{{item.recordTitle}}</text><text class="record-status {{item.evidenceType}}">{{item.evidenceType==='observed'?'来源观测':'完成声明'}}</text></view><view class="recent-reset-time">{{item.date}} {{item.time}}<text> · {{item.timeLabel}}</text></view><view wx:if="{{item.sourceName}}" class="recent-reset-source">{{item.sourceName}}</view></view>
+        <view class="recent-reset-copy">
+          <view class="recent-reset-head"><text class="recent-reset-title">{{item.recordTitle}}</text><text class="recent-reset-time">{{item.date}}<text class="recent-reset-clock">{{item.time}}</text></text></view>
+          <view class="recent-reset-meta"><text class="record-status {{item.evidenceType}}">{{item.evidenceType==='observed'?'来源观测':'完成声明'}}</text><text wx:if="{{item.sourceName}}" class="recent-reset-source">{{item.sourceName}}</text></view>
+        </view>
         <text class="record-chevron" aria-hidden="true">›</text>
       </button>
       <view wx:if="{{!recentRecords.length}}" class="recent-reset-empty">当前类型暂无已收录记录</view>
+      <button wx:elif="{{recentHasMore}}" class="recent-reset-more" bindtap="moreRecords" hover-class="recent-reset-pressed">查看更早记录 ↓</button>
+      <view wx:else class="recent-reset-end">已显示当前类型全部已收录记录</view>
     </view>
     <view class="record-notes"><button aria-expanded="{{recordNotesOpen}}" bindtap="toggleRecordNotes"><text>近半年记录</text><text>收录说明 {{recordNotesOpen?'⌃':'⌄'}}</text></button><view wx:if="{{recordNotesOpen}}" class="record-note-copy">{{periodLabel}}<view>按完成声明或来源观测的北京时间归档，分别标记与统计。类型数字为已收录条目数，不代表个人到账次数。仅有预告、预计时间已到，不计为完成；有明确同轮依据时关联观测与完成声明。未收录不代表当日没有发生重置。</view></view></view>
   </block>
