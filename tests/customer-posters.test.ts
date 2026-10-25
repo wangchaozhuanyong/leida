@@ -59,8 +59,8 @@ test('原生艺术海报实际画原背景和品牌后导出1080×1920 PNG，保
   let saves=0;const wx={canvasToTempFilePath(o:any){assert.equal(o.destWidth,1080);assert.equal(o.destHeight,1920);assert.equal(o.fileType,'png');o.success({tempFilePath:'wxfile://art.png'});},saveImageToPhotosAlbum(o:any){saves++;o.success();}};
   const artifact=await native.renderStatusPoster({wxApi:wx,canvas,input:native.statusPosterInput(fixture()),theme:'editorial'});
   await native.renderStatusPoster({wxApi:wx,canvas,input:native.statusPosterInput(fixture()),theme:'precision'});
-  assert.ok(calls.some(c=>c[0]==='load'&&c[1]==='/assets/posters/precision.jpg'));
-  assert.ok(calls.some(c=>c[0]==='load'&&c[1]==='/assets/posters/editorial.jpg'));assert.ok(calls.some(c=>c[0]==='load'&&c[1]==='/packages/poster/brand.png'));assert.equal(saves,0);
+  assert.ok(calls.some(c=>c[0]==='load'&&c[1]==='/packages/poster/precision.jpg'));
+  assert.ok(calls.some(c=>c[0]==='load'&&c[1]==='/packages/poster/editorial.jpg'));assert.ok(calls.some(c=>c[0]==='load'&&c[1]==='/packages/poster/brand.png'));assert.equal(saves,0);
   await assert.rejects(generic.savePoster(wx,artifact),/点击/);await generic.savePoster(wx,artifact,{userInitiated:true});assert.equal(saves,1);
   await assert.rejects(native.renderStatusPoster({wxApi:wx,canvas,input:native.statusPosterInput(fixture()),isCurrent:()=>false}),/取消/);
 });

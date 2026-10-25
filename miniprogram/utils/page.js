@@ -18,10 +18,12 @@ function createPage(build, extra = {}) {
   }
   function render(page, state) {
     const data = state.data;
-    const clockData = data ? { ...data, serverTime: new Date(Date.parse(data.serverTime) + Math.max(0, Date.now() - state.receivedAt)).toISOString() } : null;
+    const elapsed=Date.now()-state.receivedAt;
+    const clockUntrusted=!!state.snapshotPending&&(!Number.isFinite(elapsed)||elapsed<0||elapsed>=86400000);
+    const clockData = data&&!clockUntrusted ? { ...data, serverTime: new Date(Date.parse(data.serverTime) + Math.max(0, elapsed)).toISOString() } : null;
     const cutoff = data && data.publications.reduce((latest, item) => item.cutoffAt > latest ? item.cutoffAt : latest, '');
     const pagination=state.page||null;
-    const patch={ navigationLoading: !data && !!state.loading, initialLoading: !data && !!state.loading, refreshing: !!data && !!state.loading && !state.loadingMore, loadingMore: !!state.loadingMore, moreError: state.moreError || '', updateAvailable: !!state.updateAvailable, loading: state.loading, connected: !!data, unconfigured: state.unconfigured, error: state.error, cutoff: displayTime(cutoff), pagination, ...(build(clockData, page._params || {}, {...page.data,pagination}, getApp()) || {}) };
+    const patch={ snapshotPending:!!state.snapshotPending,clockUntrusted,snapshotReadAt:state.snapshotPending?displayTime(new Date(state.receivedAt).toISOString()):'',navigationLoading: !data && !!state.loading, initialLoading: !data && !!state.loading, refreshing: !!data && !!state.loading && !state.loadingMore, loadingMore: !!state.loadingMore, moreError: state.moreError || '', updateAvailable: !!state.updateAvailable, loading: state.loading, connected: !!data&&!clockUntrusted, unconfigured: state.unconfigured, error: state.error, cutoff: displayTime(cutoff), pagination, ...(build(clockData, page._params || {}, {...page.data,pagination}, getApp()) || {}) };
     if(extra.title)patch.navigationTitle=extra.title({...page.data,...patch}) || '';
     const generation=(page._renderGeneration||0)+1;page._renderGeneration=generation;
     const current=()=>page._visible&&generation===page._renderGeneration;

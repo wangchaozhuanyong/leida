@@ -1,7 +1,7 @@
 const m=require('../../utils/model');
 const {selectedHomeStatus,validKind}=require('../../utils/home-reset-status');
 const {PosterError,loadCanvasImage,exportCanvas}=require('../../utils/poster');
-const assets={precision:'/assets/posters/precision.jpg',editorial:'/assets/posters/editorial.jpg',brand:'/packages/poster/brand.png'};
+const assets={precision:'/packages/poster/precision.jpg',editorial:'/packages/poster/editorial.jpg',brand:'/packages/poster/brand.png'};
 function dateTime(value){
   if(!Number.isFinite(Date.parse(value)))return{date:'暂无公开公告',time:''};
   const d=new Date(Date.parse(value)+8*3600000),pad=n=>String(n).padStart(2,'0');

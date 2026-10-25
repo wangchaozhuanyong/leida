@@ -1,4 +1,5 @@
 const { configurationError, createTransport } = require('./transport');
+const {createPublicSnapshot}=require('./public-snapshot');
 const merge = (a, b) => [...new Map([...a, ...b].map(item => [item.id, item])).values()];
 const query = options => Object.entries(options).sort(([a],[b])=>a.localeCompare(b)).filter(([,value]) => value !== undefined && value !== null && value !== '').map(([key,value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join('&');
 const sameContent = (a, b) => a.contentVersion && b.contentVersion ? a.contentVersion === b.contentVersion : a.version === b.version;
@@ -8,13 +9,15 @@ const pinned = view => ['home','notices','calendar'].includes(view.view) || ['ne
 /** Foreground public reads; independent views and response epochs protect page changes. */
 function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, now = () => Date.now(), random = Math.random }) {
   const request = createTransport(wxApi, config), listeners = new Set(), views = new Map();
-  const empty = () => ({ data: null, version: '', contentVersion:'', page:null, pagesLoaded:0, loading: false, loadingMore:false, moreError:'', updateAvailable:false, candidate:null, error: configurationError(config), unconfigured: !!configurationError(config), receivedAt: 0, validatedAt: -Infinity });
+  const empty = () => ({ data: null, version: '', contentVersion:'', page:null, pagesLoaded:0, loading: false, loadingMore:false, moreError:'', updateAvailable:false, candidate:null, snapshotPending:false, error: configurationError(config), unconfigured: !!configurationError(config), receivedAt: 0, validatedAt: -Infinity });
   let state = empty();
-  let active = false, timer, pending, epoch = 0, task, failures = 0, view = {view:'home'};
+  let active = false, suspended=false, timer, pending, epoch = 0, task, failures = 0, view = {view:'home'};
   const pollMs = Math.max(5000, Number(config.pollMs)||300000);
   let latestVersion = '', latestContentVersion = '', lastCheckAt = -Infinity;
   const pinnedKeys = new Set();
   let calendarPrefetch, prefetchEpoch = 0;
+  const snapshot=createPublicSnapshot(wxApi,config,{now,timers});
+  let hydration,networkRevision=0;
   const emit = patch => {
     state = { ...state, ...patch };
     if (state.data) {
@@ -27,6 +30,14 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
     }
     listeners.forEach(fn => fn(state));
   };
+  function restoreHome(){
+    if(hydration||state.data||state.unconfigured||view.view!=='home')return;
+    const generation=epoch,revision=networkRevision;
+    hydration=snapshot.load().then(saved=>{
+      if(!saved||generation!==epoch||revision!==networkRevision||view.view!=='home'||state.data)return;
+      emit({data:saved.data,version:saved.version,contentVersion:saved.contentVersion,receivedAt:saved.savedAt,snapshotPending:true,validatedAt:-Infinity,pagesLoaded:1});
+    }).finally(()=>{hydration=undefined;});
+  }
   function schedule() {
     if (!active || state.unconfigured) return;
     if(timer!==undefined)timers.clearTimeout(timer);
@@ -64,8 +75,9 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
     try {
       lastCheckAt = now();
       const path = pathFor(cursor);
-      let result = await read(checkOnly && state.data ? '/api/v1/version?light=1' : path, checkOnly ? state.candidate?.version||state.version : undefined);
-      if (checkOnly && state.data) {
+      const versionCheck=checkOnly&&state.data&&!state.snapshotPending;
+      let result = await read(versionCheck ? '/api/v1/version?light=1' : path, versionCheck ? state.candidate?.version||state.version : undefined);
+      if (versionCheck) {
         if (result.unchanged || result.version === (state.candidate?.version||state.version)) { failures=0; latestVersion=state.candidate?.version||state.version; emit({ error: '', validatedAt:now() }); return; }
         const stateOnly = !!result.contentVersion && result.contentVersion === (state.candidate?.contentVersion||state.contentVersion);
         result = await read(stateOnly ? '/api/v1/bootstrap?view=state' : path);
@@ -85,27 +97,29 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
         const count=Math.max(1,previous.pagesLoaded||1)+(cursor?1:0);
         result=await rebuild(count,cursor?undefined:result);pagesLoaded=result.pagesLoaded;
       }
-      failures=0; latestVersion=result.version;latestContentVersion=result.contentVersion||latestContentVersion;
-      const next={ data:result.data, page:result.page||null, pagesLoaded, version:result.version, contentVersion:result.contentVersion||'', receivedAt:now(), validatedAt:now(), error:'', moreError:'' };
+      failures=0; networkRevision++; latestVersion=result.version;latestContentVersion=result.contentVersion||latestContentVersion;
+      const next={ data:result.data, page:result.page||null, pagesLoaded, version:result.version, contentVersion:result.contentVersion||'', receivedAt:now(), validatedAt:now(), snapshotPending:false, error:'', moreError:'' };
       if(checkOnly && previous.data && ['news','history'].includes(view.view) && isAddition(previous.data,result.data))emit({candidate:next,updateAvailable:true,validatedAt:now(),error:''});
       else emit({...next,candidate:null,updateAvailable:false});
+      if(view.view==='home')snapshot.save(next);
     } catch (error) { if (generation === epoch) { failures=Math.min(4,failures+1); emit({ [cursor?'moreError':'error']: error.message || '资料暂时无法加载',...(invalidated?{page:state.page?{...state.page,nextCursor:null}:null,validatedAt:-Infinity}:{}) }); } }
     finally { if (generation === epoch) emit({ loading: false, loadingMore:false }); }
   }
   function refresh(checkOnly = false, cursor) {
     if (state.unconfigured) { emit({ loading: false, error: configurationError(config) }); return Promise.resolve(); }
     if (pending) return pending;
+    if(calendarPrefetch){prefetchEpoch++;calendarPrefetch.task.abort();calendarPrefetch=undefined;}
     const work = run(checkOnly,cursor); pending=work;
     work.finally(() => { if(pending===work)pending=undefined; }); return work;
   }
   function cancel() { epoch++; if(task)task.abort(); task=undefined;pending=undefined; }
-  const current = () => state.data && !state.error && (state.candidate?.version||state.version)===latestVersion && now()-state.validatedAt<pollMs;
+  const current = () => state.data && !state.snapshotPending && !state.error && (state.candidate?.version||state.version)===latestVersion && now()-state.validatedAt>=0 && now()-state.validatedAt<pollMs;
   return {
     subscribe(fn) { listeners.add(fn); fn(state); return () => listeners.delete(fn); },
     getState() { return state; }, refresh,
     prefetchCalendar() {
       const calendar={view:'calendar'}, key=query(calendar), cached=views.get(key);
-      if (state.unconfigured || view.view==='calendar' || cached?.data && now()-cached.validatedAt<pollMs && cached.version===latestVersion) return Promise.resolve();
+      if (suspended || pending || state.loading || state.snapshotPending || !state.data || state.error || state.unconfigured || view.view==='calendar' || cached?.data && now()-cached.validatedAt<pollMs && cached.version===latestVersion) return Promise.resolve();
       if(calendarPrefetch)return calendarPrefetch.promise;
       const generation=prefetchEpoch, beforeContent=latestContentVersion;
       const task=request(`/api/v1/bootstrap?${key}`);
@@ -117,11 +131,11 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
       calendarPrefetch={task,promise};return promise;
     },
     setView(next) {
-      if (query(next)===query(view)) return current() ? pending||Promise.resolve() : refresh(true);
+      if (query(next)===query(view)) {restoreHome();return current() ? pending||Promise.resolve() : refresh(true);}
       cancel(); view={...next};
       // Each page/filter restores only its own validated snapshot. Known version
       // changes and expiry revalidate it; a cold page never shows another view.
-      const restore=()=>{const cached=views.get(query(view));state={...empty(),...cached};emit({});return current()?Promise.resolve():refresh(!!cached?.data);};
+      const restore=()=>{const cached=views.get(query(view));state={...empty(),...cached};emit({});restoreHome();return current()?Promise.resolve():refresh(!!cached?.data);};
       if(next.view==='calendar' && calendarPrefetch){
         const generation=epoch;state=empty();emit({loading:true});
         return calendarPrefetch.promise.then(()=>{if(generation===epoch)return restore();});
@@ -130,8 +144,8 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
     },
     applyUpdates() { if(state.candidate)emit({...state.candidate,candidate:null,updateAvailable:false}); },
     more() { if(state.moreError&&!state.page?.nextCursor)return refresh(false);if(state.candidate)emit({...state.candidate,candidate:null,updateAvailable:false}); return state.page?.nextCursor ? refresh(false,state.page.nextCursor) : Promise.resolve(); },
-    start() { if(active)return pending||Promise.resolve(); active=true;const first=state.data&&now()-lastCheckAt<60000?Promise.resolve():refresh(!!state.data);first.finally(schedule);return first; },
-    stop() { active=false;prefetchEpoch++;if(calendarPrefetch)calendarPrefetch.task.abort();calendarPrefetch=undefined;cancel();if(timer!==undefined)timers.clearTimeout(timer);timer=undefined;emit({loading:false,loadingMore:false}); }
+    start() { if(active)return pending||Promise.resolve(); active=true;suspended=false;restoreHome();const first=state.data&&!state.snapshotPending&&now()-lastCheckAt>=0&&now()-lastCheckAt<60000?Promise.resolve():refresh(!!state.data);first.finally(schedule);return first; },
+    stop() { active=false;suspended=true;prefetchEpoch++;if(calendarPrefetch)calendarPrefetch.task.abort();calendarPrefetch=undefined;cancel();if(timer!==undefined)timers.clearTimeout(timer);timer=undefined;emit({loading:false,loadingMore:false}); }
   };
 }
 module.exports = { createClient };

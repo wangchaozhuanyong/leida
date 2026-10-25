@@ -503,14 +503,14 @@ test('本机偏好只接受布尔值，已读去重，存储不可用时保留�
 });
 
 type NativePage = Record<string,any> & { data:Record<string,any>; setData:(patch:Record<string,unknown>)=>void };
-function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{envVersion:string;version?:string}};page?:Record<string,unknown>;wxApi?:Record<string,unknown>} = {}) {
+function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{envVersion:string;version?:string}};page?:Record<string,unknown>;wxApi?:Record<string,unknown>;clientState?:Record<string,unknown>} = {}) {
   let data = input, refreshes = 0, pullStops = 0;
   const listeners = new Set<(state:Record<string,unknown>)=>void>();
   const ui = { shares: [] as string[], navigations: [] as string[], copies: [] as string[], backgrounds: [] as Record<string,unknown>[], lifecycle: [] as string[] };
   const storage = new Map<string,unknown>();
   const app = {
     client: {
-      getState() { return { data, page:options.page, version: 'fixture-v1', receivedAt: Date.now(), loading: false, unconfigured: false, error: '' }; },
+      getState() { return { data, page:options.page, version: 'fixture-v1', receivedAt: Date.now(), loading: false, unconfigured: false, error: '',...options.clientState }; },
       subscribe(fn:(state:Record<string,unknown>)=>void) { ui.lifecycle.push('subscribe'); listeners.add(fn); fn(this.getState()); return () => listeners.delete(fn); },
       async refresh() { refreshes++; },
     },
@@ -551,7 +551,7 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   // Bundled client source version. Backend-only releases must not relabel an installed client.
-  const buildVersion='1.0.53';
+  const buildVersion='1.0.54';
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);assert.equal(news.data.navigationTitle,'动态 · 共42篇');news.onUnload();
   const records=h.page('announcements');assert.equal(records.data.navigationTitle,'重置记录');records.onUnload();
@@ -763,4 +763,20 @@ test('待确认及定向跟踪显示用户说明，核验原因留在来源中�
   assert.equal(mini.publicActions(data).length,before);
   const broken=structuredClone(data);(broken.articles.find(a=>a.id===p.articleId)! as unknown as {reviewReasons:unknown}).reviewReasons='wrong-shape';assert.equal(validateBootstrap(broken),false);
  }
+});
+
+test('本地公开快照可读但核对前不能生成海报或转发旧结论，网络核对后恢复同一分享目标',()=>{
+  const clientState:Record<string,unknown>={snapshotPending:true,loading:true,receivedAt:Date.now()-60000};
+  const h=nativeHarness(fixture(),{clientState}),page=h.page('home');
+  try{
+    assert.equal(page.data.snapshotPending,true);assert.equal(page.data.connected,true);assert.match(page.data.snapshotReadAt,/\d{4}-\d{2}-\d{2}/);
+    page.openPoster();assert.equal(h.ui.navigations.length,0);const stale=page.onShareAppMessage!();assert.equal(stale.path,'/pages/home/index');assert.equal(stale.title,'模钥重置雷达');
+    clientState.snapshotPending=false;clientState.loading=false;h.replace(fixture());page.openPoster();assert.match(h.ui.navigations[0],/^\/packages\/poster\/index\?kind=/);assert.match(page.onShareAppMessage!().path,/revision=home-/);
+  }finally{page.onUnload?.();}
+});
+test('缓存时钟回拨或跨越24小时后不继续显示旧光环计时，恢复联网后重新出现',()=>{
+  for(const receivedAt of [Date.now()+60000,Date.now()-86400001]){
+    const clientState:Record<string,unknown>={snapshotPending:true,receivedAt};const h=nativeHarness(fixture(),{clientState}),page=h.page('home');
+    try{assert.equal(page.data.clockUntrusted,true);assert.equal(page.data.connected,false);assert.equal(page.currentHomeStatus(),null);clientState.snapshotPending=false;h.replace(fixture());assert.equal(page.data.clockUntrusted,false);assert.equal(page.data.connected,true);}finally{page.onUnload?.();}
+  }
 });
