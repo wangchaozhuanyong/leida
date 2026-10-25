@@ -83,3 +83,24 @@ test('完成回复自身的未知成员条件不能被父帖普发范围盖过',
     assert.equal(extract([parent, reply]).some(row => row.url === reply.url), false, text);
   }
 });
+
+test('未注明类型的传播完成回复用明确父帖消歧，并保留全部必要证据的首次可知时间',()=>{
+ for(const [index,kind,text] of [[0,'automatic_reset','We will reset usage limits for all paid accounts.'],[1,'banked_reset','We will give a banked reset to all paid accounts.']] as const){
+  const parent=item(String(20500+index),text);
+  const child=item(String(20510+index),'Reset all propagated. Enjoy.','2026-01-02T06:00:00Z',parent.messageId);
+  const [row]=extract([parent,child]);
+  assert.equal(row.kind,kind);assert.equal(row.at,child.publishedAt.replace('Z','.000Z'));
+  assert.deepEqual(new Set(row.evidenceIds),new Set([parent.id,child.id]));
+  const late={...parent,collectedAt:'2026-01-03T00:00:00.000Z'};
+  assert.equal(extractCadenceObservations([late,child],[source],'2026-01-02T07:00:00Z')[0]?.kind,'unspecified');
+  assert.equal(extract([late,child])[0]?.firstKnownAt,late.collectedAt);
+ }
+});
+
+test('类型不明的传播完成不能靠缺失、跨作者、冲突或循环父帖猜出类型',()=>{
+ const parent=item('20600','We will reset usage limits for all paid accounts.');
+ const child=item('20601','Reset all propagated. Enjoy.','2026-01-02T06:00:00Z',parent.messageId);
+ for(const rows of [[child],[{...parent,url:'https://x.com/other/status/'+parent.messageId},child],[parent,{...parent,id:'conflict',text:'We will give a banked reset to all paid accounts.'},child],[{...parent,parentId:child.messageId},child],[{...parent,text:'We will reset usage limits for all paid accounts. We will give a banked reset to all paid accounts.'},child]]){
+  const row=extract(rows).find(o=>o.url===child.url);assert.ok(!row||row.kind==='unspecified');
+ }
+});
