@@ -2,7 +2,7 @@ const {preserveNativeReturn}=require('../../utils/entry-navigation');
 const { createPage } = require('../../utils/page');
 const { noticeModel } = require('../../utils/model');
 // Bundled client version; keep this aligned with the development-tool upload.
-const buildVersion = '1.0.53';
+const buildVersion = '1.0.54';
 Page(createPage((data, query, page, app) => {
   const stored=app.preferences.snapshot(),notices=data?noticeModel(data,stored.preferences,stored.read):[];
   return { notices:notices.slice(0,3),unread:notices.filter(n=>!n.read).length,storageError:stored.error };
@@ -36,7 +36,7 @@ Page(createPage((data, query, page, app) => {
   contactStart(){this._contactReturn=preserveNativeReturn();},
   contactReturn(){this._contactReturn?.finish();},
   contactError(){this._contactReturn?.cancel();wx.showToast({title:'客服会话暂不可用，请稍后重试',icon:'none'});},
-  settingsCanReveal(){return !this.data.settingsReady&&this._wechatSettled&&!!(this.data.connected||this.data.error||this.data.unconfigured);},
+  settingsCanReveal(){return !this.data.settingsReady&&this._wechatSettled;},
   revealSettings(){if(this.settingsCanReveal())this.setData({settingsReady:true});},
   runWechatAction(action,work){
     this.setData({wechatAction:action});

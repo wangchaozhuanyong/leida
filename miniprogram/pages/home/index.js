@@ -66,13 +66,13 @@ Page(createPage((data, query, page, app) => {
   };
 }, { view:()=>({view:'home'}), load(query) { this.setData({selectedResetKind:validKind(query.kind)}); }, data: { name: '模钥重置雷达', freshnessOpen: false, motionActive: false }, show() { this.setData({motionActive: true}); }, afterRender() { this.queueCalendarPrefetch(); this.syncCountdown(); this.syncForecastExpiry(); }, hide() { this.setData({motionActive: false}); this.cancelCalendarPrefetch(); this.stopCountdown(); this.stopForecastExpiry(); }, unload() { this.setData({motionActive: false}); this.cancelCalendarPrefetch(); this.stopCountdown(); this.stopForecastExpiry(); }, methods: {
   queueCalendarPrefetch() {
-    if(!this.data.connected || this._calendarPrefetched || this._calendarPrefetchTimer || !getApp().client.prefetchCalendar)return;
+    if(!this.data.connected || this.data.snapshotPending || this.data.loading || this.data.error || this._calendarPrefetched || this._calendarPrefetchTimer || !getApp().client.prefetchCalendar)return;
     this._calendarPrefetchTimer=setTimeout(()=>{this._calendarPrefetchTimer=null;if(this._visible){this._calendarPrefetched=true;void getApp().client.prefetchCalendar();}},800);
   },
   cancelCalendarPrefetch() { if(this._calendarPrefetchTimer)clearTimeout(this._calendarPrefetchTimer);this._calendarPrefetchTimer=null; },
   toggleFreshness() { this.setData({ freshnessOpen: !this.data.freshnessOpen }); },
-  currentHomeStatus() { const state=getApp().client.getState();if(!state.data)return null;const now=new Date(Date.parse(state.data.serverTime)+Math.max(0,Date.now()-(state.receivedAt||Date.now()))).toISOString();return selectedHomeStatus(state.data,this.data.selectedResetKind,now); },
-  openPoster() { const card=this.data.connected&&this.currentHomeStatus();if(card)wx.navigateTo({url:'/packages/poster/index?kind='+card.kind+'&revision='+encodeURIComponent(card.revision),fail(){wx.showToast({title:'海报页面加载失败，请重试。',icon:'none'});} }); },
+  currentHomeStatus() { const state=getApp().client.getState();if(!state.data||state.snapshotPending)return null;const now=new Date(Date.parse(state.data.serverTime)+Math.max(0,Date.now()-(state.receivedAt||Date.now()))).toISOString();return selectedHomeStatus(state.data,this.data.selectedResetKind,now); },
+  openPoster() { if(this.data.snapshotPending){wx.showToast({title:'核对最新消息后可分享',icon:'none'});return;}const card=this.data.connected&&this.currentHomeStatus();if(card)wx.navigateTo({url:'/packages/poster/index?kind='+card.kind+'&revision='+encodeURIComponent(card.revision),fail(){wx.showToast({title:'海报页面加载失败，请重试。',icon:'none'});} }); },
   syncCountdown() {
     if (!this.data.lastReset && !this.data.resetCards?.some(card=>['scheduled','revised','overdue'].includes(card.state)||(card.kind===this.data.selectedResetKind&&['completed','observed'].includes(card.state))) && !(this.data.pending && this.data.pending.counting) && !(this.data.timeline && (this.data.timeline.completed || this.data.timeline.scheduled))) { this.stopCountdown(); return; }
     if (!this._countdownTimer) this._countdownTimer = setInterval(() => this.tickCountdown(), 1000);
@@ -80,6 +80,7 @@ Page(createPage((data, query, page, app) => {
   tickCountdown() {
     if(!this._visible)return;
     const state=getApp().client.getState();if(!state.data)return;
+    if(state.snapshotPending&&(Date.now()<state.receivedAt||Date.now()-state.receivedAt>=86400000)){this.redraw();this.stopCountdown();return;}
     const now=new Date(Date.parse(state.data.serverTime)+Math.max(0,Date.now()-state.receivedAt)).toISOString();
     const outlook=m.resetOutlookModel(state.data),completed=m.latestCompletedBenefits(state.data)[0];
     const timeline=statusTimelineModel(outlook,now,completed?.action||null,state.data.forecasts);

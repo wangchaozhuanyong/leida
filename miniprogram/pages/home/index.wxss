@@ -16,3 +16,8 @@
 @media(max-width:350px){.home-heading-title{font-size:22px}.reset-tabs .reset-tab{font-size:13px}.reset-tab-icon{width:19px;height:19px}.orbit-title{font-size:18px}.orbit-number{font-size:38px}.orbit-result{font-size:12px}.with-days .orbit-number{font-size:29px}.is-long .orbit-number{font-size:24px}.orbit-label,.orbit-status{font-size:9px}.orbit-status{padding:4px 7px}.orbit-result{margin-bottom:4px}.orbit-description{font-size:13px}.orbit-date{font-size:14px}.fact-icon{width:23px;height:23px;padding:5px}}
 @media(min-width:600px){.home-page{max-width:480px;margin:auto}.orbit-stage{max-width:440px;margin-left:auto;margin-right:auto}.home-heading-title{font-size:28px}}
 @media(prefers-reduced-motion:reduce){.orbit-path,.orbit-scan,.orbit-light{animation:none!important}.reset-tabs .reset-tab,.home-card-actions .home-action{transition:none!important}}
+
+/* Loading keeps the orbit footprint while public facts are unavailable. */
+.home-skeleton{margin-top:20px;text-align:left}.skeleton-tabs{display:flex;gap:8px}.skeleton-tab{height:40px;flex:1;border-radius:24px;background:#e9eff9}.skeleton-orbit{width:76%;aspect-ratio:1;margin:25px auto;border:14px solid #eaf0fa;border-radius:50%;box-sizing:border-box;box-shadow:0 0 0 1px #e0e9f7}.skeleton-line{height:13px;margin:13px auto;width:85%;background:#e9eff9;border-radius:8px}.skeleton-line.short{width:62%}.snapshot-note{font-size:12px;line-height:1.8;color:#526987;padding:10px 13px;background:#eef4fc;border:1px solid #dce7f6;border-radius:12px;margin-bottom:12px}.snapshot-note-detail{font-size:11px;color:#6d7e98}.home-action.is-pending-snapshot{opacity:1;color:#6d7e98}
+
+.health-dot.cached{background:#7c8da6;box-shadow:0 0 0 4px rgba(124,141,166,.08)}

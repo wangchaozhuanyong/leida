@@ -301,7 +301,7 @@ test('慢速首次读取等次数和按钮就绪后整体展示，中途切回�
     await flush();assert.equal(held.length,1);assert.equal(page.data.wechat.safe,null);assert.equal(page.data.wechat.remainingCount,null);assert.equal(page.data.settingsReady,false);
     request(held.shift()!);await flush();
     assert.equal(held.length,1);assert.match(held[0].url,/challenge$/);
-    assert.equal(page.data.wechat.remainingCount,1);assert.equal(page.data.wechat.busy,true);assert.equal(page.data.settingsReady,false,'次数已存入但预备按钮尚未完成，仍显示整页加载');
+    assert.equal(page.data.wechat.remainingCount,1);assert.equal(page.data.wechat.busy,true);assert.equal(page.data.settingsReady,false,'次数已存入但预备按钮尚未完成，提醒区域仍整体加载，站内信不被遮挡');
     page.onHide();page.onShow();
     assert.equal(page.data.wechat.remainingCount,1,'保留已确认次数');assert.equal(page.data.settingsReady,false);
     await flush();assert.equal(held.length,1,'预备未结束时不重复请求');
@@ -325,12 +325,12 @@ test('超过缓存时间切回仍立即保留次数，慢速核对返回后更�
   }finally{if(held)request(held);await flush();page.onUnload();}
 });
 
-test('提醒先就绪时等待站内信首次读取，失败或未配置也结束整体加载',async()=>{
+test('提醒先就绪时独立展示，不等待站内信首次读取；站内信结果不改变提醒次数',async()=>{
   for(const outcome of ['success','error','unconfigured']){
     const h=mock({state:'available',sessionMs:600000,challengeMs:300000});
     const harness=pageHarness(h.reader,{data:null,loading:true}),page=harness.page('settings');
     try{
-      await flush();assert.equal(page.data.wechat.ready,true);assert.equal(page.data.settingsReady,false);
+      await flush();assert.equal(page.data.wechat.ready,true);assert.equal(page.data.settingsReady,true);assert.equal(page.data.connected,false);
       harness.feed({loading:false,...(outcome==='success'?{data:harness.data}:outcome==='error'?{error:'站内信暂时无法读取'}:{unconfigured:true})});
       assert.equal(page.data.settingsReady,true);assert.equal(page.data.wechat.remainingCount,1);
     }finally{page.onUnload();}
