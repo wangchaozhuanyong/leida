@@ -35,7 +35,7 @@ const action=(id:string,kind:BenefitAction['kind']='automatic_reset',at=observed
 test('改进同日有未关联活动的来源观测时，主标签为重置并保留观测依据和原文入口',()=>{
  const data=fixture();add(data,'product',{product:true,day:19});const e=observation('observed');add(data,'observed',{evidence:e});
  const before=structuredClone(data),view=activityModel(data,'challenge-28',19);
- assert.equal(view.days[18].label,'重置');assert.equal(view.days[18].tone,'teal');assert.deepEqual(view.days[18].types.map((t:any)=>t.label),['改进','额度重置']);
+ assert.equal(view.days[18].label,'重置');assert.equal(view.days[18].tone,'teal');assert.deepEqual(view.days[18].types.map((t:any)=>t.label),['额度重置','改进']);
  assert.equal(view.entries.length,2);assert.equal(view.entries[0].id,'observed');assert.equal(view.entries[0].stage,'来源观测');assert.equal(view.entries[0].timeLabel,'观测时间');assert.equal(view.entries[0].time,'2026-10-24 01:40');
  assert.equal(view.entries[0].path,'/pages/detail/index?publicationId=observed');assert.equal(view.entries[1].id,'product');
  assert.equal(view.days[20].label,'待公布','补采发生在第21天，不能将观测记到采集日');assert.deepEqual(data,before);

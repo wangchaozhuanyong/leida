@@ -1,8 +1,9 @@
 /** Shared public presentation only: original records and event state remain unchanged.
  * @typedef {import('../../src/lib/types').PublicData} PublicData
  * @typedef {import('../../src/lib/types').Publication} Publication
- * @typedef {{id:string, latest:Publication, updates:Publication[], category:'reset'|'activity'|'product', incident:boolean, withdrawn:boolean}} NewsGroup
+ * @typedef {{id:string, latest:Publication, updates:Publication[], category:'reset'|'activity'|'product', incident:boolean, withdrawn:boolean, observation?:ReturnType<typeof observationDayGroups>[number]}} NewsGroup
  */
+const { observationDayGroups } = require('./reset-records');
 /** @param {Publication} p */
 function sourceTime(p) {
   if (p.mode === 'news_only' || p.article.publicationMode === 'news_only') return p.article.sourcePublishedAt || p.article.publishedAt;
@@ -58,8 +59,13 @@ function publicNewsGroups(data) {
     return {id, latest, updates, withdrawn, incident:group.incident, category:group.incident ? 'product' : latest.article.category};
   }).sort((a, b) => compare(a.latest, b.latest));
 }
-/** @param {PublicData} data */
+/** @param {PublicData} data @returns {NewsGroup[]} */
 function homeNewsGroups(data) {
-  return publicNewsGroups(data).filter(g => !g.incident && (g.category === 'reset' || g.latest.event.actions.length > 0 && g.latest.mode !== 'news_only' && g.latest.article.publicationMode !== 'news_only')).slice(0, 3);
+  const groups=publicNewsGroups(data).filter(g => !g.incident && (g.category === 'reset' || g.latest.event.actions.length > 0 && g.latest.mode !== 'news_only' && g.latest.article.publicationMode !== 'news_only'));
+  const summaries=observationDayGroups(data).filter(g=>g.isObservationSummary);
+  const grouped=new Set(summaries.flatMap(g=>g.observations.map(o=>o.publicationId)));
+  return [...groups.filter(g=>!grouped.has(g.latest.id)),...summaries.map(observation=>({id:observation.id,latest:observation.publication,
+    updates:observation.sources.map(s=>data.publications.find(p=>p.id===s.publicationId)).filter(Boolean),category:'reset',incident:false,withdrawn:false,observation}))]
+    .sort((a,b)=>compare(a.latest,b.latest)).slice(0,3);
 }
 module.exports = {publicNewsGroups, homeNewsGroups};

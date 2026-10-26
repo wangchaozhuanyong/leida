@@ -77,6 +77,7 @@
 .record-status{font-size:10px;color:#607895;background:#edf2f9;padding:2px 5px;border-radius:4px;line-height:1.5}
 .record-status.observed{color:#946016;background:#fff1d9}
 .record-source{margin-top:5px;font-size:11px;line-height:1.6;color:#7b6b50;overflow-wrap:anywhere}
+.record-sources{padding:0 12px 8px 42px}.record-sources>.text-button{min-height:40px;font-size:11px;text-align:left}.record-source-link{display:block;width:100%;padding:10px 0;text-align:left;white-space:normal;line-height:1.6;font-size:11px;color:#49648b;background:transparent}.record-source-link::after{border:0}
 .month-count-note{font-size:10px;line-height:1.8;color:#7d8b9e;margin:0 0 10px;overflow-wrap:anywhere}
 .day-observation-count{font-size:8px;line-height:10px;min-width:10px;height:10px;border:1px solid #b27820;border-radius:5px;color:#946016;box-sizing:border-box;background:#fff8ec;text-align:center;margin-top:-3px}
 .selected .day-observation-count{color:#fff;border-color:rgba(255,255,255,.85);background:transparent}

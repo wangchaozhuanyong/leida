@@ -1,6 +1,6 @@
 const m = require('./model');
 const { resetStateCards } = require('./reset-state-cards');
-const { resetObservations } = require('./reset-observations');
+const { observationDayGroups, observationSources } = require('./reset-records');
 const { homeOrbitPresentation } = require('./home-orbit');
 const { countdownParts } = require('./status-timeline');
 const DAY = 86400000;
@@ -93,6 +93,14 @@ function completedCard(base, kind, round, observations, now) {
   card.hero.timeLabel=card.timeLabel;
   card.hero.description=early ? declared?'本轮已有公开完成声明，已收录预计时间前的完成依据。':'预计时间前已有第三方重置观测，持续核对完成消息。' : declared?'本轮已有公开完成声明，持续关注下一次安排。':'第三方来源已记录重置，持续关注后续公开消息。';
   card.hero.footnote=declared?'个人到账以账户为准；确认声明不会重新开始计时。':'尚无发布者完成声明；按'+(round?'本轮最早':'所示来源')+'观测计时，不是采集时间，也不代表实际到账的精确时间。';
+  const summary=!round&&observation?.displaySummary;
+  if(summary){
+    card.observationSummaryDate=summary.date;card.roundKey=summary.id;card.sourceName=summary.sourceName;
+    card.timeLabel=summary.summaryScope==='date'?'当日最早观测':'本条观测时间';card.hero.timeLabel=card.timeLabel;
+    card.hero.description='多来源报告已汇总，尚不能据此认定发生了多次重置。';
+    card.hero.footnote=`${summary.sourceCount}个来源记录时间为${summary.timeRange}（北京时间）；按${summary.summaryScope==='date'?'当日最早':'本条'}来源记录计时，实际重置时间和轮次仍待核对。`;
+    card.action='查看当日来源依据';
+  }
   if(round?.expectedAt && millis(at)>millis(round.expectedAt))card.hero.footnote+=' 记录时间晚于预计时间，不代表实际到账一定延期。';
   return card;
 }
@@ -135,7 +143,7 @@ function finalize(card, data) {
   card.shareTitle=(card.kind==='banked_reset'?'重置卡发放':'额度重置')+' · '+(card.hero.title||card.hero.label)+' · '+card.hero.badge;
   // Clock digits and collection time are intentionally excluded: a minute tick is not a new fact.
   card.revision=stateRevision(JSON.stringify([card.kind,card.roundKey,card.state,card.publicationId||'',card.timeAt||'',card.expectedAt||'',card.clockAt||'',card.declarationAt||'',card.hero.title,card.hero.badge,card.hero.description,card.hero.footnote,card.sourceName||'',card.sourceUrl||'',card.observationPublicationId||'',card.timeQualifier||'',card.oldTime||'']));
-  card.sharePath=(card.publicationId?detailPath(card.publicationId)+'&':'/pages/home/index?')+'kind='+card.kind+'&revision='+card.revision;
+  card.sharePath=(card.observationSummaryDate?'/pages/schedule/index?date='+card.observationSummaryDate+'&':card.publicationId?detailPath(card.publicationId)+'&':'/pages/home/index?')+'kind='+card.kind+'&revision='+card.revision;
   return card;
 }
 function historyMessage(record) {
@@ -146,9 +154,13 @@ function historyMessage(record) {
   return {publicationId:record.publicationId,sourceType:record.sourceType,sourceName:record.sourceName,dateText,clockText,relativeTime:duration?'距今 '+duration:'刚刚',badge:record.sourceType==='observed'?'第三方报告':'公开完成声明'};
 }
 function homeResetStatus(data, now=data.serverTime) {
-  const input={...data,serverTime:now},states=resetStateCards(input,now),observations=resetObservations(input);
+  const input={...data,serverTime:now},states=resetStateCards(input,now),observations=observationSources(input);
   states.cards=states.cards.map(base=>{
-    const kind=base.kind,rounds=roundsFor(input,kind,now),{assignments,independent,unassigned}=assignObservations(rounds,observations.filter(o=>o.kind===kind));
+    const kind=base.kind,rounds=roundsFor(input,kind,now),assigned=assignObservations(rounds,observations.filter(o=>o.kind===kind));
+    // A late report from another source must not create a second occurrence or
+    // restart the clock. Unlinked evidence stays a clearly labelled date summary.
+    const summarize=rows=>observationDayGroups(input,rows).map(g=>({...g.observations[0],...(g.isObservationSummary?{displaySummary:g}:{})}));
+    const {assignments}=assigned,independent=summarize(assigned.independent),unassigned=summarize(assigned.unassigned);
     const latest=rounds[0],record=kind==='banked_reset'?states.lastCard:states.lastReset;
     let card;
     const bound=latest?assignments.get(keyOf(latest))||[]:[];
