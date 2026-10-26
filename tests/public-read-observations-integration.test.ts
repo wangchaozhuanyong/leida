@@ -8,6 +8,7 @@ import {parseCodexLimitsObservations} from '../src/server/codexlimits-observatio
 import {resetObservations} from '../src/lib/reset-observations';
 import {publicActions} from '../src/lib/public-facts';
 import {recordCalendar} from '../miniprogram/utils/record-calendar';
+import {activityModel} from '../miniprogram/utils/model';
 
 const oldAt='2026-10-22T17:00:00.000Z',newAt='2026-10-23T17:40:00.000Z';
 const collectedAt='2026-10-23T20:19:26.735Z';
@@ -42,6 +43,7 @@ test('真实 PostgreSQL 公开读取：23/24日观测证明、日历、类型历
       for(const e of [old,latest,ordinary,forged,unpublished])assert.equal(await insert('evidence',e,client),true);
       for(const p of publications){await put('events',p.event,client);await put('articles',p.article,client);assert.equal(await insert('publications',p,client),true);}
     });
+    await put('activities',{id:'qa-challenge-28',title:'隔离28天活动',startsOn:'2026-10-05',days:28,timezone:'America/Los_Angeles',rules:'仅测试按公开事实归日',version:1,items:[]});
     const before=await snapshot();
     let calendar:PublicData;
     await t.test('home/calendar/history经过实际SQL裁剪仍保留两种来源严格证明，普通正文仍裁掉',async()=>{
@@ -55,6 +57,17 @@ test('真实 PostgreSQL 公开读取：23/24日观测证明、日历、类型历
         assert.deepEqual(publicActions(result.data).map(item=>item.action.kind),['banked_reset'],'第三方观测不提升为正式完成');
         if(view==='calendar')calendar=result.data;
       }
+    });
+    await t.test('活动接口不依赖文章手动关联，也返回同活动日的完成声明和观测',async()=>{
+      const result=await getPublicRead({view:'activity',id:'qa-challenge-28',day:19});
+      assert.deepEqual(ids(result.data),[oldPub.id,newPub.id,bankedPub.id].sort());
+      assert.deepEqual(observationDates(result.data),expected);
+      const day19=activityModel(result.data,'qa-challenge-28',19);
+      assert.equal(day19.days![16].label,'重置卡');assert.equal(day19.days![17].label,'重置');assert.equal(day19.days![18].label,'重置');
+      assert.equal(day19.entries![0].stage,'来源观测');assert.equal(day19.entries![0].time,'2026-10-24 01:40');
+      assert.equal(day19.entries![0].path,`/pages/detail/index?publicationId=${newPub.id}`);
+      assert.equal(result.data.activities[0].items.length,0,'日历只读汇总，不回写活动表');
+      assert.deepEqual(await snapshot(),before);
     });
     await t.test('真实calendar响应生成北京时间23日01:00和24日01:40，来源观测标记和详情链接正确',()=>{
       const oldDay=recordCalendar(calendar!,{date:'2026-10-23'}),newDay=recordCalendar(calendar!,{date:'2026-10-24'});
@@ -96,6 +109,9 @@ test('真实 PostgreSQL 公开读取：23/24日观测证明、日历、类型历
         assert.equal(recordCalendar(result.data).observedCount,0);
       }
       assert.equal((await getPublicRead({view:'history',filter:'automatic_reset'})).page!.total,0);
+      const activity=(await getPublicRead({view:'activity',id:'qa-challenge-28',day:19})).data;
+      assert.deepEqual(ids(activity),[bankedPub.id]);assert.deepEqual(resetObservations(activity),[]);
+      assert.equal(activityModel(activity,'qa-challenge-28',19).days![18].recorded,false,'撤回后新读取不能保留重置标签');
       for(const p of [oldPub,newPub]){
         const detail=await getPublicRead({view:'detail',entity:'events',id:p.eventId,version:p.id});
         assert.equal(detail.data.publications[0].event.status,'published');assert.equal(detail.data.publications[0].article.status,'published');

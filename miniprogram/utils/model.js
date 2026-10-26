@@ -359,6 +359,25 @@ function activityModel(data, id, day) {
     const entry={...publicationCard(data,publication),types,stage,sourceTime:Date.parse(publicationSourceTime(publication))||0};
     byDay.set(item.day,[...(byDay.get(item.day)||[]),entry]);
   }
+  // A public reset need not be linked to the campaign article. Place its fact
+  // on the activity-local date, using statement/observation time, not collection.
+  const resetFacts=completedBenefits(data).map(({action,publication})=>({publication,kind:action.kind,at:action.statementAt,stage:'发布者完成声明',timeLabel:'声明时间'}));
+  for(const observation of resetObservations(data)){
+    const publication=data.publications.find(p=>p.id===observation.publicationId);
+    if(publication)resetFacts.push({publication,kind:observation.kind,at:observation.observedAt,stage:'来源观测',timeLabel:'观测时间'});
+  }
+  for(const fact of resetFacts){
+    const value=activityDayNumber(activity,fact.at);
+    if(value===undefined||value<1||value>activity.days)continue;
+    const entries=byDay.get(value)||[],existing=entries.find(e=>e.id===fact.publication.id);
+    const type=fact.kind==='banked_reset'?{kind:'banked_reset',label:'重置卡',tone:'violet'}:{kind:'automatic_reset',label:'额度重置',tone:'teal'};
+    if(existing){
+      if(!existing.types.some(t=>t.kind===type.kind))existing.types.push(type);
+      continue;
+    }
+    byDay.set(value,[...entries,{...publicationCard(data,fact.publication),types:[type],stage:fact.stage,time:displayTime(fact.at),timeLabel:fact.timeLabel,sourceTime:Date.parse(fact.at)}]);
+  }
+  const priority=types=>['banked_reset','automatic_reset','reset_message','improvement','unknown'].map(kind=>types.find(t=>t.kind===kind)).find(Boolean);
   const recorded=new Set([...byDay].filter(([,entries])=>entries.some(e=>!e.withdrawn)).map(([day])=>day));
   const dateFor=value=>{const date=new Date(Date.parse(activity.startsOn+'T00:00:00Z')+(value-1)*86400000);return Number.isFinite(date.getTime())?`${date.getUTCMonth()+1}/${date.getUTCDate()}`:'';};
   const days=Array.from({length:activity.days},(_,index)=>{
@@ -366,10 +385,12 @@ function activityModel(data, id, day) {
     const future=actualDay!==null&&value>actualDay;
     const missing=activity.items.some(i=>i.day===value)&&!entries.length;
     const state=types.length?'recorded':future?'future':actualDay===value&&!sourceDelayed&&!missing?'waiting':'unverified';
-    const label=types.length>1?'多项':types.length?types[0].kind==='automatic_reset'?'重置':types[0].label:state==='future'?'未开始':state==='waiting'?'待公布':'待核对';
-    return {value,selected:selected===value,today:actualDay===value,recorded:recorded.has(value),date:dateFor(value),state,label,tone:types.length>1?'blue':types[0]?.tone||(state==='waiting'?'amber':'slate'),types,accessibility:`第${value}天，${dateFor(value)}，${types.length?types.map(t=>t.label).join('、'):label}`};
+    const primaryType=priority(types);
+    const label=primaryType?primaryType.kind==='automatic_reset'?'重置':primaryType.label:state==='future'?'未开始':state==='waiting'?'待公布':'待核对';
+    return {value,selected:selected===value,today:actualDay===value,recorded:recorded.has(value),date:dateFor(value),state,label,tone:primaryType?.tone||(state==='waiting'?'amber':'slate'),types,accessibility:`第${value}天，${dateFor(value)}，${types.length?types.map(t=>t.label).join('、'):label}`};
   });
-  const entries=(byDay.get(selected)||[]).sort((a,b)=>a.sourceTime-b.sourceTime||a.id.localeCompare(b.id));
+  const rank=entry=>['banked_reset','automatic_reset','reset_message','improvement','unknown'].indexOf(priority(entry.types)?.kind);
+  const entries=(byDay.get(selected)||[]).sort((a,b)=>rank(a)-rank(b)||a.sourceTime-b.sourceTime||a.id.localeCompare(b.id));
   const selectedState=days[selected-1].state;
   return { missing: false, id: activity.id, title: activity.title, rules: activity.rules, startsOn: activity.startsOn, timezone: activity.timezone === 'Asia/Shanghai' ? '北京时间' : activity.timezone === 'America/Los_Angeles' ? '美国西部时间' : '活动指定时区', selected,
     phase: actualDay === null ? '此设备暂不支持活动时区，请手动选日期' : actualDay < 1 ? '尚未开始' : actualDay > activity.days ? '活动已结束' : `第${actualDay}天 / 共${activity.days}天`,
