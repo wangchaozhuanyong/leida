@@ -27,7 +27,7 @@ test('两款固定海报在无公告、预告、进行中和逾期时均可用�
 });
 test('完成海报冻结声明和生成时间；布局切换不改事实，撤回后不能保存',()=>{
   const data=fixture('claimed_complete'),input=native.statusPosterInput(data);
-  assert.equal(input.value,'4小时0分钟');assert.equal(input.unit,'');assert.equal(input.label,'距完成声明');
+  assert.equal(input.value,'4小时0分钟');assert.equal(input.unit,'');assert.equal(input.label,'已经过去');assert.equal(input.title,'距离上次重置');
   const dark=native.createStatusPosterLayout(input,measure,'precision',true),light=native.createStatusPosterLayout(input,measure,'editorial',true);
   assert.notDeepEqual(dark.commands,light.commands);assert.equal(input.generatedAt,now);
   for(const layout of [dark,light]){const circle=layout.commands.find((c:any)=>c.type==='circle'),code=layout.commands.find((c:any)=>c.asset==='code');for(const x of [code.x,code.x+code.width])for(const y of [code.y,code.y+code.height])assert.ok(Math.hypot(x-circle.x,y-circle.y)<circle.r);assert.ok(layout.commands.filter((c:any)=>c.type==='text').map((c:any)=>c.value).join('').includes(input.title));}

@@ -89,9 +89,7 @@ function completedCard(base, kind, round, observations, now) {
     dialStatus:declared?'依据公开完成声明':'依据第三方观测',description:'持续关注下一次安排。',footer:declared?'公开完成消息，个人账户以实际显示为准':observation.sourceName+' · 第三方观测',
     action:'查看记录',oldTime:'',expectedElapsed:'',observationPublicationId:'',observationSourceName:'',observationTime:'',observationAt:'',watchNote:'',validUntil:'',early};
   card.hero=homeOrbitPresentation(card,now);
-  card.hero.title=declared ? early ? banked?'重置卡已提前发放':'额度已提前重置' : banked?'重置卡发放已确认':'额度重置已确认' : banked?'已有发卡观测':'已有重置观测';
   card.hero.badge=declared?'发布者已确认':'第三方报告';
-  card.hero.label=observation?round?'距本轮最早观测':'距来源观测':'距完成声明';
   card.hero.timeLabel=card.timeLabel;
   card.hero.description=early ? declared?'本轮已有公开完成声明，已收录预计时间前的完成依据。':'预计时间前已有第三方重置观测，持续核对完成消息。' : declared?'本轮已有公开完成声明，持续关注下一次安排。':'第三方来源已记录重置，持续关注后续公开消息。';
   card.hero.footnote=declared?'个人到账以账户为准；确认声明不会重新开始计时。':'尚无发布者完成声明；按'+(round?'本轮最早':'所示来源')+'观测计时，不是采集时间，也不代表实际到账的精确时间。';

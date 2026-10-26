@@ -32,8 +32,8 @@ test('到点不足一分钟及异常时间不产生负数NaN或完成状态',()=
 });
 test('来源观测与公开完成声明保持不同证据等级、时间语义，均保留装饰动效',()=>{
   const observed=homeOrbitPresentation(card('observed'),now),completed=homeOrbitPresentation(card('completed','banked_reset'),now);
-  assert.equal(observed.title,'已有重置观测');assert.equal(observed.badge,'第三方报告');assert.equal(observed.timeLabel,'来源观测时间');assert.match(observed.footnote,/不等于官方/);
-  assert.equal(completed.title,'重置卡发放已确认');assert.equal(completed.badge,'公开完成声明');assert.equal(completed.label,'距完成声明');
+  assert.equal(observed.title,'距离上次重置（观测）');assert.equal(observed.badge,'第三方报告');assert.equal(observed.timeLabel,'来源观测时间');assert.match(observed.footnote,/不等于官方/);
+  assert.equal(completed.title,'距离上次发卡');assert.equal(completed.badge,'公开完成声明');assert.equal(completed.label,'已经过去');
   assert.equal(observed.animated,true);assert.equal(completed.animated,true);
 });
 test('信号推测保留发布时范围不生成倒计时，独立观测不冒充本轮完成',()=>{
@@ -45,4 +45,15 @@ test('信号推测保留发布时范围不生成倒计时，独立观测不冒�
   assert.match(overdue.description,/第三方.*本轮.*待核实/);assert.equal(overdue.badge,'完成消息待确认');
   const revised=homeOrbitPresentation(card('revised','automatic_reset',{metricLabel:'距离预计最晚时间',metric:'不足1分钟'}),now);
   assert.equal(revised.label,'距离预计最晚时间');assert.equal(revised.metric,'不足1分钟');assert.equal(revised.badge,'安排已调整');
+});
+
+test('两类完成主标题直接解释经过时长，观测括号不冒充公开声明',()=>{
+  for(const kind of ['automatic_reset','banked_reset']){
+    const subject=kind==='banked_reset'?'发卡':'重置';
+    const observed=homeOrbitPresentation(card('observed',kind),now),completed=homeOrbitPresentation(card('completed',kind),now);
+    assert.equal(observed.title,'距离上次'+subject+'（观测）');assert.equal(completed.title,'距离上次'+subject);
+    assert.equal(observed.label,'已经过去');assert.deepEqual(observed.parts,completed.parts);assert.equal(observed.metric,'1小时12分钟');
+    assert.equal(observed.timeLabel,'来源观测时间');assert.equal(completed.timeLabel,'完成消息时间');
+    assert.notEqual(observed.badge,completed.badge);
+  }
 });
