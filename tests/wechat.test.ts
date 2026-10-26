@@ -9,6 +9,8 @@ import {createWechatService,defaultWechat,publicationScene,publicationForScene,w
 import {createWechatProvider,WechatServiceError} from '../src/server/wechat-provider';
 import {validateWechatImage} from '../src/server/wechat-image';
 import {apiError} from '../src/server/http';
+import {buildAutomaticTemplate} from '../src/server/automatic-content';
+import {reminderContentCurrent,reminderStatementAt} from '../src/lib/reminder-lifecycle';
 const actualPng=await QRCode.toBuffer('https://example.invalid/actual-decodable-fixture',{type:'png',width:430});
 // Locally generated, decodable 16x16 RGB JPEG; no external image request is used.
 const actualJpeg=Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAQABADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD6pooooA//2Q==','base64');
@@ -76,6 +78,89 @@ async function recipients(f:Awaited<ReturnType<typeof fixture>>,count:number){
     await f.store.put('wechat_readers',next);await f.store.put('wechat_grants',{...grant,id:`synthetic-grant-${index}`,readerId:next.id});
   }
 }
+
+async function observedFixture(f:Awaited<ReturnType<typeof fixture>>,options:{at?:string;historical?:boolean}={}) {
+  const at=options.at??new Date(Math.floor(f.now()/60_000)*60_000).toISOString(),collectedAt=new Date(f.now()).toISOString(),d=new Date(at);
+  const stamp=`${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()]} ${d.getUTCDate()}, ${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')} UTC.`;
+  const summary=`Third-party observation on ${stamp}`,url='https://codexlimits.com/reset-history';
+  const evidence:Evidence={id:'observed-proof',sourceId:'codexlimits-observations',messageId:`observed-codexlimits-${d.getTime()}`,url,text:`Usage reset landed\n${summary}`,publishedAt:at,collectedAt,hash:'synthetic-observation-proof',contextComplete:false,historical:options.historical??false,provenance:'archive',textOrigin:'archive_excerpt',metadata:{sourceGroup:'codexlimits',category:'reset',benefitKind:'automatic_reset',referenceReset:{eventId:`codexlimits:automatic_reset:${at}`,occurredAt:at,snapshotAt:collectedAt,referenceUrl:url,summary}}};
+  const draft=buildAutomaticTemplate([evidence]);assert.ok(draft);
+  const event:RadarEvent={...f.event,id:'observed-event',title:draft.title,evidenceIds:[evidence.id],actions:[],publicationId:'observed-publication',updatedAt:collectedAt};
+  const article:Article={...f.article,...draft,id:'observed-article',eventId:event.id,publicationId:event.publicationId,publishedAt:collectedAt,updatedAt:collectedAt,sourcePublishedAt:at,historical:options.historical??false};
+  const publication:Publication={...f.publication,id:event.publicationId,eventId:event.id,articleId:article.id,event,article,mode:'news_only',publishedAt:collectedAt,cutoffAt:collectedAt};
+  await f.store.put('evidence',evidence);await f.store.put('events',event);await f.store.put('articles',article);await f.store.insert('publications',publication);
+  const notice=await f.notice({publicationId:publication.id,eventId:event.id,title:draft.title,summary:draft.summary});
+  return {publication,evidence,event,article,notice};
+}
+
+test('有效来源观测从通知入队到微信发送，保持第三方限定与来源时间，不制造完成动作',async()=>{
+  const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);f.advance(6*60_000);
+  const at='2026-10-10T02:01:00.000Z',o=await observedFixture(f,{at});
+  await f.configure({templateFields:{title:'thing1',status:'thing3',time:'time5'}});
+  const jobs=await f.queued();assert.equal(jobs.length,1);assert.equal((await f.service.processWechatJob(jobs[0])).state,'sent');
+  const body=f.calls.find(call=>call.url.includes('subscribe/send'))!.body!;
+  assert.deepEqual(body.data,{thing1:{value:'Codex额度'},thing3:{value:'已观测到重置（第三方）'},time5:{value:'2026-10-10 10:01'}});
+  assert.equal(body.page,`pages/detail/index?publicationId=${o.publication.id}`);
+  assert.equal(reminderStatementAt(o.notice,o.publication,[o.evidence]),at);
+  assert.deepEqual((await f.store.one<Publication>('publications',o.publication.id))?.event.actions,[]);
+  assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,0);
+  await f.queued();await f.service.processWechatJob(jobs[0]);assert.equal(f.calls.filter(call=>call.url.includes('subscribe/send')).length,1);
+});
+
+test('观测结果类型关闭、授权前的旧观测、历史补采和无来源证明都不触发微信',async()=>{
+  for(const scenario of ['off','before-consent','historical','forged','product'] as const){
+    const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);
+    if(scenario==='off')await f.service.saveWechatReminderPreferences(session.sessionToken,{announcement:true,result:false,correction:true});
+    f.advance(6*60_000);
+    const o=await observedFixture(f,{at:scenario==='before-consent'?'2026-10-10T01:59:00.000Z':undefined,historical:scenario==='historical'});
+    if(scenario==='forged')await f.store.put('evidence',{...o.evidence,text:'未经核验的重置传闻'});
+    if(scenario==='product')await f.store.put('publications',{...o.publication,article:{...o.article,category:'product'}});
+    assert.equal((await f.queued()).length,0,scenario);assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,1,scenario);
+    assert.equal(f.calls.filter(call=>call.url.includes('subscribe/send')||call.url.includes('stable_token')).length,0,scenario);
+  }
+});
+
+test('已排队观测跨24小时或撤回时取消，未发送次数保留，未来证明不能入队',async()=>{
+  for(const scenario of ['expired','withdrawn','future'] as const){
+    const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);f.advance(60_000);
+    const o=await observedFixture(f);
+    if(scenario==='future')await f.store.put('evidence',{...o.evidence,publishedAt:'2026-10-10T02:02:00.000Z'});
+    const jobs=await f.queued();
+    if(scenario==='future'){assert.equal(jobs.length,0);continue;}
+    assert.equal(jobs.length,1);
+    if(scenario==='expired')f.advance(24*3600_000);else await f.store.put('events',{...o.event,status:'withdrawn'});
+    assert.equal((await f.service.processWechatJob(jobs[0])).state,'cancelled',scenario);
+    assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,1,scenario);
+    assert.equal(f.calls.filter(call=>call.url.includes('subscribe/send')).length,0,scenario);
+  }
+});
+
+test('观测发送结果未知不重复发送，不因补充来源或重新调度增加次数',async()=>{
+  const f=await fixture({send:'timeout'}),session=await f.login();await f.accept(session.sessionToken);f.advance(60_000);
+  const o=await observedFixture(f),job=(await f.queued())[0];assert.ok(job);
+  assert.equal((await f.service.processWechatJob(job)).state,'unknown');
+  await f.store.put('evidence',{...o.evidence,id:'duplicate-proof'});
+  await f.queued();assert.equal((await f.service.processWechatJob(job)).state,'unknown');
+  assert.equal(f.calls.filter(call=>call.url.includes('subscribe/send')).length,1);
+  assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,0);
+});
+
+test('模板明确显示预计截止时间、公开声明与观测，消息时间不使用晚到的入库时间',async()=>{
+  const f=await fixture(),settings={...defaultWechat,templateFields:{title:'thing1',status:'thing3',time:'time5'}},notice=await f.notice({categories:['announcement']});
+  const action:RadarEvent['actions'][number]={id:'expected',kind:'automatic_reset',scope:'public',stage:'promised',statementAt:'2026-10-10T01:00:00Z',expectedAt:'2026-10-11T18:00:00Z',timeNote:'最晚之前',evidenceIds:['ev'],eligibility:'公开用户'};
+  const pub={...f.publication,event:{...f.event,actions:[action]}};
+  const promised=wechatTemplateData(settings,notice,pub);
+  assert.equal(promised.thing3.value,'预计10月12日02:00前重置');assert.equal(promised.time5.value,'2026-10-10 09:00');
+  const complete={...pub,event:{...pub.event,actions:[{...action,stage:'claimed_complete' as const}]}};
+  assert.equal(wechatTemplateData(settings,{...notice,categories:['result']},complete).thing3.value,'发布者已声明重置完成');
+  assert.equal(wechatTemplateData({...settings,templateFields:{...settings.templateFields,status:'phrase3'}},notice,pub).phrase3.value,'重置预告');
+  f.advance(60_000);const observation=await observedFixture(f),compact=wechatTemplateData({...settings,templateFields:{...settings.templateFields,status:'phrase3'}},observation.notice,observation.publication,[observation.evidence]);
+  assert.equal(compact.phrase3.value,'重置观测');assert.ok(Array.from(compact.phrase3.value).length<=5);
+  const unrelated={...observation.publication,event:{...observation.event,actions:[{...action,kind:'banked_reset' as const}]}};
+  assert.equal(wechatTemplateData(settings,observation.notice,unrelated,[observation.evidence]).thing1.value,'Codex额度','观测类型不能被同事件继承的旧发卡动作替换');
+  assert.equal(reminderContentCurrent(observation.notice,observation.publication,observation.event,new Date(f.now()).toISOString(),undefined,[observation.evidence]),true);
+  assert.equal(reminderContentCurrent(observation.notice,observation.publication,observation.event,new Date(f.now()).toISOString()),false,'没有严格证明时仍拒绝普通news_only');
+});
 
 test('次数摘要不等待发送历史，保留完整状态、次数和偏好；旧调用仍返回发送结果',async()=>{
   const f=await fixture(),session=await f.login();
@@ -490,12 +575,12 @@ test('额度重置模板使用公开福利类型和阶段，混合阶段不冒�
   const notice=await f.notice({title:'不应复制到额度类型的整条公告标题'});
   const action=(kind:'automatic_reset'|'banked_reset',stage:RadarEvent['actions'][number]['stage'],scope:RadarEvent['actions'][number]['scope']='public'):RadarEvent['actions'][number]=>({id:`${kind}-${scope}`,kind,stage,scope,eligibility:'以公开来源为准',evidenceIds:['ev'],statementAt:new Date(f.now()).toISOString()});
   for(const row of [
-    {actions:[action('automatic_reset','promised')],type:'编程套餐额度',stage:'已公布计划'},
-    {actions:[action('banked_reset','claimed_complete')],type:'重置卡',stage:'公告称完成'},
-    {actions:[action('automatic_reset','in_progress')],type:'编程套餐额度',stage:'公告称进行中'},
-    {actions:[action('banked_reset','cancelled')],type:'重置卡',stage:'公告已取消'},
-    {actions:[action('automatic_reset','claimed_complete'),action('banked_reset','promised')],type:'用量重置与重置卡',stage:'公开进展更新'},
-    {actions:[action('automatic_reset','promised'),action('banked_reset','claimed_complete','private')],type:'编程套餐额度',stage:'已公布计划'},
+    {actions:[action('automatic_reset','promised')],type:'Codex额度',stage:'已发布重置预告，时间待公布'},
+    {actions:[action('banked_reset','claimed_complete')],type:'Codex重置卡',stage:'发布者已声明发卡完成'},
+    {actions:[action('automatic_reset','in_progress')],type:'Codex额度',stage:'已宣布开始，完成待确认'},
+    {actions:[action('banked_reset','cancelled')],type:'Codex重置卡',stage:'本轮安排已取消'},
+    {actions:[action('automatic_reset','claimed_complete'),action('banked_reset','promised')],type:'Codex额度与重置卡',stage:'多项重置进展已更新'},
+    {actions:[action('automatic_reset','promised'),action('banked_reset','claimed_complete','private')],type:'Codex额度',stage:'已发布重置预告，时间待公布'},
   ]){
     const publication={...f.publication,event:{...f.publication.event,actions:row.actions}};
     const data=wechatTemplateData(settings,notice,publication);
@@ -505,7 +590,7 @@ test('额度重置模板使用公开福利类型和阶段，混合阶段不冒�
   const mixed={...f.publication,event:{...f.publication.event,actions:[action('automatic_reset','claimed_complete'),action('banked_reset','promised')]}};
   const phrase=wechatTemplateData({...settings,templateFields:{...settings.templateFields,status:'phrase3'}},notice,mixed);
   assert.equal(phrase.phrase3.value,'进展已更新');assert.ok(Array.from(phrase.phrase3.value).length<=5);
-  assert.equal(wechatTemplateData(settings,{...notice,categories:['correction']},mixed).thing3.value,'公告更正');
+  assert.equal(wechatTemplateData(settings,{...notice,categories:['correction']},mixed).thing3.value,'重置信息已更正');
   assert.throws(()=>wechatTemplateData(settings,{...notice,publicationId:'different-fixed-version'},mixed),/不属于额度重置/);
 });
 
@@ -530,7 +615,7 @@ test('真实发送路径的替身使用thing1、thing3、time5及对应发布版
   const session=await f.login();await f.accept(session.sessionToken);f.advance(1000);f.publication.event.actions[0].statementAt=new Date(f.now()).toISOString();await f.store.put('publications',f.publication);await f.store.put('events',f.publication.event);await f.notice({categories:['announcement'],title:'不应发送到额度类型的长标题'});
   const jobs=await f.queued();assert.equal(jobs.length,1);assert.equal((await f.service.processWechatJob(jobs[0])).state,'sent');
   const body=f.calls.find(call=>call.url.includes('subscribe/send'))!.body!;
-  assert.deepEqual(body.data,{thing1:{value:'编程套餐额度'},thing3:{value:'已公布计划'},time5:{value:'2026-10-10 10:00'}});
+  assert.deepEqual(body.data,{thing1:{value:'Codex额度'},thing3:{value:'已发布重置预告，时间待公布'},time5:{value:'2026-10-10 10:00'}});
   assert.equal(body.page,`pages/detail/index?publicationId=${f.publication.id}`);
 });
 

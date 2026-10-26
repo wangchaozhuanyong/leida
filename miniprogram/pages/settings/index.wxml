@@ -17,7 +17,7 @@
     <view class="reminder-types">
       <view class="row reminder-types-heading"><text>提醒内容</text><text class="small muted" aria-live="polite">{{wechatAction === 'preferences' ? '正在保存' : wechat.preferencesMessage}}</text></view>
       <view class="reminder-type-row"><view class="grow"><view>重置预告</view><view class="small muted">有新的重置计划或发放进展时提醒</view></view><switch aria-label="接收重置预告" color="#2458ce" checked="{{wechat.reminderPreferences.announcement}}" disabled="{{!wechat.canChooseTypes || wechatAction}}" data-kind="announcement" bindchange="changeWechatPreference" /></view>
-      <view class="reminder-type-row"><view class="grow"><view>重置完成提醒</view><view class="small muted">公开公告确认完成时提醒</view></view><switch aria-label="接收重置完成提醒" color="#2458ce" checked="{{wechat.reminderPreferences.result}}" disabled="{{!wechat.canChooseTypes || wechatAction}}" data-kind="result" bindchange="changeWechatPreference" /></view>
+      <view class="reminder-type-row"><view class="grow"><view>重置结果提醒</view><view class="small muted">公开完成声明或有效来源观测，消息会注明依据</view></view><switch aria-label="接收重置结果与来源观测提醒" color="#2458ce" checked="{{wechat.reminderPreferences.result}}" disabled="{{!wechat.canChooseTypes || wechatAction}}" data-kind="result" bindchange="changeWechatPreference" /></view>
       <view class="reminder-type-row"><view class="grow"><view>重要更正</view><view class="small muted">已发布的重置信息被更正时提醒</view></view><switch aria-label="接收重要更正" color="#2458ce" checked="{{wechat.reminderPreferences.correction}}" disabled="{{!wechat.canChooseTypes || wechatAction}}" data-kind="correction" bindchange="changeWechatPreference" /></view>
     </view>
     <view wx:if="{{wechat.allTypesOff}}" class="reminder-paused">已暂停所有类型，剩余次数保留。开启任一类型即可继续接收新消息。</view>

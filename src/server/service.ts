@@ -17,6 +17,7 @@ import {gatherEvidenceContext,hasCompleteContext,originalConflict} from './sourc
 import {TIBO_PUBLIC_SOURCE} from './tibo-public';
 import {configuredPublicRpc} from './cloudbase/public-config';
 import {observedEvidence} from '../lib/reset-observations';
+import {reminderObservationEvidence} from '../lib/reminder-lifecycle';
 export const defaultSite:SiteSettings = { name:'模钥重置雷达',description:'跟踪公开重置公告与重置卡动态',autoPublish:true,version:1 };
 const str=(x:unknown)=>z.string().min(1).max(200).parse(x);
 export async function audit(actor:string,action:string,objectId:string,reason:string,before:unknown,after:unknown,c:Client) { await insert('audits',{id:id('audit'),actor,action,objectId,reason,createdAt:now(),before,after} satisfies Audit,c); }
@@ -173,7 +174,9 @@ async function publish(content:DraftContent, c:Client, opts:PublishOptions):Prom
   const publication:Publication={id:publicationId,eventId,articleId,event,article,cutoffAt,publishedAt:time,reason:opts.reason,mode:content.publicationMode??'state_change',contentOrigin:content.contentOrigin};
   await insert('publications',publication,c); if(!newsOnly||!existing)await put('events',event,c); await put('articles',article,c);
   const factKey=noticeKey(event,existing);
-  const key=newsOnly?undefined:opts.correction&&existing?(opts.automatic?(factKey?hash(`correction:${factKey}`):undefined):hash(`${eventId}:correction:${event.version}`)):factKey;
+  const observation=newsOnly&&content.category==='reset'?reminderObservationEvidence(evidence,content.evidenceIds,time):undefined;
+  const observationKey=observation?hash(`reset-observation:${observation.kind}:${observation.observedAt}`):undefined;
+  const key=newsOnly?observationKey:opts.correction&&existing?(opts.automatic?(factKey?hash(`correction:${factKey}`):undefined):hash(`${eventId}:correction:${event.version}`)):factKey;
   if(opts.automatic&&opts.correction&&key)for(const notice of await list<Notice>('notices',c))if(notice.eventId===eventId&&notice.status==='active'&&notice.categories.some(category=>category==='announcement'||category==='result'))await put('notices',{...notice,status:'withdrawn'},c);
   const activity=content.activityId?await one<Activity>('activities',content.activityId,c,true):undefined;
   if(content.activityId&&!activity) throw new DomainError('关联活动不存在');
@@ -181,7 +184,7 @@ async function publish(content:DraftContent, c:Client, opts:PublishOptions):Prom
   // Linking an already published article to its campaign is enrichment, not a
   // new announcement. Actual benefit changes still have their own fact key.
   const semantic=key??(activity&&cited[0]&&!opts.existingArticle?hash(`activity:${activity.id}:${content.activityDay}:${providerIdentity(cited[0])}`):undefined);
-  if(semantic&&(!historical||(opts.correction&&opts.actor!=='worker'))&&!opts.suppressNotice&&!opts.withdrawn) { const categories:Notice['categories']=opts.correction?['correction']:newsOnly?[]:content.actions.filter(a=>a.scope==='public').some(a=>a.stage==='claimed_complete')?['result']:['announcement']; if(activity) categories.push('activity'); await insert('notices',{id:`notice_${semantic}`,semanticKey:semantic,eventId,publicationId,title:article.title,summary:article.summary,categories,status:'active',createdAt:time} satisfies Notice,c); }
+  if(semantic&&(!historical||(opts.correction&&opts.actor!=='worker'))&&!opts.suppressNotice&&!opts.withdrawn) { const categories:Notice['categories']=opts.correction?['correction']:observation?['result']:newsOnly?[]:content.actions.filter(a=>a.scope==='public').some(a=>a.stage==='claimed_complete')?['result']:['announcement']; if(activity) categories.push('activity'); await insert('notices',{id:`notice_${semantic}`,semanticKey:semantic,eventId,publicationId,title:article.title,summary:article.summary,categories,status:'active',createdAt:time} satisfies Notice,c); }
   await audit(opts.actor,opts.withdrawn?'publication.withdraw':opts.correction?'publication.correct':'publication.publish',eventId,opts.reason,existing,publication,c);
   await markForecastInputsChanged(c);
   return publication;
@@ -275,8 +278,11 @@ export async function previewCandidate(candidateId:string,version:number):Promis
   const previousArticle=articleForPrimary(candidate!,content,primary,evidence,articles,!candidate!.humanEdited&&primary?.provenance!=='manual');
   const eventEvidenceIds=[...new Set([...(existing?.evidenceIds??[]),...content.evidenceIds])],cited=evidence.filter(e=>content.evidenceIds.includes(e.id));const historical=isHistoricalContent(cited,previousArticle?.publishedAt??now());
   const proposed:RadarEvent={id:existing?.id??'preview-event',title:content.title,version:(existing?.version??0)+1,status:'published',actions:merged,evidenceIds:eventEvidenceIds,publicationId:'preview',updatedAt:now()};
-  const materialChange=!!noticeKey(proposed,existing)||!!content.activityId&&!previousArticle;const canPublish=reasons.length===0,willNotify=canPublish&&!historical&&materialChange;
-  const noticeReason=!canPublish?'内容未通过校验，不会发布提醒':historical?'首次发布历史资料，不生成实时提醒':!materialChange?'没有新的公开动作变化或活动条目，不重复提醒':'发布包含新的公开动作变化或活动条目，将生成一条站内提醒';
+  const observation=content.publicationMode==='news_only'&&content.category==='reset'?reminderObservationEvidence(evidence,content.evidenceIds,now()):undefined;
+  const observationKey=observation?hash(`reset-observation:${observation.kind}:${observation.observedAt}`):undefined;
+  const observationChange=observationKey&&!await one<Notice>('notices',`notice_${observationKey}`,c);
+  const materialChange=!!noticeKey(proposed,existing)||!!content.activityId&&!previousArticle||!!observationChange;const canPublish=reasons.length===0,willNotify=canPublish&&!historical&&materialChange;
+  const noticeReason=!canPublish?'内容未通过校验，不会发布提醒':historical?'首次发布历史资料，不生成实时提醒':!materialChange?'没有新的公开动作、有效观测或活动条目，不重复提醒':observationChange?'发布包含新的有效重置观测，将生成一条结果提醒':'发布包含新的公开动作变化或活动条目，将生成一条站内提醒';
   return {canPublish,reasons:[...new Set(reasons)],changes,pages:canPublish?['首页','公告列表','事件详情','日程','分享海报',...(content.activityId?['活动页']:[]),...(willNotify?['站内提醒']:[])]:[],willNotify,noticeReason,expectedEventVersion:existing?.version};
 });}
 export async function publishCandidate(candidateId:string,version:number,actor:string,reason:string,automatic=false,expectedEventVersion?:number,requireEventVersion=false):Promise<Publication> {
