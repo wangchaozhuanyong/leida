@@ -61,17 +61,17 @@ function nativeHome(data:PublicData|null,at:number,kind='automatic_reset') {
 
 test('提前完成结束倒计时；同轮补采更早的完成声明只升级确认、沿用观测计时',()=>{
  const d=fixture();action(d,'promise');observation(d,'observation','2026-10-24T01:40:00Z');
- const observed=card(d);assert.equal(observed.state,'observed');assert.equal(observed.early,true);assert.equal(observed.hero.title,'已有重置观测');assert.equal(observed.hero.badge,'第三方报告');assert.equal(observed.clockAt,'2026-10-24T01:40:00Z');assert.match(observed.hero.description,/预计时间前.*第三方/);assert.match(observed.hero.footnote,/不是采集时间/);
+ const observed=card(d);assert.equal(observed.state,'observed');assert.equal(observed.early,true);assert.equal(observed.hero.title,'距离上次重置（观测）');assert.equal(observed.hero.badge,'第三方报告');assert.equal(observed.clockAt,'2026-10-24T01:40:00Z');assert.match(observed.hero.description,/预计时间前.*第三方/);assert.match(observed.hero.footnote,/不是采集时间/);
  action(d,'declared','claimed_complete','2026-10-24T01:30:00Z',undefined,'automatic_reset','promise',NOW);
  const declared=card(d);assert.equal(declared.state,'completed');assert.equal(declared.hero.badge,'发布者已确认');assert.equal(declared.clockAt,observed.clockAt);assert.equal(declared.hero.metric,observed.hero.metric);assert.equal(declared.publicationId,'pub-declared');assert.match(declared.declarationTime,/09:30/);assert.notEqual(declared.revision,observed.revision);
 });
 test('同轮两个来源采用最早有效观测计时，较晚采集和刷新不把计时推迟',()=>{
  const d=fixture();action(d,'promise');observation(d,'later','2026-10-24T01:40:00Z','2113492502355562875');observation(d,'earlier','2026-10-24T01:00:00Z');
- const view=card(d);assert.equal(view.clockAt,'2026-10-24T01:00:00Z');assert.equal(view.hero.label,'距本轮最早观测');assert.equal(view.hero.title,'已有重置观测');assert.equal(view.publicationId,'pub-earlier');assert.match(view.hero.metric,/2小时/);
+ const view=card(d);assert.equal(view.clockAt,'2026-10-24T01:00:00Z');assert.equal(view.hero.label,'已经过去');assert.equal(view.hero.title,'距离上次重置（观测）');assert.equal(view.publicationId,'pub-earlier');assert.match(view.hero.metric,/2小时/);
  const poster=statusPosterInput(d);assert.equal(poster.publicationId,view.publicationId);assert.equal(poster.value,view.hero.metric);assert.equal(poster.sharePath,view.sharePath);
  d.evidence.forEach(e=>e.collectedAt='2026-10-24T02:59:00Z');assert.equal(card(d).clockAt,view.clockAt);
  action(d,'declared','claimed_complete','2026-10-24T01:30:00Z',undefined,'automatic_reset','promise',NOW);
- assert.equal(card(d).clockAt,view.clockAt);assert.equal(card(d).hero.badge,'发布者已确认');assert.equal(card(d).hero.title,'额度已提前重置');
+ assert.equal(card(d).clockAt,view.clockAt);assert.equal(card(d).hero.badge,'发布者已确认');assert.equal(card(d).hero.title,'距离上次重置');
 });
 test('旧轮已有最早观测，不阻挡匹配窗口之外的新独立重置；首页、海报与转发一起接替',()=>{
  const d=fixture();d.serverTime='2026-10-25T06:43:39Z';
@@ -81,7 +81,7 @@ test('旧轮已有最早观测，不阻挡匹配窗口之外的新独立重置�
  observation(d,'new-reset','2026-10-25T06:10:00Z','2114200291319124163');
  const current=card(d),poster=statusPosterInput(d);
  assert.equal(current.clockAt,'2026-10-25T06:10:00Z');assert.equal(current.publicationId,'pub-new-reset');
- assert.equal(current.hero.title,'已有重置观测');assert.equal(current.hero.label,'距来源观测');assert.equal(current.expectedAt,'');assert.equal(current.early,false);
+ assert.equal(current.hero.title,'距离上次重置（观测）');assert.equal(current.hero.label,'已经过去');assert.equal(current.expectedAt,'');assert.equal(current.early,false);
  assert.notEqual(current.roundKey,old.roundKey);assert.notEqual(current.revision,old.revision);assert.equal(statusPosterAvailable(snapshot,d),false);
  assert.equal(poster.statementAt,current.clockAt);assert.equal(poster.publicationId,current.publicationId);assert.equal(poster.sharePath,current.sharePath);
  for(const theme of ['precision','editorial'])assert.ok(createStatusPosterLayout(poster,(s:string,n:number)=>s.length*n,theme).commands.some((c:any)=>c.value===poster.value));

@@ -37,7 +37,7 @@
         <view wx:if="{{card.hero.title && card.hero.metric}}" class="orbit-result">{{card.hero.title}}</view>
         <view class="orbit-label">{{card.hero.label}}</view>
         <block wx:if="{{card.hero.metric}}">
-          <view class="orbit-digits {{card.hero.parts.length===3?'with-days':''}} {{card.hero.long?'is-long':''}}" aria-label="{{card.hero.label}}，{{card.hero.metric}}"><block wx:if="{{card.hero.parts.length}}"><view wx:for="{{card.hero.parts}}" wx:key="unit" class="orbit-part" aria-hidden="true"><text class="orbit-number">{{item.value}}</text><text class="orbit-unit">{{item.unit}}</text></view></block><text wx:else class="orbit-minute">{{card.hero.metric}}</text></view>
+          <view class="orbit-digits {{card.hero.parts.length===3?'with-days':''}} {{card.hero.long?'is-long':''}}" aria-label="{{card.hero.title || card.hero.label}}，{{card.hero.metric}}"><block wx:if="{{card.hero.parts.length}}"><view wx:for="{{card.hero.parts}}" wx:key="unit" class="orbit-part" aria-hidden="true"><text class="orbit-number">{{item.value}}</text><text class="orbit-unit">{{item.unit}}</text></view></block><text wx:else class="orbit-minute">{{card.hero.metric}}</text></view>
         </block>
         <view wx:else class="orbit-title">{{card.hero.title}}</view>
         <view class="orbit-status"><text class="orbit-status-symbol" aria-hidden="true">{{card.hero.symbol}}</text><text>{{card.hero.badge}}</text></view>

@@ -53,12 +53,12 @@ function homeOrbitPresentation(card, now) {
       break;
     }
     case 'observed':
-      Object.assign(view, elapsedClock(card.timeAt, now), { title: banked ? '已有发卡观测' : '已有重置观测', label: '距观测记录',
+      Object.assign(view, elapsedClock(card.timeAt, now), { title: banked ? '距离上次发卡（观测）' : '距离上次重置（观测）', label: '已经过去',
         badge: '第三方报告', tone: 'teal', symbol: '◎', timeLabel: '来源观测时间',
         description: '第三方来源记录了' + subject + '，持续关注后续消息。', footnote: '第三方观测不等于官方完成声明。' });
       break;
     case 'completed':
-      Object.assign(view, elapsedClock(card.timeAt, now), { title: banked ? '重置卡发放已确认' : '额度重置已确认', label: '距完成声明',
+      Object.assign(view, elapsedClock(card.timeAt, now), { title: banked ? '距离上次发卡' : '距离上次重置', label: '已经过去',
         badge: '公开完成声明', tone: 'green', symbol: '✓', timeLabel: '完成消息时间',
         description: '本轮已有公开完成声明，持续关注下一次安排。', footnote: '个人账户请以实际到账为准。' });
       break;
