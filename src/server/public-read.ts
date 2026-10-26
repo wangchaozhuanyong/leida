@@ -130,7 +130,7 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
     const site = (await client.query("SELECT payload FROM radar_settings WHERE id='site'")).rows[0]?.payload;
     const empty: PublicData = { events: [], articles: [], publications: [], evidence: [], notices: [], activities: [], sources: state.sources, site: site || { name: '模钥重置雷达', description: '', autoPublish: false, version: 1 }, serverTime: now };
     if (options.view === 'state') return { data: empty, version: state.version, contentVersion: state.contentVersion };
-    const facts = ['home','methodology','calendar','news','history'].includes(options.view) ? await readPublicFacts(client, now) : {...empty};
+    const facts = ['home','methodology','calendar','news','history','activity'].includes(options.view) ? await readPublicFacts(client, now) : {...empty};
     const activities: Activity[] = (await client.query('SELECT payload FROM radar_activities')).rows.map(row => row.payload);
     const selected = new Set<string>();
     let page: PublicReadEnvelope['page'];
@@ -182,6 +182,10 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
       const dayItems=items.filter(item=>item.day===day);
       const rows=await client.query("SELECT payload->>'publicationId' AS publication FROM radar_articles WHERE id=ANY($1::text[])",[items.map(item=>item.articleId)]);
       rows.rows.forEach(row=>selected.add(row.publication));
+      // Include public reset facts independently of campaign links. The client
+      // groups them by the activity timezone and retains their evidence grade.
+      const resetFacts=[...completedPublicActions(facts).map(({action,publication})=>({at:action.statementAt,id:publication.id})),...resetObservations(facts).map(item=>({at:item.observedAt,id:item.publicationId}))];
+      if(activity)for(const fact of resetFacts){const value=activityDayNumber(activity,fact.at);if(value!==undefined&&value>=1&&value<=activity.days)selected.add(fact.id);}
       if(options.publications?.length){const fixed=await client.query("SELECT id FROM radar_publications WHERE id=ANY($1::text[]) AND payload->>'articleId'=ANY($2::text[])",[options.publications,dayItems.map(item=>item.articleId)]);fixed.rows.forEach(row=>selected.add(row.id));}
     } else if (options.view === 'notices') {
       empty.notices = (await client.query('SELECT payload FROM radar_notices')).rows.map(row => row.payload);
