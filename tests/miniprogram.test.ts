@@ -552,7 +552,7 @@ function nativeHarness(input = fixture(), options:{accountInfo?:{miniProgram:{en
 
 test('原生列表首次呈现就使用当前响应的总数；提醒页区分随包代码版本和微信运行渠道',()=>{
   // Bundled client source version. Backend-only releases must not relabel an installed client.
-  const buildVersion='1.0.58';
+  const buildVersion='1.0.59';
   const h=nativeHarness(fixture(),{page:{ids:[],total:42,nextCursor:'next'},accountInfo:{miniProgram:{envVersion:'trial',version:'1.0.2'}}});
   const news=h.page('news');assert.equal(news.data.count,42);assert.equal(news.data.hasMore,true);assert.equal(news.data.navigationTitle,'动态 · 共42篇');news.onUnload();
   const records=h.page('announcements');assert.equal(records.data.navigationTitle,'重置记录');records.onUnload();
@@ -791,7 +791,7 @@ test('活动整月本地选日，混合类型、预告、待公布和未开始�
  const view=mini.activityModel(data,'fixture-activity',2);
  assert.equal(view.days[1].label,'重置卡');assert.equal(view.days[1].tone,'violet');assert.deepEqual(view.days[1].types.map((t:any)=>t.label),['额度重置','重置卡','改进']);
  assert.equal(view.entries.length,3);assert.equal(view.days[0].state,'unverified');assert.equal(view.days[3].state,'future');
- const promise=mini.activityModel(data,'fixture-activity',3);assert.equal(promise.entries[0].stage,'已预告');assert.equal(promise.days[2].label,'重置卡');
+ const promise=mini.activityModel(data,'fixture-activity',3);assert.equal(promise.entries[0].stage,'已预告');assert.equal(promise.days[2].label,'发卡预告');
  data.activities[0].items=[];assert.equal(mini.activityModel(data,'fixture-activity',2).days[1].state,'recorded','独立已完成记录不依赖活动文章关联');
  const noFacts={...data,events:[],articles:[],publications:[],evidence:[]};assert.equal(mini.activityModel(noFacts,'fixture-activity',2).days[1].state,'waiting');
  noFacts.sources.at(-1)!.status='failed';assert.equal(mini.activityModel(noFacts,'fixture-activity',2).days[1].state,'unverified');
@@ -820,4 +820,43 @@ test('活动日期分类只使用本条原帖，不被历史背景或同原帖�
  primary.metadata.category='product';weakerCopy.metadata!.category='reset';data.articles.find(a=>a.id===publication.articleId)!.category='product';publication.article.category='product';
  view=mini.activityModel(data,'fixture-activity',2);
  assert.deepEqual(view.entries[0].types.map((t:any)=>t.label),['改进']);
+});
+
+test('活动预告、进行中和取消保留阶段，非公共或未来动作不算已完成',()=>{
+ for(const kind of ['automatic_reset','banked_reset'] as const){
+  for(const stage of ['promised','in_progress','cancelled'] as const){
+   const data=fixture();data.events=[];data.articles=[];data.publications=[];data.evidence=[];
+   const publication=addRound(data,'stage-only',[{id:'stage-action',kind,stage}]);
+   data.activities[0].items=[{day:2,articleId:publication.articleId,eventId:publication.eventId}];
+   const before=structuredClone(data),view=mini.activityModel(data,'fixture-activity',2);
+   const expected=stage==='promised'?(kind==='banked_reset'?'发卡预告':'重置预告'):stage==='in_progress'?'进行中':'已取消';
+   assert.equal(view.days[1].label,expected);assert.equal(view.days[1].types[0].completed,false);
+   assert.match(view.entries[0].stage,stage==='promised'?/已预告/:stage==='in_progress'?/已宣布开始/:/已取消/);
+   assert.deepEqual(data,before,'展示不改写来源或历史快照');
+   for(const patch of [{scope:'targeted'},{scope:'private'},{statementAt:'2026-10-11T00:00:00Z'}]){
+    const scoped=structuredClone(data);Object.assign(scoped.publications[0].event.actions[0],patch,{stage:'claimed_complete'});
+    assert.equal(mini.activityModel(scoped,'fixture-activity',2).days[1].label,'重置消息');
+   }
+  }
+ }
+});
+
+test('同日真实完成优先于新预告和改进，晚预告不覆盖同类完成；撤回只退出主标签',()=>{
+ const data=fixture();data.events=[];data.articles=[];data.publications=[];data.evidence=[];
+ const done=addRound(data,'real-complete',[{id:'complete',kind:'automatic_reset',stage:'claimed_complete'}]);
+ const next=addRound(data,'next-promise',[{id:'promise',kind:'banked_reset',stage:'promised'}],'2026-10-10T03:00:00Z');
+ const same=addRound(data,'same-kind-promise',[{id:'promise-auto',kind:'automatic_reset',stage:'promised'}],'2026-10-10T04:00:00Z');
+ const product=addRound(data,'product',[]);product.mode='news_only';product.article.category='product';product.article.publicationMode='news_only';
+ data.articles.find(a=>a.id===product.articleId)!.category='product';
+ const rows=[next,same,product,done];
+ for(const ordered of [rows,rows.toReversed()]){
+  data.activities[0].items=ordered.map(p=>({day:2,articleId:p.articleId,eventId:p.eventId}));
+  const view=mini.activityModel(data,'fixture-activity',2);
+  assert.equal(view.days[1].label,'重置');assert.equal(view.entries[0].id,done.id);
+  assert.equal(view.days[1].types.find((t:any)=>t.kind==='automatic_reset').completed,true);
+ }
+ data.events.find(e=>e.id===done.eventId)!.status='withdrawn';
+ const withdrawn=mini.activityModel(data,'fixture-activity',2);
+ assert.equal(withdrawn.days[1].label,'发卡预告');
+ assert.equal(withdrawn.entries.find((e:any)=>e.id===done.id).stage,'已撤回');
 });

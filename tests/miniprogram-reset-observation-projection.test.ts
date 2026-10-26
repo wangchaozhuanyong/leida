@@ -35,6 +35,27 @@ function announcement(data:PublicData,stage:'promised'|'claimed_complete',statem
   return {actionId:'announcement-action',eventId:p.eventId,publicationId:p.id,kind:'automatic_reset' as const,stage,statementAt,...(expectedAt?{expectedAt}:{})};
 }
 
+test('活动日期的有效来源观测优先于新发卡预告；撤回、未来或无效观测不冒充完成',()=>{
+ const data=fixture();
+ data.activities=[{id:'observed-activity',title:'隔离活动',startsOn:'2026-10-22',timezone:'Asia/Shanghai',days:28,rules:'测试',version:1,items:[{day:2,eventId:data.events[0].id,articleId:data.articles[0].id}]}];
+ announcement(data,'promised','2026-10-23T02:00:00Z','2026-10-24T02:00:00Z');
+ const promise=data.publications[1];promise.event.actions[0].kind='banked_reset';
+ data.activities[0].items.push({day:2,eventId:promise.eventId,articleId:promise.articleId});
+ const before=structuredClone(data),view=model.activityModel(data,'observed-activity',2);
+ assert.equal(view.days[1].label,'重置');assert.equal(view.entries[0].stage,'来源观测');
+ assert.equal(view.entries[0].types[0].completed,true);assert.deepEqual(data,before);
+ const changes:Array<(d:PublicData)=>void>=[
+  d=>{d.events[0].status='withdrawn';},
+  d=>{d.evidence[0].publishedAt='2026-10-24T00:00:00Z';},
+  d=>{d.evidence[0].sourceId='manual';},
+  d=>{d.evidence[0].text='也许重置了';},
+ ];
+ for(const change of changes){
+  const invalid=structuredClone(data);change(invalid);
+  assert.equal(model.activityModel(invalid,'observed-activity',2).days[1].label,'发卡预告');
+ }
+});
+
 test('旧 API 未提供 outlook 时从已发布的真实证据回退投影观测',()=>{
   const data=fixture(),before=structuredClone(data),outlook=model.resetOutlookModel(data);
   assert.deepEqual(outlook.latestObservation,resetObservations(data)[0]);

@@ -334,20 +334,30 @@ function activityModel(data, id, day) {
   const selected = Math.max(1, Math.min(activity.days, Number(day) || (actualDay === null ? 1 : actualDay)));
   const source=data.sources.find(s=>s.id==='activity-archive');
   const sourceDelayed=!source||source.status!=='healthy';
+  const observations=resetObservations(data);
+  const benefitType=(kind,actions,observed=false)=>{
+    const rows=actions.filter(a=>a.kind===kind).sort((a,b)=>Date.parse(b.statementAt)-Date.parse(a.statementAt));
+    const completed=observed||rows.some(a=>a.stage==='claimed_complete');
+    if(!completed&&!rows.length)return;
+    const banked=kind==='banked_reset',stage=rows[0]?.stage;
+    const label=completed?(banked?'重置卡':'额度重置'):stage==='promised'?(banked?'发卡预告':'重置预告'):stage==='in_progress'?(banked?'发卡进行中':'重置进行中'):stage==='cancelled'?'已取消':'待核对';
+    return {kind,label,dayLabel:completed?(banked?'重置卡':'重置'):stage==='in_progress'?'进行中':label,tone:completed?(banked?'violet':'teal'):stage==='cancelled'?'slate':'amber',completed};
+  };
   const byDay=new Map(), seen=new Set();
   for(const item of activity.items){
     const article=data.articles.find(a=>a.id===item.articleId&&a.eventId===item.eventId);
     const publication=article&&data.publications.find(p=>p.id===article.publicationId&&p.articleId===article.id&&p.eventId===item.eventId);
     if(!publication||seen.has(item.day+':'+article.id))continue;
     seen.add(item.day+':'+article.id);
-    const evidence=data.evidence.filter(e=>publication.article.evidenceIds.includes(e.id));
-    const actions=isNewsOnly(publication)?[]:publication.event.actions;
-    const observed=evidence.some(e=>observedEvidence(e,data.serverTime));
+    const actions=isNewsOnly(publication)?[]:publication.event.actions.filter(a=>a.scope==='public'&&validTime(a.statementAt)&&Date.parse(a.statementAt)<=Date.parse(data.serverTime));
+    const observed=observations.some(o=>o.publicationId===publication.id);
     const primary=data.evidence.find(e=>e.id===publication.article.evidenceIds[0]);
     // Context proves a relationship, not another product update on this activity day.
     const types=[];
-    if(observed||actions.some(a=>a.kind==='automatic_reset'))types.push({kind:'automatic_reset',label:'额度重置',tone:'teal'});
-    if(actions.some(a=>a.kind==='banked_reset'))types.push({kind:'banked_reset',label:'重置卡',tone:'violet'});
+    for(const kind of ['automatic_reset','banked_reset']){
+      const type=benefitType(kind,actions,kind==='automatic_reset'&&observed);
+      if(type)types.push(type);
+    }
     if(!types.length){
       if(article.category==='reset'||primary?.metadata?.category==='reset')types.push({kind:'reset_message',label:'重置消息',tone:'teal'});
       else if(article.category==='product'||primary?.metadata?.category==='product')types.push({kind:'improvement',label:'改进',tone:'blue'});
@@ -362,7 +372,7 @@ function activityModel(data, id, day) {
   // A public reset need not be linked to the campaign article. Place its fact
   // on the activity-local date, using statement/observation time, not collection.
   const resetFacts=completedBenefits(data).map(({action,publication})=>({publication,kind:action.kind,at:action.statementAt,stage:'发布者完成声明',timeLabel:'声明时间'}));
-  for(const observation of resetObservations(data)){
+  for(const observation of observations){
     const publication=data.publications.find(p=>p.id===observation.publicationId);
     if(publication)resetFacts.push({publication,kind:observation.kind,at:observation.observedAt,stage:'来源观测',timeLabel:'观测时间'});
   }
@@ -370,26 +380,31 @@ function activityModel(data, id, day) {
     const value=activityDayNumber(activity,fact.at);
     if(value===undefined||value<1||value>activity.days)continue;
     const entries=byDay.get(value)||[],existing=entries.find(e=>e.id===fact.publication.id);
-    const type=fact.kind==='banked_reset'?{kind:'banked_reset',label:'重置卡',tone:'violet'}:{kind:'automatic_reset',label:'额度重置',tone:'teal'};
+    const type=benefitType(fact.kind,[],true);
     if(existing){
-      if(!existing.types.some(t=>t.kind===type.kind))existing.types.push(type);
+      const index=existing.types.findIndex(t=>t.kind===type.kind);
+      if(index<0)existing.types.push(type);else existing.types[index]=type;
       continue;
     }
     byDay.set(value,[...entries,{...publicationCard(data,fact.publication),types:[type],stage:fact.stage,time:displayTime(fact.at),timeLabel:fact.timeLabel,sourceTime:Date.parse(fact.at)}]);
   }
-  const priority=types=>['banked_reset','automatic_reset','reset_message','improvement','unknown'].map(kind=>types.find(t=>t.kind===kind)).find(Boolean);
+  const priority=types=>['banked_reset','automatic_reset'].map(kind=>types.find(t=>t.kind===kind&&t.completed)).find(Boolean)||['banked_reset','automatic_reset','reset_message','improvement','unknown'].map(kind=>types.find(t=>t.kind===kind)).find(Boolean);
   const recorded=new Set([...byDay].filter(([,entries])=>entries.some(e=>!e.withdrawn)).map(([day])=>day));
   const dateFor=value=>{const date=new Date(Date.parse(activity.startsOn+'T00:00:00Z')+(value-1)*86400000);return Number.isFinite(date.getTime())?`${date.getUTCMonth()+1}/${date.getUTCDate()}`:'';};
   const days=Array.from({length:activity.days},(_,index)=>{
-    const value=index+1,entries=byDay.get(value)||[],types=[...new Map(entries.filter(e=>!e.withdrawn).flatMap(e=>e.types).map(t=>[t.kind,t])).values()];
+    const value=index+1,entries=byDay.get(value)||[],byKind=new Map();
+    for(const entry of entries.filter(e=>!e.withdrawn).sort((a,b)=>b.sourceTime-a.sourceTime))for(const type of entry.types){
+      if(!byKind.has(type.kind)||type.completed&&!byKind.get(type.kind).completed)byKind.set(type.kind,type);
+    }
+    const types=[...byKind.values()];
     const future=actualDay!==null&&value>actualDay;
     const missing=activity.items.some(i=>i.day===value)&&!entries.length;
     const state=types.length?'recorded':future?'future':actualDay===value&&!sourceDelayed&&!missing?'waiting':'unverified';
     const primaryType=priority(types);
-    const label=primaryType?primaryType.kind==='automatic_reset'?'重置':primaryType.label:state==='future'?'未开始':state==='waiting'?'待公布':'待核对';
+    const label=primaryType?primaryType.dayLabel||primaryType.label:state==='future'?'未开始':state==='waiting'?'待公布':'待核对';
     return {value,selected:selected===value,today:actualDay===value,recorded:recorded.has(value),date:dateFor(value),state,label,tone:primaryType?.tone||(state==='waiting'?'amber':'slate'),types,accessibility:`第${value}天，${dateFor(value)}，${types.length?types.map(t=>t.label).join('、'):label}`};
   });
-  const rank=entry=>['banked_reset','automatic_reset','reset_message','improvement','unknown'].indexOf(priority(entry.types)?.kind);
+  const rank=entry=>{const type=priority(entry.types);return (type?.completed?0:2)+['banked_reset','automatic_reset','reset_message','improvement','unknown'].indexOf(type?.kind);};
   const entries=(byDay.get(selected)||[]).sort((a,b)=>rank(a)-rank(b)||a.sourceTime-b.sourceTime||a.id.localeCompare(b.id));
   const selectedState=days[selected-1].state;
   return { missing: false, id: activity.id, title: activity.title, rules: activity.rules, startsOn: activity.startsOn, timezone: activity.timezone === 'Asia/Shanghai' ? '北京时间' : activity.timezone === 'America/Los_Angeles' ? '美国西部时间' : '活动指定时区', selected,

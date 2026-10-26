@@ -55,6 +55,21 @@ test('归档兼容不接受未来快照、未知版本、原帖身份不一致�
  assert.throws(()=>parseReferenceLatest({schema_version:1,generated_at:generatedAt,last_global_reset:null,latest_signal:null},checkedAt),/STALE/,'实时概要继续拒绝过期快照');
 });
 
+test('辅助来源超限先拒绝集合，不访问条目或放大逐项错误；1000条边界保持可读',()=>{
+ for(const [parse,value,key] of [[parseReferenceSignals,signals(),'signals'],[parseReferenceHistory,history(),'events']] as const){
+  let reads=0;
+  const row=new Proxy({}, {get(){reads++;throw new Error('oversized rows must not be read');}});
+  assert.throws(()=>parse({...value,[key]:Array(1001).fill(row)},checkedAt),(error:any)=>{
+   assert.deepEqual(error.issues.map((issue:any)=>({code:issue.code,path:issue.path,maximum:issue.maximum})),[{code:'too_big',path:[key],maximum:1000}]);
+   return true;
+  });
+  assert.equal(reads,0);
+  const first=key==='signals'?signals().signals[0]:history().events[0];
+  assert.equal(parse({...value,[key]:Array(1000).fill(first)},checkedAt).length,1000);
+  assert.throws(()=>parse({...value,[key]:[{}]},checkedAt),'限内畸形条目仍按原规则拒绝');
+ }
+});
+
 test('隔离库：验证保留关闭状态，恢复采集可读历史，304保留过期时间，新快照解除延迟',{skip:process.env.RADAR_REFERENCE_INTEGRATION!=='1'},async()=>{
  assert.match(new URL(process.env.DATABASE_URL!).pathname,/^\/radar_reference_qa_\d+$/);
  const fetchBefore=globalThis.fetch,at=new Date().toISOString(),old=new Date(Date.now()-72*3600_000).toISOString();

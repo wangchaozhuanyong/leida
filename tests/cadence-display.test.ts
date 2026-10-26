@@ -82,3 +82,37 @@ test('原生预测组件保留选择；无变化不重复setData，不触发采�
  const switched=writes;component.selectTarget({currentTarget:{dataset:{target:'banked_reset'}}});assert.equal(writes,switched);
  component.openDetails();assert.deepEqual(navigations,['/pages/methodology/index?target=banked_reset']);
 });
+
+test('固定历史卡片解释生成时状态，不承诺旧快照自动更新；当前模式仍可等待更新',()=>{
+ const base=snapshot(),blank={p24:null,p48:null,predictedAt:null,windowStart:null,windowEnd:null};
+ const cases=[
+  {row:base,at:now,state:'生成时估算',text:/生成时.*不是当前预测/},
+  {row:base,at:'2027-01-01T00:00:00Z',state:'历史记录已过期',text:/原概率和窗口保持不变/},
+  {row:{...base,...blank,status:'paused'},at:now,state:'生成时暂停',text:/生成.*来源资料不足/},
+  {row:{...base,...blank,status:'out_of_range'},at:now,state:'当时超出样本范围',text:/生成时.*当时未作估算/},
+  {row:{...base,...blank,status:'insufficient',anchorAt:null},at:now,state:'当时起点待核对',text:/生成时.*时间依据待核对/},
+  {row:{...base,...blank,status:'insufficient',eligibleCount:0},at:now,state:'当时可比样本不足',text:/生成时的可比记录不足/},
+  {row:{...base,...blank,status:'insufficient',sampleCount:2,eligibleCount:0},at:now,state:'生成时样本不足',text:/生成时可核验.*不足/},
+  {row:{...base,windowStart:null},at:now,state:'历史记录待核对',text:/历史记录.*不完整/},
+  {row:{...base,modelVersion:'legacy'},at:now,state:'历史模型',text:/旧模型记录仅供历史复盘/},
+ ];
+ for(const {row,at,state,text} of cases){
+  const before=structuredClone(row),view=cadenceModel(publicForecast(),at,'automatic_reset',row);
+  assert.equal(view.state,state);assert.match(view.message,text);assert.doesNotMatch(view.message,/恢复后自动更新|等待后台更新/);
+  assert.deepEqual(row,before);
+ }
+ const paused={...base,...blank,status:'paused'};
+ assert.match(cadenceModel(publicForecast(paused as ResetCadenceForecast),now).message,/恢复后自动更新/);
+});
+
+test('固定重置卡记录前往最新同类观察，后台新数据不覆盖固定状态',()=>{
+ let registration:any;const navigations:string[]=[];
+ runInNewContext(readFileSync(new URL('../miniprogram/components/reset-forecast/index.js',import.meta.url),'utf8'),{Component:(value:unknown)=>{registration=value;},require:()=>({cadenceModel}),wx:{navigateTo:({url}:{url:string})=>navigations.push(url)}});
+ const fixed={...snapshot('banked_reset'),status:'paused',p24:null,p48:null,predictedAt:null,windowStart:null,windowEnd:null},before=structuredClone(fixed);
+ const component:any={data:structuredClone(registration.data),properties:{forecasts:publicForecast(),now,snapshot:fixed},setData(patch:unknown){Object.assign(this.data,patch);}};
+ Object.assign(component,registration.methods);component.refresh();
+ assert.equal(component.data.target,'automatic_reset');assert.equal(component.data.view.target,'banked_reset');
+ component.openDetails();assert.deepEqual(navigations,['/pages/methodology/index?target=banked_reset']);
+ const view=structuredClone(component.data.view);component.properties.forecasts=publicForecast();component.refresh();
+ assert.deepEqual(component.data.view,view);assert.deepEqual(fixed,before);
+});
