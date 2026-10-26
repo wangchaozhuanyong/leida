@@ -15,6 +15,6 @@ Component({
       if (!['automatic_reset', 'banked_reset'].includes(target) || target === this.data.target) return;
       this.setData({ target }, () => this.refresh());
     },
-    openDetails() { wx.navigateTo({ url: `/pages/methodology/index?target=${this.data.target}` }); }
+    openDetails() { wx.navigateTo({ url: `/pages/methodology/index?target=${this.data.view.target}` }); }
   }
 });
