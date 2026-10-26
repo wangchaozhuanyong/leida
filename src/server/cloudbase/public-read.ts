@@ -6,7 +6,7 @@ import type { StoredCadenceForecast, CadenceRuntime } from '../reset-cadence-run
 import { projectPublicHistory } from '../../lib/history';
 import { homeNewsGroups } from '../../lib/public-feed';
 import { publicResetOutlook } from '../../lib/reset-outlook';
-import {resetObservations} from '../../lib/reset-observations';
+import {resetObservationSources} from '../../lib/reset-observations';
 import { publicActions, recentCompletedBenefits } from '../../lib/public-facts';
 import { parsePublicRead, decodeCursor, encodePublicCursor, finishPublicVersion, paginatePublicNews } from '../public-read';
 import { projectPublicForecastRecords } from '../forecast';
@@ -70,8 +70,8 @@ function response(bundle:Bundle,options:PublicReadOptions|{view:'legacy'},timest
     const actions=publicActions(facts).sort((a,b)=>Date.parse(b.action.statementAt)-Date.parse(a.action.statementAt));
     recentCompletedBenefits(facts).forEach(item=>selected.add(item.publication.id));
     for(const kind of ['automatic_reset','banked_reset'] as const){const item=actions.find(item=>item.action.kind===kind&&item.action.stage==='claimed_complete'&&Date.parse(item.action.statementAt)<=Date.parse(timestamp)&&Date.parse(item.publication.publishedAt)<=Date.parse(timestamp));if(item)selected.add(item.publication.id);}
-    homeNewsGroups(facts).forEach(group=>selected.add(group.latest.id));
-    resetObservations(facts).slice(0,10).forEach(item=>selected.add(item.publicationId));
+    homeNewsGroups(facts).forEach(group=>{selected.add(group.latest.id);if(group.observation)group.observation.sources.forEach(source=>selected.add(source.publicationId));});
+    resetObservationSources(facts).slice(0,10).forEach(item=>selected.add(item.publicationId));
   }else if(news)news.selected.forEach(id=>selected.add(id));
   else if(options.view==='calendar')publicActions(facts).forEach(item=>selected.add(item.publication.id));
   else facts.publications.forEach(p=>selected.add(p.id));

@@ -6,6 +6,7 @@
 const {publicNewsGroups, homeNewsGroups} = require('./public-feed');
 const {uniqueDisplayEvidence} = require('./evidence-display');
 const {resetObservations,observedEvidence}=require('./reset-observations');
+const {resetRecordFacts,observationSources}=require('./reset-records');
 const dayMs = 86400000;
 const actionLabels = { automatic_reset: '用量重置', banked_reset: '重置卡' };
 const preferenceDefaults = { announcement: true, result: true, activity: false, correction: true };
@@ -326,6 +327,17 @@ function activityHomeVisible(activity, now) {
   const day = activityDayNumber(activity, now);
   return activity.showOnHome !== false && day !== undefined && day <= activity.days + 3;
 }
+// Derive the actual local-day boundaries, including DST, rather than assuming UTC-7.
+function activityBeijingRange(activity, day) {
+  const target=Date.parse(activity.startsOn+'T00:00:00Z')+(day-1)*dayMs;
+  const boundary=value=>{
+    let low=Math.floor((target-2*dayMs)/60000),high=Math.floor((target+3*dayMs)/60000);
+    while(low<high){const mid=Math.floor((low+high)/2),number=activityDayNumber(activity,new Date(mid*60000).toISOString());if(number===undefined)return '';if(number<value)low=mid+1;else high=mid;}
+    return new Date(low*60000).toISOString();
+  };
+  const start=boundary(day),end=boundary(day+1);
+  return start&&end?displayTime(start)+' — '+displayTime(end)+'（不含）':'';
+}
 /** @param {PublicData} data @param {string} id @param {number|null} [day] */
 function activityModel(data, id, day) {
   const activity = data.activities.find(item => item.id === id);
@@ -334,7 +346,8 @@ function activityModel(data, id, day) {
   const selected = Math.max(1, Math.min(activity.days, Number(day) || (actualDay === null ? 1 : actualDay)));
   const source=data.sources.find(s=>s.id==='activity-archive');
   const sourceDelayed=!source||source.status!=='healthy';
-  const observations=resetObservations(data);
+  const observations=observationSources(data);
+  const observedPublications=new Set(observations.map(o=>o.publicationId));
   const benefitType=(kind,actions,observed=false)=>{
     const rows=actions.filter(a=>a.kind===kind).sort((a,b)=>Date.parse(b.statementAt)-Date.parse(a.statementAt));
     const completed=observed||rows.some(a=>a.stage==='claimed_complete');
@@ -350,12 +363,17 @@ function activityModel(data, id, day) {
     if(!publication||seen.has(item.day+':'+article.id))continue;
     seen.add(item.day+':'+article.id);
     const actions=isNewsOnly(publication)?[]:publication.event.actions.filter(a=>a.scope==='public'&&validTime(a.statementAt)&&Date.parse(a.statementAt)<=Date.parse(data.serverTime));
+    const withdrawn=publicationWithdrawn(data,publication);
+    // Source reports and completion actions are inserted once below, using the
+    // shared dated facts. A campaign link must not duplicate or redate them.
+    if(!withdrawn&&(observedPublications.has(publication.id)||actions.length&&actions.every(a=>a.stage==='claimed_complete')))continue;
+    const linkedActions=withdrawn?actions:actions.filter(a=>a.stage!=='claimed_complete');
     const observed=observations.some(o=>o.publicationId===publication.id);
     const primary=data.evidence.find(e=>e.id===publication.article.evidenceIds[0]);
     // Context proves a relationship, not another product update on this activity day.
     const types=[];
     for(const kind of ['automatic_reset','banked_reset']){
-      const type=benefitType(kind,actions,kind==='automatic_reset'&&observed);
+      const type=benefitType(kind,linkedActions,kind==='automatic_reset'&&observed);
       if(type)types.push(type);
     }
     if(!types.length){
@@ -363,19 +381,16 @@ function activityModel(data, id, day) {
       else if(article.category==='product'||primary?.metadata?.category==='product')types.push({kind:'improvement',label:'改进',tone:'blue'});
       else types.push({kind:'unknown',label:'活动动态',tone:'slate'});
     }
-    const withdrawn=publicationWithdrawn(data,publication);
-    const stages=[...new Set(actions.map(a=>a.stage==='claimed_complete'?'发布者完成声明':a.stage==='promised'?'已预告':a.stage==='in_progress'?'已宣布开始':a.stage==='cancelled'?'已取消':'待核对'))];
+    const stages=[...new Set(linkedActions.map(a=>a.stage==='claimed_complete'?'发布者完成声明':a.stage==='promised'?'已预告':a.stage==='in_progress'?'已宣布开始':a.stage==='cancelled'?'已取消':'待核对'))];
     const stage=withdrawn?'已撤回':observed?'来源观测':stages.join(' · ')|| (types.some(t=>t.kind==='reset_message')?'完成情况待核对':types.some(t=>t.kind==='improvement')?'公开产品消息':'公开活动消息');
     const entry={...publicationCard(data,publication),types,stage,sourceTime:Date.parse(publicationSourceTime(publication))||0};
     byDay.set(item.day,[...(byDay.get(item.day)||[]),entry]);
   }
   // A public reset need not be linked to the campaign article. Place its fact
   // on the activity-local date, using statement/observation time, not collection.
-  const resetFacts=completedBenefits(data).map(({action,publication})=>({publication,kind:action.kind,at:action.statementAt,stage:'发布者完成声明',timeLabel:'声明时间'}));
-  for(const observation of observations){
-    const publication=data.publications.find(p=>p.id===observation.publicationId);
-    if(publication)resetFacts.push({publication,kind:observation.kind,at:observation.observedAt,stage:'来源观测',timeLabel:'观测时间'});
-  }
+  const resetFacts=resetRecordFacts(data,completedBenefits(data)).map(fact=>({...fact,
+    stage:fact.evidenceType==='confirmed'?'发布者完成声明':fact.statusLabel,
+    timeLabel:fact.evidenceType==='confirmed'?'声明时间':fact.isObservationSummary&&fact.summaryScope==='date'?'最早观测':'观测时间'}));
   for(const fact of resetFacts){
     const value=activityDayNumber(activity,fact.at);
     if(value===undefined||value<1||value>activity.days)continue;
@@ -386,8 +401,26 @@ function activityModel(data, id, day) {
       if(index<0)existing.types.push(type);else existing.types[index]=type;
       continue;
     }
-    byDay.set(value,[...entries,{...publicationCard(data,fact.publication),types:[type],stage:fact.stage,time:displayTime(fact.at),timeLabel:fact.timeLabel,sourceTime:Date.parse(fact.at)}]);
+    const sourceDay=activityDayNumber(activity,fact.observedUntil||fact.at);
+    const summaryNote=fact.isObservationSummary?fact.summary+(sourceDay!==value?` 按最早来源记录归入第${value}天；较晚来源跨到第${sourceDay}天，不据此认定又重置一次。`:''):'';
+    byDay.set(value,[...entries,{...publicationCard(data,fact.publication),
+      ...(fact.isObservationSummary?{title:fact.title,summary:summaryNote,sources:fact.sources}:{}),
+      types:[type],stage:fact.stage,time:displayTime(fact.at),timeLabel:fact.timeLabel,sourceTime:Date.parse(fact.at)}]);
+    // A source report after activity midnight is still news for that day, but
+    // it does not prove a second reset. Keep it visible as supporting evidence.
+    if(fact.isObservationSummary&&sourceDay!==value){
+      const supplements=new Map();
+      for(const source of fact.sources){const day=activityDayNumber(activity,source.at);if(day!==undefined&&day!==value&&day>=1&&day<=activity.days)supplements.set(day,[...(supplements.get(day)||[]),source]);}
+      for(const [day,sources] of supplements){
+        byDay.set(day,[...(byDay.get(day)||[]),{...publicationCard(data,fact.publication),id:'supplement:'+fact.id+':'+day,
+          title:'已有观测的来源补充',summary:`这些来源属于北京时间${dateKey(fact.at)}的观测汇总，最早记录已列在第${value}天；不据此另计一次重置。`,
+          types:[{kind:'reset_message',label:'观测补充',dayLabel:'观测补充',tone:'amber',completed:false}],stage:'轮次待核对',sources,
+          time:displayTime(sources[0].at),timeLabel:'来源报告时间',sourceTime:Date.parse(sources[0].at),path:'/pages/schedule/index?date='+dateKey(fact.at)+'&kind='+fact.kind}]);
+      }
+    }
   }
+  const typeOrder=['automatic_reset','banked_reset','reset_message','improvement','unknown'];
+  for(const entries of byDay.values())for(const entry of entries)entry.types.sort((a,b)=>typeOrder.indexOf(a.kind)-typeOrder.indexOf(b.kind));
   const priority=types=>['banked_reset','automatic_reset'].map(kind=>types.find(t=>t.kind===kind&&t.completed)).find(Boolean)||['banked_reset','automatic_reset','reset_message','improvement','unknown'].map(kind=>types.find(t=>t.kind===kind)).find(Boolean);
   const recorded=new Set([...byDay].filter(([,entries])=>entries.some(e=>!e.withdrawn)).map(([day])=>day));
   const dateFor=value=>{const date=new Date(Date.parse(activity.startsOn+'T00:00:00Z')+(value-1)*86400000);return Number.isFinite(date.getTime())?`${date.getUTCMonth()+1}/${date.getUTCDate()}`:'';};
@@ -396,7 +429,7 @@ function activityModel(data, id, day) {
     for(const entry of entries.filter(e=>!e.withdrawn).sort((a,b)=>b.sourceTime-a.sourceTime))for(const type of entry.types){
       if(!byKind.has(type.kind)||type.completed&&!byKind.get(type.kind).completed)byKind.set(type.kind,type);
     }
-    const types=[...byKind.values()];
+    const types=[...byKind.values()].sort((a,b)=>typeOrder.indexOf(a.kind)-typeOrder.indexOf(b.kind));
     const future=actualDay!==null&&value>actualDay;
     const missing=activity.items.some(i=>i.day===value)&&!entries.length;
     const state=types.length?'recorded':future?'future':actualDay===value&&!sourceDelayed&&!missing?'waiting':'unverified';
@@ -409,7 +442,7 @@ function activityModel(data, id, day) {
   const selectedState=days[selected-1].state;
   return { missing: false, id: activity.id, title: activity.title, rules: activity.rules, startsOn: activity.startsOn, timezone: activity.timezone === 'Asia/Shanghai' ? '北京时间' : activity.timezone === 'America/Los_Angeles' ? '美国西部时间' : '活动指定时区', selected,
     phase: actualDay === null ? '此设备暂不支持活动时区，请手动选日期' : actualDay < 1 ? '尚未开始' : actualDay > activity.days ? '活动已结束' : `第${actualDay}天 / 共${activity.days}天`,
-    recordedDays: recorded.size,days,entries,selectedDate:dateFor(selected),sourceDelayed,lastSuccessAt:source?.lastSuccessAt?displayTime(source.lastSuccessAt):'',
+    recordedDays: recorded.size,days,entries,selectedDate:dateFor(selected),selectedBeijingRange:activityBeijingRange(activity,selected),sourceDelayed,lastSuccessAt:source?.lastSuccessAt?displayTime(source.lastSuccessAt):'',
     progress:actualDay===null?0:Math.max(0,Math.min(100,actualDay/activity.days*100)),
     emptyTitle:selectedState==='future'?'这一天尚未开始':selectedState==='waiting'?'等待当天公布':'当日资料待核对',
     emptyText:selectedState==='future'?'这一天尚未到来，有公开进展后更新。':selectedState==='waiting'?'暂未收录当天公开结果，收到有效消息后更新。':sourceDelayed?'来源更新延迟，暂不能判断当天是否已公布结果。':'暂无完整已收录进展，不代表活动没有发生。' };

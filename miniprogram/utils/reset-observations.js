@@ -24,7 +24,7 @@ function observedEvidence(e,now) {
   return {kind:'automatic_reset',observedAt:e.publishedAt,collectedAt:e.collectedAt,evidenceId:e.id,sourceId:e.sourceId,sourceName:codex?'Codex Resets':'AIPlanWatch',sourceUrl:codex?archive:reference,referenceUrl:e.url,sourceType:'observed'};
 }
 /** Only published, still-visible evidence participates; repeated collection is one observation. */
-function resetObservations(data) {
+function resetObservationSources(data) {
   if(!data||!valid(data.serverTime))return [];
   const current=new Map();
   for(const e of data.evidence||[]){
@@ -39,12 +39,15 @@ function resetObservations(data) {
   // Normal record links prefer the current publication of the same observation.
   const currentRank=(o)=>Number((data.articles||[]).some(a=>a.publicationId===o.publicationId));
   const published=(o)=>Date.parse((data.publications||[]).find(p=>p.id===o.publicationId)?.publishedAt||'')||0;
+  return [...current.values()].sort((a,b)=>Date.parse(b.observedAt)-Date.parse(a.observedAt)||currentRank(b)-currentRank(a)||published(b)-published(a)||a.evidenceId.localeCompare(b.evidenceId));
+}
+function resetObservations(data) {
   const seen=new Set();
-  return [...current.values()].sort((a,b)=>Date.parse(b.observedAt)-Date.parse(a.observedAt)||currentRank(b)-currentRank(a)||published(b)-published(a)||a.evidenceId.localeCompare(b.evidenceId)).filter(o=>{const key=o.kind+':'+o.observedAt;if(seen.has(key))return false;seen.add(key);return true;});
+  return resetObservationSources(data).filter(o=>{const key=o.kind+':'+o.observedAt;if(seen.has(key))return false;seen.add(key);return true;});
 }
 function timelineObservation(outlook,now,completion) {
  const o=outlook?.latestObservation;
  if(outlook?.active||!o||!valid(now)||o.kind!=='automatic_reset'||o.sourceType!=='observed'||!['reset-archive','aiplanwatch-reference','codexlimits-observations'].includes(o.sourceId)||o.sourceUrl!==(o.sourceId==='reset-archive'?archive:o.sourceId==='codexlimits-observations'?codexLimits:reference)||!valid(o.observedAt)||!valid(o.collectedAt)||Date.parse(o.observedAt)>Date.parse(o.collectedAt)||Date.parse(o.collectedAt)>Date.parse(now)||Date.parse(now)-Date.parse(o.observedAt)>=86400000||completion&&Date.parse(completion.statementAt)>=Date.parse(o.observedAt))return null;
  return o;
 }
-module.exports={observedEvidence,resetObservations,timelineObservation,observedResetText};
+module.exports={observedEvidence,resetObservations,resetObservationSources,timelineObservation,observedResetText};

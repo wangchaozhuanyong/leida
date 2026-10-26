@@ -5,7 +5,7 @@ import { projectPublicHistory } from '../lib/history';
 import { publicActions, completedPublicActions, publicationSourceTime, recentCompletedBenefits } from '../lib/public-facts';
 import { publicNewsGroups, homeNewsGroups } from '../lib/public-feed';
 import { publicResetOutlook } from '../lib/reset-outlook';
-import {resetObservations} from '../lib/reset-observations';
+import {resetObservations,resetObservationSources} from '../lib/reset-observations';
 import { activityDayNumber } from '../lib/activity-display';
 import { getPublicForecast, forecastTablesAvailable } from './forecast';
 import { hash } from './domain';
@@ -160,13 +160,13 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
       const actions = publicActions(facts).sort((a,b) => Date.parse(b.action.statementAt)-Date.parse(a.action.statementAt));
       recentCompletedBenefits(facts).forEach(item=>selected.add(item.publication.id));
       for (const kind of ['automatic_reset','banked_reset']) { const item = actions.find(item => item.action.kind === kind && item.action.stage === 'claimed_complete' && Date.parse(item.action.statementAt) <= Date.parse(now) && Date.parse(item.publication.publishedAt) <= Date.parse(now)); if (item) selected.add(item.publication.id); }
-      homeNewsGroups(facts).forEach(group => selected.add(group.latest.id));
+      homeNewsGroups(facts).forEach(group => {selected.add(group.latest.id);if(group.observation)group.observation.sources.forEach(source=>selected.add(source.publicationId));});
       // Keep bounded proof beyond the three news cards, so a later source's
       // report cannot hide an earlier observation needed by the same round.
-      resetObservations(facts).slice(0,10).forEach(item=>selected.add(item.publicationId));
+      resetObservationSources(facts).slice(0,10).forEach(item=>selected.add(item.publicationId));
     } else if (options.view === 'calendar') {
       publicActions(facts).forEach(item => selected.add(item.publication.id));
-      resetObservations(facts).forEach(item => selected.add(item.publicationId));
+      resetObservationSources(facts).forEach(item => selected.add(item.publicationId));
       // Cross-source display dedup can choose A while a completion cites B.
       // Retain B's published proof so clients can verify that direct citation.
       const cited = new Set(completedPublicActions(facts).flatMap(item => item.action.evidenceIds));
@@ -184,7 +184,7 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
       rows.rows.forEach(row=>selected.add(row.publication));
       // Include public reset facts independently of campaign links. The client
       // groups them by the activity timezone and retains their evidence grade.
-      const resetFacts=[...completedPublicActions(facts).map(({action,publication})=>({at:action.statementAt,id:publication.id})),...resetObservations(facts).map(item=>({at:item.observedAt,id:item.publicationId}))];
+      const resetFacts=[...completedPublicActions(facts).map(({action,publication})=>({at:action.statementAt,id:publication.id})),...resetObservationSources(facts).map(item=>({at:item.observedAt,id:item.publicationId}))];
       if(activity)for(const fact of resetFacts){const value=activityDayNumber(activity,fact.at);if(value!==undefined&&value>=1&&value<=activity.days)selected.add(fact.id);}
       if(options.publications?.length){const fixed=await client.query("SELECT id FROM radar_publications WHERE id=ANY($1::text[]) AND payload->>'articleId'=ANY($2::text[])",[options.publications,dayItems.map(item=>item.articleId)]);fixed.rows.forEach(row=>selected.add(row.id));}
     } else if (options.view === 'notices') {

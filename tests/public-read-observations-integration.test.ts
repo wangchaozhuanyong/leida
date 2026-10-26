@@ -5,7 +5,7 @@ import {pool,insert,put,transaction} from '../src/db';
 import type {BenefitAction,Evidence,Publication,PublicData} from '../src/lib/types';
 import {getPublicRead,readPublicFacts} from '../src/server/public-read';
 import {parseCodexLimitsObservations} from '../src/server/codexlimits-observation-source';
-import {resetObservations} from '../src/lib/reset-observations';
+import {resetObservations,resetObservationSources} from '../src/lib/reset-observations';
 import {publicActions} from '../src/lib/public-facts';
 import {recordCalendar} from '../miniprogram/utils/record-calendar';
 import {activityModel} from '../miniprogram/utils/model';
@@ -152,6 +152,30 @@ test('真实 PostgreSQL 公开读取：23/24日观测证明、日历、类型历
       assert.ok(!ids(compact).includes('qa-p-b-unpublished'));assert.ok(!ids(compact).includes('qa-p-b-withdrawn'));
       assert.ok(!compactCalendar.selectedItems.some(item=>item.evidenceType==='observed'&&item.at==='2026-10-23T17:50:00.000Z'));
       for(const hour of [18,19])assert.ok(compactCalendar.selectedItems.some(item=>item.evidenceType==='observed'&&item.at===`2026-10-23T${hour}:50:00.000Z`),'未公开或已撤回B不构成有效完成引用关系');
+    });
+    await t.test('实际SQL裁剪保留相同分钟的全部来源，首页、日历与活动只展示一项汇总',async()=>{
+      const at='2026-10-25T06:08:00.000Z',clock=new Date().toISOString(),url='https://codexlimits.com/reset-history';
+      const summary='Third-party observation on Oct 25, 06:08 UTC.';
+      const limits:Evidence={...latest,id:'qa-same-minute-limits',hash:'qa-same-minute-limits',publishedAt:at,collectedAt:clock,messageId:'observed-codexlimits-'+Date.parse(at),text:'Usage reset landed\n'+summary,
+        metadata:{category:'reset',benefitKind:'automatic_reset',sourceGroup:'codexlimits',referenceReset:{referenceUrl:url,eventId:'codexlimits:automatic_reset:'+at,occurredAt:at,snapshotAt:clock,summary}}};
+      const post=String((BigInt(Date.parse(at))-1288834974657n)<<22n);
+      const peer:Evidence={...old,id:'qa-same-minute-peer',hash:'qa-same-minute-peer',publishedAt:at,collectedAt:clock,messageId:'observed-'+post,url:'https://x.com/thsottiaux/status/'+post};
+      await transaction(async client=>{
+        for(const e of [limits,peer]){
+          await insert('evidence',e,client);const p=publication('qa-'+e.id,e);
+          p.publishedAt=clock;p.cutoffAt=clock;p.article.publishedAt=clock;p.article.updatedAt=clock;p.event.updatedAt=clock;
+          await put('events',p.event,client);await put('articles',p.article,client);await insert('publications',p,client);
+        }
+      });
+      const frozen=await snapshot();await new Promise(resolve=>setTimeout(resolve,10_050));
+      for(const view of ['home','calendar','activity'] as const){
+        const data=(await getPublicRead({view,...(view==='activity'?{id:'qa-challenge-28'}:{})})).data;
+        assert.equal(resetObservationSources(data).filter(o=>o.observedAt===at).length,2,view+'必须保留两个来源');
+        const rows=recordCalendar(data,{date:'2026-10-25'}).selectedItems.filter(r=>r.at===at);
+        assert.equal(rows.length,1);assert.equal(rows[0].sources.length,2);assert.equal(rows[0].sourceCount,2);
+        if(view==='activity')assert.equal(activityModel(data,'qa-challenge-28',20).entries!.filter((e:{time:string})=>e.time==='2026-10-25 14:08').length,1);
+      }
+      assert.deepEqual(await snapshot(),frozen,'读取不能改写源记录、旧快照、通知或任务');
     });
   } finally {await pool.end();}
 });

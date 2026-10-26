@@ -28,13 +28,14 @@ function addObservation(data:PublicData,e=limits(),id=`p-${e.id}`){return addPub
 function addCompletion(data:PublicData,id='confirmed',at='2026-10-23T18:10:00.000Z',kind:BenefitAction['kind']='automatic_reset',evidence:Evidence[]=[],actionEvidenceIds=evidence.map(e=>e.id),eventId=`event-${id}`){return addPublication(data,id,at,[{id:`action-${id}`,kind,stage:'claimed_complete',scope:'public',statementAt:at,eligibility:'公开',evidenceIds:actionEvidenceIds}],evidence,eventId);}
 function fixture(){const data=empty();addObservation(data,archive());addObservation(data);return data;}
 
-test('三条来源观测覆盖两个日期，条数与日期数分别表达且最近列表保留全部依据',()=>{
+test('三条来源观测汇总为两个日期项，所有来源依据保留在明细',()=>{
  const data=fixture();addObservation(data,limits('2026-10-22T17:10:00.000Z','old-limits'));
  const view=recordCalendar(data);
- assert.equal(view.observedCount,3);assert.equal(view.observedDateCount,2);assert.equal(view.days.filter(d=>d.observed).length,2);
- assert.equal(view.days.find(d=>d.date==='2026-10-23')!.observedCount,2);
- assert.equal(view.recentRecords.length,3);assert.deepEqual(view.recentRecords.map(r=>r.time),['01:40','01:10','01:00']);
- assert.ok(view.recentRecords.every(r=>r.evidenceType==='observed'&&r.timeLabel==='观测时间'&&r.recordTitle==='额度重置'));
+ assert.equal(view.observedCount,2);assert.equal(view.observationEvidenceCount,3);assert.equal(view.observedDateCount,2);assert.equal(view.days.filter(d=>d.observed).length,2);
+ assert.equal(view.days.find(d=>d.date==='2026-10-23')!.observedCount,1);
+ assert.equal(view.recentRecords.length,2);assert.deepEqual(view.recentRecords.map(r=>r.time),['01:40','01:00']);
+ assert.ok(view.recentRecords.every(r=>r.evidenceType==='observed'));
+ assert.equal(view.recentRecords[1].timeLabel,'最早观测');assert.equal(view.recentRecords[1].recordTitle,'额度重置观测');assert.equal(view.recentRecords[1].sources.length,2);
  assert.equal(view.recentRecords[0].path,view.selectedItems[0].path);
 });
 

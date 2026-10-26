@@ -12,7 +12,9 @@ function statusPosterInput(data,kind='automatic_reset'){
   if(!data||!Number.isFinite(Date.parse(data.serverTime)))throw new PosterError('missing','请先加载公开状态。');
   const card=selectedHomeStatus(data,validKind(kind)),hero=card.hero;
   const date=dateTime(card.timeAt),generated=dateTime(data.serverTime);
-  const publicationId=card.publicationId||'';
+  // A date summary has several source records; a code for one article cannot
+  // represent the whole summary. Native forwarding opens the selected date.
+  const publicationId=card.observationSummaryDate?'':card.publicationId||'';
   const shareable=publicationId&&m.resolveDetail(data,{publicationId}).canShare;
   const sourceLabel=card.evidenceType==='observation'?'来源：'+card.sourceName+' · 第三方观测':card.declarationAt?'依据：发布者公开完成声明':card.sourceName?'来源：'+card.sourceName:'依据：当前公开状态';
   return {name:data.site.name||'模钥重置雷达',kind:card.kind,round:card.revision,publicationId,codePublicationId:shareable?publicationId:'',sharePath:card.sharePath,shareTitle:card.shareTitle,generatedAt:data.serverTime,

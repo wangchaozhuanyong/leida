@@ -31,7 +31,8 @@ export function observedEvidence(e:Evidence|undefined,now:string):EvidenceObserv
   if(!codex&&!other)return null;
   return {kind:'automatic_reset',observedAt:e.publishedAt,collectedAt:e.collectedAt,evidenceId:e.id,sourceId:e.sourceId,sourceName:codex?'Codex Resets':'AIPlanWatch',sourceUrl:codex?archive:reference,referenceUrl:e.url,sourceType:'observed'};
 }
-export function resetObservations(data:PublicFactsData):ResetObservation[] {
+/** Source-complete projection; equal timestamps do not discard source evidence. */
+export function resetObservationSources(data:PublicFactsData):ResetObservation[] {
   if(!data||!valid(data.serverTime))return [];
   const current=new Map<string,ResetObservation>();
   for(const e of data.evidence||[]){
@@ -46,8 +47,11 @@ export function resetObservations(data:PublicFactsData):ResetObservation[] {
   // Normal record links prefer the current publication of the same observation.
   const currentRank=(o:ResetObservation)=>Number((data.articles||[]).some(a=>a.publicationId===o.publicationId));
   const published=(o:ResetObservation)=>Date.parse((data.publications||[]).find(p=>p.id===o.publicationId)?.publishedAt||'')||0;
+  return [...current.values()].sort((a,b)=>Date.parse(b.observedAt)-Date.parse(a.observedAt)||currentRank(b)-currentRank(a)||published(b)-published(a)||a.evidenceId.localeCompare(b.evidenceId));
+}
+export function resetObservations(data:PublicFactsData):ResetObservation[] {
   const seen=new Set<string>();
-  return [...current.values()].sort((a,b)=>Date.parse(b.observedAt)-Date.parse(a.observedAt)||currentRank(b)-currentRank(a)||published(b)-published(a)||a.evidenceId.localeCompare(b.evidenceId)).filter(o=>{const key=o.kind+':'+o.observedAt;if(seen.has(key))return false;seen.add(key);return true;});
+  return resetObservationSources(data).filter(o=>{const key=o.kind+':'+o.observedAt;if(seen.has(key))return false;seen.add(key);return true;});
 }
 export function timelineObservation(outlook:{active?:unknown;latestObservation?:ResetObservation}|undefined,now:string,completion?:{statementAt:string}|null):ResetObservation|null {
   const o=outlook?.latestObservation;

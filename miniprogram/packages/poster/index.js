@@ -41,7 +41,7 @@ Page(createPage(data=>({available:!!data}),{
         if(codePublicationId){
           try{if(!this._codeData){this._codeRequest=getApp().publicApi(`/api/v1/wechat/code/${encodeURIComponent(codePublicationId)}`);const response=await this._codeRequest.promise;if(!current())return;this._codeData=response.data;}asset=await poster.writeCodeAsset(wx,this._codeData,codePublicationId);}
           catch(error){if(!current())return;if([404,409,410].includes(error.status))throw error;this.setData({codeNote:'微信官方小程序码暂不可用，本张海报未附扫码入口，可直接分享小程序。'});}
-        }else this.setData({codeNote:'暂无关联公告，本张海报不带小程序码。'});
+        }else this.setData({codeNote:'当前状态没有可匹配的单篇公告码，可直接转发小程序查看。'});
         if(!current())return;const canvas=await canvasNode(this);if(!current())return;
         const work=()=>current()?renderStatusPoster({wxApi:wx,canvas,page:this,input:this._snapshot,theme,code:asset,isCurrent:current}):null;
         this._renderQueue=(this._renderQueue||Promise.resolve()).catch(()=>{}).then(work);

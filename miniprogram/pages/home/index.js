@@ -59,7 +59,11 @@ Page(createPage((data, query, page, app) => {
     collectedAt: m.displayTime(recentSuccess), latestSourceTime: latestArticle ? m.displayTime(m.articleSourceTime(latestArticle)) : '暂无记录',
     waitingText: outlook.status === 'completed' ? '本次已有公开完成声明，等待下一次预告。' : outlook.status === 'cancelled' ? '本次安排已取消，等待下一次预告。' : '等待下一次预告，暂无新的时间依据。',
     activity: activity ? { title: activity.title, rules: activity.rules, phase: m.activityModel(data, activity.id).phase, entries: activity.items.length, path: `/pages/activity/index?id=${encodeURIComponent(activity.id)}` } : null,
-    recent: m.homeNewsGroups(data).map(group=>group.latest).map(item => m.publicationCard(data, item)),
+    recent: m.homeNewsGroups(data).map(group=>{
+      const card=m.publicationCard(data,group.latest),summary=group.observation;
+      return summary?{...card,id:summary.id,title:summary.title,summary:summary.summary,time:summary.date,label:'观测汇总',
+        note:'按北京时间汇总来源依据，不按来源数计算重置次数。',updates:summary.sources,progressLabel:'查看来源依据'}:card;
+    }),
     recentDays: m.calendarModel(data).recentDays, sharePath: selected.sharePath, shareTitle: selected.shareTitle,
     shareLabel: '分享这条公告给朋友',
     historical: data.articles.length > 0 && data.articles.every(article => m.isHistoricalArticle(article, data.evidence))
@@ -138,6 +142,7 @@ Page(createPage((data, query, page, app) => {
   openStatusEvidence(event) {
     const kind=event.currentTarget.dataset.kind,card=kind==='untyped'?this.data.untypedSignal:this.data.resetCards.find(item=>item.kind===kind);
     if(!card)return;
+    if(card.observationSummaryDate){wx.navigateTo({url:'/pages/schedule/index?date='+encodeURIComponent(card.observationSummaryDate)+'&kind='+card.kind});return;}
     if(card.expiredRound||card.state==='waiting'&&!card.publicationId){wx.switchTab({url:'/pages/announcements/index'});return;}
     if(card.completedDisplay&&card.publicationId){wx.navigateTo({url:'/pages/detail/index?publicationId='+encodeURIComponent(card.publicationId),fail(){wx.showToast({title:'记录加载失败，请重试',icon:'none'});}});return;}
     if(card.sourceName){this.setData({expandedSourceKind:this.data.expandedSourceKind===kind?'':kind});return;}
