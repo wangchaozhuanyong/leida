@@ -1,1 +1,14 @@
-<view class="loading-page" role="status"><text class="loading-label">加载中</text><view class="loading-bar"><view class="loading-light"/></view></view>
+<view class="loading-page variant-{{variant}} {{inset ? 'is-inset' : ''}}" role="status" aria-label="正在加载内容">
+  <view wx:if="{{variant==='home'}}" class="home-placeholder" aria-hidden="true">
+    <view class="loading-tabs"><view class="loading-pill"/><view class="loading-pill alt"/></view>
+    <view class="loading-orbit"><image class="loading-orbit-art" src="/assets/neural/silver-orbit.png" mode="aspectFit"/><view class="loading-orbit-copy"><view class="bone short"/><view class="bone metric"/><view class="bone short"/></view></view>
+    <view class="loading-copy"><view class="bone"/><view class="bone short"/></view>
+    <view class="loading-fact"><view class="bone"/><view class="bone short"/></view>
+    <view class="loading-fact compact"><view class="bone"/></view>
+    <view class="loading-tabs actions"><view class="loading-pill"/><view class="loading-pill alt"/></view>
+  </view>
+  <view wx:elif="{{variant==='calendar'}}" class="loading-card" aria-hidden="true"><view class="bone short"/><view class="loading-calendar"><view wx:for="{{days}}" wx:key="*this" class="loading-day"/></view><view class="bone"/><view class="bone short"/></view>
+  <view wx:elif="{{variant==='detail'}}" class="loading-card" aria-hidden="true"><view class="bone short"/><view class="bone heading"/><view class="bone"/><view class="loading-paragraph"><view class="bone"/><view class="bone"/><view class="bone"/><view class="bone short"/></view></view>
+  <block wx:else><view wx:for="{{rows}}" wx:key="*this" class="loading-card" aria-hidden="true"><view class="bone short"/><view class="bone heading"/><view class="bone"/><view class="bone tail"/></view></block>
+  <view class="loading-hint">正在获取内容…</view>
+</view>

@@ -7,7 +7,11 @@ view,text,button,scroll-view{box-sizing:border-box}button{margin:0;font-size:14p
 
 @media(prefers-reduced-motion:reduce){button{transition:none}}
 
-.refresh-track{height:3px;position:sticky;top:0;z-index:5;margin-bottom:-3px;overflow:hidden;visibility:hidden;pointer-events:none}.refresh-track.is-active{visibility:visible}.refresh-track>view{width:40%;height:100%;border-radius:3px;background:linear-gradient(90deg,#93c5ff,#3164db)}.refresh-track.is-active>view{animation:refresh-glide 1.8s ease-in-out infinite}@keyframes refresh-glide{from{transform:translateX(-110%)}to{transform:translateX(360%)}}@media(prefers-reduced-motion:reduce){.refresh-track.is-active>view{animation:none;transform:translateX(75%)}}
+/* Quiet refresh feedback keeps the current content and layout in place. */
+.refresh-track{height:0;position:relative;z-index:5;pointer-events:none;visibility:hidden}.refresh-track.is-active{visibility:visible}.refresh-track>view{position:absolute;right:18px;top:6px;width:4px;height:4px;border-radius:50%;background:#8ca7d1;box-shadow:-8px 0 #b1c4e0,8px 0 #b1c4e0;opacity:0}.refresh-track.is-active>view{animation:refresh-breathe 1.6s .4s ease-in-out infinite}@keyframes refresh-breathe{0%,100%{opacity:.35}50%{opacity:.85}}
+/* A single first-ready entrance. Updates, clock ticks and native returns do not replay it. */
+.content-enter>view,.content-enter>publication-card{animation:content-arrive .36s cubic-bezier(.22,.7,.3,1) both}.content-enter>view:nth-child(2){animation-delay:.045s}.content-enter>view:nth-child(3){animation-delay:.09s}.content-enter>view:nth-child(n+4),.content-enter>publication-card{animation-delay:.135s}.settled-reveal{animation:content-arrive .32s cubic-bezier(.22,.7,.3,1) both}@keyframes content-arrive{from{opacity:.3;transform:translateY(-6px)}to{opacity:1;transform:none}}@media(prefers-reduced-motion:reduce){.content-enter>view,.content-enter>publication-card,.settled-reveal{animation:none!important;transform:none!important;opacity:1!important}.refresh-track.is-active>view{animation:none;opacity:.6}}
+
 
 /* Same page and card spacing as the public web surface. */
 .card>.heading+.lead,.card>.heading+.muted{margin-top:8px}

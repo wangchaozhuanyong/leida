@@ -1,6 +1,6 @@
 <navigation-header icon="activity" title="活动动态" back="{{true}}" />
 <page-loader wx:if="{{navigationLoading}}" />
-<view wx:else class="page activity-page" bindtouchstart="nativeReturnTouched">
+<view wx:else class="page activity-page {{contentMotion}}" bindtouchstart="nativeReturnTouched">
   <status-panel wx:if="{{!connected}}" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />
   <block wx:else>
     <view wx:if="{{error}}" class="warning">{{error}}<button class="text-button" bindtap="retry">重新加载</button></view>
