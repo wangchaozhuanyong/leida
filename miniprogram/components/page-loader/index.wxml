@@ -1,4 +1,4 @@
-<view class="loading-page variant-{{variant}} {{inset ? 'is-inset' : ''}}" role="status" aria-label="正在加载内容">
+<view class="loading-page variant-{{variant}} {{inset ? 'is-inset' : ''}} {{visible ? 'is-visible' : ''}}" role="status" aria-label="正在加载内容">
   <view wx:if="{{variant==='home'}}" class="home-placeholder" aria-hidden="true">
     <view class="loading-tabs"><view class="loading-pill"/><view class="loading-pill alt"/></view>
     <view class="loading-orbit"><image class="loading-orbit-art" src="/assets/neural/silver-orbit.png" mode="aspectFit"/><view class="loading-orbit-copy"><view class="bone short"/><view class="bone metric"/><view class="bone short"/></view></view>

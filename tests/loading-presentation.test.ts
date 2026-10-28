@@ -66,3 +66,13 @@ test('网页四种占位使用真实结构及状态语义，不显示虚构数�
     if(variant==='calendar')assert.equal((html.match(/<span><\/span>/g)||[]).length,35);
   }
 });
+test('快速请求移除占位时不闪骨架，持续等待才显示；卸载后迟到回调不写页面',()=>{
+ let definition:any,timerId=0;const timers=new Map<number,()=>void>();
+ new Script(readFileSync(new URL('../miniprogram/components/page-loader/index.js',import.meta.url),'utf8')).runInNewContext({
+  Component(value:any){definition=value;},setTimeout(fn:()=>void,ms:number){assert.equal(ms,180);const id=timerId++;timers.set(id,fn);return id;},clearTimeout(id:number){timers.delete(id);}
+ });
+ const instance=()=>({data:{...definition.data},writes:[] as any[],setData(patch:any){this.writes.push(patch);Object.assign(this.data,patch);}});
+ const fast:any=instance();definition.lifetimes.attached.call(fast);assert.equal(fast.data.visible,false);const late=timers.get(0)!;
+ definition.lifetimes.detached.call(fast);assert.equal(timers.size,0);late();assert.equal(fast.writes.length,0);
+ const slow:any=instance();definition.lifetimes.attached.call(slow);assert.equal(slow.data.visible,false);const show=timers.get(1)!;timers.delete(1);show();assert.equal(slow.data.visible,true);assert.equal(slow.writes.length,1);definition.lifetimes.detached.call(slow);
+});
