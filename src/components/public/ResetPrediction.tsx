@@ -20,7 +20,7 @@ export function ResetPrediction({forecast,now,details=false,frozen=false}:{forec
  const recentError=forecast?.backtest.recent.medianAbsoluteErrorHours;
  const coarse=typeof recentError==='number'&&recentError>24;
  const state=legacy?'冻结历史模型':!forecast?'尚无记录':expired||ended?'待重新计算':forecast.status==='ready'?(ready?(coarse?'粗略估计':'历史估算'):'资料待核验'):forecast.status==='paused'?'暂停估计':forecast.status==='out_of_range'?'超出样本范围':'样本不足';
- const unavailable=!forecast?'正在读取最新预测。':expired||ended?'上一次估计已过有效时间，等待重新计算。':forecast.status==='paused'?'采集资料暂时不足以支持当前估计，预测已暂停。':forecast.status==='out_of_range'?'当前等待时间已超过历史样本支持范围，暂不提供下一次时间估计。':forecast.status==='insufficient'?'可比较的历史间隔还不足，暂不提供下一次时间估计。':'预测资料尚未完整核验，暂不提供时间估计。';
+ const unavailable=!forecast?'正在读取最新预测。':expired||ended?'上一次估计已过有效时间，等待重新计算。':forecast.status==='paused'?'资料不足，暂时无法估算下一次时间。':forecast.status==='out_of_range'?'当前等待时间已超过历史样本支持范围，暂不提供下一次时间估计。':forecast.status==='insufficient'?'可比较的历史间隔还不足，暂不提供下一次时间估计。':'预测资料尚未完整核验，暂不提供时间估计。';
  const observations=forecast?.observations.filter(item=>forecast.trainingObservationIds.includes(item.id)).slice().sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)).slice(0,6)??[];
  return <section className={`pub-card pub-reset-prediction${ready?' is-ready':''}`} aria-label="历史间隔实验">
   <div className="pub-card-top"><h2>{!legacy&&forecast?.target?(forecast.target==='banked_reset'?'重置卡发放参考':'用量重置参考'):'历史间隔实验'}</h2><span className={`pub-badge${ready?' purple':''}`}>{state}</span></div>

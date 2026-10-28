@@ -32,7 +32,7 @@ test('到点不足一分钟及异常时间不产生负数NaN或完成状态',()=
 });
 test('来源观测与公开完成声明保持不同证据等级、时间语义，均保留装饰动效',()=>{
   const observed=homeOrbitPresentation(card('observed'),now),completed=homeOrbitPresentation(card('completed','banked_reset'),now);
-  assert.equal(observed.title,'距离上次重置（观测）');assert.equal(observed.badge,'第三方报告');assert.equal(observed.timeLabel,'来源观测时间');assert.match(observed.footnote,/不等于官方/);
+  assert.equal(observed.title,'距离上次重置（观测）');assert.equal(observed.badge,'第三方报告');assert.equal(observed.timeLabel,'来源观测时间');assert.match(observed.footnote,/依据第三方观测/);
   assert.equal(completed.title,'距离上次发卡');assert.equal(completed.badge,'公开完成声明');assert.equal(completed.label,'已经过去');
   assert.equal(observed.animated,true);assert.equal(completed.animated,true);
 });

@@ -29,14 +29,14 @@ export class FixedSnapshotCache {
         const response = await this.fetcher(key, { cache: 'no-store', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) });
         if (!current()) return;
         if (response.status === 404 || response.status === 410) {
-          this.put(key, { error: '该固定记录已不可用。', loading: false, unavailable: true, checkedVersion: version });
+          this.put(key, { error: '这条历史记录已不可用。', loading: false, unavailable: true, checkedVersion: version });
           return;
         }
         const body = await response.json();
-        if (!response.ok || body.data?.id !== id) throw new Error('固定记录暂时无法读取，请重试。');
+        if (!response.ok || body.data?.id !== id) throw new Error('这条历史记录暂时无法加载，请重试。');
         if (current()) this.put(key, { value: body.data as FixedValue, error: '', loading: false, unavailable: false, checkedVersion: version });
       } catch {
-        if (current()) this.put(key, { ...this.get(key), error: this.get(key).error || '固定记录暂时无法读取，请重试。', loading: false });
+        if (current()) this.put(key, { ...this.get(key), error: this.get(key).error || '这条历史记录暂时无法加载，请重试。', loading: false });
       } finally {
         if (this.requests.get(key)?.controller === controller) this.requests.delete(key);
       }

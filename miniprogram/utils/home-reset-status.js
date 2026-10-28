@@ -91,17 +91,16 @@ function completedCard(base, kind, round, observations, now) {
   card.hero=homeOrbitPresentation(card,now);
   card.hero.badge=declared?'发布者已确认':'第三方报告';
   card.hero.timeLabel=card.timeLabel;
-  card.hero.description=early ? declared?'本轮已有公开完成声明，已收录预计时间前的完成依据。':'预计时间前已有第三方重置观测，持续核对完成消息。' : declared?'本轮已有公开完成声明，持续关注下一次安排。':'第三方来源已记录重置，持续关注后续公开消息。';
-  card.hero.footnote=declared?'个人到账以账户为准；确认声明不会重新开始计时。':'尚无发布者完成声明；按'+(round?'本轮最早':'所示来源')+'观测计时，不是采集时间，也不代表实际到账的精确时间。';
+  card.hero.description=early ? '预计时间前已有'+(declared?'完成声明。':'重置观测。') : declared?(banked?'发布者已声明发卡完成。':'发布者已声明重置完成。'):'来源：'+observation.sourceName+'。';
+  card.hero.footnote=declared?'实际到账以账户显示为准。':early?'来源：'+observation.sourceName+' · 实际额度以账户为准。':'实际额度以账户显示为准。';
   const summary=!round&&observation?.displaySummary;
   if(summary){
     card.observationSummaryDate=summary.date;card.roundKey=summary.id;card.sourceName=summary.sourceName;
-    card.timeLabel=summary.summaryScope==='date'?'当日最早观测':'本条观测时间';card.hero.timeLabel=card.timeLabel;
-    card.hero.description='多来源报告已汇总，尚不能据此认定发生了多次重置。';
-    card.hero.footnote=`${summary.sourceCount}个来源记录时间为${summary.timeRange}（北京时间）；按${summary.summaryScope==='date'?'当日最早':'本条'}来源记录计时，实际重置时间和轮次仍待核对。`;
-    card.action='查看当日来源依据';
+    card.timeLabel=summary.summaryScope==='date'?'最早观测时间':'观测时间';card.hero.timeLabel=card.timeLabel;
+    card.hero.description='来源：'+summary.sourceName+'。';
+    card.hero.footnote='实际额度以账户显示为准。';
+    card.action='查看来源';
   }
-  if(round?.expectedAt && millis(at)>millis(round.expectedAt))card.hero.footnote+=' 记录时间晚于预计时间，不代表实际到账一定延期。';
   return card;
 }
 function pendingCard(base, round, now) {
@@ -112,7 +111,7 @@ function pendingCard(base, round, now) {
     observationPublicationId:'',observationSourceName:'',observationTime:'',observationAt:'',oldTime:'',expectedElapsed:'',metric:'',clockParts:[],window:'',watchNote:'',validUntil:timed?new Date(overdue?deadline+DAY:deadline).toISOString():''};
   if(expired){
     Object.assign(card,{state:'waiting',tone:'slate',title:'暂无新消息',badge:'持续关注',publicationId:'',eventId:'',sourceName:'',sourceUrl:'',sourceType:'',...dateFields(''),timeLabel:'',action:'查看历史记录',validUntil:'',previousRoundPublicationId:round.publicationId});
-    card.hero=homeOrbitPresentation(card,now);Object.assign(card.hero,{title:'暂无新消息',label:'公开消息追踪',badge:'持续关注',description:'上一轮预计时间已过24小时，暂无新的相关消息。',footnote:'原预告保留在历史记录，未据此判定完成或取消。'});
+    card.hero=homeOrbitPresentation(card,now);Object.assign(card.hero,{title:'暂无新消息',label:'公开消息追踪',badge:'持续关注',description:'暂未收到新的重置消息。',footnote:'有新进展会及时更新。'});
     return card;
   }
   const adjusted=valid(round.previousExpectedAt),timing=/(?:日终|最晚|之前|以内|截止|\bby\b|\bwithin\b)/i.test(round.timeNote||'')?'deadline':/^原文近似时间/.test(round.timeNote||'')?'approximate':'point';
@@ -131,7 +130,7 @@ function pendingCard(base, round, now) {
   }
   card.action=overdue?'查看原预告':adjusted?'查看调整说明':progress?'查看最新进展':'查看安排依据';
   card.hero=homeOrbitPresentation(card,now);
-  if(overdue){card.hero.description=progress?'已宣布开始，原预计时间已过，完成情况待核对。':'原预计时间已过，暂未观测到完成，正在持续核对。';card.hero.badge='暂未观测到完成';card.hero.footnote='此状态最多保留至原预计时间后24小时，不代表个人账户一定未恢复。';}
+  if(overdue){card.hero.description=progress?'已宣布开始，原预计时间已过，完成情况待核对。':'原预计时间已过，暂未观测到完成，正在持续核对。';card.hero.badge='暂未观测到完成';card.hero.footnote='实际到账以账户显示为准。';}
   return card;
 }
 function finalize(card, data) {
@@ -187,7 +186,7 @@ function homeResetStatus(data, now=data.serverTime) {
     card.lastMessage=historyMessage(record);
     return finalize(card,input);
   });
-  states.sourceWarning=[states.sourceWarning,m.sourceStatus(input.sources).warning?'来源更新延迟，完成情况可能尚未更新；当前保留已有公开记录。':''].filter(Boolean).join(' ');
+  states.sourceWarning=[states.sourceWarning,m.sourceStatus(input.sources).warning?'部分来源更新延迟，新消息可能稍晚显示。':''].filter(Boolean).join(' ');
   return states;
 }
 function selectedHomeStatus(data, kind, now=data.serverTime) {return homeResetStatus(data,now).cards.find(c=>c.kind===validKind(kind));}

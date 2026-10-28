@@ -11,7 +11,7 @@ export async function createPosterFromEndpoint(endpoint: string, filename: strin
   if (!/^\/api\/v1\/(?:posters|activity-posters|forecast-posters)\//.test(endpoint) || /[\r\n]/.test(endpoint)) throw new Error('海报地址无效。');
   const response = await fetch(endpoint, { cache: 'no-store', signal });
   if (!response.ok) throw new Error(response.status === 410 ? '此内容已撤回，已停止生成海报。' : response.status === 409 ? '公开状态已变化，请关闭后重新生成海报。' : '海报生成失败，请稍后重试。');
-  if (response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'image/svg+xml') throw new Error('海报接口返回格式异常，请稍后重试。');
+  if (response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'image/svg+xml') throw new Error('海报暂时无法加载，请稍后重试。');
   const svg = await response.blob();
   const source = URL.createObjectURL(svg);
   try {
@@ -43,11 +43,11 @@ export async function createPosterFromEndpoint(endpoint: string, filename: strin
       image.src = source;
     });
     if (signal.aborted) throw new DOMException('已取消', 'AbortError');
-    if (image.naturalHeight > 16_384 || image.naturalWidth * image.naturalHeight > 24_000_000) throw new Error('内容较长，暂时无法生成图片海报，请分享此版本链接。');
+    if (image.naturalHeight > 16_384 || image.naturalWidth * image.naturalHeight > 24_000_000) throw new Error('内容较长，暂时无法生成图片海报，请直接分享消息链接。');
     const canvas = document.createElement('canvas');
     canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
     const context = canvas.getContext('2d');
-    if (!context) throw new Error('浏览器不支持图片海报，请分享此版本链接。');
+    if (!context) throw new Error('浏览器不支持图片海报，请直接分享消息链接。');
     context.drawImage(image, 0, 0);
     const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('海报图片生成失败，请重试。')), 'image/png'));
     if (signal.aborted) throw new DOMException('已取消', 'AbortError');

@@ -41,11 +41,11 @@ test('海报由指定快照生成：事件版本、截止时间和当时预告�
 });
 
 test('撤回、合并、缺失以及错版本真码阻止海报；无配置不画装饰码',()=>{
-  for(const kind of ['withdrawn','merged','missing']){const original=data();if(kind==='withdrawn')original.articles[0].status='withdrawn';if(kind==='merged')original.events[0].status='merged';if(kind==='missing')original.events=[];assert.throws(()=>p.posterInput(original,'fixture-publication'),/撤回|合并|缺失/);}
+  for(const kind of ['withdrawn','merged','missing']){const original=data();if(kind==='withdrawn')original.articles[0].status='withdrawn';if(kind==='merged')original.events[0].status='merged';if(kind==='missing')original.events=[];assert.throws(()=>p.posterInput(original,'fixture-publication'),(error:unknown)=>error instanceof Error && (error as Error & {code:string}).code===kind);}
   const input=p.posterInput(data(),'fixture-publication'),layout=p.createPosterLayout(input,measure);
   assert.equal(layout.codeRect,undefined);assert.equal(layout.commands.some((item:{type:string})=>item.type==='image'),false);
-  assert.ok(layout.commands.some((item:{text?:string})=>item.text==='小程序码尚未配置'));
-  assert.throws(()=>p.createPosterLayout(input,measure,{status:'ready',publicationId:'other-version',filePath:'fixture-file'}),/不匹配/);
+  assert.ok(layout.commands.some((item:{text?:string})=>item.text==='本张海报未附小程序码'));
+  assert.throws(()=>p.createPosterLayout(input,measure,{status:'ready',publicationId:'other-version',filePath:'fixture-file'}),/不一致/);
 });
 
 test('长中文摘要全部进入布局，过长明确报错，不静默删去福利事实',()=>{
@@ -77,7 +77,7 @@ test('完整真码置于圆形白底内，保留所有像素，不裁剪或生�
   const image=canvas.calls.find(item=>item.type==='image') as {x:number;y:number;width:number;height:number};
   for(const x of [image.x,image.x+image.width])for(const y of [image.y,image.y+image.height])assert.ok(Math.hypot(x-circle.x,y-circle.y)<circle.r);
   const layout=p.createPosterLayout(p.posterInput(data(),'fixture-publication'),measure,{status:'ready',publicationId:'fixture-publication',filePath:'wxfile://fixture-server-code.png'});
-  const caption=layout.commands.find((item:{text?:string})=>item.text==='扫码进入小程序首页');assert.ok(caption.y>circle.y+circle.r);
+  const caption=layout.commands.find((item:{text?:string})=>item.text==='扫码查看这条消息');assert.ok(caption.y>circle.y+circle.r);
 });
 
 test('海报黑金与水墨切换只改样式，指定版本、完整事实及真码位置保持一致',()=>{
@@ -137,8 +137,8 @@ test('简短新闻模板随实际内容收尾，无动作不留空动作框或�
   assert.equal(layout.commands.some((c:{type:string;color?:string})=>c.type==='rect'&&c.color==='#141b1d'),false);
   assert.ok(layout.commands.some((c:{text?:string})=>c.text==='小程序码暂不可用'));
   const texts=layout.commands.filter((c:{type:string})=>c.type==='text').map((c:{text:string})=>c.text).join('');
-  assert.ok(texts.includes('仅新闻更新，福利状态以已确认记录为准'));
-  assert.ok(texts.includes('新闻更新 · 第7版'));
+  assert.ok(texts.includes('具体安排请查看最新重置消息'));
+  assert.ok(texts.includes('新闻更新'));
 });
 
 test('真实码文件只写微信沙盒，限定体积/类型/版本/scene，绘制后清理且重复清理无重复操作',async()=>{
@@ -148,7 +148,7 @@ test('真实码文件只写微信沙盒，限定体积/类型/版本/scene，绘
   const asset=await p.writeCodeAsset(wx,value,'fixture-publication');
   assert.ok(asset.filePath.startsWith(wx.env.USER_DATA_PATH+'/'));assert.equal(written[0].encoding,'base64');assert.equal(written[0].data,imageBase64);
   await asset.dispose();await asset.dispose();assert.equal(removed.length,1);
-  for(const broken of [{...value,publicationId:'other'},{...value,scene:'../path'},{...value,contentType:'image/svg+xml'},{...value,imageBase64:'not-a-real-image'},{...value,imageBase64:'A'.repeat(3000004)}])await assert.rejects(p.writeCodeAsset(wx,broken,'fixture-publication'),/不匹配|格式/);
+  for(const broken of [{...value,publicationId:'other'},{...value,scene:'../path'},{...value,contentType:'image/svg+xml'},{...value,imageBase64:'not-a-real-image'},{...value,imageBase64:'A'.repeat(3000004)}])await assert.rejects(p.writeCodeAsset(wx,broken,'fixture-publication'),/不一致|格式/);
   assert.equal(written.length,1);
 });
 

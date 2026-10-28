@@ -126,9 +126,9 @@ test('公共预测接口使用匿名GET，列表与固定记录读取正确合�
 });
 
 test('固定记录不接受旧包装、其他记录或异常概率；管理路径与越界路径不发送',async()=>{
-  for(const body of [{data:{case:fixture().forecasts!.cases[0],snapshot:snapshot(),outcomes:[]}},{data:{...snapshot(),id:'wrong'}},{data:{...snapshot(),p24:2}}]){const mock=mockTransport(body);await assert.rejects(mock.request('/api/v1/forecasts/snapshot-test').promise,/格式不完整/);}
-  for(const path of ['/api/admin/forecasts','/api/v1/forecasts/../admin','/api/v1/forecasts/snapshot-test?current=1','/api/v1/forecasts/.hidden']){const mock=mockTransport({data:snapshot()});await assert.rejects(mock.request(path).promise,/不受支持/);assert.equal(mock.calls.length,0);}
-  const mock=mockTransport({data:snapshot()});await assert.rejects(mock.privateRequest('/api/v1/forecasts/snapshot-test',{sessionToken:'fixture-not-real'}).promise,/不受支持/);assert.equal(mock.calls.length,0);
+  for(const body of [{data:{case:fixture().forecasts!.cases[0],snapshot:snapshot(),outcomes:[]}},{data:{...snapshot(),id:'wrong'}},{data:{...snapshot(),p24:2}}]){const mock=mockTransport(body);await assert.rejects(mock.request('/api/v1/forecasts/snapshot-test').promise,/资料暂时无法加载/);}
+  for(const path of ['/api/admin/forecasts','/api/v1/forecasts/../admin','/api/v1/forecasts/snapshot-test?current=1','/api/v1/forecasts/.hidden']){const mock=mockTransport({data:snapshot()});await assert.rejects(mock.request(path).promise,/暂时无法打开/);assert.equal(mock.calls.length,0);}
+  const mock=mockTransport({data:snapshot()});await assert.rejects(mock.privateRequest('/api/v1/forecasts/snapshot-test',{sessionToken:'fixture-not-real'}).promise,/暂时无法打开/);assert.equal(mock.calls.length,0);
 });
 
 type NativePage=Record<string,any> & {data:Record<string,any>;setData:(patch:Record<string,unknown>)=>void};
@@ -299,7 +299,7 @@ test('后续结局独立显示阶段、双时间与原信号窗口，不修改�
   assert.equal((byId.get('done') as any).stage,'公告称已完成');assert.equal((byId.get('done') as any).windowText,'窗口外');
   assert.equal((byId.get('cancel') as any).stage,'已取消');assert.equal((byId.get('unknown') as any).stage,'结局未知');assert.equal((byId.get('unknown') as any).windowText,'窗口位置未知');
   assert.equal((byId.get('promise') as any).announcementAt,'2026-10-10 14:00');assert.equal((byId.get('promise') as any).observedAt,'2026-10-10 15:00');
-  assert.match(model.note,/后续记录，不改原快照；个人到账未观测/);assert.deepEqual(fixed,before);
+  assert.match(model.note,/保留当时预测，后续进展另行记录。实际到账以账户显示为准/);assert.deepEqual(fixed,before);
 });
 
 test('结局缺失、当前接口不可用与真实未知分开，错误记录不能冒充无公告',()=>{

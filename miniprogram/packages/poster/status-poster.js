@@ -19,7 +19,7 @@ function statusPosterInput(data,kind='automatic_reset'){
   const sourceLabel=card.evidenceType==='observation'?'来源：'+card.sourceName+' · 第三方观测':card.declarationAt?'依据：发布者公开完成声明':card.sourceName?'来源：'+card.sourceName:'依据：当前公开状态';
   return {name:data.site.name||'模钥重置雷达',kind:card.kind,round:card.revision,publicationId,codePublicationId:shareable?publicationId:'',sharePath:card.sharePath,shareTitle:card.shareTitle,generatedAt:data.serverTime,
     title:hero.title||card.title,label:hero.label,value:hero.metric||hero.title,unit:'',date:date.date,time:date.time+(card.timeQualifier?' '+card.timeQualifier:''),generated:generated.date+' '+generated.time,
-    statementAt:card.timeAt,statementLabel:hero.timeLabel||'公开状态',nextNote:(card.oldTime?card.oldTime+' · 北京时间。 ':'')+hero.description+' '+hero.footnote+(card.declarationTime?' 发布者声明：'+card.declarationTime+' · 北京时间。':''),
+    statementAt:card.timeAt,statementLabel:hero.timeLabel||'公开状态',nextNote:(card.oldTime?card.oldTime+' · 北京时间。 ':'')+hero.description+' '+hero.footnote+(card.declarationTime?' 完成声明：'+card.declarationTime+' · 北京时间。':''),
     sourceLabel,validUntil:card.validUntil||''};
 }
 function statusPosterAvailable(input,data){
@@ -66,12 +66,12 @@ function createStatusPosterLayout(input,measure,theme='precision',includeCode=fa
   }
   rect(0,1530,1080,390,dark?'#0b0d10':'#faf6ec',1);
   text(includeCode?'微信扫码进入小程序':input.name,82,1653,40,ink,400,'left',includeCode?610:930);text(input.sourceLabel,82,1711,28,muted,400,'left',includeCode?610:930);
-  text(includeCode?'海报为生成时的快照，最新进展请查看小程序':'小程序码暂不可用，可直接分享小程序卡片',82,1772,24,muted);
+  text(includeCode?'消息可能更新，最新进展请查看小程序':'小程序码暂不可用，可直接分享小程序卡片',82,1772,24,muted);
   code();text('仅整理公开公告，个人状态以账户显示为准',82,1833,24,muted);text(`生成于 ${input.generated} · 北京时间`,82,1880,22,muted);
   return{width:1080,height:1920,theme,background:assets[theme],commands};
 }
 async function renderStatusPoster({wxApi,canvas,page,input,theme='precision',code,isCurrent=()=>true}){
-  const ctx=canvas.getContext('2d');if(!ctx)throw new PosterError('canvas','海报画布暂不可用。');
+  const ctx=canvas.getContext('2d');if(!ctx)throw new PosterError('canvas','海报暂不可用，请重试。');
   if(code&&(code.publicationId!==(input.codePublicationId||input.publicationId)||!code.filePath))throw new PosterError('code_version','小程序码与当前海报不匹配。');
   const layout=createStatusPosterLayout(input,(value,size,weight)=>{ctx.font=`${weight} ${size}px Songti SC,STSong,serif`;return ctx.measureText(value).width;},theme,!!code);
   const images={background:await loadCanvasImage(canvas,layout.background),brand:await loadCanvasImage(canvas,assets.brand)};

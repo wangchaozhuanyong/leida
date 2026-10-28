@@ -84,7 +84,7 @@ test('反向代理HTTPS与公开Host生成同一固定版本的完整海报',asy
   const url=publicationUrl(origin,selected);
   assert.equal(url,'https://radar.example.org/events/event-1?version=pub-snapshot-1');
   const svg=posterSvg(selected,'模钥重置雷达',url);
-  assert.equal((await decodedSvg(svg)).url,url); assert.match(svg,/扫码查看此版本/); assert.ok(!svg.includes('本机预览码'));
+  assert.equal((await decodedSvg(svg)).url,url); assert.match(svg,/扫码查看这条消息/); assert.ok(!svg.includes('本机预览码'));
 });
 
 test('Host中的路径、参数、认证信息和异常端口不能进入分享来源',()=>{
@@ -133,7 +133,7 @@ test('仅新闻海报实际嵌入二维码可解码，不携带已有事件福�
   const url=publicationUrl('https://radar.example.org',selected);
   const svg=posterSvg(selected,'模钥重置雷达',url);
   assert.equal((await decodedSvg(svg)).url,url);
-  assert.ok(!svg.includes('适用范围：')); assert.match(svg,/仅新闻更新/); assert.match(svg,/第7版/); assert.match(svg,/&lt;与&gt;/);
+  assert.ok(!svg.includes('适用范围：')); assert.match(svg,/具体安排请查看最新重置消息/); assert.doesNotMatch(svg,/第7版/); assert.match(svg,/&lt;与&gt;/);
 });
 
 test('本机预览海报保留提示，二维码与分享链接同为所选发布版本',async()=>{

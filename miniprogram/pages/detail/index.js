@@ -5,16 +5,16 @@ const poster=require('../../utils/poster');
 const {privacyRequired}=require('../../utils/wechat');
 function stopPage(page){clearTimeout(page._posterTimeout);page._active=false;page._sceneGeneration=(page._sceneGeneration||0)+1;page._posterGeneration=(page._posterGeneration||0)+1;if(page._sceneRequest)page._sceneRequest.abort();if(page._codeRequest)page._codeRequest.abort();}
 function canvasNode(page){return new Promise((resolve,reject)=>{
-  if(typeof wx.createSelectorQuery!=='function'){reject(new Error('当前微信不支持海报画布，请更新微信。'));return;}
-  const timer=setTimeout(()=>reject(new Error('海报画布尚未准备好，请重试。')),10000);
-  try{wx.createSelectorQuery().in(page).select('#poster-canvas').fields({node:true},result=>{clearTimeout(timer);result&&result.node?resolve(result.node):reject(new Error('海报画布尚未准备好，请重试。'));}).exec();}
-  catch(_){clearTimeout(timer);reject(new Error('海报画布尚未准备好，请重试。'));}
+  if(typeof wx.createSelectorQuery!=='function'){reject(new Error('当前微信不支持生成海报，请更新微信。'));return;}
+  const timer=setTimeout(()=>reject(new Error('海报尚未准备好，请重试。')),10000);
+  try{wx.createSelectorQuery().in(page).select('#poster-canvas').fields({node:true},result=>{clearTimeout(timer);result&&result.node?resolve(result.node):reject(new Error('海报尚未准备好，请重试。'));}).exec();}
+  catch(_){clearTimeout(timer);reject(new Error('海报尚未准备好，请重试。'));}
 });}
 Page(createPage((data, query, page) => data && !page.sceneLoading && !page.sceneError && query.publicationId ? { detail: m.resolveDetail(data, query) } : { detail:null }, {
   view:query=>query.publicationId?({view:'detail',entity:'publications',id:query.publicationId}):({view:'home'}),
   data: { detail: null,sceneLoading:false,sceneError:'',sceneCanRetry:false,posterBusy:false,posterSaving:false,posterError:'',posterPreview:'',posterReady:false,posterPrivacyNeeded:false,bodyOpen:false,evidenceOpen:false,progressOpen:false,posterTheme:'precision' },
-  load(query){this._wantPoster=query.poster==='1';if(query.scene){this._params={};try{const scene=decodeURIComponent(query.scene).toLowerCase();if(!/^[a-f0-9]{32}$/.test(scene))throw new Error();this._scene=scene;this.setData({sceneLoading:true,sceneCanRetry:true});}catch(_){this.setData({sceneError:'这个小程序码场景无效，请返回公开公告。'});}}
-    else if(!query.publicationId)this.setData({sceneError:'缺少指定发布版本，请返回公开公告。'});},
+  load(query){this._wantPoster=query.poster==='1';if(query.scene){this._params={};try{const scene=decodeURIComponent(query.scene).toLowerCase();if(!/^[a-f0-9]{32}$/.test(scene))throw new Error();this._scene=scene;this.setData({sceneLoading:true,sceneCanRetry:true});}catch(_){this.setData({sceneError:'这个小程序码无效，请返回查看最新消息。'});}}
+    else if(!query.publicationId)this.setData({sceneError:'消息链接不完整，请返回查看最新消息。'});},
   show(){this._active=true;this.setData({posterBusy:false});if(this._scene&&!this._sceneResolved)void this.resolveScene();this.maybeGeneratePoster();},hide(){stopPage(this);},unload(){stopPage(this);this.clearPosters();this._codeData=null;},
   afterRender() {
     const canShare = this.data.detail && this.data.detail.canShare;

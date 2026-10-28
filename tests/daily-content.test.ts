@@ -73,5 +73,5 @@ test('指纹只跟随证据输入变化，不因采集时间变化收费',()=>{
 test('仅新闻海报不附已有事件的福利动作',()=>{
  const a={id:'article',eventId:'event',title:'公开消息记录',summary:'仅新闻更新',translation:'',category:'product' as const,version:1,status:'published' as const,publicationId:'pub',evidenceIds:['e'],publishedAt:at,updatedAt:at,publicationMode:'news_only' as const};
  const p:Publication={id:'pub',eventId:'event',articleId:a.id,article:a,event:event([action()]),publishedAt:at,cutoffAt:at,reason:'test',mode:'news_only'};
- const svg=posterSvg({...p,article:{...a,version:7}},'模钥重置雷达');assert.ok(!svg.includes('适用范围：'));assert.match(svg,/仅新闻更新/);assert.match(svg,/第7版/);
+ const svg=posterSvg({...p,article:{...a,version:7}},'模钥重置雷达');assert.ok(!svg.includes('适用范围：'));assert.match(svg,/仅新闻更新/);assert.doesNotMatch(svg,/第7版/);
 });

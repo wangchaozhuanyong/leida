@@ -69,7 +69,7 @@ function assertParallelObservation(data:PublicData,sourceName:string) {
   assert.equal(card.observationAt,observedAt);assert.equal(card.observationTime,'2026-10-24 01:40');
   assert.equal(card.observationPublicationId,'p-observation');assert.equal(card.observationEventId,'event-observation');
   assert.equal(card.expectedElapsed,'原预计时间已过 1小时33分钟');
-  assert.match(card.dialTitle,/已有重置观测/);assert.match(card.title,/第三方/);assert.match(card.description,/完成声明/);
+  assert.match(card.dialTitle,/已有重置观测/);assert.match(card.title,/第三方/);assert.match(card.description,/发布方尚未确认/);
   assert.equal(card.metric,'');assert.deepEqual(card.clockParts,[]);
   assert.deepEqual(card.progress.map(p=>p.current),[true,false,false],'独立观测不点亮完成阶段');
   assert.equal(outlook.status,'overdue');assert.equal(outlook.active?.publicationId,'p-promise');
@@ -159,13 +159,13 @@ test('额度观测不混入重置卡；两类预告均保持各自的记录和�
   const view=resetStateCards(data),banked=view.cards.find(c=>c.kind==='banked_reset')!;
   assert.equal(view.cards[0].observationPublicationId,'p-observation');
   assert.equal(banked.state,'overdue');assert.equal(banked.publicationId,'p-banked-promise');assert.equal(banked.timeAt,expectedAt);assertNoIndependentObservation(banked);
-  assert.match(banked.description,/重置卡发放完成声明/);assert.equal(view.lastCard,null);
+  assert.match(banked.description,/重置卡发放完成消息/);assert.equal(view.lastCard,null);
 });
 
 test('无有效观测的过点预告说明已过去多久，刚到预计时间不伪称已完成',()=>{
   const data=fixture(null),card=quota(data);
   assert.equal(card.state,'overdue');assert.equal(card.expectedElapsed,'原预计时间已过 1小时33分钟');assertNoIndependentObservation(card);
-  assert.match(card.description,/尚未采集到额度重置完成声明/);assert.match(card.description,/不代表你的账户尚未恢复/);
+  assert.match(card.description,/暂未收到额度重置完成消息/);assert.match(card.footer,/个人账户以实际显示为准/);
   assert.equal(card.timeAt,expectedAt);assert.equal(publicResetOutlook(data).latestGlobalCompletionAt,undefined);
   const justDue=quota(data,expectedAt);assert.equal(justDue.state,'overdue');assert.equal(justDue.expectedElapsed,'刚到原预计时间');assert.equal(justDue.metric,'');
 });

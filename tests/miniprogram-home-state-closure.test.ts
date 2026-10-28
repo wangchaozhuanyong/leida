@@ -61,7 +61,7 @@ function nativeHome(data:PublicData|null,at:number,kind='automatic_reset') {
 
 test('提前完成结束倒计时；同轮补采更早的完成声明只升级确认、沿用观测计时',()=>{
  const d=fixture();action(d,'promise');observation(d,'observation','2026-10-24T01:40:00Z');
- const observed=card(d);assert.equal(observed.state,'observed');assert.equal(observed.early,true);assert.equal(observed.hero.title,'距离上次重置（观测）');assert.equal(observed.hero.badge,'第三方报告');assert.equal(observed.clockAt,'2026-10-24T01:40:00Z');assert.match(observed.hero.description,/预计时间前.*第三方/);assert.match(observed.hero.footnote,/不是采集时间/);
+ const observed=card(d);assert.equal(observed.state,'observed');assert.equal(observed.early,true);assert.equal(observed.hero.title,'距离上次重置（观测）');assert.equal(observed.hero.badge,'第三方报告');assert.equal(observed.clockAt,'2026-10-24T01:40:00Z');assert.match(observed.hero.description,/预计时间前.*观测/);assert.match(observed.hero.footnote,/来源：.*账户为准/);assert.equal(observed.evidenceType,'observation');
  action(d,'declared','claimed_complete','2026-10-24T01:30:00Z',undefined,'automatic_reset','promise',NOW);
  const declared=card(d);assert.equal(declared.state,'completed');assert.equal(declared.hero.badge,'发布者已确认');assert.equal(declared.clockAt,observed.clockAt);assert.equal(declared.hero.metric,observed.hero.metric);assert.equal(declared.publicationId,'pub-declared');assert.match(declared.declarationTime,/09:30/);assert.notEqual(declared.revision,observed.revision);
 });

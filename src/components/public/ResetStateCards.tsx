@@ -28,7 +28,7 @@ export function ResetStateCardView({card}:{card:ResetStateCard}) {
       {card.observationPublicationId&&<aside className="pub-orbit-observation" aria-label="独立第三方重置观测">
         <div className="pub-orbit-observation-heading"><strong>第三方重置观测</strong><span>独立记录</span></div>
         <p className="pub-orbit-observation-time"><time dateTime={card.observationAt}>{card.observationTime}</time> <small>北京时间</small></p>
-        <p className="pub-orbit-observation-source">{card.observationSourceName} · 不代表官方完成确认</p>
+        <p className="pub-orbit-observation-source">{card.observationSourceName} · 第三方观测</p>
         <Link scroll={false} href={`/events/${encodeURIComponent(card.observationEventId)}?version=${encodeURIComponent(card.observationPublicationId)}`}>查看观测依据 ↗</Link>
       </aside>}
       {card.expectedElapsed&&<p className="pub-orbit-elapsed">{card.expectedElapsed}</p>}
@@ -68,7 +68,7 @@ export function LastResetElapsed({data,selectedKind='automatic_reset'}:{data:Pub
       <div className="pub-last-reset-record">
         <p className="pub-last-reset-time"><span>{record.sourceType==='observed'?'来源观测时间':banked?'上次发放时间':'上次重置时间'}</span><span className="pub-last-reset-date"><time dateTime={record.statementAt}>{record.displayTime}</time><small>北京时间</small></span></p>
         <div className="pub-last-reset-footer">
-          <p className="pub-last-reset-basis">{record.sourceType==='observed'?`${record.sourceName} 观测 · 个人到账未核验`:banked?'依据公开发放完成消息记录':'依据公开完成消息记录'}</p>
+          <p className="pub-last-reset-basis">{record.sourceType==='observed'?`${record.sourceName} · 第三方观测`:banked?'依据公开发放完成消息记录':'依据公开完成消息记录'}</p>
           <Link scroll={false} href={`/events/${encodeURIComponent(record.eventId)}?version=${encodeURIComponent(record.publicationId)}`} className="pub-last-reset-link" aria-label={banked?'查看这次发卡记录':'查看这次重置记录'}>查看记录 <span aria-hidden="true">↗</span></Link>
         </div>
       </div>
@@ -77,5 +77,5 @@ export function LastResetElapsed({data,selectedKind='automatic_reset'}:{data:Pub
 }
 
 export function ResetStatePending({failed=false,busy=false,onRetry}:{failed?:boolean;busy?:boolean;onRetry:()=>void}) {
-  return <section className="pub-reset-state tone-slate" role={failed?'alert':'status'} aria-label="公开动态读取状态"><div className="pub-reset-state-body"><div className="pub-reset-state-meta"><span>公开动态追踪</span><span className="pub-reset-state-badge">{failed?'连接异常':'读取中'}</span></div><div className="pub-reset-state-heading"><h2>{failed?'暂时无法获取动态':'正在获取公开动态'}</h2></div><p className="pub-reset-state-description">{failed?'当前没有可展示的缓存，连接恢复后更新。':'正在读取公开消息和已确认记录。'}</p>{!failed&&<div className="pub-page-loading"><span className="pub-loading-bar" aria-hidden="true"/></div>}</div><div className="pub-reset-state-footer"><span>{failed?'暂不能判断是否出现新消息':'读取完成后显示来源'}</span>{failed&&<button className="pub-text-button" onClick={onRetry} disabled={busy}>{busy?'正在重试…':'重新获取 →'}</button>}</div></section>;
+  return <section className="pub-reset-state tone-slate" role={failed?'alert':'status'} aria-label="公开动态读取状态"><div className="pub-reset-state-body"><div className="pub-reset-state-meta"><span>公开动态追踪</span><span className="pub-reset-state-badge">{failed?'连接异常':'读取中'}</span></div><div className="pub-reset-state-heading"><h2>{failed?'暂时无法获取动态':'正在获取公开动态'}</h2></div><p className="pub-reset-state-description">{failed?'暂时无法加载消息，请检查网络后重试。':'正在读取公开消息和已确认记录。'}</p>{!failed&&<div className="pub-page-loading"><span className="pub-loading-bar" aria-hidden="true"/></div>}</div><div className="pub-reset-state-footer"><span>{failed?'暂不能判断是否出现新消息':'读取完成后显示来源'}</span>{failed&&<button className="pub-text-button" onClick={onRetry} disabled={busy}>{busy?'正在重试…':'重新获取 →'}</button>}</div></section>;
 }

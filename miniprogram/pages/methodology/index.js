@@ -67,12 +67,12 @@ Page({
       if (epoch !== this._fixedEpoch || !this._visible) return;
       if(this._cadenceId){
         const snapshot=result.data;
-        if(!validateCadenceSnapshot(snapshot) || snapshot.id!==this._snapshotId)throw new Error('预测记录格式不完整，请稍后重新读取。');
+        if(!validateCadenceSnapshot(snapshot) || snapshot.id!==this._snapshotId)throw new Error('预测记录暂不可用，请稍后重新加载。');
         const view=cadenceModel(null,snapshot.generatedAt,snapshot.target||'automatic_reset',snapshot);
-        this.setData({ cadenceSnapshot:snapshot,cadenceNow:snapshot.generatedAt,cadenceNote:view.legacy?'此旧记录仅用于复盘，不作为当前预测。':'这份记录固定保留生成时的概率和窗口，后续资料不会重写。' });
+        this.setData({ cadenceSnapshot:snapshot,cadenceNow:snapshot.generatedAt,cadenceNote:view.legacy?'此旧记录仅用于复盘，不作为当前预测。':'这是当时的预测记录，请结合后续进展查看。' });
         return;
       }
-      if (!m.validateForecastSnapshot(result.data) || result.data.id !== this._snapshotId) throw new Error('预测记录格式不完整，请稍后重新读取。');
+      if (!m.validateForecastSnapshot(result.data) || result.data.id !== this._snapshotId) throw new Error('预测记录暂不可用，请稍后重新加载。');
       // Bootstrap/current cases never replace the immutable snapshot endpoint.
       this._fixedSnapshot = result.data;
       this.setData({ forecast: m.forecastSnapshotModel(result.data, result.data.generatedAt) });

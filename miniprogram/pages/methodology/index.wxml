@@ -21,7 +21,7 @@
     <view class="small muted">首次信号 {{forecast.signalAt}}</view><view class="small muted">预测生成 {{forecast.generatedAt}}</view><view class="small muted">资料截至 {{forecast.cutoff}}</view>
     <view class="small muted lead">24小时截至 {{forecast.window24}}</view><view class="small muted">48小时截至 {{forecast.window48}}</view>
     <view class="small muted lead">{{forecast.windowNote}} 时间均为北京时间。</view><view class="small muted lead">{{forecast.deliveryNote}}</view>
-    <view wx:if="{{forecast.late}}" class="warning lead">资料晚采，这条记录不能冒充提前预测。</view>
+    <view wx:if="{{forecast.late}}" class="warning lead">资料收录较晚，本条不作为提前预测。</view>
     <button wx:if="{{!fixed}}" class="secondary full" style="margin-top:12px" bindtap="openForecast">查看固定预测记录</button>
     <button wx:if="{{fixed}}" class="secondary full" style="margin-top:12px" open-type="share">分享这条实验预测给朋友</button>
     <button class="secondary full" style="margin-top:12px" bindtap="copySignal">复制原始信号链接</button>

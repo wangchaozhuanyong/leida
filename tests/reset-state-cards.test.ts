@@ -72,7 +72,7 @@ test('已有可信分类的信号按类型显示；来源中断保留完成事�
  d.forecasts!.watch={status:'active',checkedAt:now,signal:{sourceUrl:url,text:'public hint',level:'elevated',observedAt:'2026-10-18T10:00:00Z',expiresAt:'2026-10-18T14:00:00Z',forecastWindow:'within 2 hours'}};
  d.forecasts!.cases=[{id:'existing',url,target:'banked_reset',status:'watching',coverage:{status:'verified'},signalEvidenceIds:[]} as any];
  assert.equal(card(d,'banked_reset').title,'预计近期发放重置卡');assert.equal(card(d).state,'waiting');
- add(d,'done','automatic_reset','claimed_complete');projected(d);d.forecasts!.watch={status:'unavailable',checkedAt:now};assert.equal(card(d).state,'completed');assert.match(resetStateCards(d).sourceWarning,/仅影响信号观察/);assert.match(resetStateCards(d).sourceWarning,/公开公告与历史记录仍可查看/);
+ add(d,'done','automatic_reset','claimed_complete');projected(d);d.forecasts!.watch={status:'unavailable',checkedAt:now};assert.equal(card(d).state,'completed');assert.match(resetStateCards(d).sourceWarning,/重置信号更新延迟/);assert.match(resetStateCards(d).sourceWarning,/已有消息和记录仍可查看/);
 });
 
 test('内部趋势读取失败不归咎第三方信号，保留公告状态与历史计时',()=>{
@@ -160,7 +160,7 @@ test('雷达倒计时跨天保持三列、一天内两列，不足一分钟与�
  assert.deepEqual(card(d,'automatic_reset','2026-10-20T00:00:00Z').clockParts,[{unit:'小时',value:'00'},{unit:'分钟',value:'45'}]);
  const minute=card(d,'automatic_reset','2026-10-20T00:44:30Z');assert.equal(minute.metric,'不足1分钟');assert.deepEqual(minute.clockParts,[]);
  const overdue=card(d,'automatic_reset','2026-10-20T00:45:00Z');assert.deepEqual(overdue.clockParts,[]);assert.equal(overdue.dialTitle,'完成情况待确认');
- const html=renderToStaticMarkup(createElement(ResetStateCardView,{card:overdue}));assert.doesNotMatch(html,/class="pub-radar-sweep"|class="pub-orbit-digits/);assert.match(html,/尚未采集到额度重置完成声明/);assert.match(html,/刚到原预计时间/);
+ const html=renderToStaticMarkup(createElement(ResetStateCardView,{card:overdue}));assert.doesNotMatch(html,/class="pub-radar-sweep"|class="pub-orbit-digits/);assert.match(html,/暂未收到额度重置完成消息/);assert.match(html,/刚到原预计时间/);
 });
 
 test('分列日期保留北京时间与截止限定词，长天数不截断',()=>{

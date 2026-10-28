@@ -33,7 +33,7 @@ test('模板文案隐藏处理流程，人工摘要保持原样且不删除资�
   assert.doesNotMatch(publicArticleSummary({...article,summary:text}),/智能服务/);
   assert.equal(publicArticleSummary({...article,summary:text,manualFields:['summary']}),text);
   assert.equal(publicArticleSummary({...article,summary:text,contentOrigin:'generated'}),text);
-  assert.match(publicArticleSummary({...article,summary:'根据公开归档保存的原帖，公告称已完成，原帖未列明具体套餐。 原文发布时间：2026/10/12 12:00（北京时间）。这是中文事实摘要，个人账户是否到账尚未观测。'}),/原帖未列明具体套餐。 个人账户是否到账尚未观测/);
+  assert.match(publicArticleSummary({...article,summary:'根据公开归档保存的原帖，公告称已完成，原帖未列明具体套餐。 原文发布时间：2026/10/12 12:00（北京时间）。这是中文事实摘要，个人账户是否到账尚未观测。'}),/原帖未列明具体套餐。 实际到账以账户显示为准/);
 });
 test('详情页属于原有导航分类',()=>{
   assert.equal(publicNavSection('events'),'history');assert.equal(publicNavSection('sources'),'history');
@@ -50,7 +50,7 @@ test('详情只展示一份重复来源，动作独有的不同原文仍可达',
   assert.match(html,/href="https:\/\/example.com\/source-a"/);
   assert.match(html,/href="https:\/\/example.com\/action-only"/);
   assert.match(html,/查看来源/);assert.doesNotMatch(html,/相同内容的另外|辅助归档/);
-  assert.match(html,/个人账户是否到账尚未观测/);assert.match(html,/原帖未列明具体套餐/);
+  assert.match(html,/实际到账以账户显示为准/);assert.match(html,/原帖未列明具体套餐/);
 });
 test('首页先显示当前进度，再显示独立历史计时，预告不会清空最近完成记录',()=>{
   const data=fixture();

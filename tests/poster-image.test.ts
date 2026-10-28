@@ -45,7 +45,7 @@ test('关闭海报时取消解码，不启动备用加载',async t=>{
 });
 test('状态为200的非图片响应仍拒绝作为海报',async t=>{
   t.mock.method(globalThis,'fetch',async()=>new Response('<html>upstream page</html>',{headers:{'Content-Type':'text/html'}}));
-  await assert.rejects(createPosterFromEndpoint('/api/v1/posters/fixed','公告.png',new AbortController().signal),/返回格式异常/);
+  await assert.rejects(createPosterFromEndpoint('/api/v1/posters/fixed','公告.png',new AbortController().signal),/海报暂时无法加载/);
 });
 for (const [status,message] of [[409,'公开状态已变化'],[410,'此内容已撤回']] as const) {
   test(`海报接口 ${status} 保留内容状态失效原因`,async t=>{

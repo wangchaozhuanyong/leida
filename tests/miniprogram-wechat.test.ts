@@ -134,10 +134,10 @@ test('公共scene/code无需读者登录，固定pub与32hex合同核验，公�
   const resolved=await publicRequest(`/api/v1/wechat/scene/${scene}`).promise;assert.equal(resolved.data.publicationId,'fixture-publication');
   const code=await publicRequest('/api/v1/wechat/code/fixture-publication',{sessionToken:'must-not-go-public'}).promise;assert.equal(code.data.publicationId,'fixture-publication');assert.equal(h.login,0);
   assert.equal(h.requests.every(item=>!item.header.Authorization),true);
-  await assert.rejects(publicRequest('/api/wechat/subscription').promise,/路径/);
-  await assert.rejects(privateRequest(`/api/v1/wechat/scene/${scene}`,{sessionToken:'fixture-reader-session'}).promise,/路径/);
-  await assert.rejects(privateRequest('/api/wechat/subscription').promise,/重新建立/);
-  await assert.rejects(publicRequest('/api/v1/wechat/scene/../latest').promise,/路径/);
+  await assert.rejects(publicRequest('/api/wechat/subscription').promise,/暂时无法打开/);
+  await assert.rejects(privateRequest(`/api/v1/wechat/scene/${scene}`,{sessionToken:'fixture-reader-session'}).promise,/暂时无法打开/);
+  await assert.rejects(privateRequest('/api/wechat/subscription').promise,/重新打开微信提醒/);
+  await assert.rejects(publicRequest('/api/v1/wechat/scene/../latest').promise,/暂时无法打开/);
 });
 
 test('未配置和撤回真码返回具体中文提示，不自动替代为装饰码或最新版本',async()=>{
@@ -260,9 +260,9 @@ test('保存结果不确定后关闭提醒取得权威选择，开关恢复且�
 
 test('类型接口只允许读者私有POST，不能通过公开传输发送',async()=>{
   const h=mock(),privateRequest=createWechatTransport(h.wx,config),choice={announcement:true,result:false,correction:false};
-  await assert.rejects(createTransport(h.wx,config)('/api/wechat/subscription/preferences').promise,/路径/);
-  await assert.rejects(privateRequest('/api/wechat/subscription/preferences',{method:'GET',sessionToken:'fixture-reader-session'}).promise,/路径/);
-  await assert.rejects(privateRequest('/api/wechat/subscription/preferences',{method:'POST',data:choice}).promise,/重新建立/);
+  await assert.rejects(createTransport(h.wx,config)('/api/wechat/subscription/preferences').promise,/暂时无法打开/);
+  await assert.rejects(privateRequest('/api/wechat/subscription/preferences',{method:'GET',sessionToken:'fixture-reader-session'}).promise,/暂时无法打开/);
+  await assert.rejects(privateRequest('/api/wechat/subscription/preferences',{method:'POST',data:choice}).promise,/重新打开微信提醒/);
   assert.equal(h.requests.length,0);
 });
 

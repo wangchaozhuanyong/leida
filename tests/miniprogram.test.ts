@@ -277,7 +277,7 @@ test('正式配置连接现有云托管，空白示例仍拒绝联网、本机�
   assert.deepEqual(Object.keys(deployed).sort(), ['baseUrl','cloudEnv','mode','pollMs','serviceName','timeoutMs'].sort());
   const config = require('../miniprogram/config.example.js');
   assert.deepEqual([config.mode, config.baseUrl, config.cloudEnv, config.serviceName], ['', '', '', '']);
-  assert.match(configurationError(config), /尚未连接/);
+  assert.match(configurationError(config), /服务暂不可用/);
   for (const baseUrl of ['http://example.org', 'https://127.0.0.1', 'https://localhost', 'https://example.org/api/v1']) assert.ok(configurationError({ ...httpsConfig, baseUrl }));
   assert.equal(configurationError(httpsConfig), '');
   assert.ok(configurationError({ mode: 'cloud', cloudEnv: ' ', serviceName: '' }));
@@ -303,7 +303,7 @@ test('普通请求只读公开接口，携带版本和限时；私有及任意�
   assert.equal(mock.calls[0].timeout, 10000);
   assert.deepEqual(await request('/api/v1/version', 'fixture-v1').promise, { unchanged: true });
   assert.equal(mock.calls[1].header['If-None-Match'], '"fixture-v1"');
-  for (const path of ['/api/admin/bootstrap', '/api/v1/publish', 'https://elsewhere.example.org']) await assert.rejects(request(path).promise, /路径/);
+  for (const path of ['/api/admin/bootstrap', '/api/v1/publish', 'https://elsewhere.example.org']) await assert.rejects(request(path).promise, /暂时无法打开/);
   assert.equal(mock.calls.length, 2);
 });
 
@@ -315,15 +315,40 @@ test('结构校验拒绝不完整数据、重复ID和跨事件快照，不把异
   assert.equal(validateBootstrap(duplicate), false);
   for (const response of [envelope(invalid), { statusCode: 200, data: '<html>错误页</html>' }, { statusCode: 200, data: { data: {} } }, { statusCode: 304 }]) {
     const mock = network(options => options.success(response));
-    await assert.rejects(createTransport(mock.wx, httpsConfig)('/api/v1/bootstrap').promise, /资料|格式/);
+    await assert.rejects(createTransport(mock.wx, httpsConfig)('/api/v1/bootstrap').promise, /资料|消息/);
   }
 });
 
 test('HTTP和网络错误显示中文可重试原因，不回显底层请求内容', async () => {
   const failed = network(options => options.success({ statusCode: 503, data: { message: 'internal-private-details' } }));
-  await assert.rejects(createTransport(failed.wx, httpsConfig)('/api/v1/bootstrap').promise, /503/);
+  await assert.rejects(createTransport(failed.wx, httpsConfig)('/api/v1/bootstrap').promise, error=>error instanceof Error && error.message==='资料暂时无法读取，请稍后重试。' && (error as Error & {status:number}).status===503);
   const disconnected = network(options => options.fail({ errMsg: 'private-provider-details' }));
   await assert.rejects(createTransport(disconnected.wx, httpsConfig)('/api/v1/bootstrap').promise, error => error instanceof Error && error.message.includes('连接失败') && !error.message.includes('private'));
+});
+
+test('用户错误提示隐藏配置诊断，保留状态码、限流恢复时间和消息撤回事实', async () => {
+  const cases: [number,string,string][] = [
+    [503,'微信接口证书校验失败（CERT_EXPIRED），请联系站长检查云端证书配置','微信服务暂不可用，请稍后重试。'],
+    [503,'服务端加密密钥不可用','微信服务暂不可用，请稍后重试。'],
+    [503,'微信小程序码尚未配置','小程序码暂不可用，请返回查看最新消息。'],
+    [404,'未找到对应发布版本','这条记录暂不可用，请返回查看最新消息。'],
+    [404,'未找到固定重置时间预测','这条记录暂不可用，请返回查看最新消息。'],
+    [400,'公开读取参数无效，请重新打开页面','链接已失效，请返回后重试。'],
+    [503,'模板字段未配置或类型不兼容','微信提醒暂不可用，请稍后重试。'],
+    [401,'微信读者会话已过期，请重新授权','连接已失效，请重新打开微信提醒。'],
+    [409,'订阅请求不存在或已失效','本次提醒授权已失效，请重新操作。'],
+    [429,'微信接口拒绝请求（错误码 45009）','微信服务暂时繁忙，请稍后重试。'],
+    [429,'当前来源连续登录失败，请在15分钟后重试','连接暂受限制，请在15分钟后重试'],
+    [429,'微信登录调用已达限制，次日零点恢复','微信连接次数已达限制，次日零点恢复'],
+    [410,'该内容已撤回、合并或不可分享','该内容已撤回、合并或不可分享'],
+    [403,'微信提醒身份已停用','微信提醒身份已停用'],
+  ];
+  for (const [status,raw,expected] of cases) {
+    const mock=network(options=>options.success({statusCode:status,data:{error:raw}}));
+    await assert.rejects(createTransport(mock.wx,httpsConfig)('/api/v1/bootstrap').promise,error=>
+      error instanceof Error && error.message===expected && (error as Error & {status:number}).status===status);
+    assert.equal(mock.calls.length,1,'文案转换不触发重试或新请求');
+  }
 });
 
 test('云托管使用实际环境和服务标识、只初始化一次，保持与HTTPS相同的公开合同', async () => {
@@ -375,7 +400,7 @@ test('首次配置为空不轮询、不调用任何网络，重试不制造模�
   await client.start(); await client.refresh(false);
   assert.equal(mock.calls.length, 0); assert.equal(timers.callbacks.size, 0);
   assert.equal(client.getState().data, null); assert.equal(client.getState().unconfigured, true);
-  assert.match(client.getState().error, /尚未连接/);
+  assert.match(client.getState().error, /服务暂不可用/);
   client.stop();
 });
 
@@ -752,7 +777,7 @@ test('观察记录缓存返回不制造遮罩，迟到请求不改变当前页�
   page.onUnload();assert.equal(h.subscriptions,0);assert.equal(page.data.navigationLoading,false);
 });
 
-test('待确认及定向跟踪显示用户说明，核验原因留在来源中，不增加福利次数',()=>{
+test('待确认及定向跟踪显示用户说明，内部核验备注不进入页面且不增加福利次数',()=>{
  for(const reviewStatus of ['pending','targeted_update'] as const){
   const data=fixture(),before=mini.publicActions(data).length;
   const p=addRound(data,'review-'+reviewStatus,[]);
@@ -760,7 +785,7 @@ test('待确认及定向跟踪显示用户说明，核验原因留在来源中�
   Object.assign(data.articles.find(a=>a.id===p.articleId)!,p.article);
   assert.equal(validateBootstrap(data),true);
   assert.equal(mini.publicationCard(data,p).reviewStatus,reviewStatus);
-  const detail=mini.resolveDetail(data,{publicationId:p.id});assert.equal(detail.reviewStatus,reviewStatus);assert.match(detail.reviewReasons,/后续公告|适用范围/);assert.ok(detail.sourceNotes.includes('资格或轮次等待原文核对'));assert.doesNotMatch(mini.publicationCard(data,p).reviewReasons,/原文核对/);assert.deepEqual(detail.actions,[]);
+  const detail=mini.resolveDetail(data,{publicationId:p.id});assert.equal(detail.reviewStatus,reviewStatus);assert.match(detail.reviewReasons,/后续公告|适用范围/);assert.ok(detail.sourceNotes.includes(detail.reviewReasons));assert.doesNotMatch(detail.sourceNotes.join(' '),/资格或轮次等待原文核对/);assert.deepEqual(p.article.reviewReasons,['资格或轮次等待原文核对']);assert.doesNotMatch(mini.publicationCard(data,p).reviewReasons,/原文核对/);assert.deepEqual(detail.actions,[]);
   assert.equal(mini.publicActions(data).length,before);
   const broken=structuredClone(data);(broken.articles.find(a=>a.id===p.articleId)! as unknown as {reviewReasons:unknown}).reviewReasons='wrong-shape';assert.equal(validateBootstrap(broken),false);
  }

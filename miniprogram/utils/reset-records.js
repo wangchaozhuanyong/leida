@@ -44,10 +44,10 @@ function observationDayGroups(data, observations = observationSources(data)) {
     const multi = sorted.length > 1, summaryScope=key===first.kind+':'+beijingDate(first.observedAt)?'date':'time';
     return [{id:'observation-day:'+key,kind:first.kind,date:beijingDate(first.observedAt),at:first.observedAt,observedUntil:last.observedAt,
       publication,observations:sorted,sourceCount:sourceNames.length,evidenceCount:sorted.length,sourceName:sourceNames.join('、'),
-      evidenceType:'observed',statusLabel:multi?summaryScope==='date'?'当日观测汇总':'同刻观测汇总':'来源观测',isObservationSummary:multi,summaryScope,
+      evidenceType:'observed',statusLabel:'来源观测',isObservationSummary:multi,summaryScope,
       timeRange:times.length>1?times[0]+'–'+times[times.length-1]:times[0],
-      title:multi?(summaryScope==='date'?'当日':'同刻')+'额度重置观测汇总':publication?.article.title||'额度重置观测',
-      summary:multi?`${summaryScope==='date'?'当天':'该时刻'}收录${sourceNames.length}个来源、${sorted.length}条重置观测，来源记录时间${times.join('、')}。这些是来源依据，不据此认定发生了多次重置。`:'',
+      title:multi?'额度已重置（观测）':publication?.article.title||'额度重置观测',
+      summary:multi?`来源：${sourceNames.join('、')}。最早观测 ${beijingTime(first.observedAt)}（北京时间）。`:'',
       sources:sorted.map(o=>({id:o.evidenceId,title:o.sourceName,time:beijingDate(o.observedAt)+' '+beijingTime(o.observedAt),at:o.observedAt,publicationId:o.publicationId,path:'/pages/detail/index?publicationId='+encodeURIComponent(o.publicationId)}))}];
   }).sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)||a.id.localeCompare(b.id));
 }

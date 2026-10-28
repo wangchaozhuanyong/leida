@@ -48,7 +48,7 @@ function resolveStatusTimeline(outlook: ResetOutlook, now: string, completion: C
     stages: ['公开预告', banked ? '发卡进行' : '重置进行', '完成确认'],
   };
   if(referenceSignal)return {...base,sourceName:referenceSignal.sourceName,watching:true,completed:false,lead:'公开信号观察',title:'发现公开重置信号',note:`信号发布于 ${beijing(referenceSignal.publishedAt)}`,detail:'来源已收录这条公开暗示，发放安排尚未明确。',sourceUrl:referenceSignal.sourceUrl,sourceType:'x_post',sourceCredit:true,statementAt:referenceSignal.publishedAt,observedLabel:`来源收录于 ${beijing(referenceSignal.recordedAt)}`,forecastWindow:'',currentStage:-1};
-  if(signal)return {...base,watching:true,completed:false,lead:'重置信号观察',title:'发现重置信号',note:`观察有效至 ${beijing(signal.expiresAt)}`,detail:signal.sourceType==='observed'?'来源观察记录，尚无明确预告':'AI 信号推测，尚无明确预告',sourceUrl:signal.sourceUrl??'',sourceType:signal.sourceType??'x_post',sourceCredit:true,statementAt:signal.observedAt,observedLabel:`信号时间 ${beijing(signal.observedAt)}`,expiresAt:signal.expiresAt,forecastWindow:resetWatchWindow(signal.forecastWindow),chanceLabel:typeof signal.chancePercent==='number'?`上游信号概率 ${signal.chancePercent}%`:'',currentStage:-1};
+  if(signal)return {...base,watching:true,completed:false,lead:'重置信号观察',title:'发现重置信号',note:`观察有效至 ${beijing(signal.expiresAt)}`,detail:signal.sourceType==='observed'?'来源观察记录，尚无明确预告':'AI 信号推测，尚无明确预告',sourceUrl:signal.sourceUrl??'',sourceType:signal.sourceType??'x_post',sourceCredit:true,statementAt:signal.observedAt,observedLabel:`信号时间 ${beijing(signal.observedAt)}`,expiresAt:signal.expiresAt,forecastWindow:resetWatchWindow(signal.forecastWindow),chanceLabel:typeof signal.chancePercent==='number'?`来源估计概率 ${signal.chancePercent}%`:'',currentStage:-1};
   // Historical cadence is not evidence that a new reset is approaching.
   // Keep it in the experimental records, never as a current homepage fallback.
   return base;
@@ -71,7 +71,7 @@ export function statusTimelineModel(outlook:ResetOutlook,now:string,completion:C
   const observation=timelineObservation(outlook,now,completion);
   if(observation&&!activeResetSchedule(forecasts?.watch,now)){
     const model=resolveStatusTimeline(outlook,now,{kind:'automatic_reset',stage:'claimed_complete',statementAt:observation.observedAt},forecasts?{...forecasts,referenceSignal:undefined,watch:undefined}:undefined);
-    return {...model,sourceName:observation.sourceName,sourceUrl:observation.sourceUrl,sourceType:'observed' as const,sourceCredit:true,publicationId:observation.publicationId,statementAt:observation.observedAt,note:'第三方来源记录了用量重置；个人到账尚未核验。',presentation:{tone:'green',badge:'来源观测',heading:'来源观测：用量已重置',kind:'额度重置'}};
+    return {...model,sourceName:observation.sourceName,sourceUrl:observation.sourceUrl,sourceType:'observed' as const,sourceCredit:true,publicationId:observation.publicationId,statementAt:observation.observedAt,note:'第三方已观测到额度重置，实际额度以账户显示为准。',presentation:{tone:'green',badge:'来源观测',heading:'来源观测：用量已重置',kind:'额度重置'}};
   }
   const model=resolveStatusTimeline(outlook,now,completion,forecasts);
   return {...model,presentation:statusPresentation(model)};

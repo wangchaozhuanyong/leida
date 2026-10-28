@@ -72,7 +72,7 @@ test('正文隐藏内部分类与时间换算说明，保留来源限定、日�
   const before=JSON.stringify(p),summary=publicArticleSummary(p.article);
   assert.match(summary,/AIPlanWatch|Pro|2026\/10\/18 16:00/);assert.doesNotMatch(summary,/未虚构|字面|夏令时/);
   assert.match(publicReviewMessage(p.article),/尚不能确认/);assert.doesNotMatch(publicReviewMessage(p.article),/补抓/);
-  assert.ok(publicSourceNotes(p.article,p.event.actions).includes(note));assert.equal(native.publicArticleSummary(p.article),summary);assert.equal(JSON.stringify(p),before);
+  const notes=publicSourceNotes(p.article,p.event.actions);assert.ok(notes.includes('预计为最晚时间，以实际发放为准。'));assert.doesNotMatch(notes.join(' '),/字面|夏令时|补抓|未虚构/);assert.ok(notes.includes(publicReviewMessage(p.article)));assert.equal(native.publicArticleSummary(p.article),summary);assert.equal(JSON.stringify(p),before);
   p.article.manualFields=['summary'];assert.equal(publicArticleSummary(p.article),p.article.summary);
 });
 
@@ -97,4 +97,33 @@ test('系统站内信使用对应历史公告的客户摘要，人工站内信�
   assert.equal(publicNoticeSummary({...notice,origin:'admin'},data.publications),notice.summary);
   assert.equal(publicNoticeSummary(notice,[]),notice.summary);
   data.notices=[notice];assert.equal(native.noticeModel(data,{},[])[0].summary,'额度将重置。');
+});
+
+test('活动摘要去掉归档处理说明，保留时间限定、适用范围和不确定性，两端一致且原文不变',()=>{
+  const d=fixture(),p=add(d,'copy-only');p.article.contentOrigin='template';
+  const cases=[
+    {text:'辅助归档将此条列为第 20 天重置相关消息。归档摘录：“在午夜 PST 之前”。仅记录消息，不据此认定已完成；具体福利、时间和完成情况仍需核对。',expected:'在午夜 PST 之前 具体发放安排待确认。'},
+    {text:'辅助归档将此条列为第 1 天产品动态。归档摘录：“Pro 用户速度提升约50%，两小时内逐步生效”。这是来源消息，完整细节以原帖为准。',expected:'Pro 用户速度提升约50%，两小时内逐步生效'},
+    {text:'Codex Limits 记录用量重置观测，观测时间：2026/10/26 14:08（北京时间）。这不是原作者的新完成公告，个人账户是否到账请查看实际额度。',expected:'Codex Limits 已观测到额度重置，时间：2026/10/26 14:08（北京时间）。实际额度以账户显示为准。'}
+  ];
+  for(const row of cases){
+    p.article.summary=row.text;const before=JSON.stringify(p);
+    assert.equal(publicArticleSummary(p.article),row.expected);assert.equal(native.publicArticleSummary(p.article),row.expected);assert.equal(JSON.stringify(p),before);
+    p.article.manualFields=['summary'];assert.equal(publicArticleSummary(p.article),row.text);assert.equal(native.publicArticleSummary(p.article),row.text);p.article.manualFields=[];
+  }
+});
+
+test('精简时间备注仍区分最晚与近似时间，原始时间说明不被改写',()=>{
+ const d=fixture(),p=add(d,'time-note-copy');p.article.contentOrigin='template';
+ const rows=[
+  {note:'原文承诺日终前完成，预计最晚时间已换算为北京时间（UTC+8）；按原文PST字面UTC-8换算，未自行改用当地夏令时；这是公告预计时间，仍待实际确认。',match:/最晚时间/},
+  {note:'原文近似时间：约略预计时刻，并非最晚截止，未给出误差范围；按原文PDT字面UTC-7换算，未自行改用当地夏令时；这是公告预计时间，仍待实际确认。',match:/大致时间/}
+ ];
+ for(const row of rows){
+  p.event.actions[0].timeNote=row.note;p.article.summary='保留的公告内容';
+  const before=JSON.stringify(p),notes=publicSourceNotes(p.article,p.event.actions);
+  assert.match(notes.join(' '),row.match);assert.doesNotMatch(notes.join(' '),/字面|误差范围|夏令时/);
+  const data={...d,publications:[p]};const view=native.resolveDetail(data,{publicationId:p.id});
+  assert.deepEqual(view.sourceNotes,notes);assert.equal(JSON.stringify(p),before);
+ }
 });

@@ -87,10 +87,10 @@ test('固定重置预测拒绝错误 ID、异常状态、概率、时间及不�
   ];
   for(const [label,mutate] of mutations){
     const value=snapshot();mutate(value);const transport=mock({data:value});
-    await assert.rejects(transport.request(path).promise,/格式不完整/,label);
+    await assert.rejects(transport.request(path).promise,/资料暂时无法加载/,label);
     assert.equal(transport.calls.length,1,label);
   }
-  for(const body of [null,{data:null},{data:{id}},{data:{snapshot:snapshot()}}])await assert.rejects(mock(body).request(path).promise,/格式不完整/);
+  for(const body of [null,{data:null},{data:{id}},{data:{snapshot:snapshot()}}])await assert.rejects(mock(body).request(path).promise,/资料暂时无法加载/);
 });
 
 test('重置预测只允许精确固定 ID，越界路径及私有 transport 均在发请求前拒绝',async()=>{
@@ -101,10 +101,10 @@ test('重置预测只允许精确固定 ID，越界路径及私有 transport 均
     '/api/v1/forecasts/cadence/%2e%2e','/api/admin/forecasts/cadence/'+id
   ]){
     const transport=mock({data:snapshot()});
-    await assert.rejects(transport.request(invalid).promise,/不受支持/,invalid);assert.equal(transport.calls.length,0);
+    await assert.rejects(transport.request(invalid).promise,/暂时无法打开/,invalid);assert.equal(transport.calls.length,0);
   }
   const transport=mock({data:snapshot()});
-  await assert.rejects(transport.privateRequest(path,{sessionToken:'isolated-not-real'}).promise,/不受支持/);assert.equal(transport.calls.length,0);
+  await assert.rejects(transport.privateRequest(path,{sessionToken:'isolated-not-real'}).promise,/暂时无法打开/);assert.equal(transport.calls.length,0);
 });
 
 function fixedPage(value:unknown,query:Record<string,string>={cadence:id}) {

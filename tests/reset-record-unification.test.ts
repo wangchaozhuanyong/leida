@@ -43,14 +43,14 @@ test('26日两条来源跨过活动午夜，三处只展示一个北京时间观
  assert.equal(calendar.selectedItems[0].time,'14:08');assert.equal(calendar.selectedItems[0].timeRange,'14:08–15:00');assert.equal(calendar.selectedItems[0].sourceCount,2);
  assert.deepEqual(calendar.selectedItems[0].sources.map((s:any)=>s.time),['2026-10-26 14:08','2026-10-26 15:00']);
  assert.equal(activity.days[20].label,'重置');assert.equal(activity.days[21].label,'观测补充');assert.equal(activity.entries.length,1);
- const supplement=activityModel(data,'challenge',22);assert.equal(supplement.entries.length,1);assert.equal(supplement.entries[0].types[0].completed,false);assert.match(supplement.entries[0].path,/date=2026-10-26/);assert.match(supplement.entries[0].summary,/不据此另计一次重置/);
- assert.deepEqual(activity.entries[0].sources,calendar.selectedItems[0].sources);assert.match(activity.entries[0].summary,/不据此认定又重置一次/);
+ const supplement=activityModel(data,'challenge',22);assert.equal(supplement.entries.length,1);assert.equal(supplement.entries[0].types[0].completed,false);assert.match(supplement.entries[0].path,/date=2026-10-26/);assert.match(supplement.entries[0].summary,/新来源.*第21天的重置记录/);assert.equal(supplement.entries[0].stage,'来源补充');
+ assert.deepEqual(activity.entries[0].sources,calendar.selectedItems[0].sources);assert.match(activity.entries[0].summary,/来源：.*14:08/);assert.doesNotMatch(activity.entries[0].summary,/归入|轮次|不据此/);
  assert.equal(activity.selectedBeijingRange,'2026-10-25 15:00 — 2026-10-26 15:00（不含）');
  assert.equal(news.length,1);assert.equal(news[0].observation.id,calendar.selectedItems[0].id);assert.equal(news[0].updates.length,2);
  const home=selectedHomeStatus(data,'automatic_reset'),poster=statusPosterInput(data);
- assert.equal(home.clockAt,calendar.selectedItems[0].at);assert.equal(home.hero.timeLabel,'当日最早观测');assert.match(home.hero.footnote,/14:08–15:00/);
+ assert.equal(home.clockAt,calendar.selectedItems[0].at);assert.equal(home.hero.timeLabel,'最早观测时间');assert.match(home.hero.description,/来源：Codex Limits、AIPlanWatch/);assert.equal(home.hero.footnote,'实际额度以账户显示为准。');
  assert.match(home.sharePath,/^\/pages\/schedule\/index\?date=2026-10-26&kind=automatic_reset&revision=/);
- assert.equal(poster.statementAt,home.clockAt);assert.equal(poster.sharePath,home.sharePath);assert.equal(poster.codePublicationId,'');assert.match(poster.nextNote,/轮次仍待核对/);assert.equal(statusPosterAvailable(poster,data),true);
+ assert.equal(poster.statementAt,home.clockAt);assert.equal(poster.sharePath,home.sharePath);assert.equal(poster.codePublicationId,'');assert.match(poster.nextNote,/来源：Codex Limits、AIPlanWatch/);assert.doesNotMatch(poster.nextNote,/轮次|不据此|汇总/);assert.equal(statusPosterAvailable(poster,data),true);
  assert.deepEqual(publicActions(data),[]);assert.equal(resetObservations(data).length,2);assert.deepEqual(data,before);
 });
 
@@ -76,7 +76,7 @@ test('同一来源同日两条独立记录和两次明确完成不能被一天�
  assert.equal(observationDayGroups(data).length,2);assert.equal(recordCalendar(data).recentTotal,2);
  add(data,'archive','2026-10-26T08:08:00.000Z');
  assert.equal(observationDayGroups(data).length,2);assert.equal(recordCalendar(data).recentTotal,2);
- assert.equal(selectedHomeStatus(data,'automatic_reset').hero.timeLabel,'本条观测时间');assert.match(selectedHomeStatus(data,'automatic_reset').hero.footnote,/本条来源记录/);
+ assert.equal(selectedHomeStatus(data,'automatic_reset').hero.timeLabel,'观测时间');assert.equal(selectedHomeStatus(data,'automatic_reset').clockAt,'2026-10-26T08:08:00.000Z');
  const complete=fixture();publish(complete,'first','2026-10-26T03:00:00.000Z',undefined,[action('first','2026-10-26T03:00:00.000Z')]);publish(complete,'second','2026-10-26T09:00:00.000Z',undefined,[action('second','2026-10-26T09:00:00.000Z')]);
  assert.equal(recordCalendar(complete).confirmedCount,2);assert.equal(recordCalendar(complete).recentTotal,2);
 });
@@ -86,7 +86,7 @@ test('相同分钟的两个来源依据仍完整保留，重复采集不增加�
  data.evidence.push({...data.evidence[0],id:'duplicate',collectedAt:now});
  assert.equal(observationSources(data).length,2);assert.equal(observationDayGroups(data)[0].sources.length,2);assert.equal(recordCalendar(data).recentTotal,1);
  assert.deepEqual(observationSources(data),serverObservationSources(data));
- assert.match(selectedHomeStatus(data,'automatic_reset').hero.footnote,/2个来源/);assert.equal(homeNewsGroups(data)[0].observation.sourceCount,2);
+ assert.match(selectedHomeStatus(data,'automatic_reset').hero.description,/来源：Codex Limits、Codex Resets/);assert.equal(homeNewsGroups(data)[0].observation.sourceCount,2);
  data.events.find(e=>e.id===p.eventId)!.status='withdrawn';assert.equal(observationSources(data).length,1);assert.equal(recordCalendar(data).selectedItems[0].sourceCount,1);
 });
 
