@@ -4,6 +4,7 @@
 <view class="page {{contentMotion}}">
     <view class="chips"><button wx:for="{{categories}}" wx:key="value" class="{{category === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="selectCategory">{{item.label}}</button></view>
   <view wx:if="{{category==='reset'}}" class="record-kinds"><button wx:for="{{kinds}}" wx:key="value" class="{{kind===item.value?'active':''}}" data-value="{{item.value}}" bindtap="selectKind">{{item.label}}</button></view>
+  <view class="cached-content-note" role="status">{{snapshotPending && connected ? error ? '更新失败 · 显示上次内容' : '已显示上次内容 · 更新中' : ''}}</view>
   <status-panel wx:if="{{!connected}}" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />
   <block wx:else><view wx:if="{{error}}" class="warning">{{error}}<button class="secondary" bindtap="retry">重新加载</button></view>
     <button wx:if="{{updateAvailable}}" class="update-prompt" bindtap="applyUpdates">有新内容 · 点击更新</button>

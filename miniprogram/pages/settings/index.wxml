@@ -3,6 +3,7 @@
 <view class="refresh-track {{settingsReady && (refreshing || wechat.refreshing) ? 'is-active' : ''}}"><view/></view>
 <view class="page {{contentMotion}}" bindtouchstart="nativeReturnTouched">
   <view wx:if="{{storageError}}" class="warning">{{storageError}}</view>
+  <view class="cached-content-note" role="status">{{snapshotPending && connected ? error ? '更新失败 · 显示上次内容' : '已显示上次内容 · 更新中' : ''}}</view>
   <view class="card inbox-card"><view class="row"><view class="heading">站内信 <text wx:if="{{unread}}" class="inbox-unread">{{unread}} 未读</text></view><button class="text-button" data-path="/pages/notices/index" bindtap="navigate">查看全部提醒 →</button></view>
     <view wx:if="{{!connected}}" class="inbox-loading"><text>{{error || (unconfigured ? '站内信暂不可用' : '正在更新提醒')}}</text><button wx:if="{{error}}" class="text-button" bindtap="retry">重新加载</button></view>
     <view wx:elif="{{error}}" class="warning lead">{{error}}<button class="text-button" bindtap="retry">重新加载</button></view>

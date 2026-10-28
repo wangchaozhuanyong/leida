@@ -15,8 +15,14 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
   const pollMs = Math.max(5000, Number(config.pollMs)||300000);
   let latestVersion = '', latestContentVersion = '', lastCheckAt = -Infinity;
   const pinnedKeys = new Set();
-  let calendarPrefetch, prefetchEpoch = 0;
-  const snapshot=createPublicSnapshot(wxApi,config,{now,timers});
+  let prefetchTask, prefetchEpoch = 0;
+  const warmQueue=[],snapshots=new Map();
+  const primaryViews=[{view:'calendar'},{view:'news',filter:'all'},{view:'notices'}];
+  function snapshotFor(target){
+    if(!['home','calendar','news','notices'].includes(target.view)||Object.keys(target).some(key=>key!=='view'&&(key!=='filter'||target.view!=='news'||!['','all',undefined].includes(target.filter))))return null;
+    if(!snapshots.has(target.view))snapshots.set(target.view,createPublicSnapshot(wxApi,config,{now,timers,view:target.view}));
+    return snapshots.get(target.view);
+  }
   let hydration,networkRevision=0;
   const emit = patch => {
     state = { ...state, ...patch };
@@ -30,13 +36,37 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
     }
     listeners.forEach(fn => fn(state));
   };
-  function restoreHome(){
-    if(hydration||state.data||state.unconfigured||view.view!=='home')return;
+  function restoreSnapshot(){
+    const key=query(view),snapshot=snapshotFor(view);
+    if(hydration?.key===key||state.data||state.unconfigured||!snapshot)return;
     const generation=epoch,revision=networkRevision;
-    hydration=snapshot.load().then(saved=>{
-      if(!saved||generation!==epoch||revision!==networkRevision||view.view!=='home'||state.data)return;
-      emit({data:saved.data,version:saved.version,contentVersion:saved.contentVersion,receivedAt:saved.savedAt,snapshotPending:true,validatedAt:-Infinity,pagesLoaded:1});
-    }).finally(()=>{hydration=undefined;});
+    const work=snapshot.load().then(saved=>{
+      if(!saved||generation!==epoch||revision!==networkRevision||query(view)!==key||state.data)return;
+      emit({data:saved.data,version:saved.version,contentVersion:saved.contentVersion,page:saved.page||null,receivedAt:saved.savedAt,snapshotPending:true,validatedAt:-Infinity,pagesLoaded:1});
+    }).finally(()=>{if(hydration?.promise===work)hydration=undefined;});
+    hydration={key,promise:work};
+  }
+  const canPrefetch=()=>!suspended&&!pending&&!state.loading&&!state.snapshotPending&&!!state.data&&!state.error&&!state.unconfigured;
+  function prefetch(next,queued=false){
+    const key=query(next),cached=views.get(key);
+    if(!canPrefetch()||query(view)===key||cached?.data&&!cached.snapshotPending&&now()-cached.validatedAt>=0&&now()-cached.validatedAt<pollMs&&cached.version===latestVersion)return Promise.resolve(null);
+    if(prefetchTask)return prefetchTask.key===key?prefetchTask.promise:Promise.resolve(null);
+    const generation=prefetchEpoch,beforeContent=latestContentVersion,requestTask=request(`/api/v1/bootstrap?${key}`);
+    const flight={key,view:next,queued,task:requestTask,promise:null};
+    const promise=requestTask.promise.then(result=>{
+      if(generation!==prefetchEpoch||beforeContent!==latestContentVersion&&result.contentVersion!==latestContentVersion)return null;
+      const value={...empty(),data:result.data,version:result.version,contentVersion:result.contentVersion||'',page:result.page||null,pagesLoaded:1,receivedAt:now(),validatedAt:now(),error:''};
+      views.set(key,value);pinnedKeys.add(key);snapshotFor(next)?.save(value);
+      return {value};
+    }).catch(error=>generation===prefetchEpoch?{error:error.message||'资料暂时无法更新，请重试。'}:null).finally(()=>{
+      if(prefetchTask===flight)prefetchTask=undefined;
+      void Promise.resolve().then(pumpPrefetch);
+    });
+    flight.promise=promise;prefetchTask=flight;return promise;
+  }
+  function pumpPrefetch(){
+    if(!canPrefetch()||prefetchTask||!warmQueue.length)return;
+    const next=warmQueue.shift();void prefetch(next,true).finally(()=>{void Promise.resolve().then(pumpPrefetch);});
   }
   function schedule() {
     if (!active || state.unconfigured) return;
@@ -101,51 +131,54 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
       const next={ data:result.data, page:result.page||null, pagesLoaded, version:result.version, contentVersion:result.contentVersion||'', receivedAt:now(), validatedAt:now(), snapshotPending:false, error:'', moreError:'' };
       if(checkOnly && previous.data && ['news','history'].includes(view.view) && isAddition(previous.data,result.data))emit({candidate:next,updateAvailable:true,validatedAt:now(),error:''});
       else emit({...next,candidate:null,updateAvailable:false});
-      if(view.view==='home')snapshot.save(next);
+      snapshotFor(view)?.save(next);
     } catch (error) { if (generation === epoch) { failures=Math.min(4,failures+1); emit({ [cursor?'moreError':'error']: error.message || '资料暂时无法加载',...(invalidated?{page:state.page?{...state.page,nextCursor:null}:null,validatedAt:-Infinity}:{}) }); } }
     finally { if (generation === epoch) emit({ loading: false, loadingMore:false }); }
   }
   function refresh(checkOnly = false, cursor) {
     if (state.unconfigured) { emit({ loading: false, error: configurationError(config) }); return Promise.resolve(); }
     if (pending) return pending;
-    if(calendarPrefetch){prefetchEpoch++;calendarPrefetch.task.abort();calendarPrefetch=undefined;}
+    if(prefetchTask){
+      prefetchEpoch++;const previous=prefetchTask;prefetchTask=undefined;previous.task.abort();
+      if(previous.queued&&!warmQueue.some(next=>query(next)===previous.key))warmQueue.push(previous.view);
+    }
     const work = run(checkOnly,cursor); pending=work;
-    work.finally(() => { if(pending===work)pending=undefined; }); return work;
+    work.finally(() => { if(pending===work)pending=undefined;pumpPrefetch(); }); return work;
   }
   function cancel() { epoch++; if(task)task.abort(); task=undefined;pending=undefined; }
   const current = () => state.data && !state.snapshotPending && !state.error && (state.candidate?.version||state.version)===latestVersion && now()-state.validatedAt>=0 && now()-state.validatedAt<pollMs;
   return {
     subscribe(fn) { listeners.add(fn); fn(state); return () => listeners.delete(fn); },
     getState() { return state; }, refresh,
-    prefetchCalendar() {
-      const calendar={view:'calendar'}, key=query(calendar), cached=views.get(key);
-      if (suspended || pending || state.loading || state.snapshotPending || !state.data || state.error || state.unconfigured || view.view==='calendar' || cached?.data && now()-cached.validatedAt<pollMs && cached.version===latestVersion) return Promise.resolve();
-      if(calendarPrefetch)return calendarPrefetch.promise;
-      const generation=prefetchEpoch, beforeContent=latestContentVersion;
-      const task=request(`/api/v1/bootstrap?${key}`);
-      const promise=task.promise.then(result=>{
-        if(generation!==prefetchEpoch)return;
-        if(beforeContent!==latestContentVersion && result.contentVersion!==latestContentVersion)return;
-        views.set(key,{...empty(),data:result.data,version:result.version,contentVersion:result.contentVersion||'',page:result.page||null,pagesLoaded:1,receivedAt:now(),validatedAt:now(),error:''});pinnedKeys.add(key);
-      }).catch(()=>{}).finally(()=>{if(calendarPrefetch?.promise===promise)calendarPrefetch=undefined;});
-      calendarPrefetch={task,promise};return promise;
+    prefetchCalendar() { return prefetch({view:'calendar'}); },
+    prefetchPrimaryViews(){
+      for(const next of primaryViews)if(query(next)!==query(view)&&!warmQueue.some(item=>query(item)===query(next))&&prefetchTask?.key!==query(next))warmQueue.push(next);
+      pumpPrefetch();
     },
     setView(next) {
-      if (query(next)===query(view)) {restoreHome();return current() ? pending||Promise.resolve() : refresh(true);}
+      if (query(next)===query(view)) {restoreSnapshot();return current() ? pending||Promise.resolve() : refresh(true);}
       cancel(); view={...next};
       // Each page/filter restores only its own validated snapshot. Known version
       // changes and expiry revalidate it; a cold page never shows another view.
-      const restore=()=>{const cached=views.get(query(view));state={...empty(),...cached};emit({});restoreHome();return current()?Promise.resolve():refresh(!!cached?.data);};
-      if(next.view==='calendar' && calendarPrefetch){
-        const generation=epoch;state=empty();emit({loading:true});
-        return calendarPrefetch.promise.then(()=>{if(generation===epoch)return restore();});
+      const restore=()=>{const cached=views.get(query(view));state={...empty(),...cached};emit({});restoreSnapshot();return current()?Promise.resolve():refresh(!!cached?.data);};
+      if(prefetchTask?.key===query(next)){
+        const generation=epoch,flight=prefetchTask;state={...empty(),...views.get(query(next))};emit({loading:true});restoreSnapshot();
+        const work=flight.promise.then(result=>{
+          if(generation!==epoch)return;
+          if(result?.error){emit({loading:false,error:result.error});return;}
+          networkRevision++;
+          if(result?.value){latestVersion=result.value.version;latestContentVersion=result.value.contentVersion||latestContentVersion;lastCheckAt=now();}
+          if(pending===work)pending=undefined;
+          return restore();
+        }).finally(()=>{if(pending===work)pending=undefined;pumpPrefetch();});
+        pending=work;return work;
       }
       return restore();
     },
     applyUpdates() { if(state.candidate)emit({...state.candidate,candidate:null,updateAvailable:false}); },
-    more() { if(state.moreError&&!state.page?.nextCursor)return refresh(false);if(state.candidate)emit({...state.candidate,candidate:null,updateAvailable:false}); return state.page?.nextCursor ? refresh(false,state.page.nextCursor) : Promise.resolve(); },
-    start() { if(active)return pending||Promise.resolve(); active=true;suspended=false;restoreHome();const first=state.data&&!state.snapshotPending&&now()-lastCheckAt>=0&&now()-lastCheckAt<60000?Promise.resolve():refresh(!!state.data);first.finally(schedule);return first; },
-    stop() { active=false;suspended=true;prefetchEpoch++;if(calendarPrefetch)calendarPrefetch.task.abort();calendarPrefetch=undefined;cancel();if(timer!==undefined)timers.clearTimeout(timer);timer=undefined;emit({loading:false,loadingMore:false}); }
+    more() { if(state.snapshotPending||state.moreError&&!state.page?.nextCursor)return refresh(false);if(state.candidate)emit({...state.candidate,candidate:null,updateAvailable:false}); return state.page?.nextCursor ? refresh(false,state.page.nextCursor) : Promise.resolve(); },
+    start() { if(active)return pending||Promise.resolve(); active=true;suspended=false;restoreSnapshot();const first=state.data&&!state.snapshotPending&&now()-lastCheckAt>=0&&now()-lastCheckAt<60000?Promise.resolve():refresh(!!state.data);first.finally(schedule);return first; },
+    stop() { active=false;suspended=true;prefetchEpoch++;warmQueue.length=0;if(prefetchTask)prefetchTask.task.abort();prefetchTask=undefined;cancel();if(timer!==undefined)timers.clearTimeout(timer);timer=undefined;emit({loading:false,loadingMore:false}); }
   };
 }
 module.exports = { createClient };

@@ -2,7 +2,7 @@ const {preserveNativeReturn}=require('../../utils/entry-navigation');
 const { createPage } = require('../../utils/page');
 const { noticeModel } = require('../../utils/model');
 // Bundled client version; keep this aligned with the development-tool upload.
-const buildVersion = '1.0.62';
+const buildVersion = '1.0.63';
 Page(createPage((data, query, page, app) => {
   const stored=app.preferences.snapshot(),notices=data?noticeModel(data,stored.preferences,stored.read):[];
   return { notices:notices.slice(0,3),unread:notices.filter(n=>!n.read).length,storageError:stored.error };

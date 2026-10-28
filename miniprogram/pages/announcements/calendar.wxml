@@ -1,4 +1,5 @@
 <view class="page records-page {{contentMotion}}">
+  <view class="cached-content-note" role="status">{{snapshotPending && connected ? error ? '更新失败 · 显示上次内容' : '已显示上次内容 · 更新中' : ''}}</view>
   <status-panel wx:if="{{!connected}}" variant="calendar" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />
   <block wx:else>
     <view wx:if="{{error}}" class="warning">{{error}}<button class="text-button" bindtap="retry">重新加载</button></view>

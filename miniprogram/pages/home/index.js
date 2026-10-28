@@ -68,12 +68,12 @@ Page(createPage((data, query, page, app) => {
     shareLabel: '分享这条公告给朋友',
     historical: data.articles.length > 0 && data.articles.every(article => m.isHistoricalArticle(article, data.evidence))
   };
-}, { view:()=>({view:'home'}), load(query) { this.setData({selectedResetKind:validKind(query.kind)}); }, data: { name: '模钥重置雷达', freshnessOpen: false, motionActive: false }, show() { this.setData({motionActive: true}); }, afterRender() { this.queueCalendarPrefetch(); this.syncCountdown(); this.syncForecastExpiry(); }, hide() { this.setData({motionActive: false}); this.cancelCalendarPrefetch(); this.stopCountdown(); this.stopForecastExpiry(); }, unload() { this.setData({motionActive: false}); this.cancelCalendarPrefetch(); this.stopCountdown(); this.stopForecastExpiry(); }, methods: {
-  queueCalendarPrefetch() {
-    if(!this.data.connected || this.data.snapshotPending || this.data.loading || this.data.error || this._calendarPrefetched || this._calendarPrefetchTimer || !getApp().client.prefetchCalendar)return;
-    this._calendarPrefetchTimer=setTimeout(()=>{this._calendarPrefetchTimer=null;if(this._visible){this._calendarPrefetched=true;void getApp().client.prefetchCalendar();}},800);
+}, { view:()=>({view:'home'}), load(query) { this.setData({selectedResetKind:validKind(query.kind)}); }, data: { name: '模钥重置雷达', freshnessOpen: false, motionActive: false }, show() { this.setData({motionActive: true}); }, afterRender() { this.queuePrimaryPrefetch(); this.syncCountdown(); this.syncForecastExpiry(); }, hide() { this.setData({motionActive: false}); this.cancelPrimaryPrefetch(); this.stopCountdown(); this.stopForecastExpiry(); }, unload() { this.setData({motionActive: false}); this.cancelPrimaryPrefetch(); this.stopCountdown(); this.stopForecastExpiry(); }, methods: {
+  queuePrimaryPrefetch() {
+    if(!this.data.connected || this.data.snapshotPending || this.data.loading || this.data.error || this._primaryPrefetched || this._primaryPrefetchTimer || !getApp().client.prefetchPrimaryViews)return;
+    this._primaryPrefetchTimer=setTimeout(()=>{this._primaryPrefetchTimer=null;if(this._visible){this._primaryPrefetched=true;void getApp().client.prefetchPrimaryViews();}},80);
   },
-  cancelCalendarPrefetch() { if(this._calendarPrefetchTimer)clearTimeout(this._calendarPrefetchTimer);this._calendarPrefetchTimer=null; },
+  cancelPrimaryPrefetch() { if(this._primaryPrefetchTimer)clearTimeout(this._primaryPrefetchTimer);this._primaryPrefetchTimer=null; },
   toggleFreshness() { this.setData({ freshnessOpen: !this.data.freshnessOpen }); },
   currentHomeStatus() { const state=getApp().client.getState();if(!state.data||state.snapshotPending)return null;const now=new Date(Date.parse(state.data.serverTime)+Math.max(0,Date.now()-(state.receivedAt||Date.now()))).toISOString();return selectedHomeStatus(state.data,this.data.selectedResetKind,now); },
   openPoster() { if(this.data.snapshotPending){wx.showToast({title:'更新最新消息后可分享',icon:'none'});return;}const card=this.data.connected&&this.currentHomeStatus();if(card)wx.navigateTo({url:'/packages/poster/index?kind='+card.kind+'&revision='+encodeURIComponent(card.revision),fail(){wx.showToast({title:'海报页面加载失败，请重试。',icon:'none'});} }); },
