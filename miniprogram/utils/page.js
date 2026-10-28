@@ -8,6 +8,31 @@ function setWindowBackground() {
   } catch (_) { /* An unavailable appearance API must never block page data. */ }
 }
 function createPage(build, extra = {}) {
+  function stopEntrance(page) {
+    if(page._entranceTimer)clearTimeout(page._entranceTimer);
+    page._entranceTimer=null;
+    if(page.data.contentMotion)page.setData({contentMotion:''});
+  }
+  function entrance(page, patch) {
+    // Content is committed immediately. Motion never waits for a timer or network.
+    if(!patch.connected){
+      if(page._entranceTimer)clearTimeout(page._entranceTimer);
+      page._entranceTimer=null;
+      patch.contentMotion='';
+      return;
+    }
+    const key=page._viewKey||'home';
+    const seen=page._presentedViews||(page._presentedViews=new Set());
+    if(seen.has(key))return;
+    seen.add(key);
+    if(seen.size>20)seen.delete(seen.values().next().value);
+    if(page._entranceTimer)clearTimeout(page._entranceTimer);
+    patch.contentMotion='content-enter';
+    page._entranceTimer=setTimeout(()=>{
+      page._entranceTimer=null;
+      if(page._visible&&page._viewKey===key)page.setData({contentMotion:''});
+    },560);
+  }
   function foreground(page, work) {
     const generation=(page._navigationGeneration||0)+1;page._navigationGeneration=generation;
     // Request state, rather than navigation, owns the content loader.
@@ -36,6 +61,7 @@ function createPage(build, extra = {}) {
       if(!current())return;
       const anchor=before?.[0]?.find(rect=>rect.bottom>0&&patch.items?.some(item=>item.id===rect.dataset.readingId));
       page._renderedData=data;
+      entrance(page,patch);
       const changed=Object.fromEntries(Object.entries(patch).filter(([key,value])=>JSON.stringify(page.data[key])!==JSON.stringify(value)));
       const afterCommit=()=>{
         if(current() && data && page._restoreScroll!==undefined && typeof wx.pageScrollTo==='function'){
@@ -60,15 +86,15 @@ function createPage(build, extra = {}) {
 
   }
   return {
-    data: { navigationLoading:true, loading: false, connected: false, unconfigured: false, error: '', cutoff: '暂无记录', ...(extra.data || {}) },
+    data: { contentMotion:'', navigationLoading:true, loading: true, connected: false, unconfigured: false, error: '', cutoff: '暂无记录', ...(extra.data || {}) },
     onLoad(params) { setWindowBackground(); this._params = params || {}; if (extra.load) extra.load.call(this, params || {}); },
     // Keep native appearance setup on initial load. Retained tabs only need to
     // resume their subscriptions; their background is also declared in page-meta.
     onShow() { if(enterPage(this,()=>this.onShow()))return;const app=getApp();this._visible=true;this._viewKey=JSON.stringify(this.readView());const work=app.client.setView&&app.client.setView(this.readView());this._unsubscribe = app.client.subscribe(state => render(this, state));if(extra.show)extra.show.call(this);foreground(this,work); },
     nativeReturnTouched(){getApp().entryNavigation?.touched();},
     onPageScroll(event) { if(this._viewKey){this._positions=this._positions||{};this._positions[this._viewKey]=event.scrollTop;} },
-    onHide() { suspendEntry(this);this._visible=false;this._renderGeneration=(this._renderGeneration||0)+1;this._navigationGeneration=(this._navigationGeneration||0)+1;if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.hide)extra.hide.call(this); },
-    onUnload() { suspendEntry(this,true);this._visible=false;this._navigationGeneration=(this._navigationGeneration||0)+1;if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.unload)extra.unload.call(this); },
+    onHide() { stopEntrance(this);suspendEntry(this);this._visible=false;this._renderGeneration=(this._renderGeneration||0)+1;this._navigationGeneration=(this._navigationGeneration||0)+1;if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.hide)extra.hide.call(this); },
+    onUnload() { stopEntrance(this);suspendEntry(this,true);this._visible=false;this._navigationGeneration=(this._navigationGeneration||0)+1;if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.unload)extra.unload.call(this); },
     async onPullDownRefresh() { try { await foreground(this,()=>getApp().client.refresh(false)); } finally { wx.stopPullDownRefresh(); } },
     readView() { return extra.view ? extra.view(this._params||{},this.data) : {view:'home'}; },
     reloadView() { this._viewKey=JSON.stringify(this.readView());this._restoreScroll=this._positions?.[this._viewKey]||0;const client=getApp().client; if(client.setView)return foreground(this,()=>client.setView(this.readView()));this.redraw(); },

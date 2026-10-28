@@ -600,7 +600,7 @@ test('四个原生导航页初始化 iOS 窗口底色，缓存返回和资料刷
       assert.equal(value.backgroundColorTop,'#f2f5fb');
       assert.equal(value.backgroundColorBottom,'#f2f5fb');
     }
-    const previous=structuredClone(page.data);
+    const previous={...structuredClone(page.data),contentMotion:''};
     h.replace(fixture());
     assert.equal(h.ui.backgrounds.length,1,'资料更新不触碰原生窗口外观');
     page.onHide();assert.equal(h.subscriptions,0);
@@ -743,7 +743,7 @@ test('缓存返回、重试和下拉刷新均保持正文；隐藏后迟到请�
   h.replace(fixture());assert.equal(page.data.navigationLoading,false,'后台资料更新不制造前景加载');page.onUnload();
 });
 test('已加载列表再次显示时没有变化就不向视图层提交数据',()=>{
-  const h=nativeHarness(),page=h.page('news');let submissions=0;
+  const h=nativeHarness(),page=h.page('news');page.onHide();page.onShow();let submissions=0;
   const setData=page.setData;
   page.setData=function(patch){submissions++;return setData.call(this,patch);};
   for(let index=0;index<10;index++){page.onHide();page.onShow();}

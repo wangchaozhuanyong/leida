@@ -7,9 +7,10 @@
     <button class="freshness-summary" bindtap="toggleFreshness" aria-label="公开资料状态" aria-expanded="{{freshnessOpen}}"><view class="health-dot {{snapshotPending ? 'cached' : sourceDelayed || error ? 'delayed' : ''}}" aria-hidden="true"/><text>{{snapshotPending ? '上次公开资料 · 待更新' : error ? connected ? '更新暂时中断' : '暂时无法连接' : connected ? sourceStatusLabel : loading ? '正在读取公开消息' : '等待连接公开资料'}}</text><text class="info-symbol" aria-hidden="true">ⓘ</text></button>
   </view>
   <view wx:if="{{freshnessOpen && connected}}" class="freshness-detail"><view>来源最近更新：{{collectedAt}} · 北京时间</view><view>最新消息发布于：{{latestSourceTime}} · 北京时间</view><view class="muted">来源分别更新；具体重置时间请查看对应消息。</view></view>
-  <view wx:if="{{!connected}}" class="connection-card"><view class="connection-symbol" aria-hidden="true">◎</view><view class="connection-title">{{clockUntrusted ? '消息时间暂不可用' : error || unconfigured ? '暂时无法获取动态' : '正在获取公开动态'}}</view><view class="connection-description">{{clockUntrusted ? '请联网后重新加载；若仍异常，请检查手机日期和时间。' : error || unconfigured ? '连接恢复后更新，暂不能判断是否出现新消息。' : '正在读取公开消息和已确认记录。'}}</view><view wx:if="{{loading}}" class="refresh-track is-active"><view/></view><button wx:if="{{error || unconfigured}}" class="primary" bindtap="retry" disabled="{{loading}}">{{loading ? '正在重试…' : '重新获取'}}</button><view wx:if="{{loading && !error && !unconfigured}}" class="home-skeleton" aria-label="正在读取公开消息"><view class="skeleton-tabs"><view class="skeleton-tab"/><view class="skeleton-tab"/></view><view class="skeleton-orbit"/><view class="skeleton-line"/><view class="skeleton-line short"/></view></view>
-  <block wx:else>
-    <view wx:if="{{snapshotPending}}" class="snapshot-note" role="status">上次读取 {{snapshotReadAt}} · {{error ? '更新失败，当前为上次资料' : '正在核对最新消息'}}<view class="snapshot-note-detail">更新完成后即可分享。</view></view>
+  <view wx:if="{{!connected && (clockUntrusted || error || unconfigured)}}" class="connection-card"><view class="connection-symbol" aria-hidden="true">◎</view><view class="connection-title">{{clockUntrusted ? '消息时间暂不可用' : '暂时无法获取动态'}}</view><view class="connection-description">{{clockUntrusted ? '请联网后重新加载；若仍异常，请检查手机日期和时间。' : '连接恢复后更新，暂不能判断是否出现新消息。'}}</view><button class="primary" bindtap="retry" disabled="{{loading}}">{{loading ? '正在重试…' : '重新获取'}}</button></view>
+  <page-loader wx:elif="{{!connected}}" variant="home" />
+  <view wx:else class="home-content {{contentMotion}}">
+    <view class="home-update-note" role="status">{{snapshotPending ? error ? '正在显示上次内容，连接恢复后更新' : '正在更新上次读取的消息' : ''}}</view>
     <view wx:if="{{error}}" class="warning">连接暂时中断，正在显示上次内容。<button class="text-button" bindtap="retry" loading="{{loading}}">重新连接 →</button></view>
     <view wx:if="{{historical}}" class="warning">当前公告为历史收录，不代表刚刚发放。</view>
     <view class="reset-tabs" role="tablist" aria-label="重置类型"><button wx:for="{{resetCards}}" wx:key="kind" data-kind="{{item.kind}}" bindtap="selectResetKind" class="reset-tab kind-{{item.kind}} {{selectedResetKind === item.kind ? 'selected' : ''}}" role="tab" aria-selected="{{selectedResetKind === item.kind}}" hover-class="tab-pressed"><image src="/assets/icons/{{item.kind==='banked_reset'?'card':'reset'}}.png" class="reset-tab-icon" aria-hidden="true"/><text>{{item.kind==='banked_reset'?'重置卡发放':'额度重置'}}</text></button></view>
@@ -23,7 +24,7 @@
     <publication-card wx:for="{{recent}}" wx:key="id" item="{{item}}" compact="{{true}}" />
     <view wx:if="{{!recent.length}}" class="card empty">暂无公开公告，有新消息后会在这里更新。</view>
     <view class="foot"><view>所有时间均为北京时间</view></view>
-  </block>
+  </view>
 </view>
 
 <template name="reset-state">

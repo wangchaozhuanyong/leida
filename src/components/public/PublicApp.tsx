@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useSearchParams, usePathname } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {WechatEntryGuide} from './WechatEntryGuide';
+import {LoadingContent} from './LoadingContent';
+import {useContentEntrance} from './useContentEntrance';
 import {openPublicDialog} from './dialog-lifecycle';
 import {sourceStatus, uniqueDisplayEvidence} from './model';
 import { publicNewsGroups, homeNewsGroups, type NewsGroup } from '@/lib/public-feed';
@@ -77,7 +79,7 @@ function PublicRouteReader({ onChange }: { onChange: (pathname: string, search: 
   return null;
 }
 function ContentPlaceholder() {
-  return <div className="pub-page-loading" role="status"><span className="pub-loading-bar" aria-hidden="true"/><span>加载中</span></div>;
+  return <LoadingContent />;
 }
 
 export default function PublicApp() {
@@ -101,6 +103,7 @@ export default function PublicApp() {
   const endpoint = queryReady ? readPath : null;
   const { data, page, initialLoading, refreshing, navigationLoading, loadingMore, error, moreError, refresh, more, applyUpdates, updateAvailable, currentTime } = usePublicQuery(endpoint, `${pathname}?${queryString}:${queryReady}`);
   const loading = initialLoading || refreshing;
+  const contentMotion=useContentEntrance(readPath||pathname,queryReady&&(!!data||!readPath));
   const { status: wechatEntry, codeAvailable: posterCodeAvailable, retry: retryWechat } = useWechatAvailability(route === 'home' || route === 'settings' || !!poster || !!statusPoster || !!dayPoster || wechatReminders);
   const { navHref, backHref, changeFilter, onNavigateCapture } = usePublicNavigation(pathname, queryString, data, queryReady && !navigationLoading);
   const setNewsCategory = (value: NewsCategory) => changeFilter('category', value === 'all' ? null : value);
@@ -158,7 +161,7 @@ export default function PublicApp() {
   const historyPublications = route === 'news' && newsCategory === 'reset' && data ? sortedStatePublications(data).filter(p => (p.event.actions.length>0 && (historyFilter === 'all' || p.event.actions.some(action => action.kind === historyFilter)) || ['all','automatic_reset'].includes(historyFilter) && resetObservations(data).some(o=>o.publicationId===p.id))) : [];
   const pageTitle = ({ history: '重置记录', news: '动态', settings: '提醒', more: '关于与隐私', notices: '站内提醒', methodology: '观察记录', events: '事件详情', articles: '动态详情', sources: '原文来源', activities: '活动动态' } as Record<string, string>)[route] ?? '重置雷达';
   const failure = <div className="pub-empty" role="alert"><Icon name="info" /><h2>资料暂时无法加载</h2><p>{error || '请稍后重试。'}</p><button className="pub-button primary" onClick={() => void refresh()} disabled={loading}>{loading ? '正在重试…' : '重新加载'}</button></div>;
-  const pending = error ? failure : <ContentPlaceholder />;
+  const pending = error ? failure : <LoadingContent variant={route==='history'?'calendar':['events','articles','sources','methodology'].includes(route)?'detail':'list'}/>;
   let content: React.ReactNode;
   if (route === 'settings') content = <Settings notices={visibleNotices} read={read} markRead={markRead} storageError={storageError} data={data} codeAvailable={posterCodeAvailable} pending={!data ? error ? <div className="pub-inbox-empty" role="alert"><p>消息暂时无法加载，请稍后重试。</p><button className="pub-text-button" onClick={() => void refresh()} disabled={loading}>重新加载</button></div> : pending : undefined}/>;
   else if (route === 'more') content = <MorePage />;
@@ -166,7 +169,7 @@ export default function PublicApp() {
   else if (route === 'history') content = data ? <RecordCalendar data={data} date={query.get('date') || ''} kind={historyFilter} onDate={value=>changeFilter('date',value)} onKind={setHistoryFilter}/> : pending;
   else if (route === 'activities' && path[1]) content = <ActivityPage data={data} activity={data ? currentActivity : activityCache.current.get(path[1])} id={path[1]} query={query} onDay={value => changeFilter('day', value === null ? null : String(value))} pending={!data ? pending : undefined} onPoster={setPoster} onDayPoster={value => { setPoster(null); setDayPoster(value); }} />;
   else if (!readPath) content = <><Empty title="暂时没有这条记录" detail="链接可能已变化，请返回首页查看公开动态。" /><TextLink href="/">返回首页</TextLink></>;
-  else if (!data) content = route==='home'?<ResetStatePending failed={!!error} busy={loading} onRetry={()=>void refresh()}/>:pending;
+  else if (!data) content = route==='home'?(error?<ResetStatePending failed busy={loading} onRetry={()=>void refresh()}/>:<LoadingContent variant="home"/>):pending;
   else if (route === 'home') content = <Home data={data} onWechatReminders={() => setWechatReminders(true)} onPoster={() => {const at=currentTime()||data.serverTime;setStatusPoster({actionId:'',round:statusPosterSnapshot(data,at).round,generatedAt:at});}} onShare={share} historical={historical} wechatEntry={wechatEntry} />;
   else if (route === 'events' && path[1]) content = <EventPage data={data} id={path[1]} onPoster={setPoster} onShare={share} />;
   else if (route === 'articles' && path[1]) content = <ArticlePage data={data} id={path[1]} onPoster={setPoster} />;
@@ -188,14 +191,14 @@ export default function PublicApp() {
       <div className="pub-home-heading-copy"><h1><span className="pub-home-heading-topic"><span className="pub-home-heading-product">Codex</span>重置</span><span className="pub-home-heading-accent">一目了然</span></h1><p>不要错过每一次重置。</p></div>
       {!navigationLoading && data && <details className="pub-freshness"><summary><span className={`pub-status-dot${error || sourceStatus(data.sources).warning ? ' is-delayed' : ''}`} />{error ? '连接中断，保留已有资料' : sourceStatus(data.sources).label}<Icon name="info" /></summary><div><p>来源最近更新：<time dateTime={collectedAt}>{collectedAt ? `${briefTime(collectedAt)} · 北京时间` : '暂无记录'}</time></p><p>最新消息发布于：<time dateTime={latestArticle ? articleSourceTime(latestArticle) : undefined}>{latestArticle ? `${briefTime(articleSourceTime(latestArticle))} · 北京时间` : '暂无记录'}</time></p><p>来源分别更新；具体重置时间请查看对应消息。</p></div></details>}
     </div>}
-    <main className="pub-main" id="public-main" tabIndex={-1}>
+    <main className={`pub-main ${contentMotion}`} id="public-main" tabIndex={-1} aria-busy={initialLoading}>
       {!navigationLoading && data && error && <div className="pub-warning" role="alert">连接暂时中断，保留上次成功获取的资料。<button className="pub-text-button" onClick={() => void refresh()}>重试</button></div>}
       {!navigationLoading && data && !error && sourceStatus(data.sources).warning && <div className="pub-warning" role="status">{sourceStatus(data.sources).label}，以下保留最近收录的资料。</div>}
       {updateAvailable && <button className="pub-update-prompt" onClick={applyUpdates}>有新内容 · 点击更新</button>}
       <Suspense fallback={<ContentPlaceholder />}>{content}</Suspense>
       {!navigationLoading && moreError && <div className="pub-pagination-error" role="alert">{moreError}<button className="pub-text-button" disabled={loadingMore} onClick={() => void more()}>重试加载更多</button></div>}
     </main>
-    <footer className={`pub-footer ${subpage ? 'subpage' : ''}`}>{navigationLoading ? null : route==='methodology'&&query.get('snapshot') ? <p>预测资料截至时间见历史记录</p> : cutoff && !['home', 'events', 'articles', 'sources'].includes(route) ? <p>{historical ? '历史资料' : '资料截至'} · {displayTime(cutoff)}</p> : !data && !loading && !error && readPath ? <p>暂无已发布资料</p> : null}<p>所有时间均为北京时间</p><Link scroll={false} href="/more#privacy">隐私说明</Link></footer>
+    <footer className={`pub-footer ${subpage ? 'subpage' : ''}`}>{navigationLoading ? null : route==='methodology'&&query.get('snapshot') ? <p>预测资料截至时间见历史记录</p> : cutoff && !['home', 'events', 'articles', 'sources'].includes(route) ? <p>{historical ? '历史资料' : '资料截至'} · {displayTime(cutoff)}</p> : null}<p>所有时间均为北京时间</p><Link scroll={false} href="/more#privacy">隐私说明</Link></footer>
     <nav className="pub-bottom-nav" aria-label="手机主导航">{navigation}</nav>
     {statusPoster && <PosterModal statusDesign codeAvailable={posterCodeAvailable} target={{ validUntil:data?statusPosterSnapshot(data,statusPoster.generatedAt).validUntil:undefined,id: `${statusPoster.publication?.id??'current'}:${statusPoster.actionId}`, cutoffAt: statusPoster.publication?.cutoffAt??statusPoster.generatedAt, title: '公开重置状态', endpoint: `/api/v1/posters/${encodeURIComponent(statusPoster.publication?.id??'current')}?${new URLSearchParams({ layout: 'status', action: statusPoster.actionId,round:statusPoster.round,at:statusPoster.generatedAt })}`, filename: `模钥重置雷达-重置状态-${dateKey(data?.serverTime || new Date().toISOString())}.png` }} name={data?.site.name || '模钥重置雷达'} blocked={data && statusPoster.round!==statusPosterSnapshot(data,currentTime()||data.serverTime).round ? '公开状态已变化，请关闭后重新生成海报。' : ''} onClose={() => setStatusPoster(null)} onShare={() => share(statusPoster.publication)} />}
     {poster && <PosterModal target={{ id: poster.id, cutoffAt: poster.cutoffAt, title: poster.article.title, endpoint: `/api/v1/posters/${encodeURIComponent(poster.id)}`, filename: `模钥重置雷达-${dateKey(poster.cutoffAt)}-${poster.id}.png` }} name={data?.site.name || '模钥重置雷达'} blocked={posterWithdrawn ? '此内容已撤回，已停止生成海报。' : ''} onClose={() => setPoster(null)} onShare={() => share(poster)} />}

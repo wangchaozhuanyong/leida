@@ -1,5 +1,5 @@
-<view class="page records-page">
-  <status-panel wx:if="{{!connected}}" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />
+<view class="page records-page {{contentMotion}}">
+  <status-panel wx:if="{{!connected}}" variant="calendar" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />
   <block wx:else>
     <view wx:if="{{error}}" class="warning">{{error}}<button class="text-button" bindtap="retry">重新加载</button></view>
     <view class="record-sheet">

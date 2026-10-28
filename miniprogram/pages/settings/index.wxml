@@ -1,7 +1,7 @@
 <page-meta root-background-color="#f2f5fb" page-style="background-color:#f2f5fb" />
 <navigation-header icon="reminder" title="提醒" />
 <view class="refresh-track {{settingsReady && (refreshing || wechat.refreshing) ? 'is-active' : ''}}"><view/></view>
-<view class="page" bindtouchstart="nativeReturnTouched">
+<view class="page {{contentMotion}}" bindtouchstart="nativeReturnTouched">
   <view wx:if="{{storageError}}" class="warning">{{storageError}}</view>
   <view class="card inbox-card"><view class="row"><view class="heading">站内信 <text wx:if="{{unread}}" class="inbox-unread">{{unread}} 未读</text></view><button class="text-button" data-path="/pages/notices/index" bindtap="navigate">查看全部提醒 →</button></view>
     <view wx:if="{{!connected}}" class="inbox-loading"><text>{{error || (unconfigured ? '站内信暂不可用' : '正在更新提醒')}}</text><button wx:if="{{error}}" class="text-button" bindtap="retry">重新加载</button></view>
@@ -11,7 +11,7 @@
   </view>
   <button class="support-card" open-type="contact" bindtap="contactStart" bindcontact="contactReturn" binderror="contactError" aria-label="联系小程序客服"><view class="support-icon" aria-hidden="true"><image src="/assets/icons/inbox.png" mode="aspectFit" /></view><view class="support-copy"><view class="support-title">联系小程序客服</view><view class="support-caption">记录缺失、提醒问题，都可以告诉我们</view></view><view class="support-arrow" aria-hidden="true">→</view></button>
   <view wx:if="{{!settingsReady}}" class="card reminder-skeleton" role="status"><view class="heading">微信提醒</view><view class="small muted lead">正在加载提醒设置</view><view class="reminder-skeleton-count"/><view class="reminder-skeleton-line"/><view class="reminder-skeleton-line"/><view class="reminder-skeleton-button"/></view>
-  <view wx:else class="card reminder-card"><view class="row"><view class="heading">微信提醒</view><text class="badge muted">{{!wechat.safe ? (wechat.busy ? '加载中' : '未连接') : !wechat.safe.configured || !wechat.safe.enabled ? '暂不可用' : wechat.safe.state === 'revoked' ? '已关闭' : wechat.safe.state === 'unknown' || wechat.allTypesOff ? '已暂停' : wechat.remainingCount > 0 ? '已开启' : '按次提醒'}}</text></view>
+  <view wx:else class="card reminder-card settled-reveal"><view class="row"><view class="heading">微信提醒</view><text class="badge muted">{{!wechat.safe ? (wechat.busy ? '加载中' : '未连接') : !wechat.safe.configured || !wechat.safe.enabled ? '暂不可用' : wechat.safe.state === 'revoked' ? '已关闭' : wechat.safe.state === 'unknown' || wechat.allTypesOff ? '已暂停' : wechat.remainingCount > 0 ? '已开启' : '按次提醒'}}</text></view>
     <view class="reminder-count"><text class="muted">剩余提醒</text><text class="reminder-number">{{wechat.safe ? wechat.remainingCount : '—'}}</text><text class="muted">次</text></view>
     <view class="muted lead">只接收你开启的类型，每成功发送一条使用一次。</view>
     <view class="reminder-types">
