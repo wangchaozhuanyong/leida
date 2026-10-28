@@ -1,1 +1,4 @@
-{"navigationBarTitleText":"站内提醒"}
+{
+  "navigationBarTitleText": "站内提醒",
+  "enablePullDownRefresh": true
+}

@@ -1,5 +1,15 @@
 const { displayTime } = require('./model');
 const {enterPage,suspendEntry,preserveNativeReturn}=require('./entry-navigation');
+// The native pull surface belongs to one gesture, not to the network request.
+// An old page's timer/finally must never close a newer page's gesture.
+let activePull = null;
+function endPull(page, gesture = activePull) {
+  if (!gesture || gesture.page !== page || activePull !== gesture) return;
+  clearTimeout(gesture.timer);
+  activePull = null;
+  try { if (typeof wx.stopPullDownRefresh === 'function') wx.stopPullDownRefresh({ fail() {} }); }
+  catch (_) { /* Native feedback cannot block data or navigation. */ }
+}
 function setWindowBackground() {
   // iOS has separate native top/bottom backdrops outside the page's CSS surface.
   if (typeof wx === 'undefined' || typeof wx.setBackgroundColor !== 'function') return;
@@ -93,9 +103,19 @@ function createPage(build, extra = {}) {
     onShow() { if(enterPage(this,()=>this.onShow()))return;const app=getApp();this._visible=true;this._viewKey=JSON.stringify(this.readView());const work=app.client.setView&&app.client.setView(this.readView());this._unsubscribe = app.client.subscribe(state => render(this, state));if(extra.show)extra.show.call(this);foreground(this,work); },
     nativeReturnTouched(){getApp().entryNavigation?.touched();},
     onPageScroll(event) { if(this._viewKey){this._positions=this._positions||{};this._positions[this._viewKey]=event.scrollTop;} },
-    onHide() { stopEntrance(this);suspendEntry(this);this._visible=false;this._renderGeneration=(this._renderGeneration||0)+1;this._navigationGeneration=(this._navigationGeneration||0)+1;if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.hide)extra.hide.call(this); },
-    onUnload() { stopEntrance(this);suspendEntry(this,true);this._visible=false;this._navigationGeneration=(this._navigationGeneration||0)+1;if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.unload)extra.unload.call(this); },
-    async onPullDownRefresh() { try { await foreground(this,()=>getApp().client.refresh(false)); } finally { wx.stopPullDownRefresh(); } },
+    onHide() { endPull(this);stopEntrance(this);suspendEntry(this);this._visible=false;this._renderGeneration=(this._renderGeneration||0)+1;this._navigationGeneration=(this._navigationGeneration||0)+1;if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.hide)extra.hide.call(this); },
+    onUnload() { endPull(this);stopEntrance(this);suspendEntry(this,true);this._visible=false;this._navigationGeneration=(this._navigationGeneration||0)+1;if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.unload)extra.unload.call(this); },
+    onPullDownRefresh() {
+      if (activePull?.page === this) return activePull.work;
+      if (activePull) clearTimeout(activePull.timer);
+      const gesture = { page:this, timer:null, work:null };
+      activePull = gesture;
+      gesture.timer = setTimeout(() => endPull(this, gesture), 300);
+      try { gesture.work = Promise.resolve(foreground(this, () => getApp().client.refresh(false))); }
+      catch (error) { gesture.work = Promise.reject(error); }
+      gesture.work = gesture.work.finally(() => endPull(this, gesture));
+      return gesture.work;
+    },
     readView() { return extra.view ? extra.view(this._params||{},this.data) : {view:'home'}; },
     reloadView() { this._viewKey=JSON.stringify(this.readView());this._restoreScroll=this._positions?.[this._viewKey]||0;const client=getApp().client; if(client.setView)return foreground(this,()=>client.setView(this.readView()));this.redraw(); },
     applyUpdates() { const client=getApp().client;if(client.applyUpdates)client.applyUpdates(); },

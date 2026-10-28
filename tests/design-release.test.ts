@@ -37,7 +37,8 @@ test('等待状态缺少小程序码时不生成网站替代码，手机分享�
   for(const style of ['precision','editorial'] as const){
     const svg=currentStatusPosterSvg(data,now,'waiting',style,undefined,url);
     assert.doesNotMatch(svg,/data-poster-code="website"|网站二维码|扫码查看最新动态/);
-    assert.match(svg,/小程序码暂不可用/);
+    assert.match(svg,/公开信息仅供参考/);
+    assert.doesNotMatch(svg,/微信扫码|微信小程序码|请查看小程序/);
     assert.doesNotMatch(svg,/公告称已/);
     for(const width of [1080,540,390,320]){
       const {data:pixels,info}=await sharp(Buffer.from(svg)).resize({width}).ensureAlpha().raw().toBuffer({resolveWithObject:true});

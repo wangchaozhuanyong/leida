@@ -3,13 +3,18 @@ const {createPage}=require('../../utils/page');
 const {statusPosterInput,statusPosterAvailable,renderStatusPoster}=require('./status-poster');
 const poster=require('../../utils/poster');
 const {privacyRequired}=require('../../utils/wechat');
+// Public codes only. Keep a small, short-lived cache across page entries; the
+// selected publication and current public status are still checked on every use.
+const publicCodes=new Map();
+function cachedCode(id){const value=publicCodes.get(id);if(value&&Date.now()>=value.at&&Date.now()-value.at<300000)return value.data;publicCodes.delete(id);return null;}
+function rememberCode(id,data){publicCodes.delete(id);publicCodes.set(id,{at:Date.now(),data});while(publicCodes.size>2)publicCodes.delete(publicCodes.keys().next().value);}
 function canvasNode(page){return new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('海报尚未准备好，请重试。')),10000);try{wx.createSelectorQuery().in(page).select('#status-poster-canvas').fields({node:true},result=>{clearTimeout(timer);result&&result.node?resolve(result.node):reject(new Error('海报暂不可用，请重试。'));}).exec();}catch(_){clearTimeout(timer);reject(new Error('海报暂不可用，请重试。'));}});}
 function currentData(){const state=getApp().client.getState(),data=state.data;if(!data)return data;const age=Number.isFinite(state.receivedAt)?Math.max(0,Date.now()-state.receivedAt):0;return {...data,serverTime:new Date(Date.parse(data.serverTime)+age).toISOString()};}
-function stop(page){clearTimeout(page._stateExpiryTimer);clearTimeout(page._posterTimeout);page._active=false;page._generation=(page._generation||0)+1;if(page._codeRequest)page._codeRequest.abort();}
+function stop(page){clearTimeout(page._stateExpiryTimer);clearTimeout(page._posterTimeout);page._active=false;page._generation=(page._generation||0)+1;if(page._codeRequest)page._codeRequest.abort();page._codeFlight=null;}
 Page(createPage(data=>({available:!!data}),{
   view:()=>({view:'home'}),
   load(query){this._selectedKind=query.kind==='banked_reset'?'banked_reset':'automatic_reset';this._expectedRevision=typeof query.revision==='string'?query.revision:'';},
-  data:{available:false,theme:'precision',preview:'',posterBusy:false,posterSaving:false,posterError:'',codeNote:'',blocked:'',privacyNeeded:false},
+  data:{available:false,theme:'precision',preview:'',posterReady:false,posterBusy:false,posterSaving:false,posterError:'',codeNote:'',blocked:'',privacyNeeded:false},
   show(){this._active=true;if(this._snapshot)void this.generate();},hide(){stop(this);},unload(){stop(this);this.clearPosters();this._codeData=null;},
   afterRender(){
     const data=currentData();
@@ -20,7 +25,8 @@ Page(createPage(data=>({available:!!data}),{
   },
   methods:{
     clearPosters(){
-      const paths=new Set(Object.values(this._artifacts||{}).map(value=>value.artifact.tempFilePath));
+      const paths=new Set([...Object.values(this._artifacts||{}).map(value=>value.artifact.tempFilePath),...(this._previewPaths||[])]);
+      this._previewPaths=[];
       this._artifacts={};this._artifact=null;
       if(typeof wx.getFileSystemManager==='function')for(const filePath of paths)wx.getFileSystemManager().unlink({filePath,success(){},fail(){}});
     },
@@ -28,26 +34,43 @@ Page(createPage(data=>({available:!!data}),{
     async generate(){
       if(!this._active||!this._snapshot||this.data.blocked)return;
       if(!statusPosterAvailable(this._snapshot,currentData())){stop(this);this.clearPosters();this.setData({preview:'',posterBusy:false,blocked:'公开状态已变化，请返回首页重新生成。'});return;}
-      if(this._codeRequest)this._codeRequest.abort();clearTimeout(this._posterTimeout);
+      clearTimeout(this._posterTimeout);
       const generation=(this._generation||0)+1;this._generation=generation;
       const current=()=>this._active&&generation===this._generation,theme=this.data.theme;let asset;
       this._artifacts=this._artifacts||{};
       const cached=this._artifacts[theme];
-      if(cached){this._artifact=cached.artifact;this.setData({preview:cached.artifact.tempFilePath,posterBusy:false,posterError:'',codeNote:cached.note});return;}
-      this._artifact=null;this.setData({posterBusy:true,posterError:'',codeNote:''});
+      if(cached){this._artifact=cached.artifact;this.setData({preview:cached.artifact.tempFilePath,posterReady:true,posterBusy:false,posterError:'',codeNote:cached.note});return;}
+      this._artifact=null;this.setData({posterReady:false,posterBusy:true,posterError:'',codeNote:''});
       this._posterTimeout=setTimeout(()=>{if(!current())return;stop(this);this._active=true;this.setData({posterBusy:false,posterError:'海报生成超时，请重试。'});},20000);
       try{
         const codePublicationId=this._snapshot.codePublicationId||this._snapshot.publicationId;
+        let codeSettled=!codePublicationId,codeError;
+        let codeWork=Promise.resolve();
         if(codePublicationId){
-          try{if(!this._codeData){this._codeRequest=getApp().publicApi(`/api/v1/wechat/code/${encodeURIComponent(codePublicationId)}`);const response=await this._codeRequest.promise;if(!current())return;this._codeData=response.data;}asset=await poster.writeCodeAsset(wx,this._codeData,codePublicationId);}
+          this._codeData=this._codeData||cachedCode(codePublicationId);
+          if(!this._codeData){
+            try{
+              if(!this._codeFlight){this._codeRequest=getApp().publicApi(`/api/v1/wechat/code/${encodeURIComponent(codePublicationId)}`);const flight=this._codeRequest.promise.then(response=>response.data);this._codeFlight=flight;flight.finally(()=>{if(this._codeFlight===flight)this._codeFlight=null;}).catch(()=>{});}
+              codeWork=this._codeFlight.then(data=>{if(current())this._codeData=data;},error=>{codeError=error;}).finally(()=>{codeSettled=true;});
+            }catch(error){codeError=error;codeSettled=true;}
+          }else codeSettled=true;
+        }
+        const canvas=await canvasNode(this);if(!current())return;
+        const render=(code)=>{
+          const work=()=>current()?renderStatusPoster({wxApi:wx,canvas,page:this,input:this._snapshot,theme,code,isCurrent:current}):null;
+          this._renderQueue=(this._renderQueue||Promise.resolve()).catch(()=>{}).then(work);return this._renderQueue;
+        };
+        // Show the factual artwork while the optional public code is loading.
+        // This draft cannot be saved; it is replaced by the final validated image.
+        if(!codeSettled){const draft=await render();if(!current())return;if(draft){(this._previewPaths||(this._previewPaths=[])).push(draft.tempFilePath);this.setData({preview:draft.tempFilePath});}}
+        await codeWork;if(!current())return;
+        if(codePublicationId){
+          try{if(codeError)throw codeError;asset=await poster.writeCodeAsset(wx,this._codeData,codePublicationId);}
           catch(error){if(!current())return;if([404,409,410].includes(error.status))throw error;this.setData({codeNote:'小程序码暂不可用，本张海报无法扫码，可直接转发小程序。'});}
         }else this.setData({codeNote:'本张海报未附小程序码，可直接转发小程序。'});
-        if(!current())return;const canvas=await canvasNode(this);if(!current())return;
-        const work=()=>current()?renderStatusPoster({wxApi:wx,canvas,page:this,input:this._snapshot,theme,code:asset,isCurrent:current}):null;
-        this._renderQueue=(this._renderQueue||Promise.resolve()).catch(()=>{}).then(work);
-        const artifact=await this._renderQueue;
-        if(current()&&artifact){this._artifact=artifact;this._artifacts[theme]={artifact,note:this.data.codeNote};this.setData({preview:artifact.tempFilePath});}
-      }catch(error){if(current())this.setData({posterError:error.message||'海报生成失败，请重试。'});}
+        if(!current())return;const artifact=await render(asset);
+        if(current()&&artifact){if(asset)rememberCode(codePublicationId,this._codeData);this._artifact=artifact;this._artifacts[theme]={artifact,note:this.data.codeNote};this.setData({preview:artifact.tempFilePath,posterReady:true});}
+      }catch(error){if(current()){if([404,409,410].includes(error.status)){this.clearPosters();this.setData({preview:'',posterReady:false,blocked:'这条消息暂不可用，请返回首页核对。'});}this.setData({posterError:error.message||'海报生成失败，请重试。'});}}
       finally{if(asset)await asset.dispose();if(current()){clearTimeout(this._posterTimeout);this.setData({posterBusy:false});}}
     },
     previewImage(){if(this.data.preview&&!this.data.posterBusy){const guard=preserveNativeReturn();try{wx.previewImage({current:this.data.preview,urls:[this.data.preview],fail:()=>guard.cancel()});}catch(_){guard.cancel();}}},
