@@ -10,7 +10,6 @@
   <view wx:if="{{!connected && (clockUntrusted || error || unconfigured)}}" class="connection-card"><view class="connection-symbol" aria-hidden="true">◎</view><view class="connection-title">{{clockUntrusted ? '消息时间暂不可用' : '暂时无法获取动态'}}</view><view class="connection-description">{{clockUntrusted ? '请联网后重新加载；若仍异常，请检查手机日期和时间。' : '连接恢复后更新，暂不能判断是否出现新消息。'}}</view><button class="primary" bindtap="retry" disabled="{{loading}}">{{loading ? '正在重试…' : '重新获取'}}</button></view>
   <page-loader wx:elif="{{!connected}}" variant="home" />
   <view wx:else class="home-content {{contentMotion}}">
-    <view class="home-update-note" role="status">{{snapshotPending ? error ? '正在显示上次内容，连接恢复后更新' : '正在更新上次读取的消息' : ''}}</view>
     <view wx:if="{{error}}" class="warning">连接暂时中断，正在显示上次内容。<button class="text-button" bindtap="retry" loading="{{loading}}">重新连接 →</button></view>
     <view wx:if="{{historical}}" class="warning">当前公告为历史收录，不代表刚刚发放。</view>
     <view class="reset-tabs" role="tablist" aria-label="重置类型"><button wx:for="{{resetCards}}" wx:key="kind" data-kind="{{item.kind}}" bindtap="selectResetKind" class="reset-tab kind-{{item.kind}} {{selectedResetKind === item.kind ? 'selected' : ''}}" role="tab" aria-selected="{{selectedResetKind === item.kind}}" hover-class="tab-pressed"><image src="/assets/icons/{{item.kind==='banked_reset'?'card':'reset'}}.png" class="reset-tab-icon" aria-hidden="true"/><text>{{item.kind==='banked_reset'?'重置卡发放':'额度重置'}}</text></button></view>

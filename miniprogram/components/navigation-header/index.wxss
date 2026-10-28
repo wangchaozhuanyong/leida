@@ -1,16 +1,13 @@
 :host{display:block;flex:none}
 .navigation-space,.navigation-header,.navigation-inner,.navigation-copy,.navigation-back{box-sizing:border-box}
 .navigation-header{position:fixed;z-index:30;top:0;left:0;right:0;background:#f2f5fb;color:#14263e}
-.navigation-inner{display:flex;align-items:center;gap:10px;min-width:0;padding-left:12px}
-.navigation-logo{width:42px;height:42px;flex:none;margin-left:-3px;margin-right:-3px}
+.navigation-inner{display:flex;align-items:center;min-width:0;padding-left:16px;gap:8px}
+.navigation-logo{flex:none;width:32px;height:32px;margin-left:0;margin-right:0}
 .navigation-symbol{width:32px;height:32px;flex:none}
 .navigation-copy{min-width:0;flex:1;text-align:left}
-.navigation-title{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:18px;line-height:24px;font-weight:650}
+.navigation-title{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:24px;font-size:17px;font-weight:600}
 .navigation-inner.has-back{padding-left:8px;gap:8px}
 .navigation-back{width:44px;height:44px;min-height:44px;flex:none;display:flex;align-items:center;justify-content:center;margin:0;padding:0;border:0;border-radius:8px;background:transparent}
 .navigation-back::after{border:0}
 .back-mark{width:10px;height:10px;border-left:2px solid #14263e;border-bottom:2px solid #14263e;transform:rotate(45deg);margin-left:4px}
 .navigation-pressed{background:#e8eef8}
-
-@media(min-width:701px){.navigation-inner{padding-left:20px}}
-@media(min-width:1181px){.navigation-inner{padding-left:24px}}

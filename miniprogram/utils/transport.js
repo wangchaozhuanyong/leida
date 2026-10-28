@@ -76,9 +76,11 @@ function createTransport(wxApi, config, {privateRequests=false}={}) {
     const basePath=path.split('?')[0];
     const readPath=/^\/api\/v1\/bootstrap\?(?:[A-Za-z]+=[A-Za-z0-9%._~-]*)(?:&[A-Za-z]+=[A-Za-z0-9%._~-]*)*$/.test(path);
     const versionPath=basePath==='/api/v1/version' && (path===basePath || path==='/api/v1/version?light=1');
-    let task, cancelled = false, rejectPending;
+    let task, cancelled = false, rejectPending, deadline, initializing, initialized = false;
     const error = configurationError(config);
-    const promise = new Promise((resolve, reject) => {
+    const promise = new Promise((resolveResult, rejectResult) => {
+      const resolve = value => { clearTimeout(deadline); resolveResult(value); };
+      const reject = error => { clearTimeout(deadline); rejectResult(error); };
       rejectPending = reject;
       if (error) { reject(new Error(error)); return; }
       const allowed=privateRequests ? ((path==='/api/wechat/login' && method==='POST') || (path==='/api/wechat/subscription' && ['GET','DELETE'].includes(method)) || (['/api/wechat/subscription/challenge','/api/wechat/subscription/confirm','/api/wechat/subscription/preferences'].includes(path) && method==='POST'))
@@ -102,12 +104,22 @@ function createTransport(wxApi, config, {privateRequests=false}={}) {
       };
       const fail = () => { if (!cancelled) reject(new Error('连接失败，请检查网络后重试。')); };
       const timeout = Math.max(1000, Math.min(60000, Number(config.timeoutMs) || 10000));
+      // The SDK timeout does not cover cloud.init or a promise that never settles.
+      // Bound the whole request and ignore callbacks arriving after its deadline.
+      deadline = setTimeout(() => {
+        cancelled = true;
+        if (!initialized && cloudInit === initializing) cloudInit = undefined;
+        reject(new Error('连接超时，请稍后重试。'));
+        try { if (task && typeof task.abort === 'function') task.abort(); }
+        catch (_) { /* The deadline has already settled this request. */ }
+      }, timeout);
       if (config.mode === 'https') { try { task = wxApi.request({ url: config.baseUrl.replace(/\/$/, '') + path, method, data:options.data, header, timeout, success: receive, fail }); } catch (_) { fail(); } }
       else {
         if (!wxApi.cloud || typeof wxApi.cloud.callContainer !== 'function') { reject(new Error('当前微信版本不支持云服务，请更新微信。')); return; }
         try {
           if (!cloudInit) cloudInit = Promise.resolve(typeof wxApi.cloud.init === 'function' ? wxApi.cloud.init({ traceUser: false }) : undefined);
-          cloudInit.then(() => { if (!cancelled) return wxApi.cloud.callContainer({ config: { env: config.cloudEnv }, path, method, data:options.data, header: { ...header, 'X-WX-SERVICE': config.serviceName }, timeout }); }).then(response => { if (!cancelled) receive(response); }).catch(() => { cloudInit = undefined; fail(); });
+          initializing = cloudInit;
+          cloudInit.then(() => { initialized = true; if (!cancelled) return wxApi.cloud.callContainer({ config: { env: config.cloudEnv }, path, method, data:options.data, header: { ...header, 'X-WX-SERVICE': config.serviceName }, timeout }); }).then(response => { if (!cancelled) receive(response); }).catch(() => { if (!cancelled) { if (cloudInit === initializing) cloudInit = undefined; fail(); } });
         } catch (_) { cloudInit = undefined; fail(); }
       }
     });

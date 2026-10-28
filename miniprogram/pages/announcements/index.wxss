@@ -1,108 +1,95 @@
-.record-kinds{display:flex;gap:4px;background:#e5ecf7;padding:4px;border-radius:12px;margin-bottom:16px}.record-kinds button{flex:1;min-height:40px;padding:0 4px;font-size:13px;color:#748399;background:transparent;line-height:40px;border-radius:9px;margin:0}.record-kinds button.active{background:#fff;color:#214faf;font-weight:600;box-shadow:0 2px 6px #2c4f7b0a}.record-dot{width:5px;height:5px;background:#2458ce;border-radius:50%;display:inline-block;flex-shrink:0}.record-dot.banked_reset{background:#9876cb;border-radius:1px;transform:rotate(45deg)}.record-kinds .record-dot{margin-right:6px;vertical-align:2px}
+.record-kinds{display:flex;gap:4px;background:#e5ecf7;padding:4px;border-radius:12px;margin-bottom:16px}.record-kinds button{flex:1;min-height:44px;padding:0 4px;font-size:13px;color:#748399;background:transparent;line-height:40px;border-radius:8px;margin:0}.record-kinds button.active{background:#fff;color:#214faf;font-weight:600;box-shadow:0 2px 6px #2c4f7b0a}.record-dot{width:5px;height:5px;background:#2458ce;border-radius:50%;display:inline-block;flex-shrink:0}.record-dot.banked_reset{background:#9876cb;border-radius:1px;transform:rotate(45deg)}.record-kinds .record-dot{margin-right:6px;vertical-align:2px}
 /* One continuous sheet, from month choice to the selected day's announcement. */
 .records-page{max-width:620px}
-.record-sheet{background:#fff;border:1px solid #dce5f1;border-radius:22px;box-shadow:0 8px 30px #284d7910;overflow:hidden}
+.record-sheet{background:#fff;border:1px solid #dce5f1;overflow:hidden;border-radius:16px;box-shadow:none}
 .month-calendar{padding:16px 16px 12px}
-.month-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 2px 10px}
-.month-select{font:inherit;font-size:21px;letter-spacing:-.5px;font-weight:700;min-height:44px;max-width:190px;border:0;background:transparent;color:#20344f;padding:0;cursor:pointer}
-.month-subtitle{margin:-6px 0 6px;font-size:11px;line-height:1.8;color:#8190a3}
+.month-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 8px}
+.month-subtitle{margin:-6px 0 6px;line-height:1.8;font-size:12px;color:#4d607b}
 .month-controls{display:flex;gap:2px}
-.month-controls button{width:44px;height:44px;border:0;border-radius:50%;background:#f2f6fc;color:#526e96;font:inherit;font-size:26px;cursor:pointer}
 .month-controls button[disabled]{color:#c7d1df;background:transparent;opacity:1}
 .records-page .record-kinds{background:transparent;padding:0;border-radius:0;border-bottom:1px solid #e9eef5;margin:0 0 8px;gap:0}
-.records-page .record-kinds button{min-height:46px;position:relative;border-radius:0;font-size:12px;color:#7b899d}
 .records-page .record-kinds button.active{background:transparent;box-shadow:none;color:#2458ce}
-.records-page .record-kinds button.active:after{content:"";position:absolute;bottom:-1px;left:16%;right:16%;height:2px;background:#2c5dcd;border-radius:2px}
 .kind-count{font-size:12px;margin-left:6px;font-variant-numeric:tabular-nums;opacity:.7}
 .month-week,.month-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
-.month-week{font-size:11px;color:#9aa5b4;text-align:center;margin-bottom:3px}
+.month-week{font-size:11px;text-align:center;margin-bottom:3px;color:#4d607b}
 .month-week text{height:26px;display:grid;place-items:center}
 .month-days{gap:2px 0}
-.month-days button{height:44px;min-width:0;position:relative;border:1px solid transparent;border-radius:12px;background:transparent;color:#52647d;font:inherit;font-size:14px;cursor:pointer;font-variant-numeric:tabular-nums}
 .month-days button[disabled]{color:#b2bed0;background:transparent;opacity:1}
 .month-days button.today:not(.selected){border-color:#d8e2f4;color:#45679b}
 .month-days button.selected{color:#fff;background:#2c5dcd;box-shadow:0 4px 11px #2758ce25;font-weight:700}
-.day-markers{position:absolute;bottom:4px;left:0;right:0;display:flex;justify-content:center;gap:3px}
 .month-days .selected .record-dot{background:#fff}
-.record-detail{padding:18px 20px 8px;border-top:1px solid #e9eef5;background:#f8faff}
+.record-detail{border-top:1px solid #e9eef5;background:#f8faff;padding:16px 16px 8px}
 .record-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
-.record-heading>text:first-child{font-size:16px;margin:0;font-weight:700;letter-spacing:-.2px;color:#20344f}
-.record-count{font-size:10px;color:#8897ad}
-.date-record{display:flex;align-items:center;gap:12px;text-decoration:none;padding:14px 0;color:#20344f;min-height:76px}
+.record-heading>text:first-child{margin:0;letter-spacing:-.2px;color:#20344f;font-size:17px;font-weight:600}
+.record-count{font-size:11px;color:#4d607b}
 .record-detail .date-record+.date-record{border-top:1px solid #e3eaf5}
-.record-seal{display:grid;place-items:center;flex-shrink:0;width:34px;height:34px;border-radius:50%;background:#e9effc;color:#3765c3;font-size:16px}
 .record-seal.banked_reset{background:#eee8f7;color:#8965b7}
-.record-copy{flex:1;min-width:0}
-.record-meta{display:flex;align-items:center;gap:10px;font-size:11px;color:#8493a8}
-.record-label{font-size:11px;color:#426bb6}
 .record-label.banked_reset{color:#8965b7}
-.record-time{font-size:11px;color:#8c99ac}
-.record-title{font-size:14px;line-height:1.6;margin:5px 0 0;font-weight:600;overflow-wrap:anywhere}
+.record-time{font-size:12px;color:#4d607b}
+.record-title{margin:5px 0 0;font-weight:600;overflow-wrap:anywhere;font-size:14px;line-height:22px}
 .record-chevron{font-size:23px;color:#8ca1bd;flex-shrink:0}
 .date-empty{padding:18px 0 10px}
-.date-empty>view:first-child{font-size:14px;font-weight:550;color:#657890}
+.date-empty>view:first-child{font-size:14px;font-weight:500;color:#657890}
 .date-empty .small{font-size:12px;line-height:1.7;margin:6px 0 0;color:#8796ab}
 .date-empty button{font:inherit;font-size:12px;color:#2458ce;min-height:44px;padding:0;border:0;background:transparent;cursor:pointer}
 
-.record-notes{margin:2px 2px 0;color:#8a98ad;font-size:11px;line-height:1.8}
-.record-notes button{display:flex;justify-content:space-between;align-items:center;min-height:44px;line-height:1.8;padding:0;margin:0;border:0;background:transparent;font-size:11px;color:#8a98ad;border-radius:0;text-align:left;font-weight:400}
-.record-note-copy{margin:0 0 14px;font-size:11px;line-height:1.8}
-.month-select{display:flex;align-items:center;line-height:1.4}
-.month-controls button{margin:0;padding:0;line-height:44px}
-.month-days button{width:100%;min-height:44px;margin:0;padding:0;line-height:42px;box-sizing:border-box}
-.month-days .blank-day{height:44px}
-.records-page .record-kinds button{margin:0;padding:0;line-height:46px;border:0}
-.records-page .record-kinds button.active:after{width:auto;transform:none;border:0;top:auto}
-.day-markers{height:5px}
-.date-record{margin:0;width:100%;line-height:1.5;border:0;border-radius:0;background:transparent;text-align:left;font-weight:400;box-sizing:border-box}
-.record-seal{display:flex;align-items:center;justify-content:center}
-.record-copy{display:block}
-.record-label{padding:0;background:transparent}
+.record-notes{margin:2px 2px 0;line-height:1.8;font-size:12px;color:#4d607b}
+.record-notes button{display:flex;justify-content:space-between;align-items:center;min-height:44px;line-height:1.8;padding:0;margin:0;border:0;background:transparent;border-radius:0;text-align:left;font-weight:400;font-size:12px;color:#4d607b}
+.record-note-copy{margin:0 0 14px;line-height:1.8;font-size:12px}
+.month-select{font:inherit;letter-spacing:-.5px;min-height:44px;max-width:190px;border:0;background:transparent;color:#20344f;padding:0;cursor:pointer;font-size:22px;font-weight:600;line-height:30px;display:flex;align-items:center;font-size:22px;font-weight:600;line-height:30px}
+.month-controls button{width:44px;height:44px;border:0;border-radius:50%;background:#f2f6fc;color:#526e96;font:inherit;font-size:26px;cursor:pointer;margin:0;padding:0;line-height:44px}
+.month-days button{min-width:0;position:relative;border:1px solid transparent;border-radius:12px;background:transparent;color:#52647d;font:inherit;font-size:14px;cursor:pointer;font-variant-numeric:tabular-nums;height:52px;min-height:52px;line-height:1.5;width:100%;margin:0;padding:0;box-sizing:border-box;height:52px;min-height:52px;line-height:1.5}
+.month-days .blank-day{height:52px}
+.records-page .record-kinds button{min-height:46px;position:relative;border-radius:0;font-size:12px;color:#4d607b;margin:0;padding:0;line-height:46px;border:0}
+.records-page .record-kinds button.active:after{content:"";position:absolute;bottom:-1px;left:16%;right:16%;height:2px;background:#2c5dcd;border-radius:2px;width:auto;transform:none;border:0;top:auto}
+.day-markers{position:absolute;bottom:4px;left:0;right:0;display:flex;justify-content:center;gap:3px;height:5px}
+.date-record{display:flex;align-items:center;gap:12px;text-decoration:none;padding:14px 0;color:#20344f;min-height:76px;margin:0;width:100%;line-height:1.5;border:0;border-radius:0;background:transparent;text-align:left;font-weight:400;box-sizing:border-box}
+.record-seal{display:grid;place-items:center;flex-shrink:0;width:34px;height:34px;border-radius:50%;background:#e9effc;color:#3765c3;font-size:16px;display:flex;align-items:center;justify-content:center}
+.record-copy{flex:1;min-width:0;display:block}
+.record-label{font-size:11px;color:#426bb6;padding:0;background:transparent}
 .date-empty .text-button{margin:0;text-align:left}
 .record-sheet button::after{border:0}
-@media(max-width:360px){.month-calendar{padding:12px 10px 10px}.month-select{font-size:19px}.record-detail{padding:16px 14px 6px}.records-page .record-kinds .record-dot{margin-right:4px}.kind-count{margin-left:4px}}
+@media(max-width:360px){.month-calendar{padding:16px 16px 12px}.month-select{font-size:19px}.record-detail{padding:16px 16px 8px}.records-page .record-kinds .record-dot{margin-right:4px}.kind-count{margin-left:4px}}
 
 /* Calendar and selected-day records use the same card inset. */
-.records-page .month-calendar{padding:20px 16px 12px}
-.records-page .record-detail{padding:20px 16px 8px}
-@media(min-width:701px){.records-page .month-calendar{padding:24px 24px 12px}.records-page .record-detail{padding:24px 24px 8px}}
+
 
 .records-page .month-heading{margin-left:0;margin-right:0}
 .record-dot.observed{background:transparent;border:1px solid #b27820;box-sizing:border-box;width:6px;height:6px}
 .month-days .selected .record-dot.observed{background:transparent;border-color:#fff}
-.record-legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin:12px 0 0;color:#6c7c91;font-size:10px;line-height:1.6}
+.record-legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin:12px 0 0;line-height:1.6;font-size:11px;color:#4d607b}
 .record-legend>view{display:flex;align-items:center;gap:5px}
 .record-seal.observed{background:#fff3df;color:#a36c18}
-.record-meta{flex-wrap:wrap;gap:5px 8px}
-.record-status{font-size:10px;color:#607895;background:#edf2f9;padding:2px 5px;border-radius:4px;line-height:1.5}
+.record-meta{display:flex;align-items:center;gap:10px;font-size:12px;color:#4d607b;flex-wrap:wrap;gap:5px 8px;font-size:12px;color:#4d607b}
+.record-status{color:#607895;background:#edf2f9;padding:2px 5px;border-radius:8px;line-height:1.5;font-size:11px}
 .record-status.observed{color:#946016;background:#fff1d9}
-.record-source{margin-top:5px;font-size:11px;line-height:1.6;color:#7b6b50;overflow-wrap:anywhere}
-.record-sources{padding:0 12px 8px 42px}.record-sources>.text-button{min-height:40px;font-size:11px;text-align:left}.record-source-link{display:block;width:100%;padding:10px 0;text-align:left;white-space:normal;line-height:1.6;font-size:11px;color:#49648b;background:transparent}.record-source-link::after{border:0}
-.month-count-note{font-size:10px;line-height:1.8;color:#7d8b9e;margin:0 0 10px;overflow-wrap:anywhere}
-.day-observation-count{font-size:8px;line-height:10px;min-width:10px;height:10px;border:1px solid #b27820;border-radius:5px;color:#946016;box-sizing:border-box;background:#fff8ec;text-align:center;margin-top:-3px}
+.record-source{margin-top:5px;line-height:1.6;overflow-wrap:anywhere;font-size:12px;color:#4d607b}
+.record-sources{padding:0 12px 8px 42px}.record-sources>.text-button{min-height:44px;font-size:11px;text-align:left}.record-source-link{display:block;width:100%;padding:10px 0;text-align:left;white-space:normal;line-height:1.6;font-size:11px;color:#49648b;background:transparent}.record-source-link::after{border:0}
+.month-count-note{line-height:1.8;margin:0 0 10px;overflow-wrap:anywhere;font-size:11px;color:#4d607b}
+.day-observation-count{border:1px solid #b27820;border-radius:5px;color:#946016;box-sizing:border-box;background:#fff8ec;text-align:center;margin-top:-3px;font-size:10px;line-height:14px;height:16px;min-width:16px}
 .selected .day-observation-count{color:#fff;border-color:rgba(255,255,255,.85);background:transparent}
-.recent-reset-sheet{margin-top:18px;padding:18px 16px 4px;background:#fff;border:1px solid #dce5f1;border-radius:22px;overflow:hidden}
-.recent-reset-heading{display:flex;align-items:baseline;justify-content:space-between;gap:8px;color:#20344f;font-size:17px;font-weight:700;line-height:1.5}
-.recent-reset-count{font-size:10px;font-weight:400;color:#8493a8;white-space:nowrap}
-.recent-reset-note{font-size:10px;color:#8493a8;line-height:1.8;margin:4px 0 8px}
+.recent-reset-sheet{background:#fff;border:1px solid #dce5f1;overflow:hidden;margin-top:24px;padding:16px 16px 4px;border-radius:16px}
+.recent-reset-heading{display:flex;align-items:baseline;justify-content:space-between;gap:8px;color:#20344f;font-weight:600;font-size:17px;line-height:24px}
+.recent-reset-count{font-weight:400;white-space:nowrap;font-size:11px;color:#4d607b}
+.recent-reset-note{font-size:11px;color:#4d607b;line-height:1.8;margin:4px 0 8px}
 .recent-reset-row{display:flex;align-items:center;gap:10px;min-height:72px;width:100%;margin:0;padding:14px 0;background:transparent;border-radius:0;line-height:1.5;text-align:left;font-weight:400;box-sizing:border-box}
 .recent-reset-row::after{border:0}
 .recent-reset-row+.recent-reset-row{border-top:1px solid #edf1f7}
-.recent-reset-icon{display:flex;align-items:center;justify-content:center;flex:none;width:32px;height:32px;border-radius:10px;background:#edf4ff}
+.recent-reset-icon{display:flex;align-items:center;justify-content:center;flex:none;width:32px;height:32px;border-radius:8px;background:#edf4ff}
 .recent-reset-icon.banked_reset{background:#f2edfb}
 .recent-reset-icon image{width:23px;height:23px}
 .recent-reset-copy{flex:1;min-width:0}
-.recent-reset-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;white-space:nowrap}
+.recent-reset-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;white-space:normal;flex-wrap:wrap}
 .recent-reset-title{flex:none;font-size:14px;line-height:21px;font-weight:600;color:#20344f}
-.recent-reset-time{flex:none;font-size:11px;line-height:18px;color:#687c97;font-variant-numeric:tabular-nums}
+.recent-reset-time{flex:none;font-variant-numeric:tabular-nums;font-size:12px;line-height:18px;color:#4d607b}
 .recent-reset-clock{margin-left:6px;color:#536a89}
-.recent-reset-meta{display:flex;align-items:center;gap:8px;min-width:0;margin-top:5px}
+.recent-reset-meta{display:flex;align-items:center;gap:8px;min-width:0;margin-top:5px;flex-wrap:wrap}
 .recent-reset-meta .record-status{flex:none;white-space:nowrap;font-weight:400}
-.recent-reset-source{display:block;min-width:0;flex:1;font-size:11px;line-height:19px;color:#687c97;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.recent-reset-source{display:block;min-width:0;flex:1;line-height:19px;white-space:normal;overflow-wrap:anywhere;overflow:visible;text-overflow:clip;font-size:12px;color:#4d607b}
 .recent-reset-row .record-chevron{font-size:20px}
-@media(max-width:360px){.recent-reset-row{gap:8px}.recent-reset-icon{width:28px;height:28px;border-radius:9px}.recent-reset-icon image{width:21px;height:21px}.recent-reset-head{gap:6px}.recent-reset-title{font-size:13px}.recent-reset-time{font-size:10px}.recent-reset-clock{margin-left:4px}}
+@media(max-width:360px){.recent-reset-row{gap:8px}.recent-reset-icon{width:28px;height:28px;border-radius:8px}.recent-reset-icon image{width:21px;height:21px}.recent-reset-head{gap:6px}.recent-reset-title{font-size:13px}.recent-reset-time{font-size:12px}.recent-reset-clock{margin-left:4px}}
 .recent-reset-pressed{opacity:.7}
-.recent-reset-empty{padding:22px 0;font-size:12px;color:#8493a8;text-align:center}
+.recent-reset-empty{padding:22px 0;font-size:12px;color:#4d607b;text-align:center}
 .recent-reset-more{width:100%;min-height:46px;margin:0;padding:12px 0;background:transparent;color:#3467c5;font-size:13px;font-weight:500;line-height:22px;border-radius:0;border-top:1px solid #edf1f7}
 .recent-reset-more::after{border:0}
-.recent-reset-end{padding:16px 0;font-size:11px;color:#8493a8;text-align:center;border-top:1px solid #edf1f7;line-height:1.6}
+.recent-reset-end{padding:16px 0;font-size:11px;color:#4d607b;text-align:center;border-top:1px solid #edf1f7;line-height:1.6}

@@ -1,1 +1,4 @@
-{"navigationBarTitleText":"重置记录"}
+{
+  "navigationBarTitleText": "重置记录",
+  "enablePullDownRefresh": true
+}

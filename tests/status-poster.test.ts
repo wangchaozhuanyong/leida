@@ -192,11 +192,11 @@ for (const { id: style } of statusPosterStyles) {
     assert.match(svg, /2026\.10\.08/); assert.match(svg, /11:44/);
     assert.match(svg, /生成于 2026\.10\.10 22:46 · 北京时间/);
     assert.match(svg, /下一次时间待公开确认/);
-    assert.match(svg, /个人状态以账户显示为准/);
+    assert.match(svg, /具体额度以账户为准/);
     assert.match(svg, /依据：所选公开公告/);
     assert.doesNotMatch(svg, /圆码示意|设计样张|data-poster-code="mini"/);
     assert.doesNotMatch(svg, /data-poster-code="website"|网站二维码|扫码查看最新动态/);
-    assert.match(svg, /小程序码暂不可用，可分享公告链接查看进展/);
+    assert.doesNotMatch(svg, /微信扫码|微信小程序码|请查看小程序|可分享公告链接/);
     const png = await rasterize(Buffer.from(svg)).png().toBuffer();
     assert.equal(png.readUInt32BE(16), 1080); assert.equal(png.readUInt32BE(20), 1920);
     const future = statusPosterSvg(input({ style, nextAction: announcement({ expectedAt: '2026-10-11T03:30:00Z' }) }));

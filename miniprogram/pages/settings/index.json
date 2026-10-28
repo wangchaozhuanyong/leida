@@ -1,1 +1,4 @@
-{"navigationBarTitleText":"提醒"}
+{
+  "navigationBarTitleText": "提醒",
+  "enablePullDownRefresh": true
+}

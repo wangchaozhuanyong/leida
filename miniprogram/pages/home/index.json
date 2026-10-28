@@ -4,5 +4,6 @@
     "neural-orb": "/components/neural-orb/index",
     "signal-arrow": "/components/signal-arrow/index",
     "instrument-dial": "/components/instrument-dial/index"
-  }
+  },
+  "enablePullDownRefresh": true
 }

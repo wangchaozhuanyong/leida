@@ -3,7 +3,7 @@
 <view class="refresh-track {{settingsReady && (refreshing || wechat.refreshing) ? 'is-active' : ''}}"><view/></view>
 <view class="page {{contentMotion}}" bindtouchstart="nativeReturnTouched">
   <view wx:if="{{storageError}}" class="warning">{{storageError}}</view>
-  <view class="cached-content-note" role="status">{{snapshotPending && connected ? error ? '更新失败 · 显示上次内容' : '已显示上次内容 · 更新中' : ''}}</view>
+  <view wx:if="{{snapshotPending && connected && !error}}" class="cached-content-note" role="status">正在更新上次内容</view>
   <view class="card inbox-card"><view class="row"><view class="heading">站内信 <text wx:if="{{unread}}" class="inbox-unread">{{unread}} 未读</text></view><button class="text-button" data-path="/pages/notices/index" bindtap="navigate">查看全部提醒 →</button></view>
     <view wx:if="{{!connected}}" class="inbox-loading"><text>{{error || (unconfigured ? '站内信暂不可用' : '正在更新提醒')}}</text><button wx:if="{{error}}" class="text-button" bindtap="retry">重新加载</button></view>
     <view wx:elif="{{error}}" class="warning lead">{{error}}<button class="text-button" bindtap="retry">重新加载</button></view>
@@ -24,7 +24,7 @@
     <view wx:if="{{wechat.allTypesOff}}" class="reminder-paused">已暂停所有类型，剩余次数保留。开启任一类型即可继续接收新消息。</view>
     <view wx:elif="{{wechat.safe && !wechat.safe.preferencesSupported}}" class="small muted lead">提醒类型暂不可设置，请稍后重新加载。</view>
     <view class="small muted lead">设置自动保存，开启后仅接收新消息。</view>
-    <view class="reminder-feedback {{wechat.error ? 'warning' : ''}}" aria-live="polite">{{wechat.error}}</view>
+    <view wx:if="{{wechat.error}}" class="reminder-feedback warning" aria-live="polite">{{wechat.error}}</view>
     <view wx:if="{{wechat.privacyNeeded}}" class="stack lead"><button class="secondary full" bindtap="openPrivacyContract">查看隐私指引</button><button class="primary full" open-type="agreePrivacyAuthorization" bindagreeprivacyauthorization="agreeWechatPrivacy">同意隐私指引并继续</button></view>
     <block wx:else><button class="primary full reminder-add {{wechat.busy || wechatAction || (!wechat.ready && !wechat.confirmNeeded && !wechat.error) ? 'is-disabled' : ''}} {{wechatAction === 'add' || wechatAction === 'reload' ? 'is-pending' : ''}}" loading="{{wechatAction === 'add' || wechatAction === 'reload'}}" disabled="{{wechat.busy || wechatAction || (!wechat.ready && !wechat.confirmNeeded && !wechat.error)}}" bindtap="addWechat">{{wechatAction === 'add' ? '正在确认' : wechatAction === 'reload' ? '正在加载' : wechat.confirmNeeded ? '重试' : wechat.error && !wechat.ready ? '重新加载' : wechat.safe && (!wechat.safe.configured || !wechat.safe.enabled) ? '暂不可开启' : wechat.safe && wechat.safe.state === 'unknown' ? '重新授权增加一次' : wechat.remainingCount > 0 ? '增加一次提醒' : '开启微信提醒'}}</button>
     <view wx:if="{{wechat.safe && wechat.safe.state === 'unknown'}}" class="small muted lead">上次发送的结果未确认，该消息不会重复发送。重新授权后只接收新消息，未确认的次数不计入可用次数。</view>

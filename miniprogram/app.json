@@ -28,7 +28,7 @@
     "backgroundColorTop": "#f2f5fb",
     "backgroundColorBottom": "#f2f5fb",
     "backgroundTextStyle": "dark",
-    "enablePullDownRefresh": true,
+    "enablePullDownRefresh": false,
     "navigationStyle": "custom"
   },
   "tabBar": {

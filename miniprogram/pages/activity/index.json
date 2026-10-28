@@ -1,1 +1,4 @@
-{"navigationBarTitleText":"活动动态"}
+{
+  "navigationBarTitleText": "活动动态",
+  "enablePullDownRefresh": true
+}

@@ -41,14 +41,13 @@ export function designedStatusPoster(input: DesignedPoster): string {
     if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw new Error('无效的扫码地址');
   }
   const scan = input.code ? `<g data-poster-code="mini"><circle cx="875" cy="1705" r="135" fill="#fff"/><image x="780.5" y="1610.5" width="189" height="189" preserveAspectRatio="xMidYMid meet" href="data:${input.code.contentType};base64,${input.code.image.toString('base64')}"/></g>` : '';
-  const scanHeading=input.code?'微信扫码进入小程序':input.name;
-  const footer=`<rect x="0" y="1530" width="1080" height="390" fill="${dark?'#0b0d10':'#faf6ec'}" opacity="1"/>${text(scanHeading,82,1653,fit(scanHeading,40,input.code?610:930))}${text(input.sourceLabel,82,1711,fit(input.sourceLabel,28,input.code?610:930),muted)}${text(input.code?'海报内容可能更新，最新进展请查看小程序':'小程序码暂不可用，可分享公告链接查看进展',82,1772,24,muted)}${scan}${input.code?text('微信小程序码',875,1876,25,muted,400,'middle'):''}${text('仅整理公开公告，个人状态以账户显示为准',82,1833,24,muted)}${text(`生成于 ${dateTime(input.generatedAt).date} ${dateTime(input.generatedAt).time} · 北京时间`,82,1880,22,muted)}`;
+  const footer=`<rect x="0" y="1530" width="1080" height="390" fill="${dark?'#0b0d10':'#faf6ec'}" opacity="1"/>${text(input.name,82,1653,fit(input.name,40,input.code?610:930))}${text(input.sourceLabel,82,1711,fit(input.sourceLabel,28,input.code?610:930),muted)}${scan}${text('公开信息仅供参考，具体额度以账户为准',82,1833,24,muted)}${text(`生成于 ${dateTime(input.generatedAt).date} ${dateTime(input.generatedAt).time} · 北京时间`,82,1880,22,muted)}`;
   const date = dateTime(input.statementAt), generated = dateTime(input.generatedAt);
   const elapsed = input.interval.match(/^(\d+) (.+)$/);
   const next = input.nextNote === '暂无可靠的下次重置日期' ? '下一次时间待公开确认' : input.nextNote;
   const nextLines = wrap(next.replace(' · 北京时间', ''), dark ? 11 : 10.5);
   const nextSize = nextLines.length > 2 ? 30 : 38;
-  const qualifier = '仅整理公开公告，个人状态以账户显示为准';
+  const qualifier = '公开信息仅供参考，具体额度以账户为准';
   const interval = dark
     ? elapsed ? text(elapsed[1], 540, 948, fit(elapsed[1], 286, 520), 'url(#elapsed-gold)', 700, 'middle', 'font-family="Georgia,Times New Roman,serif"') + text(elapsed[2], 540, 1070, 43, ink, 400, 'middle') : text(input.interval, 540, 920, fit(input.interval,100,510), 'url(#elapsed-gold)', 700, 'middle')
     : elapsed ? text(elapsed[1], 380, 1320, fit(elapsed[1], 460, 316), '#b72f28', 700, 'end', 'font-family="Georgia,Times New Roman,serif"') + text(elapsed[2], 505, 1310, elapsed[2].length > 1 ? 58 : 89, ink, 700, 'end') : text(input.interval, 64, 1190, fit(input.interval,138,455), '#b72f28', 700);
@@ -68,7 +67,7 @@ export function designedStatusPoster(input: DesignedPoster): string {
     ${mark(57, 105)}${text(input.name, 186, 181, fit(input.name, 61, input.code ? 490 : 815), ink, 700)}
     ${text('Codex 用量动态', 64, 260, 43, ink, 400, 'start', 'letter-spacing="7"')}
     ${line(64, 320, input.code ? 692 : 1015, 320)}
-    ${text('关注公开公告，追踪用量动态', 64, 371, 28, muted, 400, 'start', 'letter-spacing="6"')}
+    ${text('公开信息整理 · 用量动态记录', 64, 371, 28, muted, 400, 'start', 'letter-spacing="6"')}
     ${text(input.title.startsWith('公告称') ? '公告称' : '公开状态', 64, 578, 146, ink, 700)}
     ${text(input.title.replace(/^公告称/, ''), 64, 769, fit(input.title.replace(/^公告称/, ''), 157, 948), ink, 700)}
     ${line(64, 831, 1016, 831)}${text(input.intervalLabel ?? '距该公告', 64, 916, 48, ink, 600)}${interval}${input.intervalUnit?text(input.intervalUnit,64,1285,35):''}

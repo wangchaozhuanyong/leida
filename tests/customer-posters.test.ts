@@ -18,6 +18,13 @@ function fixture(stage?:BenefitAction['stage'],expectedAt?:string):PublicData {
   return data;
 }
 const measure=(text:string,size:number)=>Array.from(text).reduce((n,c)=>n+(c.charCodeAt(0)<128?.56:1)*size,0);
+test('两款海报保留事实和真码，不再印扫码引导、平台名称及码下方说明',()=>{
+  const input=native.statusPosterInput(fixture('claimed_complete'));
+  for(const theme of ['precision','editorial'])for(const includeCode of [false,true]){
+    const layout=native.createStatusPosterLayout(input,measure,theme,includeCode),text=layout.commands.filter((c:any)=>c.type==='text').map((c:any)=>c.value).join('\n');
+    assert.doesNotMatch(text,/微信|扫码|小程序|关注|最新|仅整理公开公告/);assert.ok(text.includes(input.title));assert.ok(text.includes(input.date));assert.ok(text.includes(input.sourceLabel));assert.match(text,/具体额度以账户为准/);assert.equal(layout.commands.filter((c:any)=>c.asset==='code').length,includeCode?1:0);
+  }
+});
 test('两款固定海报在无公告、预告、进行中和逾期时均可用，不捏造完成或经过天数',()=>{
   for(const [stage,time,value]of [[undefined,undefined,'等待下一次预告'],['promised','2026-10-15T03:00:00Z','3小时0分钟'],['in_progress',undefined,'额度重置进行中'],['promised','2026-10-14T23:00:00Z','1小时0分钟']] as const){
     const data=fixture(stage,time),input=native.statusPosterInput(data);

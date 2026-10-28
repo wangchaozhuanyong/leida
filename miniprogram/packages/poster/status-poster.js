@@ -40,7 +40,6 @@ function createStatusPosterLayout(input,measure,theme='precision',includeCode=fa
   const brand=(x,y)=>commands.push({type:'image',asset:'brand',x,y,width:100,height:75,sx:110,sy:520,sw:1850,sh:1010});
   const code=()=>{
     if(includeCode){commands.push({type:'circle',x:875,y:1705,r:135,color:'#fff'});commands.push({type:'image',asset:'code',x:780.5,y:1610.5,width:189,height:189});}
-    if(includeCode)text('微信小程序码',875,1876,25,muted,400,'center');
   };
   const nextLines=[];let row='';for(const c of input.nextNote.replace(' · 北京时间','')){if(c==='\n'){if(row)nextLines.push(row);row='';continue;}if(measure(row+c,38,500)>(dark?425:415)){nextLines.push(row);row='';}row+=c;}if(row)nextLines.push(row);
   if(nextLines.length>3){nextLines.length=3;nextLines[2]=nextLines[2].slice(0,-1)+'…';}
@@ -54,28 +53,28 @@ function createStatusPosterLayout(input,measure,theme='precision',includeCode=fa
     line(543,1330,543,1500);nextLines.forEach((s,i)=>text(s,590,1375+i*42,nextSize,ink,500,'left',425));
 
   }else{
-    brand(57,105);text(input.name,186,181,61,ink,700,'left',includeCode?490:815);text('Codex 用量动态',64,260,43);line(64,320,includeCode?692:1015,320);text('关注公开公告，追踪用量动态',64,371,28,muted);
+    brand(57,105);text(input.name,186,181,61,ink,700,'left',includeCode?490:815);text('Codex 用量动态',64,260,43);line(64,320,includeCode?692:1015,320);text('公开信息整理 · 用量动态记录',64,371,28,muted);
     const completed=input.title.startsWith('公告称');text(completed?'公告称':'公开状态',64,578,146,ink,700);text(input.title.replace(/^公告称/,''),64,769,157,ink,700,'left',948);
     line(64,831,1016,831);text(input.label,64,916,48,ink,600);
     if(/^\d+$/.test(input.value)){text(input.value,380,1320,460,'#b72f28',700,'right',316);text(input.unit,505,1310,input.unit.length>1?58:89,ink,700,'right');}
     else{text(input.value,64,1190,input.value.includes(':')?130:110,'#b72f28',700,'left',455);if(input.unit)text(input.unit,64,1285,35);}
     line(563,886,563,1349);text(input.statementLabel||'公告时间',600,923,35);text(input.date,600,1000,62,ink,600,'left',416);text(input.time||'待公开确认',600,1076,73,ink,600,'left',416);if(input.time)text('北京时间',600,1126,32,muted);
     line(600,1170,1016,1170);nextLines.forEach((s,i)=>text(s,600,1234+i*47,nextSize,ink,600,'left',416));
-    rect(48,1403,978,174,'#faf5e9',.72);line(64,1404,1016,1404);text(input.sourceLabel,64,1462,37,ink,600,'left',944);text('仅整理公开公告，个人状态以账户显示为准',64,1516,29,muted,400,'left',944);
+    rect(48,1403,978,174,'#faf5e9',.72);line(64,1404,1016,1404);text(input.sourceLabel,64,1462,37,ink,600,'left',944);text('公开信息仅供参考，具体额度以账户为准',64,1516,29,muted,400,'left',944);
 
   }
   rect(0,1530,1080,390,dark?'#0b0d10':'#faf6ec',1);
-  text(includeCode?'微信扫码进入小程序':input.name,82,1653,40,ink,400,'left',includeCode?610:930);text(input.sourceLabel,82,1711,28,muted,400,'left',includeCode?610:930);
-  text(includeCode?'消息可能更新，最新进展请查看小程序':'小程序码暂不可用，可直接分享小程序卡片',82,1772,24,muted);
-  code();text('仅整理公开公告，个人状态以账户显示为准',82,1833,24,muted);text(`生成于 ${input.generated} · 北京时间`,82,1880,22,muted);
+  text(input.name,82,1653,40,ink,400,'left',includeCode?610:930);text(input.sourceLabel,82,1711,28,muted,400,'left',includeCode?610:930);
+  code();text('公开信息仅供参考，具体额度以账户为准',82,1833,24,muted);text(`生成于 ${input.generated} · 北京时间`,82,1880,22,muted);
   return{width:1080,height:1920,theme,background:assets[theme],commands};
 }
 async function renderStatusPoster({wxApi,canvas,page,input,theme='precision',code,isCurrent=()=>true}){
   const ctx=canvas.getContext('2d');if(!ctx)throw new PosterError('canvas','海报暂不可用，请重试。');
   if(code&&(code.publicationId!==(input.codePublicationId||input.publicationId)||!code.filePath))throw new PosterError('code_version','小程序码与当前海报不匹配。');
   const layout=createStatusPosterLayout(input,(value,size,weight)=>{ctx.font=`${weight} ${size}px Songti SC,STSong,serif`;return ctx.measureText(value).width;},theme,!!code);
-  const images={background:await loadCanvasImage(canvas,layout.background),brand:await loadCanvasImage(canvas,assets.brand)};
-  if(code){images.code=await loadCanvasImage(canvas,code.filePath);if(!images.code.width||images.code.width!==images.code.height)throw new PosterError('image','小程序码格式不正确。');}
+  const [background,brand,codeImage]=await Promise.all([loadCanvasImage(canvas,layout.background),loadCanvasImage(canvas,assets.brand),code?loadCanvasImage(canvas,code.filePath):undefined]);
+  const images={background,brand,code:codeImage};
+  if(code&&(!images.code.width||images.code.width!==images.code.height))throw new PosterError('image','小程序码格式不正确。');
   if(!isCurrent())throw new PosterError('cancelled','已取消旧海报生成。');
   canvas.width=1080;canvas.height=1920;ctx.drawImage(images.background,0,0,1080,1920);ctx.textBaseline='alphabetic';
   const gold=ctx.createLinearGradient(420,540,730,1100);[[0,'#fff1cc'],[.45,'#e3bb71'],[.74,'#f5d99b'],[1,'#ad7835']].forEach(([stop,color])=>gold.addColorStop(stop,color));
