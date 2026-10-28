@@ -61,8 +61,8 @@ Page(createPage((data, query, page, app) => {
     activity: activity ? { title: activity.title, rules: activity.rules, phase: m.activityModel(data, activity.id).phase, entries: activity.items.length, path: `/pages/activity/index?id=${encodeURIComponent(activity.id)}` } : null,
     recent: m.homeNewsGroups(data).map(group=>{
       const card=m.publicationCard(data,group.latest),summary=group.observation;
-      return summary?{...card,id:summary.id,title:summary.title,summary:summary.summary,time:summary.date,label:'观测汇总',
-        note:'按北京时间汇总来源依据，不按来源数计算重置次数。',updates:summary.sources,progressLabel:'查看来源依据'}:card;
+      return summary?{...card,id:summary.id,title:summary.title,summary:summary.summary,time:summary.date,label:'重置观测',
+        note:summary.sourceCount+'个来源',updates:summary.sources,progressLabel:'查看来源'}:card;
     }),
     recentDays: m.calendarModel(data).recentDays, sharePath: selected.sharePath, shareTitle: selected.shareTitle,
     shareLabel: '分享这条公告给朋友',
@@ -76,7 +76,7 @@ Page(createPage((data, query, page, app) => {
   cancelCalendarPrefetch() { if(this._calendarPrefetchTimer)clearTimeout(this._calendarPrefetchTimer);this._calendarPrefetchTimer=null; },
   toggleFreshness() { this.setData({ freshnessOpen: !this.data.freshnessOpen }); },
   currentHomeStatus() { const state=getApp().client.getState();if(!state.data||state.snapshotPending)return null;const now=new Date(Date.parse(state.data.serverTime)+Math.max(0,Date.now()-(state.receivedAt||Date.now()))).toISOString();return selectedHomeStatus(state.data,this.data.selectedResetKind,now); },
-  openPoster() { if(this.data.snapshotPending){wx.showToast({title:'核对最新消息后可分享',icon:'none'});return;}const card=this.data.connected&&this.currentHomeStatus();if(card)wx.navigateTo({url:'/packages/poster/index?kind='+card.kind+'&revision='+encodeURIComponent(card.revision),fail(){wx.showToast({title:'海报页面加载失败，请重试。',icon:'none'});} }); },
+  openPoster() { if(this.data.snapshotPending){wx.showToast({title:'更新最新消息后可分享',icon:'none'});return;}const card=this.data.connected&&this.currentHomeStatus();if(card)wx.navigateTo({url:'/packages/poster/index?kind='+card.kind+'&revision='+encodeURIComponent(card.revision),fail(){wx.showToast({title:'海报页面加载失败，请重试。',icon:'none'});} }); },
   syncCountdown() {
     if (!this.data.lastReset && !this.data.resetCards?.some(card=>['scheduled','revised','overdue'].includes(card.state)||(card.kind===this.data.selectedResetKind&&['completed','observed'].includes(card.state))) && !(this.data.pending && this.data.pending.counting) && !(this.data.timeline && (this.data.timeline.completed || this.data.timeline.scheduled))) { this.stopCountdown(); return; }
     if (!this._countdownTimer) this._countdownTimer = setInterval(() => this.tickCountdown(), 1000);

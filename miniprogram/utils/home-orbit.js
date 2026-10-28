@@ -22,11 +22,11 @@ function homeOrbitPresentation(card, now) {
   switch (card.state) {
     case 'signal':
       Object.assign(view, { title: '安排待明确', label: '发现公开线索', badge: '信号观察', tone: 'violet', symbol: '◎',
-        description: card.description, footnote: '公开线索不等于明确预告。' });
+        description: card.description, footnote: '具体安排待公布。' });
       break;
     case 'estimated':
       Object.assign(view, { title: card.window || '近期可能更新', label: '信号发布时推测', badge: '推测 · 非明确预告', tone: 'violet',
-        description: card.description, footnote: '保留信号发布时的推测范围，不作为发放倒计时。' });
+        description: card.description, footnote: '推测时间仅供参考，具体安排待公布。' });
       break;
     case 'announced':
       Object.assign(view, { title: '时间待公布', label: '已有' + subject + '预告', badge: '已发布预告', tone: 'blue',
@@ -55,7 +55,7 @@ function homeOrbitPresentation(card, now) {
     case 'observed':
       Object.assign(view, elapsedClock(card.timeAt, now), { title: banked ? '距离上次发卡（观测）' : '距离上次重置（观测）', label: '已经过去',
         badge: '第三方报告', tone: 'teal', symbol: '◎', timeLabel: '来源观测时间',
-        description: '第三方来源记录了' + subject + '，持续关注后续消息。', footnote: '第三方观测不等于官方完成声明。' });
+        description: '第三方来源记录了' + subject + '，持续关注后续消息。', footnote: '依据第三方观测，实际额度以账户显示为准。' });
       break;
     case 'completed':
       Object.assign(view, elapsedClock(card.timeAt, now), { title: banked ? '距离上次发卡' : '距离上次重置', label: '已经过去',
@@ -64,12 +64,12 @@ function homeOrbitPresentation(card, now) {
       break;
     case 'cancelled':
       Object.assign(view, { title: '本轮安排已取消', label: subject, badge: '公开取消声明', animated: false, symbol: '—',
-        description: '原安排已取消；如有新安排，将另行更新。', footnote: '原预计时间不再参与倒计时。' });
+        description: '原安排已取消；如有新安排，将另行更新。', footnote: '如有新安排会及时更新。' });
       break;
   }
   if (card.observationPublicationId && ['overdue', 'progress'].includes(card.state)) {
     view.description = '已有第三方重置观测，本轮完成声明仍待核实。';
-    view.footnote = '下方可查看独立观测，暂不将其视为本轮完成依据。';
+    view.footnote = '下方可查看来源与时间。';
   }
   view.long = view.parts.some(part => part.value.length > 2);
   return view;

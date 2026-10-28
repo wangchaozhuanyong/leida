@@ -21,7 +21,7 @@ const stub=(fn:(url:RequestInfo|URL,init?:RequestInit)=>Promise<Response>)=>fn a
 test('上游信号概率和预测窗口原样归属上游，不从历史间隔另造日期或概率',()=>{
  const read=watch(),forecasts={status:'ready' as const,generatedAt:now,ruleVersion:'test',modelVersion:'test',cases:[],reference:referenceForecast(),watch:read};
  const view=statusTimelineModel({status:'monitoring'},now,null,forecasts);
- assert.equal(view.forecastWindow,'10小时内');assert.equal(view.chanceLabel,'上游信号概率 73%');assert.equal(view.scheduled,false);
+ assert.equal(view.forecastWindow,'10小时内');assert.equal(view.chanceLabel,'来源估计概率 73%');assert.equal(view.scheduled,false);
  assert.deepEqual(native.statusTimelineModel({status:'monitoring'},now,null,forecasts),view);
  const input=response();input.data.active_watch.reset_chance_percent=null as any;
  assert.equal(statusTimelineModel({status:'monitoring'},now,null,{...forecasts,watch:parseResetWatchResponse(input,now)}).chanceLabel,'');

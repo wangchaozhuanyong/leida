@@ -50,7 +50,7 @@ test('真实01:00观测进入公共状态和共享首页计时，不伪造成原
  assert.equal(outlook.byKind?.automatic_reset?.latestObservation?.observedAt,observedAt);
  assert.equal(outlook.latestGlobalCompletionAt,undefined);assert.deepEqual(publicActions(data),[]);
  assert.equal(view.lastReset.statementAt,observedAt);assert.equal(view.lastReset.sourceType,'observed');
- assert.equal(view.cards[0].state,'observed');assert.match(view.cards[0].footer,/非原作者/);
+ assert.equal(view.cards[0].state,'observed');assert.match(view.cards[0].footer,/依据第三方观测/);
  assert.equal(data.publications[0].mode,'news_only');assert.equal(data.publications[0].event.actions.length,0);
  assert.match(data.articles[0].summary,/观测时间/);assert.equal(view.lastCard,null);
  assert.deepEqual(require('../miniprogram/utils/status-timeline.js').statusTimelineModel(outlook,now),statusTimelineModel(outlook,now));

@@ -9,6 +9,12 @@ export const intervalText=(value:[number,number]|null)=>value?`${(value[0]*100).
 export const forecastBasisText=(basis:ForecastSnapshot['basis'])=>({experimental_seed:'历史样本实验',verified_live:'观察样本实验',insufficient:'样本不足',late:'迟到观察',already_known:'已知公告，非提前预测'}[basis]);
 export const forecastStatusText=(status:ForecastCaseView['status'])=>({watching:'观察中',elapsed:'窗口已结束',observed:'已找到对应公告',paused:'来源暂停或有缺口'}[status]);
 
+/** Public copy only; the original explanation and frozen probabilities remain intact. */
+export const forecastExplanationText=(snapshot:ForecastSnapshot)=>snapshot.basis==='late'?'资料收录较晚，本条不作为提前预测。'
+ :snapshot.basis==='already_known'?'生成记录时，相关重置消息已经公布。'
+ :snapshot.basis==='insufficient'?(snapshot.target==='banked_reset'?'重置卡历史记录不足，暂不显示概率。':'可比较的历史记录不足，暂不显示概率。')
+ :snapshot.basis==='verified_live'?'根据已核实的历史记录估算，仅供参考。':'根据选定的历史记录估算，仅供参考。';
+
 /** The hero compares both original windows only before the first one expires. */
 export function currentForecast(data:ForecastPublicData|undefined,now:string):ForecastCaseView|undefined {
  if(data?.status!=='ready'||!Number.isFinite(Date.parse(now)))return;

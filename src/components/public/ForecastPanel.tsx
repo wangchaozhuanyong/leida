@@ -2,22 +2,22 @@
 import Link from 'next/link';
 import {useFixedSnapshot} from './useFixedSnapshot';
 import type {ForecastPublicData,ForecastSnapshot,ForecastCaseView} from '@/lib/forecast';
-import {forecastBasisText,forecastStatusText,forecastValueText,intervalText,probabilityText} from '@/lib/forecast-display';
+import {forecastBasisText,forecastStatusText,forecastValueText,forecastExplanationText,intervalText,probabilityText} from '@/lib/forecast-display';
 import {displayTime,safeUrl} from './model';
 import {CadencePanel} from './CadencePanel';
 import {ResetOutlookPanel} from './ResetOutlookPanel';
 
 function Snapshot({snapshot,onPoster,onShare,disabled=false}:{snapshot:ForecastSnapshot;disabled?:boolean;onPoster:(s:ForecastSnapshot)=>void;onShare:(s:ForecastSnapshot)=>Promise<void>}) {
- return <section className="pub-card"><div className="pub-card-top"><h2>{snapshot.target==='banked_reset'?'重置卡':'用量重置'}实验快照</h2><span className="pub-badge purple">{forecastBasisText(snapshot.basis)}</span></div>
-  <p>{snapshot.title}</p><p className="pub-muted">这是生成时的固定预测，后续公告不会重写这组概率。</p>
+ return <section className="pub-card"><div className="pub-card-top"><h2>{snapshot.target==='banked_reset'?'重置卡':'用量重置'}实验预测记录</h2><span className="pub-badge purple">{forecastBasisText(snapshot.basis)}</span></div>
+  <p>{snapshot.title}</p><p className="pub-muted">这是当时的预测记录，请结合后续进展查看。</p>
   <div className="pub-source-row"><div><strong>24小时内出现对应公开公告</strong><span>窗口截至：{displayTime(snapshot.windows[24])}</span></div><strong>{forecastValueText(snapshot,24)}</strong></div>
   <div className="pub-source-row"><div><strong>48小时内出现对应公开公告</strong><span>窗口截至：{displayTime(snapshot.windows[48])}</span></div><strong>{forecastValueText(snapshot,48)}</strong></div>
   <p>首次信号：{displayTime(snapshot.signalAt)}<br/>生成时间：{displayTime(snapshot.generatedAt)}<br/>证据截至：{displayTime(snapshot.evidenceCutoffAt)}</p>
   <p className="pub-muted">样本{snapshot.sampleCount}例 · 24小时区间{intervalText(snapshot.interval24)} · 48小时区间{intervalText(snapshot.interval48)}</p>
-  <p>{snapshot.explanation}</p><p className="pub-muted">预测目标是公开公告，分别记录预告、进行中和完成；个人到账未观测。来源连续覆盖{snapshot.coverage.status==='verified'?'已核验':'未核验'}，概率和区间均不代表准确率。</p>
+  <p>{forecastExplanationText(snapshot)}</p><p className="pub-muted">预测目标是公开公告，分别记录预告、进行中和完成；个人到账未观测。来源连续覆盖{snapshot.coverage.status==='verified'?'已核验':'未核验'}，概率和区间均不代表准确率。</p>
   {safeUrl(snapshot.url)&&<a className="pub-text-link" href={safeUrl(snapshot.url)!} target="_blank" rel="noopener noreferrer">查看首次信号来源</a>}
-  <details><summary>查看实验计算依据</summary><p className="pub-prose">规则批次：{snapshot.ruleVersion.match(/\d{8}-\d+$/)?.[0]||'固定版本'}<br/>模型：历史样本实验<br/>已采用的历史参考：{snapshot.referenceSampleIds.length}例<br/>实时结局观察：{snapshot.trainingSampleIds.length}条，尚未用于概率训练</p></details>
-  <div className="pub-share-row"><button className="pub-button" disabled={disabled} onClick={()=>void onShare(snapshot)}>转发此快照</button><button className="pub-button" disabled={disabled} onClick={()=>onPoster(snapshot)}>生成实验海报</button></div>
+  <details><summary>查看实验计算依据</summary><p className="pub-prose">规则批次：{snapshot.ruleVersion.match(/\d{8}-\d+$/)?.[0]||'固定版本'}<br/>模型：历史样本实验<br/>已采用的历史参考：{snapshot.referenceSampleIds.length}例<br/>实时结局观察：{snapshot.trainingSampleIds.length}条，尚未用于概率训练<br/>{snapshot.explanation}</p></details>
+  <div className="pub-share-row"><button className="pub-button" disabled={disabled} onClick={()=>void onShare(snapshot)}>分享这条记录</button><button className="pub-button" disabled={disabled} onClick={()=>onPoster(snapshot)}>生成实验海报</button></div>
  </section>;
 }
 
@@ -35,7 +35,7 @@ export function ForecastPanel({data,snapshotId,cadenceId,target='automatic_reset
  if(cadenceId)return <CadencePanel data={data} selectedId={cadenceId}/>;
  if(snapshotId){
   if(!fixed.value && !fixed.error)return <div className="pub-page-loading" role="status"><span className="pub-loading-bar" aria-hidden="true"/><span>加载中</span></div>;
-  if(!fixed.value)return <section className="pub-card" role="alert"><h2>预测快照暂时不可用</h2><p>{fixed.error}</p><button className="pub-button" disabled={fixed.loading} onClick={fixed.retry}>重新加载</button><Link scroll={false} className="pub-text-link" href="/methodology">查看其他记录</Link></section>;
+  if(!fixed.value)return <section className="pub-card" role="alert"><h2>这条预测记录暂时不可用</h2><p>{fixed.error}</p><button className="pub-button" disabled={fixed.loading} onClick={fixed.retry}>重新加载</button><Link scroll={false} className="pub-text-link" href="/methodology">查看其他记录</Link></section>;
   return <><Snapshot snapshot={fixed.value} onPoster={onPoster} onShare={onShare} disabled={!!fixed.error || fixed.loading}/>{fixed.error && <p className="pub-warning" role="alert">{fixed.error}<button onClick={fixed.retry}>重新检查</button></p>}<OutcomeRecords item={data?.cases.find(c=>c.id===fixed.value?.caseId)} available={data?.status==='ready'&&data.cases.some(c=>c.id===fixed.value?.caseId)}/><Link scroll={false} className="pub-text-link" href="/methodology">查看全部实验观察</Link></>;
  }
  const reference=data?.reference;
@@ -47,6 +47,6 @@ export function ForecastPanel({data,snapshotId,cadenceId,target='automatic_reset
    {reference?<><p>历史参考{reference.sampleCount}例：24小时{probabilityText(reference.p24)}，48小时{probabilityText(reference.p48)}；48小时95%可信区间{intervalText(reference.interval48)}。</p><p className="pub-muted">{reference.note}</p><details><summary>查看实验计算方式</summary><p>三个历史案例中，24小时内出现公告1例、24至48小时出现2例。加入固定先验[0.5，0.5，1]后计算窗口概率和95%可信区间。历史样本未完成连续覆盖核验及前瞻校准。</p></details></>:<p className="pub-muted">实验资料暂时不可用。</p>}
    <p>以上历史参考不会单独作为首页下次发放预测。重置卡没有可比样本时不生成概率；晚采、缺口和无法对应的结局保留为未知。</p>
   </section>
-  <section className="pub-card"><h2>自动观察记录</h2>{data?.status!=='ready'?<p className="pub-muted">{data?.reason||'观察服务尚未接入'}</p>:!data.cases.length?<p className="pub-muted">暂无符合规则的异常信号，有新的明确异常后自动建立观察。</p>:data.cases.map(c=><div className="pub-source-row" key={c.id}><div><strong>{c.target==='banked_reset'?'重置卡':'用量重置'} · {forecastStatusText(c.status)}</strong><span>首次信号：{displayTime(c.signalAt)}</span><span>48小时截至：{displayTime(c.windows[48])}</span><span>{c.outcomes.length?`已记录${c.outcomes.length}条结局`:'尚无可对应公告，个人到账未观测'}</span></div>{c.snapshot?<Link scroll={false} className="pub-text-link" href={`/methodology?snapshot=${encodeURIComponent(c.snapshot.id)}`}>查看固定快照</Link>:<span className="pub-muted">待生成</span>}</div>)}</section>
+  <section className="pub-card"><h2>自动观察记录</h2>{data?.status!=='ready'?<p className="pub-muted">{data?.reason||'观察记录暂不可用'}</p>:!data.cases.length?<p className="pub-muted">暂无符合规则的异常信号，有新的明确异常后自动建立观察。</p>:data.cases.map(c=><div className="pub-source-row" key={c.id}><div><strong>{c.target==='banked_reset'?'重置卡':'用量重置'} · {forecastStatusText(c.status)}</strong><span>首次信号：{displayTime(c.signalAt)}</span><span>48小时截至：{displayTime(c.windows[48])}</span><span>{c.outcomes.length?`已记录${c.outcomes.length}条结局`:'尚无可对应公告，个人到账未观测'}</span></div>{c.snapshot?<Link scroll={false} className="pub-text-link" href={`/methodology?snapshot=${encodeURIComponent(c.snapshot.id)}`}>查看预测记录</Link>:<span className="pub-muted">待生成</span>}</div>)}</section>
  </details></>;
 }

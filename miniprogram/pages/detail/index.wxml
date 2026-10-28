@@ -2,24 +2,24 @@
 <page-loader wx:if="{{navigationLoading}}" />
 <view wx:else>
 <view class="page" bindtouchstart="nativeReturnTouched">
-  <view wx:if="{{sceneLoading}}" class="card empty">正在读取小程序码对应的发布版本。</view>
-  <view wx:if="{{sceneError}}" class="warning">{{sceneError}}<button wx:if="{{sceneCanRetry}}" class="secondary full" style="margin-top:12px" bindtap="retryScene">重新读取</button><button class="secondary full" style="margin-top:12px" data-path="/pages/announcements/index" bindtap="navigate">查看公开公告</button></view>
+  <view wx:if="{{sceneLoading}}" class="card empty">正在打开消息。</view>
+  <view wx:if="{{sceneError}}" class="warning">{{sceneError}}<button wx:if="{{sceneCanRetry}}" class="secondary full" style="margin-top:12px" bindtap="retryScene">重新加载</button><button class="secondary full" style="margin-top:12px" data-path="/pages/announcements/index" bindtap="navigate">查看公开公告</button></view>
   <status-panel wx:if="{{!connected}}" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />
   <block wx:elif="{{detail}}">
     <view wx:if="{{error}}" class="warning">{{error}}<button class="secondary" bindtap="retry">重新加载</button></view>
     <view wx:if="{{detail.missing}}" class="card empty"><view class="heading">{{detail.title}}</view><view>{{detail.explanation}}</view><button class="secondary full" style="margin-top:16px" data-path="/pages/announcements/index" bindtap="navigate">返回公开公告</button></view>
     <block wx:else>
-      <view wx:if="{{detail.withdrawn}}" class="warning">这条内容已撤回，以下保留原发布版本，不能作为当前发放依据。</view>
-      <view wx:if="{{detail.merged}}" class="warning">此事件已合并，以下为原发布版本。<button wx:if="{{detail.mergePath}}" class="secondary full" style="margin-top:12px" data-path="{{detail.mergePath}}" bindtap="navigate">查看合并后的事件</button><view wx:else>合并目标暂时缺少公开记录。</view></view>
-      <view wx:if="{{detail.isOld && !detail.observationSourceUpdate}}" class="warning">正在查看指定历史版本。<button wx:if="{{detail.latestPath}}" class="secondary full" style="margin-top:12px" data-path="{{detail.latestPath}}" bindtap="navigate">查看最新公开版本</button></view>
-      <view wx:if="{{detail.observationSourceUpdate}}" class="small muted observation-source-update">这条观测后来补充了来源，观测时间未变。此链接保留原分享内容。<button wx:if="{{detail.latestPath}}" class="text-button" data-path="{{detail.latestPath}}" bindtap="navigate">查看补充来源 →</button></view>
+      <view wx:if="{{detail.withdrawn}}" class="warning">此消息已撤回，请勿作为当前重置依据。</view>
+      <view wx:if="{{detail.merged}}" class="warning">本条进展已并入其他消息，以下为原内容。<button wx:if="{{detail.mergePath}}" class="secondary full" style="margin-top:12px" data-path="{{detail.mergePath}}" bindtap="navigate">查看后续进展</button><view wx:else>后续进展暂时无法打开，请稍后重试。</view></view>
+      <view wx:if="{{detail.isOld && !detail.observationSourceUpdate}}" class="warning">此消息已有更新。<button wx:if="{{detail.latestPath}}" class="secondary full" style="margin-top:12px" data-path="{{detail.latestPath}}" bindtap="navigate">查看最新消息</button></view>
+      <view wx:if="{{detail.observationSourceUpdate}}" class="small muted observation-source-update">已新增来源，重置观测时间未变。<button wx:if="{{detail.latestPath}}" class="text-button" data-path="{{detail.latestPath}}" bindtap="navigate">查看补充来源 →</button></view>
       <view wx:if="{{detail.reviewStatus}}" class="warning">{{detail.reviewReasons}}</view>
       <view class="title">{{detail.title}}</view><view class="muted lead" style="margin-bottom:18px">{{detail.historical ? '历史收录 · ' : ''}}{{detail.time}}</view>
-      <view class="card"><view class="heading">{{detail.hasAdditionalContent ? '中文摘要' : '公告内容'}}</view><view class="prose">{{detail.summary || '暂无可展示的公告内容。'}}</view><view wx:if="{{detail.newsOnly}}" class="warning" style="margin-top:16px;margin-bottom:0">来源消息，具体内容以原文为准。</view></view>
+      <view class="card"><view class="heading">{{detail.hasAdditionalContent ? '中文摘要' : '公告内容'}}</view><view class="prose">{{detail.summary || '暂无可展示的公告内容。'}}</view></view>
       <view wx:if="{{detail.hasAdditionalContent}}" class="card"><button class="disclosure-heading" data-section="bodyOpen" bindtap="toggleSection" aria-expanded="{{bodyOpen}}"><text>阅读全文</text><text class="disclosure-symbol">{{bodyOpen ? '−' : '+'}}</text></button><text wx:if="{{bodyOpen}}" class="prose" style="display:block" user-select="{{true}}">{{detail.body}}</text></view>
       <view wx:if="{{!detail.newsOnly}}" class="card"><view class="heading">发放安排</view>
         <view wx:for="{{detail.actions}}" wx:key="id" class="fact"><view class="row wrap"><text class="badge">{{item.label}}</text><text>{{item.stage}}</text></view><view class="lead">适用对象：{{item.eligibility}}</view><view class="muted">范围：{{item.scope}}</view><view class="muted">预计时间：{{item.expectedAt}}</view><view wx:if="{{item.quote}}" class="quote">{{item.quote}}</view></view>
-        <view wx:if="{{!detail.actions.length}}" class="muted lead">暂未公布具体发放安排。</view><view class="small muted lead">依据公开声明，个人账户是否到账尚未观测。</view>
+        <view wx:if="{{!detail.actions.length}}" class="muted lead">暂未公布具体发放安排。</view><view class="small muted lead">实际到账以你的账户显示为准。</view>
       </view>
       <button class="disclosure-heading section" data-section="evidenceOpen" bindtap="toggleSection" aria-expanded="{{evidenceOpen}}"><view><text>查看来源</text><view wx:if="{{detail.evidence.length}}" class="small muted lead">{{detail.evidence[0].name}} · {{detail.evidence[0].time}}</view></view><text class="disclosure-symbol">{{evidenceOpen ? '−' : '+'}}</text></button><block wx:if="{{evidenceOpen}}">
       <view wx:for="{{detail.evidence}}" wx:key="id" class="card"><view class="row wrap"><text class="badge">{{item.label}}</text><text class="small muted">{{item.time}}</text></view><view wx:if="{{item.origin}}" class="small muted lead">{{item.origin}}</view><view wx:if="{{!item.complete && !item.observed}}" class="small muted lead">内容不完整，请结合原始链接查看。</view>
@@ -49,7 +49,7 @@
           <view class="preview-heading"><text>长图预览</text><button class="text-button preview-expand" bindtap="previewPoster" disabled="{{posterBusy}}">查看大图 ↗</button></view>
           <view class="announcement-poster-stage"><image src="{{posterPreview}}" mode="aspectFit" class="announcement-poster-image" bindtap="previewPoster" aria-label="公告长图，点击查看完整图片"/><view wx:if="{{posterBusy}}" class="poster-progress" role="status">正在生成{{posterTheme === 'precision' ? '黑金' : '米白'}}长图</view></view>
           <button class="share-save" loading="{{posterSaving}}" disabled="{{posterSaving || posterBusy || !posterReady}}" bindtap="savePoster">保存长图到相册</button>
-          <view class="share-description preview-note">内容对应当前公告版本，点击图片可放大阅读。</view>
+          <view class="share-description preview-note">点击图片可放大阅读。</view>
         </view>
       </view>
       <view wx:if="{{posterPrivacyNeeded}}" class="card stack"><button class="secondary full" bindtap="openPrivacyContract">阅读微信隐私指引</button><button class="primary full" open-type="agreePrivacyAuthorization" bindagreeprivacyauthorization="agreePosterPrivacy">同意并继续保存</button></view>

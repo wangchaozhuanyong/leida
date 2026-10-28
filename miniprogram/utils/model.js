@@ -242,11 +242,17 @@ function publicArticleSummary(article) {
   if (article.contentOrigin !== 'template' || article.manualFields?.includes('summary')) return article.summary;
   return article.summary
     .replace(/^AIPlanWatch 将对应原帖记录为公共额度重置；原帖仅为简短完成表达，福利类型采用参考项目分类，未虚构回复关系。/, 'AIPlanWatch 已收录本次额度重置完成消息。')
-    .replace(/原文承诺日终前完成，预计最晚时间已换算为北京时间（UTC\+8）；(?:按原文PST字面UTC-8换算，未自行改用当地夏令时；)?这是公告预计时间，仍待实际确认。/g, '预计时间仅供参考，以实际发放为准。')
+    .replace(/原文承诺日终前完成，预计最晚时间已换算为北京时间（UTC\+8）；(?:按原文PST字面UTC-8换算，未自行改用当地夏令时；)?这是公告预计时间，仍待实际确认。/g, '预计为最晚时间，以实际发放为准。')
     .replace(/（依据 AIPlanWatch 分类，适用套餐以原公告为准）/g, '（适用套餐暂未明确）')
-    .replace(/(?:原文近似时间：约略预计时刻，并非最晚截止，未给出误差范围；|原文预计时刻：并非最晚截止；)?按原文(?:PST|PDT)字面UTC-(?:7|8)换算，未自行改用当地夏令时；这是公告预计时间，仍待实际确认。/g, '预计时间仅供参考，以实际发放为准。')
+    .replace(/(原文近似时间：约略预计时刻，并非最晚截止，未给出误差范围；|原文预计时刻：并非最晚截止；)?按原文(?:PST|PDT)字面UTC-(?:7|8)换算，未自行改用当地夏令时；这是公告预计时间，仍待实际确认。/g, (_, qualifier) => qualifier?.startsWith('原文近似') ? '预计为大致时间，以实际发放为准。' : '预计时间仅供参考，以实际发放为准。')
     .replace(/原文预计时间：[^\n]*?；日期、精度或时区尚不明确，未生成精确截止。/g, '具体发放时间暂未明确。')
     .replace(/已换算为北京时间（UTC\+8）/g, '北京时间')
+    .replace(/记录用量重置观测，观测时间：/g, '已观测到额度重置，时间：')
+    .replace(/这不是原作者的新完成公告，个人账户是否到账请查看实际额度。/g, '实际额度以账户显示为准。')
+    .replace(/辅助归档保存原文：[“「]([\s\S]*?)[”」]。/g, '')
+    .replace(/此条仅记录来源消息，不据此确认额度已完成发放。/g, '发放情况待后续消息确认。')
+    .replace(/个人账户是否到账尚未观测。/g, '实际到账以账户显示为准。')
+    .replace(/^辅助归档将此条列为第 \d+ 天(?:产品动态|重置相关消息)。归档摘录：“([\s\S]*)”。(这是来源消息，完整细节以原帖为准。|仅记录消息，不据此认定已完成；具体福利、时间和完成情况仍需核对。)$/, (_, excerpt, note) => excerpt + (note.startsWith('仅记录') ? ' 具体发放安排待确认。' : ''))
     .replace(/^已保存公开来源消息。活动简写已收录；套餐资格和具体发放安排仍需后续声明核对。此条不计入已重置、已发卡或预测准确率；请查看原文依据。$/, '发布方提及后续活动，具体安排仍待明确。')
     .replace('已保存发布说明；完整中文改动会在智能服务可用后自动补充。', '更新细节请查看官方发布说明。')
     .replace(/^公开归档收录(?:产品动态|消息)：[“「]([\s\S]*?)[”」]。此条仅作(?:产品)?消息记录，完整细节请查看原文。$/, '$1')
@@ -261,8 +267,12 @@ function publicReviewMessage(article) {
     : article.reviewStatus === 'targeted_update' ? '仅涉及部分账户，具体适用范围请查看原文。' : '';
 }
 function publicSourceNotes(article, actions = []) {
-  const reference = article.summary.match(/^AIPlanWatch 将对应原帖记录为公共额度重置；[^。]*。/)?.[0];
-  return [...new Set([...(reference ? [reference] : []), ...(article.reviewReasons ?? []), ...actions.map(action => action.timeNote).filter(note => !!note)])];
+  // Reviewer notes remain in the stored article; show only useful source qualifications.
+  const reference = /^AIPlanWatch 将对应原帖记录为公共额度重置；/.test(article.summary)
+    ? '重置类型依据 AIPlanWatch，适用范围请查看原文。' : '';
+  const timeNotes = actions.map(action => action.timeNote ? publicArticleSummary({...article, summary:action.timeNote}) : '')
+    .filter(Boolean);
+  return [...new Set([reference, publicReviewMessage(article), ...timeNotes].filter(Boolean))];
 }
 function publicEligibility(action) {
   return action.eligibility.replace(/^公开额度重置（依据 AIPlanWatch 分类，适用套餐以原公告为准）$/, '暂未明确').trim() || '暂未明确';
@@ -280,10 +290,10 @@ function publicArticleContent(article) {
 /** @param {PublicData} data @param {{publicationId?:string}} query */
 function resolveDetail(data, query) {
   const publication = data.publications.find(item => item.id === query.publicationId);
-  if (!publication) return { missing: true, title: '未找到指定发布版本', explanation: '这条记录可能尚未发布，请返回查看公开公告。' };
+  if (!publication) return { missing: true, title: '这条消息暂不可用', explanation: '请返回查看最新消息，或稍后重试。' };
   const currentEvent = data.events.find(item => item.id === publication.eventId);
   const currentArticle = data.articles.find(item => item.id === publication.articleId);
-  if (!currentEvent || !currentArticle) return { missing: true, title: '关联记录暂时缺失', explanation: '保留指定版本入口，稍后重新加载。' };
+  if (!currentEvent || !currentArticle) return { missing: true, title: '消息详情暂不可用', explanation: '请稍后重新加载，或返回查看其他消息。' };
   const withdrawn = publicationWithdrawn(data, publication), merged = currentEvent.status === 'merged';
   const targetEvent = merged && data.events.find(item => item.id === currentEvent.mergedInto);
   const targetPublication = targetEvent && currentPublication(data, targetEvent);
@@ -307,7 +317,7 @@ function resolveDetail(data, query) {
     updates: (publicNewsGroups(data).find(group=>group.updates.some(p=>p.id===publication.id))?.updates || []).filter(p=>p.id!==publication.id).map(p=>({id:p.id,title:p.article.title,time:displayTime(publicationSourceTime(p)),path:sharePath(p)})),
     evidence: evidence.map(item => {
       const observation=observedEvidence(item,item.collectedAt);
-      return {id:item.id,name:observation?.sourceName||(data.sources.find(source=>source.id===item.sourceId)?.name||'原文记录').replace('（辅助来源）','').replace('（免费）',''),label:observation?'来源观测':{official:'官方原文',archive:'第三方收录',manual:'补充来源'}[item.provenance],text:item.text,origin:observation?'来源记录了用量重置，个人到账尚未核验；观测时间与原帖发布时间分别保留。':item.textOrigin==='archive_excerpt'?'仅收录原文片段':item.textOrigin==='structured'?'来源摘要':'',complete:item.contextComplete,observed:!!observation,time:displayTime(item.publishedAt),url:observation?.sourceUrl||safeUrl(item.url)||'',referenceUrl:observation?.referenceUrl||''};
+      return {id:item.id,name:observation?.sourceName||(data.sources.find(source=>source.id===item.sourceId)?.name||'原文记录').replace('（辅助来源）','').replace('（免费）',''),label:observation?'来源观测':{official:'官方原文',archive:'第三方收录',manual:'补充来源'}[item.provenance],text:item.text,origin:observation?'第三方观测，实际额度以账户显示为准。':item.textOrigin==='archive_excerpt'?'仅收录原文片段':item.textOrigin==='structured'?'来源摘要':'',complete:item.contextComplete,observed:!!observation,time:displayTime(item.publishedAt),url:observation?.sourceUrl||safeUrl(item.url)||'',referenceUrl:observation?.referenceUrl||''};
     })
   };
 }
@@ -402,7 +412,7 @@ function activityModel(data, id, day) {
       continue;
     }
     const sourceDay=activityDayNumber(activity,fact.observedUntil||fact.at);
-    const summaryNote=fact.isObservationSummary?fact.summary+(sourceDay!==value?` 按最早来源记录归入第${value}天；较晚来源跨到第${sourceDay}天，不据此认定又重置一次。`:''):'';
+    const summaryNote=fact.isObservationSummary?fact.summary:'';
     byDay.set(value,[...entries,{...publicationCard(data,fact.publication),
       ...(fact.isObservationSummary?{title:fact.title,summary:summaryNote,sources:fact.sources}:{}),
       types:[type],stage:fact.stage,time:displayTime(fact.at),timeLabel:fact.timeLabel,sourceTime:Date.parse(fact.at)}]);
@@ -413,8 +423,8 @@ function activityModel(data, id, day) {
       for(const source of fact.sources){const day=activityDayNumber(activity,source.at);if(day!==undefined&&day!==value&&day>=1&&day<=activity.days)supplements.set(day,[...(supplements.get(day)||[]),source]);}
       for(const [day,sources] of supplements){
         byDay.set(day,[...(byDay.get(day)||[]),{...publicationCard(data,fact.publication),id:'supplement:'+fact.id+':'+day,
-          title:'已有观测的来源补充',summary:`这些来源属于北京时间${dateKey(fact.at)}的观测汇总，最早记录已列在第${value}天；不据此另计一次重置。`,
-          types:[{kind:'reset_message',label:'观测补充',dayLabel:'观测补充',tone:'amber',completed:false}],stage:'轮次待核对',sources,
+          title:'重置观测新增来源',summary:`北京时间${dateKey(fact.at)}的重置观测有了新来源，可查看第${value}天的重置记录。`,
+          types:[{kind:'reset_message',label:'观测补充',dayLabel:'观测补充',tone:'amber',completed:false}],stage:'来源补充',sources,
           time:displayTime(sources[0].at),timeLabel:'来源报告时间',sourceTime:Date.parse(sources[0].at),path:'/pages/schedule/index?date='+dateKey(fact.at)+'&kind='+fact.kind}]);
       }
     }
@@ -549,7 +559,7 @@ function forecastSnapshotModel(snapshot, serverTime) {
     expired24, expired48, late: snapshot.late, missing: snapshot.p24 === null && snapshot.p48 === null, emptyProbabilityText: noAdvanceForecast ? '不作提前预测' : '样本不足', url: safeUrl(snapshot.url), path: forecastPath(snapshot),
     basisText: { experimental_seed: '使用选定历史样本作实验参考', verified_live: '使用已核验的既往样本', insufficient: '样本不足，暂不显示概率', late: '资料晚采，不作为提前预测', already_known: '已知公告，非提前预测' }[snapshot.basis],
     coverageText: snapshot.coverage.status === 'verified' ? '来源覆盖已核验' : snapshot.coverage.status === 'gap' ? '来源覆盖存在缺口' : '实验参考，连续来源覆盖未核验',
-    windowNote: '从首次合格信号计算，刷新不重开窗口。', deliveryNote: `预测对象是公开${snapshot.target === 'banked_reset' ? '重置卡' : '额度重置'}公告；个人到账未观测。` };
+    windowNote: '从首次信号时间起算。', deliveryNote: `预测对象是公开${snapshot.target === 'banked_reset' ? '重置卡' : '额度重置'}公告；个人到账未观测。` };
 }
 function currentForecast(data) {
   if (!data || !validTime(data.serverTime) || !validateForecastPublicData(data.forecasts) || data.forecasts.status !== 'ready' || upcomingActions(data).length) return null;
@@ -567,7 +577,7 @@ function forecastReferenceModel(data) {
   return { label: '历史实验参考', sampleCount: data.reference.sampleCount, probability24: probabilityText(data.reference.p24), probability48: probabilityText(data.reference.p48), interval24: intervalText(data.reference.interval24), interval48: intervalText(data.reference.interval48), counts: data.reference.counts.join('、'), prior: data.reference.prior.join('、'), note: '选定历史样本，连续来源覆盖未核验；这是实验参考，不是当前发放预告或准确率。' };
 }
 function forecastOutcomeModel(snapshot, data) {
-  const note = '后续记录，不改原快照；个人到账未观测。';
+  const note = '保留当时预测，后续进展另行记录。实际到账以账户显示为准。';
   const unavailable = { available: false, entries: [], message: '后续记录暂不可用，不能据此判断没有公告。', note };
   if (!validateForecastSnapshot(snapshot) || !validateForecastPublicData(data) || data.status !== 'ready') return unavailable;
   const item = data.cases.find(value => value.id === snapshot.caseId && value.target === snapshot.target);

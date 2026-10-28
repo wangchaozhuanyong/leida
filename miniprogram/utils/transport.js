@@ -4,12 +4,12 @@ const {replayPath,validateReplay}=require('./replay');
 const {validateCadenceSnapshot}=require('./cadence');
 /** @param {Config} config */
 function configurationError(config) {
-  if (!config || !['https', 'cloud'].includes(config.mode)) return '尚未连接，请先配置公开接口或微信云托管。';
+  if (!config || !['https', 'cloud'].includes(config.mode)) return '服务暂不可用，请稍后再试。';
   if (config.mode === 'https') {
     const match = typeof config.baseUrl === 'string' && config.baseUrl.match(/^https:\/\/([a-z0-9.-]+)(?::\d{1,5})?\/?$/i);
-    if (!match || !match[1].includes('.') || /^(?:\d+\.){3}\d+$/.test(match[1]) || /(?:^|\.)localhost$/i.test(match[1])) return '请配置真实 HTTPS 接口域名，不使用本机地址。';
+    if (!match || !match[1].includes('.') || /^(?:\d+\.){3}\d+$/.test(match[1]) || /(?:^|\.)localhost$/i.test(match[1])) return '服务连接异常，请稍后再试。';
   }
-  if (config.mode === 'cloud' && (typeof config.cloudEnv !== 'string' || !config.cloudEnv.trim() || typeof config.serviceName !== 'string' || !config.serviceName.trim())) return '尚未连接，请填写实际云托管环境和服务名。';
+  if (config.mode === 'cloud' && (typeof config.cloudEnv !== 'string' || !config.cloudEnv.trim() || typeof config.serviceName !== 'string' || !config.serviceName.trim())) return '服务暂不可用，请稍后再试。';
   return '';
 }
 function validateBootstrap(value) {
@@ -52,7 +52,20 @@ function validWechatBody(path,value) {
   return validateSubscription(value);
 }
 function requestError(status,body) {
-  const safe=body && typeof body.error==='string' && body.error.length<=250 && /[\u4e00-\u9fff]/.test(body.error) ? body.error.replace(/[\u0000-\u001f]/g,'') : `资料暂时无法读取（${Number(status) || '请求异常'}）`;
+  let safe=body && typeof body.error==='string' && body.error.length<=250 && /[\u4e00-\u9fff]/.test(body.error) ? body.error.replace(/[\u0000-\u001f]/g,'') : '资料暂时无法读取，请稍后重试。';
+  // Keep server diagnostics on the server; show only a useful recovery step.
+  // Status codes still drive the existing session, retry and uncertainty rules.
+  if(status===429) {
+    safe=safe.replace('当前来源连续登录失败','连接暂受限制').replace('微信登录调用','微信连接次数').replace('微信接口调用上限','微信服务使用次数上限');
+    if(/错误码|微信接口拒绝/.test(safe))safe='微信服务暂时繁忙，请稍后重试。';
+  }
+  else if(/服务端|凭据|密钥|证书|微信接口/.test(safe)) safe='微信服务暂不可用，请稍后重试。';
+  else if(/小程序码.*(?:配置|参数|标识)/.test(safe)) safe='小程序码暂不可用，请返回查看最新消息。';
+  else if(/未找到.*预测|固定预测|发布版本/.test(safe)) safe='这条记录暂不可用，请返回查看最新消息。';
+  else if(/读取参数|回放查询/.test(safe)) safe='链接已失效，请返回后重试。';
+  else if(/微信配置|微信.*未配置|模板字段/.test(safe)) safe='微信提醒暂不可用，请稍后重试。';
+  else if(/读者会话/.test(safe)) safe='连接已失效，请重新打开微信提醒。';
+  else if(/订阅模板|订阅请求/.test(safe)) safe='本次提醒授权已失效，请重新操作。';
   const error=new Error(safe);error.status=status;return error;
 }
 function createTransport(wxApi, config, {privateRequests=false}={}) {
@@ -70,8 +83,8 @@ function createTransport(wxApi, config, {privateRequests=false}={}) {
       if (error) { reject(new Error(error)); return; }
       const allowed=privateRequests ? ((path==='/api/wechat/login' && method==='POST') || (path==='/api/wechat/subscription' && ['GET','DELETE'].includes(method)) || (['/api/wechat/subscription/challenge','/api/wechat/subscription/confirm','/api/wechat/subscription/preferences'].includes(path) && method==='POST'))
         : (readPath || versionPath || replayPath.test(path) || ['/api/v1/bootstrap','/api/v1/forecasts'].includes(path) || forecastSnapshotPath.test(path) || cadenceSnapshotPath.test(path) || /^\/api\/v1\/wechat\/code\/[^/?#]+$/.test(path) || /^\/api\/v1\/wechat\/scene\/[a-f0-9]{32}$/.test(path));
-      if (!allowed) { reject(new Error('请求路径不受支持')); return; }
-      if(privateRequests && path!=='/api/wechat/login' && !options.sessionToken){reject(requestError(401,{error:'请先点击微信提醒，重新建立当前会话。'}));return;}
+      if (!allowed) { reject(new Error('暂时无法打开，请返回后重试。')); return; }
+      if(privateRequests && path!=='/api/wechat/login' && !options.sessionToken){reject(requestError(401,{error:'连接已失效，请重新打开微信提醒。'}));return;}
       const header = typeof etag==='string' && etag ? { 'If-None-Match': `"${etag}"` } : {};
       if(!privateRequests)header['X-Radar-Watch-Contract']='2';
       if(privateRequests){header['content-type']='application/json';if(options.sessionToken)header.Authorization=`Bearer ${options.sessionToken}`;}
@@ -80,14 +93,14 @@ function createTransport(wxApi, config, {privateRequests=false}={}) {
       if(privateRequests&&(path==='/api/wechat/subscription'&&method==='GET'||path==='/api/wechat/subscription/challenge'&&method==='POST'))header['X-Radar-Subscription-View']='summary';
       const receive = response => {
         if (cancelled) return;
-        if (response.statusCode === 304) { if (versionPath && etag) resolve({ unchanged: true }); else reject(new Error('接口未返回公开资料，请重新加载。')); return; }
+        if (response.statusCode === 304) { if (versionPath && etag) resolve({ unchanged: true }); else reject(new Error('暂未获取到消息，请重新加载。')); return; }
         if (response.statusCode < 200 || response.statusCode >= 300) { reject(requestError(response.statusCode,response.data)); return; }
         const body = response.data;
-        if(body?.page && (!Array.isArray(body.page.ids)||!body.page.ids.every(id=>typeof id==='string')||!(body.page.nextCursor===null||typeof body.page.nextCursor==='string')||!Number.isSafeInteger(body.page.total)||body.page.total<0)){reject(new Error('分页资料格式不完整，请重试。'));return;}
-        if (!body || typeof body !== 'object' || (basePath==='/api/v1/bootstrap' ? !validateBootstrap(body.data) || typeof body.version !== 'string' : versionPath ? !body.data || typeof body.data.version !== 'string' : replayPath.test(path) ? !validateReplay(path,body.data) : path==='/api/v1/forecasts'||forecastSnapshotPath.test(path)||cadenceSnapshotPath.test(path) ? !validForecastBody(path,body.data) : !validWechatBody(path,body.data))) { reject(new Error('接口返回的公开资料格式不完整，请稍后重试。')); return; }
+        if(body?.page && (!Array.isArray(body.page.ids)||!body.page.ids.every(id=>typeof id==='string')||!(body.page.nextCursor===null||typeof body.page.nextCursor==='string')||!Number.isSafeInteger(body.page.total)||body.page.total<0)){reject(new Error('列表暂时无法更新，请重试。'));return;}
+        if (!body || typeof body !== 'object' || (basePath==='/api/v1/bootstrap' ? !validateBootstrap(body.data) || typeof body.version !== 'string' : versionPath ? !body.data || typeof body.data.version !== 'string' : replayPath.test(path) ? !validateReplay(path,body.data) : path==='/api/v1/forecasts'||forecastSnapshotPath.test(path)||cadenceSnapshotPath.test(path) ? !validForecastBody(path,body.data) : !validWechatBody(path,body.data))) { reject(new Error('资料暂时无法加载，请稍后重试。')); return; }
         resolve(basePath==='/api/v1/bootstrap' ? { data: body.data, version: body.version, ...(body.contentVersion?{contentVersion:body.contentVersion}:{}), ...(body.page?{page:body.page}:{}) } : versionPath ? { version: body.data.version, ...(body.data.contentVersion?{contentVersion:body.data.contentVersion}:{}) } : {data:body.data});
       };
-      const fail = () => { if (!cancelled) reject(new Error('连接失败，请检查网络或接口设置后重试。')); };
+      const fail = () => { if (!cancelled) reject(new Error('连接失败，请检查网络后重试。')); };
       const timeout = Math.max(1000, Math.min(60000, Number(config.timeoutMs) || 10000));
       if (config.mode === 'https') { try { task = wxApi.request({ url: config.baseUrl.replace(/\/$/, '') + path, method, data:options.data, header, timeout, success: receive, fail }); } catch (_) { fail(); } }
       else {

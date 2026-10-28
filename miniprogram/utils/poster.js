@@ -8,7 +8,7 @@ class PosterError extends Error {
 const clean = value => String(value == null ? '' : value).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').replace(/\t/g,' ');
 /** Preserve Unicode code points and deliberate line breaks. Never silently omit facts. */
 function wrapText(value, measure, width) {
-  if (!Number.isFinite(width) || width <= 0 || typeof measure !== 'function') throw new PosterError('layout', '海报排版参数不完整。');
+  if (!Number.isFinite(width) || width <= 0 || typeof measure !== 'function') throw new PosterError('layout', '海报暂不可用，请重新生成。');
   const lines = [];
   for (const paragraph of clean(value).split(/\r?\n/)) {
     let line = '';
@@ -24,20 +24,20 @@ function wrapText(value, measure, width) {
 /** @param {PublicData} data @param {string} publicationId */
 function posterInput(data, publicationId) {
   const publication = data.publications.find(item => item.id === publicationId);
-  if (!publication) throw new PosterError('missing', '未找到指定发布版本。');
-  if(!data.events.some(item=>item.id===publication.eventId)||!data.articles.some(item=>item.id===publication.articleId))throw new PosterError('missing','关联公开记录暂时缺失，请稍后重试。');
+  if (!publication) throw new PosterError('missing', '这条消息暂不可用，请返回查看最新消息。');
+  if(!data.events.some(item=>item.id===publication.eventId)||!data.articles.some(item=>item.id===publication.articleId))throw new PosterError('missing','消息详情暂不可用，请稍后重试。');
   if (m.publicationWithdrawn(data,publication)) throw new PosterError('withdrawn', '此内容已撤回，不能生成分享海报。');
-  if (data.events.some(item => item.id === publication.eventId && item.status === 'merged')) throw new PosterError('merged', '事件已合并，请查看合并后的公开记录。');
+  if (data.events.some(item => item.id === publication.eventId && item.status === 'merged')) throw new PosterError('merged', '本条进展已并入其他消息，请查看后续进展。');
   const newsOnly = m.isNewsOnly(publication);
   return { publicationId, name:data.site.name || '模钥重置雷达', title:publication.article.title, summary:m.publicArticleSummary(publication.article),
     version:newsOnly ? publication.article.version : publication.event.version, historical:m.isHistoricalArticle(publication.article,data.evidence), newsOnly,
     sourceTime:publication.article.sourcePublishedAt ? m.displayTime(publication.article.sourcePublishedAt) : '', cutoff:m.displayTime(publication.cutoffAt),
-    actions:newsOnly ? [] : publication.event.actions.map(action => ({ title:`${m.actionLabels[action.kind]} · ${m.stageText(action,publication.cutoffAt)}`, eligibility:action.eligibility,
-      scope:{public:'公开发放',targeted:'定向补偿',private:'个人记录'}[action.scope], statementAt:m.displayTime(action.statementAt), expectedAt:action.expectedAt ? m.displayTime(action.expectedAt) : '', timeNote:action.timeNote || '', tone:action.kind === 'banked_reset' ? 'purple' : 'cyan' })) };
+    actions:newsOnly ? [] : publication.event.actions.map(action => ({ title:`${m.actionLabels[action.kind]} · ${m.stageText(action,publication.cutoffAt)}`, eligibility:m.publicEligibility(action),
+      scope:{public:'公开发放',targeted:'定向补偿',private:'个人记录'}[action.scope], statementAt:m.displayTime(action.statementAt), expectedAt:action.expectedAt ? m.displayTime(action.expectedAt) : '', timeNote:action.timeNote ? m.publicArticleSummary({...publication.article,summary:action.timeNote}) : '', tone:action.kind === 'banked_reset' ? 'purple' : 'cyan' })) };
 }
 function createPosterLayout(input, measure, code = {status:'not_configured'}, options = {}) {
-  if (!input || !input.publicationId || !Array.isArray(input.actions) || !Number.isInteger(input.version)) throw new PosterError('layout','指定海报版本资料不完整。');
-  if (code.status === 'ready' && (code.publicationId !== input.publicationId || !code.filePath)) throw new PosterError('code_version','小程序码与这条发布版本不匹配。');
+  if (!input || !input.publicationId || !Array.isArray(input.actions) || !Number.isInteger(input.version)) throw new PosterError('layout','海报资料暂不可用，请返回重新生成。');
+  if (code.status === 'ready' && (code.publicationId !== input.publicationId || !code.filePath)) throw new PosterError('code_version','小程序码与这条消息不一致，请重新生成。');
   const width = Math.max(600,Math.min(1200,Number(options.width) || 900)), scale = width/900, margin = 72*scale;
   const theme=options.theme==='editorial'?'editorial':'precision';
   const palette=theme==='editorial'
@@ -64,7 +64,7 @@ function createPosterLayout(input, measure, code = {status:'not_configured'}, op
   // A restrained masthead anchors the fixed template without competing with the announcement.
   rect(margin,y,48*scale,4*scale,palette.accent);y+=24*scale;
   text(input.name,27,palette.text,600);y+=22*scale;rule(y);y+=30*scale;
-  text(`${input.historical?'历史收录':input.newsOnly?'新闻更新':'公开公告'} · 第${input.version}版`,21,palette.accent,600);
+  text(`${input.historical?'历史收录':input.newsOnly?'新闻更新':'公开公告'}`,21,palette.accent,600);
   if (input.sourceTime) { y+=6*scale;text(`来源发布：${input.sourceTime} 北京时间`,20,palette.muted); }
   y+=24*scale;text(input.title,48,palette.text,700,1.32);y+=28*scale;
   text('公告摘要',21,palette.muted,600);y+=12*scale;text(input.summary,27,palette.body,400,1.7);
@@ -103,19 +103,19 @@ function createPosterLayout(input, measure, code = {status:'not_configured'}, op
     const copyWidth=available-r*2-38*scale;
     let copyY=textAt('资料截至',margin,y,copyWidth,20,palette.muted,600);
     copyY+=10*scale;copyY=textAt(`${input.cutoff} 北京时间`,margin,copyY,copyWidth,25,palette.text,500,1.5);
-    copyY+=24*scale;copyY=textAt(input.newsOnly?'仅新闻更新，福利状态以已确认记录为准':'公开声明不代表个人到账',margin,copyY,copyWidth,23,palette.body,400,1.6);
+    copyY+=24*scale;copyY=textAt(input.newsOnly?'具体安排请查看最新重置消息':'实际到账以账户显示为准',margin,copyY,copyWidth,23,palette.body,400,1.6);
     copyY+=18*scale;copyY=textAt('原文与更新记录，可在小程序中查看',margin,copyY,copyWidth,20,palette.muted);
     // Store the image rectangle itself, never the surrounding decorative plate.
     codeRect={x:cx-size/2,y:cy-size/2,width:size,height:size};
     commands.push({type:'circle',x:cx,y:cy,r,color:'#ffffff',stroke:palette.line});
     commands.push({type:'image',...codeRect});
-    const caption='扫码进入小程序首页',captionWidth=measure(caption,20*scale,500,'sans-serif');
+    const caption='扫码查看这条消息',captionWidth=measure(caption,20*scale,500,'sans-serif');
     const captionEnd=textAt(caption,cx-captionWidth/2,plateTop+r*2+18*scale,r*2,20,palette.muted,500);
     y=Math.max(copyY,captionEnd);
   } else {
     text('资料截至',20,palette.muted,600);y+=8*scale;text(`${input.cutoff} 北京时间`,25,palette.text,500);
-    y+=18*scale;text(input.newsOnly?'仅新闻更新，福利状态以已确认记录为准':'公开声明不代表个人到账',23,palette.body);
-    y+=16*scale;text(code.status === 'not_configured'?'小程序码尚未配置':'小程序码暂不可用',20,palette.muted);
+    y+=18*scale;text(input.newsOnly?'具体安排请查看最新重置消息':'实际到账以账户显示为准',23,palette.body);
+    y+=16*scale;text(code.status === 'not_configured'?'本张海报未附小程序码':'小程序码暂不可用',20,palette.muted);
   }
   const height=Math.ceil(y+margin);
   // This is an application memory limit, not a claim about a universal WeChat canvas limit.
@@ -134,7 +134,7 @@ function loadCanvasImage(canvas, path, timers = {setTimeout,clearTimeout}) {
 }
 function nextPaint(canvas, timers = {setTimeout,clearTimeout}) {
   return new Promise((resolve,reject) => {
-    if (typeof canvas.requestAnimationFrame !== 'function') { reject(new PosterError('unsupported','当前微信不支持海报画布，请更新微信。')); return; }
+    if (typeof canvas.requestAnimationFrame !== 'function') { reject(new PosterError('unsupported','当前微信不支持生成海报，请更新微信。')); return; }
     const timeout=timers.setTimeout(()=>reject(new PosterError('canvas','海报绘制尚未完成，请重试。')),10000);
     try { canvas.requestAnimationFrame(()=>{timers.clearTimeout(timeout);resolve();}); }
     catch (_) { timers.clearTimeout(timeout);reject(new PosterError('canvas','海报绘制失败，请重试。')); }
@@ -144,7 +144,7 @@ function nextPaint(canvas, timers = {setTimeout,clearTimeout}) {
 async function renderPoster({wxApi,canvas,data,publicationId,code={status:'not_configured'},page,options,isCurrent=()=>true}) {
   if (!canvas || typeof canvas.getContext !== 'function' || !wxApi || typeof wxApi.canvasToTempFilePath !== 'function') throw new PosterError('unsupported','当前微信不支持生成海报，请更新微信。');
   const input=posterInput(data,publicationId), ctx=canvas.getContext('2d');
-  if (!ctx || typeof ctx.measureText !== 'function') throw new PosterError('unsupported','当前微信不支持海报画布，请更新微信。');
+  if (!ctx || typeof ctx.measureText !== 'function') throw new PosterError('unsupported','当前微信不支持生成海报，请更新微信。');
   const layout=createPosterLayout(input,(text,size,weight,font)=>{ctx.font=`${weight} ${size}px ${font}`;return ctx.measureText(text).width;},code,options);
   canvas.width=layout.width;canvas.height=layout.height;
   let image;
@@ -189,7 +189,7 @@ function savePoster(wxApi,artifact,{userInitiated=false}={}) {
 }
 /** Write only the genuine server response into the WeChat sandbox; remove after drawing. */
 function writeCodeAsset(wxApi,value,publicationId){
-  if(!value||value.publicationId!==publicationId||!['image/png','image/jpeg'].includes(value.contentType)||!/^[a-f0-9]{32}$/.test(value.scene))return Promise.reject(new PosterError('code_version','小程序码与指定发布版本不匹配。'));
+  if(!value||value.publicationId!==publicationId||!['image/png','image/jpeg'].includes(value.contentType)||!/^[a-f0-9]{32}$/.test(value.scene))return Promise.reject(new PosterError('code_version','小程序码与这条消息不一致，请重新生成。'));
   const encoded=value.imageBase64;
   if(typeof encoded!=='string'||encoded.length>3000000||encoded.length%4!==0||!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)||encoded.length*3/4-(encoded.endsWith('==')?2:encoded.endsWith('=')?1:0)>2097152||!(value.contentType==='image/png'?encoded.startsWith('iVBORw0KGgo'):encoded.startsWith('/9j/')))return Promise.reject(new PosterError('image','小程序码图片格式不正确，请重新生成。'));
   if(typeof wxApi.getFileSystemManager!=='function'||!wxApi.env||!wxApi.env.USER_DATA_PATH)return Promise.reject(new PosterError('unsupported','当前微信不能读取小程序码，请更新微信。'));

@@ -1,6 +1,6 @@
 <page-loader wx:if="{{loading}}" />
 <view wx:else class="card empty">
-  <view class="heading">{{unconfigured ? '尚未连接' : '资料暂时无法加载'}}</view>
+  <view class="heading">{{unconfigured ? '暂时无法连接' : '资料暂时无法加载'}}</view>
   <view class="lead">{{error || '连接恢复后会继续更新。'}}</view>
   <button class="primary full" style="margin-top:20px" bindtap="retry">重新加载</button>
 </view>

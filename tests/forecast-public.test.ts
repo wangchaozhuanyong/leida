@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildForecastSnapshot,forecastWindows,referenceForecast,type ForecastCase,type ForecastPublicData} from '../src/lib/forecast';
-import {forecastRevision} from '../src/lib/forecast-display';
+import {forecastRevision,forecastExplanationText} from '../src/lib/forecast-display';
 import {publicRevision} from '../src/server/public-version';
 import {forecastPosterSvg} from '../src/server/forecast-poster';
 import {fullTime} from '../src/lib/labels';
@@ -13,6 +13,18 @@ const caseFixture:ForecastCase={id:'case-public',identity:'test',title:'隔离�
 const snapshot=()=>buildForecastSnapshot({id:'snapshot-public',signature:'fixed',case:caseFixture,generatedAt:'2026-10-10T00:01:00Z',evidenceCutoffAt:'2026-10-10T00:01:00Z',cases:[],outcomes:[]});
 const forecast=():ForecastPublicData=>({status:'ready',ruleVersion:'rule',modelVersion:'model',generatedAt:signalAt,cases:[{...caseFixture,snapshot:snapshot(),outcomes:[]}],reference:referenceForecast()});
 const data=(forecasts:ForecastPublicData):PublicData=>({events:[],articles:[],publications:[],evidence:[],notices:[],activities:[],site:{name:'模钥重置雷达',description:'',version:1,autoPublish:true},sources:[],serverTime:signalAt,forecasts});
+
+test('预测海报使用用户说明，历史概率、来源等级、时间与内部说明不被改写',()=>{
+ for(const basis of ['late','already_known','insufficient','verified_live','experimental_seed'] as const){
+  const fixed={...snapshot(),basis,explanation:'内部处理说明：实时结局尚不用于训练。'};
+  if(['late','already_known','insufficient'].includes(basis)){fixed.p24=null;fixed.p48=null;fixed.interval24=null;fixed.interval48=null;}
+  const before=structuredClone(fixed),text=forecastExplanationText(fixed);
+  const svg=forecastPosterSvg(fixed,'模钥重置雷达','https://radar.example/methodology?snapshot=snapshot-public');
+  assert.ok(svg.includes(text));assert.doesNotMatch(svg,/内部处理说明|规则批次|固定快照/);
+  assert.match(svg,/来源连续覆盖未核验/);assert.ok(svg.includes(fullTime(fixed.windows[48])));
+  assert.deepEqual(fixed,before);
+ }
+});
 
 test('预测轮询版本忽略读取时钟、结局与暂停会改变公开版本',()=>{
  const original=forecast(),next={...original,generatedAt:'2026-10-10T00:03:00Z'};
@@ -27,8 +39,8 @@ test('预测海报只读取冻结快照，时间、窗口、实验标签与共�
  const fixed=snapshot(),url='https://radar.example/methodology?snapshot=snapshot-public';
  const original=forecastPosterSvg(fixed,'模钥重置雷达',url);
  assert.match(original,/24小时：30%/);assert.match(original,/48小时：80%/);assert.ok(original.includes(fullTime(fixed.windows[24])));assert.ok(original.includes(fullTime(fixed.windows[48])));
- assert.match(original,/个人到账未观测/);assert.match(original,/覆盖未核验/);assert.match(original,/snapshot-public/);
- assert.match(original,/固定历史预测/);assert.equal(forecastPosterSvg(structuredClone(fixed),'模钥重置雷达',url),original);
+ assert.match(original,/实际到账以账户显示为准/);assert.match(original,/覆盖未核验/);assert.match(original,/snapshot-public/);
+ assert.match(original,/这是当时的预测/);assert.equal(forecastPosterSvg(structuredClone(fixed),'模钥重置雷达',url),original);
  const card={...fixed,target:'banked_reset' as const,p24:null,p48:null,interval24:null,interval48:null,sampleCount:0};
  assert.match(forecastPosterSvg(card,'模钥重置雷达',url),/样本不足/);assert.doesNotMatch(forecastPosterSvg(card,'模钥重置雷达',url),/80%/);
 });

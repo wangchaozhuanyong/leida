@@ -9,9 +9,9 @@
       <view class="activity-intro"><view class="activity-kicker">每日公开进展</view><view class="title">{{activity.title}}</view><view class="activity-subtitle">每天的改进与重置，按日持续整理</view><view class="activity-progress"><view style="width:{{activity.progress}}%" /></view><view class="row activity-phase"><text>{{activity.phase}}</text><button class="text-button" bindtap="toggleRules" aria-expanded="{{rulesOpen}}">活动规则 {{rulesOpen ? '−' : '+'}}</button></view><view wx:if="{{rulesOpen}}" class="prose muted activity-rules">{{activity.rules}}</view></view>
       <view class="card activity-calendar"><view class="row"><view class="heading">每日进展</view><button class="activity-today" bindtap="today">回到今天</button></view>
         <view class="activity-legend"><text class="type-blue">● 改进</text><text class="type-teal">● 重置</text><text class="type-violet">● 重置卡</text><text class="type-amber">● 待公布</text><text class="type-slate">● 未开始</text></view>
-        <view class="small muted activity-reset-note">已完成或有效观测的重置卡、重置优先标记；跨活动日的其他来源标为观测补充，不另算一次重置。</view>
+        <view class="small muted activity-reset-note">选择日期，查看当天的重置、发卡与活动进展。</view>
         <view class="challenge-grid"><button wx:for="{{activity.days}}" wx:key="value" class="challenge-day {{item.selected ? 'is-selected' : ''}} {{item.state === 'future' ? 'is-future' : ''}}" data-day="{{item.value}}" bindtap="selectDay" aria-label="{{item.accessibility}}" aria-pressed="{{item.selected}}"><view wx:if="{{item.today}}" class="challenge-today-dot"/><view class="challenge-number">{{item.value}}</view><view class="challenge-date">{{item.date}}</view><view class="challenge-label type-{{item.tone}}">{{item.label}}</view></button></view>
-        <view class="activity-zone">按{{activity.timezone}}划分活动日，日期与北京时间不同 · 已收录{{activity.recordedDays}}天</view>
+        <view class="activity-zone">活动日期：{{activity.timezone}} · 已更新{{activity.recordedDays}}天</view>
       </view>
       <view class="row activity-selected"><view><view class="heading">第{{activity.selected}}天</view><view class="small muted">{{activity.selectedDate}} · {{activity.timezone}}</view></view><view class="activity-arrows"><button data-step="-1" bindtap="adjacentDay" disabled="{{activity.selected === 1}}" aria-label="前一天">‹</button><button data-step="1" bindtap="adjacentDay" disabled="{{activity.selected === activity.days.length}}" aria-label="后一天">›</button></view></view>
       <view wx:if="{{activity.selectedBeijingRange}}" class="small muted activity-date-range">对应北京时间：{{activity.selectedBeijingRange}}</view>
@@ -19,8 +19,8 @@
         <view wx:for="{{activity.entries}}" wx:key="id" class="card activity-entry-card"><view class="activity-badges"><text wx:for="{{item.types}}" wx:for-item="type" wx:key="kind" class="activity-type type-{{type.tone}}">{{type.label}}</text><text class="activity-stage">{{item.stage}}</text></view><view class="announcement-title">{{item.title}}</view><view class="prose publication-summary">{{item.summary}}</view><view class="row activity-entry-footer"><text class="small muted">{{item.timeLabel ? item.timeLabel+' ' : ''}}{{item.time}} · 北京时间</text><button class="text-button" data-path="{{item.path}}" bindtap="navigate">查看详情 →</button></view><view wx:if="{{item.sources.length}}"><button wx:for="{{item.sources}}" wx:for-item="source" wx:key="id" class="text-button" data-path="{{source.path}}" bindtap="navigate">{{source.title}} · {{source.time}} →</button></view></view>
         <view wx:if="{{!activity.entries.length}}" class="card activity-empty"><view class="heading">{{activity.emptyTitle}}</view><view class="small muted lead">{{activity.emptyText}}</view></view>
       </view>
-      <view wx:if="{{activity.sourceDelayed}}" class="warning">来源更新延迟，已收录内容仍保留。</view>
-      <view class="foot">{{activity.lastSuccessAt ? '活动来源最近核对 '+activity.lastSuccessAt+' · 北京时间' : '活动来源最近核对时间暂不可用'}}</view>
+      <view wx:if="{{activity.sourceDelayed}}" class="warning">来源更新延迟，新消息可能稍晚显示。</view>
+      <view class="foot">{{activity.lastSuccessAt ? '来源更新 '+activity.lastSuccessAt+' · 北京时间' : '来源更新时间暂不可用'}}</view>
     </block>
   </block>
 </view>
