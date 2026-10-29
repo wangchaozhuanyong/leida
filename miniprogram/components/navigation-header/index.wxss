@@ -11,3 +11,10 @@
 .navigation-back::after{border:0}
 .back-mark{width:10px;height:10px;border-left:2px solid #14263e;border-bottom:2px solid #14263e;transform:rotate(45deg);margin-left:4px}
 .navigation-pressed{background:#e8eef8}
+.navigation-feedback{box-sizing:border-box;display:flex;align-items:center;gap:6px;height:16px;min-width:0;color:#2458ce;font-size:12px;line-height:16px;pointer-events:none}
+.feedback-message{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.feedback-spinner{box-sizing:border-box;width:14px;height:14px;flex:none;border:2px solid #d7e5ff;border-top-color:#2458ce;border-right-color:#2458ce;border-radius:50%;animation:feedback-spin .8s linear infinite}
+.feedback-result{font-size:13px;line-height:16px;font-weight:600;flex:none}
+.navigation-feedback.is-error{color:#8a541a}
+@keyframes feedback-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.feedback-spinner{animation:none}}

@@ -98,3 +98,19 @@ test('Every configured page retains a header outside its loading branch, with ba
     if (tabs.has(page)) assert.ok(template.indexOf('<page-meta') < template.indexOf(header));
   }
 });
+
+test('Every native pull-enabled page exposes pending and result feedback through its persistent header', () => {
+  const root = new URL('../miniprogram/', import.meta.url);
+  const app = JSON.parse(readFileSync(new URL('app.json', root), 'utf8'));
+  const enabled = app.pages.filter((page: string) => {
+    const settings = JSON.parse(readFileSync(new URL(`${page}.json`, root), 'utf8'));
+    return settings.enablePullDownRefresh ?? app.window.enablePullDownRefresh;
+  });
+  assert.equal(enabled.length, 8);
+  for (const page of enabled) {
+    const markup = readFileSync(new URL(`${page}.wxml`, root), 'utf8');
+    const header = markup.match(/<navigation-header\b[^>]+>/)?.[0] || '';
+    assert.match(header, /refresh-state="\{\{pullRefreshState\}\}"/, page);
+    assert.match(header, /refreshing="\{\{[^}]*refreshing/, page);
+  }
+});

@@ -1,4 +1,3 @@
 <page-meta root-background-color="#f2f5fb" page-style="background-color:#f2f5fb" />
-<navigation-header icon="history" title="重置记录" />
-<view class="refresh-track {{refreshing ? 'is-active' : ''}}" aria-label="{{refreshing ? '正在更新' : ''}}"><view/></view>
+<navigation-header refresh-state="{{pullRefreshState}}" refreshing="{{refreshing}}" icon="history" title="重置记录" />
 <include src="./calendar.wxml" />

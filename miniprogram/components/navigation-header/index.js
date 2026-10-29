@@ -5,7 +5,9 @@ Component({
     title: { type: String, value: '模钥重置雷达' },
     brand: { type: Boolean, value: false },
     icon: { type: String, value: 'document' },
-    back: { type: Boolean, value: false }
+    back: { type: Boolean, value: false },
+    refreshing: { type: Boolean, value: false },
+    refreshState: { type: String, value: '' }
   },
   data: navigationMetrics(typeof wx === 'undefined' ? {} : wx),
   lifetimes: {

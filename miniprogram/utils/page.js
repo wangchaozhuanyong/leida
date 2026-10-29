@@ -18,6 +18,13 @@ function setWindowBackground() {
   } catch (_) { /* An unavailable appearance API must never block page data. */ }
 }
 function createPage(build, extra = {}) {
+  function clearPullFeedback(page) {
+    clearTimeout(page._pullFeedbackTimer);
+    page._pullFeedbackTimer = null;
+    page._pullFeedbackGeneration = (page._pullFeedbackGeneration || 0) + 1;
+    page._pullRefreshWork = null;
+    if (page.data.pullRefreshState) page.setData({ pullRefreshState:'' });
+  }
   function stopEntrance(page) {
     if(page._entranceTimer)clearTimeout(page._entranceTimer);
     page._entranceTimer=null;
@@ -96,25 +103,45 @@ function createPage(build, extra = {}) {
 
   }
   return {
-    data: { contentMotion:'', navigationLoading:true, loading: true, connected: false, unconfigured: false, error: '', cutoff: '暂无记录', ...(extra.data || {}) },
+    data: { contentMotion:'', pullRefreshState:'', navigationLoading:true, loading: true, connected: false, unconfigured: false, error: '', cutoff: '暂无记录', ...(extra.data || {}) },
     onLoad(params) { setWindowBackground(); this._params = params || {}; if (extra.load) extra.load.call(this, params || {}); },
     // Keep native appearance setup on initial load. Retained tabs only need to
     // resume their subscriptions; their background is also declared in page-meta.
     onShow() { if(enterPage(this,()=>this.onShow()))return;const app=getApp();this._visible=true;this._viewKey=JSON.stringify(this.readView());const work=app.client.setView&&app.client.setView(this.readView());this._unsubscribe = app.client.subscribe(state => render(this, state));if(extra.show)extra.show.call(this);foreground(this,work); },
     nativeReturnTouched(){getApp().entryNavigation?.touched();},
     onPageScroll(event) { if(this._viewKey){this._positions=this._positions||{};this._positions[this._viewKey]=event.scrollTop;} },
-    onHide() { endPull(this);stopEntrance(this);suspendEntry(this);this._visible=false;this._renderGeneration=(this._renderGeneration||0)+1;this._navigationGeneration=(this._navigationGeneration||0)+1;if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.hide)extra.hide.call(this); },
-    onUnload() { endPull(this);stopEntrance(this);suspendEntry(this,true);this._visible=false;this._navigationGeneration=(this._navigationGeneration||0)+1;if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.unload)extra.unload.call(this); },
+    onHide() { endPull(this);clearPullFeedback(this);stopEntrance(this);suspendEntry(this);this._visible=false;this._renderGeneration=(this._renderGeneration||0)+1;this._navigationGeneration=(this._navigationGeneration||0)+1;if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.hide)extra.hide.call(this); },
+    onUnload() { endPull(this);clearPullFeedback(this);stopEntrance(this);suspendEntry(this,true);this._visible=false;this._navigationGeneration=(this._navigationGeneration||0)+1;if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.unload)extra.unload.call(this); },
     onPullDownRefresh() {
-      if (activePull?.page === this) return activePull.work;
+      if (!this._visible) return Promise.resolve();
       if (activePull) clearTimeout(activePull.timer);
-      const gesture = { page:this, timer:null, work:null };
+      const gesture = { page:this, timer:null };
       activePull = gesture;
+      // Show feedback before releasing the native pull area. No artificial hold
+      // while the request runs, and a fallback if the render callback is delayed.
       gesture.timer = setTimeout(() => endPull(this, gesture), 300);
-      try { gesture.work = Promise.resolve(foreground(this, () => getApp().client.refresh(false))); }
-      catch (error) { gesture.work = Promise.reject(error); }
-      gesture.work = gesture.work.finally(() => endPull(this, gesture));
-      return gesture.work;
+      this.setData({ pullRefreshState:'loading' }, () => endPull(this, gesture));
+      if (this._pullRefreshWork) return this._pullRefreshWork;
+      clearTimeout(this._pullFeedbackTimer);
+      const generation = this._pullFeedbackGeneration = (this._pullFeedbackGeneration || 0) + 1;
+      let failed = false, work;
+      try {
+        work = foreground(this, () => Promise.resolve(getApp().client.refresh(false)).catch(error => { failed = true; throw error; }));
+      } catch (_) { failed = true; }
+      const settled = Promise.resolve(work).finally(() => {
+        endPull(this, gesture);
+        if (!this._visible || generation !== this._pullFeedbackGeneration) return;
+        this._pullRefreshWork = null;
+        const error = failed || !!getApp().client.getState().error;
+        this.setData({ pullRefreshState:error ? 'error' : 'success' });
+        this._pullFeedbackTimer = setTimeout(() => {
+          if (!this._visible || generation !== this._pullFeedbackGeneration) return;
+          this._pullFeedbackTimer = null;
+          this.setData({ pullRefreshState:'' });
+        }, error ? 3500 : 1400);
+      });
+      this._pullRefreshWork = settled;
+      return settled;
     },
     readView() { return extra.view ? extra.view(this._params||{},this.data) : {view:'home'}; },
     reloadView() { this._viewKey=JSON.stringify(this.readView());this._restoreScroll=this._positions?.[this._viewKey]||0;const client=getApp().client; if(client.setView)return foreground(this,()=>client.setView(this.readView()));this.redraw(); },
