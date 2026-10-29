@@ -259,12 +259,18 @@ test('首页近7天预览不包含尚未到来的周末，完整日程仍保留�
   assert.equal(calendar.weeks.flatMap((item:{days:{future:boolean}[]}) => item.days).some((item:{future:boolean}) => item.future), true);
 });
 
-test('多分类提醒只显示一次；已撤回提醒不显示，缺失版本保留说明', () => {
-  const data = fixture();
-  const notices = mini.noticeModel(data, { announcement: true, result: true, activity: true, correction: true }, ['notice-combined']);
-  assert.equal(notices.length, 2); assert.equal(notices[0].read, true);
-  assert.equal(notices[1].missing, true); assert.equal(notices[1].path, '');
-  assert.equal(mini.noticeModel(data, { announcement: false, result: false, activity: false, correction: false }, []).length, 2);
+test('站内信仅显示手动公告，不受微信提醒开关影响；置顶优先且不改原日期', () => {
+  const data=fixture();
+  const base={eventId:'',publicationId:'',semanticKey:'manual',origin:'admin' as const,summary:'公告',body:'正文',categories:['system' as const],status:'active' as const};
+  data.notices.push({...base,id:'older',title:'较早公告',createdAt:historic,pinned:true},
+    {...base,id:'newer',title:'近期公告',createdAt:now},
+    {...base,id:'withdrawn',title:'已撤回',createdAt:now,pinned:true,status:'withdrawn'});
+  const before=structuredClone(data.notices);
+  const notices=mini.noticeModel(data, {announcement:true,result:true,activity:true,correction:true}, ['older']);
+  assert.deepEqual(notices.map((n:any)=>n.id),['older','newer']);assert.equal(notices[0].read,true);
+  assert.equal(notices[0].createdAt,historic);assert.equal(notices[0].missing,false);
+  assert.deepEqual(mini.noticeModel(data,{announcement:false,result:false,activity:false,correction:false},[]).map((n:any)=>n.id),['older','newer']);
+  assert.deepEqual(data.notices,before);
 });
 
 test('正式配置连接现有云托管，空白示例仍拒绝联网、本机地址和空云环境', () => {
@@ -641,7 +647,8 @@ test('实际详情页面分享固定版本，收到撤回后隐藏菜单并保�
 });
 
 test('实际日程、活动及提醒页面可选日期、查看固定版本和本机已读，不发写接口', async () => {
-  const harness = nativeHarness(), schedule = harness.page('schedule',{ date:'2026-10-10' });
+  const input=fixture();input.notices[0]={...input.notices[0],origin:'admin',body:'手动公告正文'};
+  const harness = nativeHarness(input), schedule = harness.page('schedule',{ date:'2026-10-10' });
   assert.equal(schedule.data.selectedItems.length, 3);
   schedule.selectDay({ currentTarget: { dataset: { date:'2026-10-09' } } });
   assert.equal(schedule.data.selected, '2026-10-09'); assert.equal(schedule.data.selectedItems.length, 0);
@@ -650,7 +657,7 @@ test('实际日程、活动及提醒页面可选日期、查看固定版本和�
   assert.equal(activity.data.activity.selected,1); assert.equal(activity.data.activity.entries.length,0);
   const notices = harness.page('notices');
   notices.openNotice({ currentTarget:{dataset:{id:'notice-combined'}} });
-  assert.deepEqual(harness.ui.navigations, ['/pages/detail/index?publicationId=pub-done']);
+  assert.deepEqual(harness.ui.navigations, ['/pages/notices/index?id=notice-combined']);
   assert.ok(harness.app.preferences.snapshot().read.includes('notice-combined'));
   notices.openNotice({ currentTarget:{dataset:{id:'notice-missing'}} });
   assert.equal(harness.ui.navigations.length,1);
@@ -726,9 +733,9 @@ test('所有原生JS可解析，JSON配置有效；模板无浏览器标签与�
 test('独立站内信不依赖公告链接；顶部预览、未读及已读由真实页面状态驱动',()=>{
   const input=fixture();input.notices.push({id:'manual',eventId:'',publicationId:'',semanticKey:'manual',origin:'admin',title:'测试站内信',summary:'测试摘要',body:'完整正文',categories:['system'],status:'active',createdAt:now});
   input.notices.push({...input.notices[0],id:'activity-only',categories:['activity']});
-  const h=nativeHarness(input),settings=h.page('settings');assert.equal(settings.data.notices.length,3);assert.equal(settings.data.unread,3);
+  const h=nativeHarness(input),settings=h.page('settings');assert.equal(settings.data.notices.length,1);assert.equal(settings.data.unread,1);
   const n=settings.data.notices.find((n:any)=>n.id==='manual');assert.equal(n.missing,false);
-  settings.openNotice({currentTarget:{dataset:{id:'manual'}}});assert.equal(settings.data.unread,2);assert.equal(h.ui.navigations.at(-1),'/pages/notices/index?id=manual');
+  settings.openNotice({currentTarget:{dataset:{id:'manual'}}});assert.equal(settings.data.unread,0);assert.equal(h.ui.navigations.at(-1),'/pages/notices/index?id=manual');
   const detail=h.page('notices',{id:'manual'});assert.equal(detail.data.selected.body,'完整正文');assert.equal(detail.data.selected.read,true);
   input.notices.find(n=>n.id==='manual')!.status='withdrawn';h.replace(input);assert.equal(detail.data.selected,null);
   settings.onUnload();detail.onUnload();

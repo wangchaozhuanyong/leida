@@ -214,3 +214,33 @@ test('已有实时公告补齐活动关联不重新通知，保留原快照且�
   const current=(await one<Candidate>('candidates',candidate.id))!;
   const repeated=await publishCandidate(candidate.id,current.version,'worker','重复核对',true);assert.equal(repeated.id,result.id);assert.equal(table('notices').length,0);
 });
+
+test('手动站内信支持置顶与取消，重复操作幂等，自动提醒及撤回消息不可置顶',async()=>{
+  reset();
+  const notice=await executeCommand('notice.publish',{title:'手动公告',body:'公告正文',pinned:true,requestId:'c16491a5-c272-4cb2-8b6c-dc1c87e84999'},actor) as {id:string;pinned:boolean;createdAt:string};
+  assert.equal(notice.pinned,true);
+  const unpin={id:notice.id,pinned:false,expectedPinned:true};
+  await executeCommand('notice.pin',unpin,actor);await executeCommand('notice.pin',unpin,actor);
+  assert.equal(table('notices')[0].pinned,false);assert.equal(table('notices')[0].createdAt,notice.createdAt);
+  assert.equal((await audits()).filter(a=>a.action==='notice.pin').length,1);
+  await assert.rejects(executeCommand('notice.pin',{id:notice.id,pinned:true,expectedPinned:true},actor),/已变化/);
+  await assert.rejects(executeCommand('notice.pin',{id:notice.id,pinned:'true',expectedPinned:false},actor));
+  await executeCommand('notice.pin',{id:notice.id,pinned:true,expectedPinned:false},actor);
+  await put('notices',{...table('notices')[0],id:'automatic',origin:undefined});
+  await assert.rejects(executeCommand('notice.pin',{id:'automatic',pinned:true,expectedPinned:false},actor),/手动/);
+  await executeCommand('notice.withdraw',{id:notice.id},actor);
+  await assert.rejects(executeCommand('notice.pin',{id:notice.id,pinned:false,expectedPinned:true},actor),/手动/);
+  for(const name of ['events','articles','publications','jobs','wechat_deliveries','wechat_grants'])assert.equal(table(name).length,0);
+});
+
+test('三篇指定公告经现有发布命令写入，重复执行无重复消息、快照或提醒',async()=>{
+  reset();
+  const entries=JSON.parse(readFileSync(new URL('../scripts/inbox-announcements-20261029.json',import.meta.url),'utf8'));
+  for(let attempt=0;attempt<2;attempt++)for(const entry of entries)await executeCommand('notice.publish',entry,actor);
+  assert.equal(table('notices').length,3);assert.equal((await audits()).filter(a=>a.action==='notice.publish').length,3);
+  const messages=table('notices');assert.equal(messages.filter(n=>n.pinned).length,1);
+  assert.ok(messages.every(n=>n.origin==='admin'&&n.status==='active'&&!n.eventId&&!n.publicationId));
+  assert.deepEqual(messages.map(n=>n.createdAt),['2026-07-29T02:00:00.000Z','2026-08-29T02:00:00.000Z','2026-10-19T02:00:00.000Z']);
+  for(const audit of await audits())assert.ok(Date.parse(audit.createdAt)>Date.parse('2026-10-19T02:00:00Z'));
+  for(const name of ['events','articles','publications','jobs','wechat_deliveries','wechat_grants'])assert.equal(table(name).length,0);
+});

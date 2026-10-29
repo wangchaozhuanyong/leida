@@ -11,7 +11,7 @@ import {openPublicDialog} from './dialog-lifecycle';
 import {sourceStatus, uniqueDisplayEvidence} from './model';
 import { publicNewsGroups, homeNewsGroups, type NewsGroup } from '@/lib/public-feed';
 import { publicReviewMessage, publicSourceNotes, publicEligibility, publicNoticeSummary } from '@/lib/public-content';
-import { customerNotice } from '@/lib/notice-display';
+import { customerNotice, compareNotices } from '@/lib/notice-display';
 import type { Activity, Article, BenefitAction, Evidence, Notice, PublicData, Publication } from '@/lib/types';
 import { usePublicClock, usePublicQuery, useWechatAvailability } from './PublicSession';
 import { RecordCalendar, RecordKindFilter } from './RecordCalendar';
@@ -141,7 +141,7 @@ export default function PublicApp() {
   const navigation = navItems.map(item => <Link scroll={false} key={item.route} href={navHref(item.href)} prefetch={true} className={navSection === item.route ? 'active' : ''} aria-current={navSection === item.route ? route === item.route ? 'page' : 'location' : undefined}><Icon name={item.icon} /><span>{item.label}</span></Link>);
   const collectedAt = data ? latestSourceSuccess(data.sources) : undefined;
   const latestArticle = data && sortedArticles(data.articles)[0];
-  const visibleNotices = data?.notices.filter(customerNotice).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)) || [];
+  const visibleNotices = data?.notices.filter(customerNotice).sort(compareNotices) || [];
   const selectedEvent = data?.events.find(event => event.id === path[1]);
   const selectedArticle = data?.articles.find(article => article.id === path[1]);
   const selectedVersion = route === 'events' ? query.get('version') || selectedEvent?.publicationId : route === 'articles' ? selectedArticle?.publicationId : undefined;
@@ -159,7 +159,7 @@ export default function PublicApp() {
   }
   const newsArticles = route === 'news' && data ? sortedArticles(data.articles.filter(article => newsCategory === 'all' || article.category === newsCategory)) : [];
   const historyPublications = route === 'news' && newsCategory === 'reset' && data ? sortedStatePublications(data).filter(p => (p.event.actions.length>0 && (historyFilter === 'all' || p.event.actions.some(action => action.kind === historyFilter)) || ['all','automatic_reset'].includes(historyFilter) && resetObservations(data).some(o=>o.publicationId===p.id))) : [];
-  const pageTitle = ({ history: '重置记录', news: '动态', settings: '提醒', more: '关于与隐私', notices: '站内提醒', methodology: '观察记录', events: '事件详情', articles: '动态详情', sources: '原文来源', activities: '活动动态' } as Record<string, string>)[route] ?? '重置雷达';
+  const pageTitle = ({ history: '重置记录', news: '动态', settings: '提醒', more: '关于与隐私', notices: '站内信', methodology: '观察记录', events: '事件详情', articles: '动态详情', sources: '原文来源', activities: '活动动态' } as Record<string, string>)[route] ?? '重置雷达';
   const failure = <div className="pub-empty" role="alert"><Icon name="info" /><h2>资料暂时无法加载</h2><p>{error || '请稍后重试。'}</p><button className="pub-button primary" onClick={() => void refresh()} disabled={loading}>{loading ? '正在重试…' : '重新加载'}</button></div>;
   const pending = error ? failure : <LoadingContent variant={route==='history'?'calendar':['events','articles','sources','methodology'].includes(route)?'detail':'list'}/>;
   let content: React.ReactNode;
@@ -277,9 +277,9 @@ function PublicationNote({ publication }: { publication: Publication }) {
 }
 function Notices({publications,notices,read,markRead,storageError,selectedId}:{publications:Publication[];notices:Notice[];read:string[];markRead:(ids:string[])=>void;storageError:string;selectedId?:string|null}) {
   const unread=notices.filter(n=>!read.includes(n.id)).length,selected=selectedId?notices.find(n=>n.id===selectedId):null;
-  if(selectedId)return selected?<article className="pub-card"><h2>{selected.title}</h2><p className="pub-muted">{displayTime(selected.createdAt)}</p><p className="pub-prose">{selected.body||publicNoticeSummary(selected,publications)}</p><TextLink href="/notices">查看全部提醒</TextLink></article>:<Empty title="消息暂不可用" detail="这条消息已撤回或暂时无法读取。"/>;
+  if(selectedId)return selected?<article className="pub-card">{selected.pinned&&<Badge>置顶</Badge>}<h2>{selected.title}</h2><p className="pub-muted">{displayTime(selected.createdAt)}</p><p className="pub-prose">{selected.body||publicNoticeSummary(selected,publications)}</p><TextLink href="/notices">查看全部站内信</TextLink></article>:<Empty title="消息暂不可用" detail="这条消息已撤回或暂时无法读取。"/>;
   return <>{storageError&&<p className="pub-warning">{storageError}</p>}<div className="pub-section-heading"><span>{unread} 条未读</span><button className="pub-text-button" disabled={!unread} onClick={()=>markRead(notices.map(n=>n.id))}>全部标为已读</button></div>
-    {notices.length?notices.map(n=><article key={n.id} className={`pub-card pub-notice${read.includes(n.id)?' is-read':''}`}><div className="pub-card-top"><Badge tone={read.includes(n.id)?'muted':''}>{read.includes(n.id)?'已读':'未读'}</Badge><time>{displayTime(n.createdAt)}</time></div><h2>{n.title}</h2><p>{publicNoticeSummary(n,publications)}</p>{n.origin==='admin'?<Link scroll={false} className="pub-text-link" href={`/notices?message=${encodeURIComponent(n.id)}`} onClick={()=>markRead([n.id])}>查看详情<Icon name="arrow"/></Link>:publications.some(p=>p.id===n.publicationId)?<Link scroll={false} className="pub-text-link" href={`/events/${encodeURIComponent(n.eventId)}?version=${encodeURIComponent(n.publicationId)}`} onClick={()=>markRead([n.id])}>查看关联公告<Icon name="arrow"/></Link>:<p className="pub-muted">关联记录暂不可用</p>}</article>):<Empty title="暂无提醒" detail="有新消息会显示在这里。"/>}
+    {notices.length?notices.map(n=><article key={n.id} className={`pub-card pub-notice${read.includes(n.id)?' is-read':''}`}><div className="pub-card-top">{n.pinned&&<Badge>置顶</Badge>}<Badge tone={read.includes(n.id)?'muted':''}>{read.includes(n.id)?'已读':'未读'}</Badge><time>{displayTime(n.createdAt)}</time></div><h2>{n.title}</h2><p>{publicNoticeSummary(n,publications)}</p>{n.origin==='admin'?<Link scroll={false} className="pub-text-link" href={`/notices?message=${encodeURIComponent(n.id)}`} onClick={()=>markRead([n.id])}>查看详情<Icon name="arrow"/></Link>:publications.some(p=>p.id===n.publicationId)?<Link scroll={false} className="pub-text-link" href={`/events/${encodeURIComponent(n.eventId)}?version=${encodeURIComponent(n.publicationId)}`} onClick={()=>markRead([n.id])}>查看关联公告<Icon name="arrow"/></Link>:<p className="pub-muted">关联记录暂不可用</p>}</article>):<Empty title="暂无站内信" detail="有新消息会显示在这里。"/>}
   </>;
 }
 function ActionCard({ action, now }: { action: BenefitAction; now: string }) {
@@ -399,9 +399,9 @@ function ActivityContent({ activity, data, pending, day, onDay, onPoster, onDayP
 export function Settings({notices,read,markRead,storageError,pending,data,codeAvailable=false}:{notices:Notice[];read:string[];markRead:(ids:string[])=>void;storageError:string;pending?:React.ReactNode;data?:PublicData|null;codeAvailable?:boolean}) {
   const unread=notices.filter(n=>!read.includes(n.id)).length;
   return <>
-    <section className="pub-card pub-inbox-card"><div className="pub-section-heading"><h2>站内信 {unread>0&&<span className="pub-inbox-unread">{unread} 未读</span>}</h2><TextLink href="/notices">查看全部提醒</TextLink></div>
-      {pending ?? <>{notices.slice(0,3).map(n=><Link scroll={false} key={n.id} className="pub-inbox-preview" href={n.origin==='admin'?`/notices?message=${encodeURIComponent(n.id)}`:`/events/${encodeURIComponent(n.eventId)}?version=${encodeURIComponent(n.publicationId)}`} onClick={()=>markRead([n.id])}><div><strong>{n.title}</strong>{!read.includes(n.id)&&<span className="pub-status-dot"/>}</div><p>{publicNoticeSummary(n,data?.publications)}</p><small>{displayTime(n.createdAt)}</small></Link>)}
-      {!notices.length&&<p className="pub-inbox-empty">暂无提醒，有新消息会显示在这里。</p>}</>}
+    <section className="pub-card pub-inbox-card"><div className="pub-section-heading"><h2>站内信 {unread>0&&<span className="pub-inbox-unread">{unread} 未读</span>}</h2><TextLink href="/notices">查看全部站内信</TextLink></div>
+      {pending ?? <>{notices.slice(0,3).map(n=><Link scroll={false} key={n.id} className="pub-inbox-preview" href={n.origin==='admin'?`/notices?message=${encodeURIComponent(n.id)}`:`/events/${encodeURIComponent(n.eventId)}?version=${encodeURIComponent(n.publicationId)}`} onClick={()=>markRead([n.id])}><div><strong>{n.pinned&&<span className="pub-inbox-pin">置顶 · </span>}{n.title}</strong>{!read.includes(n.id)&&<span className="pub-status-dot"/>}</div><p>{publicNoticeSummary(n,data?.publications)}</p><small>{displayTime(n.createdAt)}</small></Link>)}
+      {!notices.length&&<p className="pub-inbox-empty">暂无站内信，有新消息会显示在这里。</p>}</>}
     </section>
     <section className="pub-card pub-reminder-pending"><div className="pub-section-heading"><h2>微信提醒</h2><Badge tone="muted">小程序内开启</Badge></div><p>请在小程序的提醒页开启微信提醒，每次成功授权增加一次提醒机会。</p><p className="pub-muted">可分别选择重置预告、重置完成提醒和重要更正。每成功发送一条使用一次，未开启的类型不使用次数。</p><WechatEntryGuide publicationId={data?.publications.find(p=>!publicationWithdrawn(data,p))?.id} codeAvailable={codeAvailable}/></section>
     {storageError&&<p className="pub-warning">{storageError}</p>}
@@ -421,7 +421,7 @@ export function Methodology({data,snapshotId,cadenceId,target='automatic_reset',
 function WechatReminderModal({onClose,data,codeAvailable}:{data:PublicData|null;dataError:string;onRetryData:()=>void;entry:WechatEntryState;codeAvailable:boolean;onRetryEntry:()=>void;onClose:()=>void}) {
   const dialog=useRef<HTMLDialogElement>(null);
   useEffect(() => dialog.current ? openPublicDialog(dialog.current) : undefined, []);
-  return <dialog className="pub-dialog" ref={dialog} onClose={onClose} onCancel={onClose}><div className="pub-dialog-heading"><h2>微信提醒</h2><button className="pub-icon-button" aria-label="关闭窗口" onClick={onClose}><Icon name="close"/></button></div><div className="pub-dialog-body"><p>在小程序的提醒页开启，每次成功授权增加一次提醒机会。</p><p>可分别选择重置预告、重置完成提醒和重要更正。每成功发送一条使用一次，也可以随时关闭。</p><WechatEntryGuide publicationId={data?.publications.find(p=>!publicationWithdrawn(data,p))?.id} codeAvailable={codeAvailable}/><TextLink href="/notices">查看全部站内提醒</TextLink><button className="pub-button full" onClick={onClose}>知道了</button></div></dialog>;
+  return <dialog className="pub-dialog" ref={dialog} onClose={onClose} onCancel={onClose}><div className="pub-dialog-heading"><h2>微信提醒</h2><button className="pub-icon-button" aria-label="关闭窗口" onClick={onClose}><Icon name="close"/></button></div><div className="pub-dialog-body"><p>在小程序的提醒页开启，每次成功授权增加一次提醒机会。</p><p>可分别选择重置预告、重置完成提醒和重要更正。每成功发送一条使用一次，也可以随时关闭。</p><WechatEntryGuide publicationId={data?.publications.find(p=>!publicationWithdrawn(data,p))?.id} codeAvailable={codeAvailable}/><TextLink href="/notices">查看全部站内信</TextLink><button className="pub-button full" onClick={onClose}>知道了</button></div></dialog>;
 }
 function ShareLinkModal({ url, onClose }: { url: string; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null), input = useRef<HTMLInputElement>(null);

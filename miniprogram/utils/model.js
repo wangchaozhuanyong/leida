@@ -235,7 +235,7 @@ function calendarModel(data, selected) {
 }
 /** @param {PublicData} data @param {typeof preferenceDefaults} preferences @param {string[]} read */
 function noticeModel(data, preferences, read) {
-  return data.notices.filter(notice => notice.status === 'active' && (notice.origin === 'admin' || notice.categories.some(category => ['announcement','result','correction'].includes(category)))).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).map(notice => ({ ...notice, summary:publicNoticeSummary(notice, data.publications), time: displayTime(notice.createdAt), read: read.includes(notice.id), path: data.publications.some(item => item.id === notice.publicationId) ? `/pages/detail/index?publicationId=${encodeURIComponent(notice.publicationId)}` : '', missing: notice.origin !== 'admin' && !data.publications.some(item => item.id === notice.publicationId) }));
+  return data.notices.filter(notice => notice.status === 'active' && notice.origin === 'admin').sort((a, b) => Number(b.pinned === true) - Number(a.pinned === true) || Date.parse(b.createdAt) - Date.parse(a.createdAt) || a.id.localeCompare(b.id)).map(notice => ({ ...notice, summary:publicNoticeSummary(notice, data.publications), time: displayTime(notice.createdAt), read: read.includes(notice.id), path: data.publications.some(item => item.id === notice.publicationId) ? `/pages/detail/index?publicationId=${encodeURIComponent(notice.publicationId)}` : '', missing: notice.origin !== 'admin' && !data.publications.some(item => item.id === notice.publicationId) }));
 }
 /** Public reading copy; ingestion metadata remains unchanged in the stored article. */
 function publicArticleSummary(article) {

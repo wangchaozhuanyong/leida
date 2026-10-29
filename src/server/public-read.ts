@@ -1,3 +1,4 @@
+import { customerNotice } from '../lib/notice-display';
 import { transaction, type Client } from '../db';
 import type { Activity, Article, Evidence, PublicData, Publication, RadarEvent, Source } from '../lib/types';
 import type { PublicReadEnvelope, PublicReadOptions, PublicView } from '../lib/public-read';
@@ -188,7 +189,7 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
       if(activity)for(const fact of resetFacts){const value=activityDayNumber(activity,fact.at);if(value!==undefined&&value>=1&&value<=activity.days)selected.add(fact.id);}
       if(options.publications?.length){const fixed=await client.query("SELECT id FROM radar_publications WHERE id=ANY($1::text[]) AND payload->>'articleId'=ANY($2::text[])",[options.publications,dayItems.map(item=>item.articleId)]);fixed.rows.forEach(row=>selected.add(row.id));}
     } else if (options.view === 'notices') {
-      empty.notices = (await client.query('SELECT payload FROM radar_notices')).rows.map(row => row.payload);
+      empty.notices = (await client.query("SELECT payload FROM radar_notices WHERE payload->>'origin'='admin' AND payload->>'status'='active'")).rows.map(row => row.payload);
       empty.notices.forEach(notice => selected.add(notice.publicationId));
     } else if (options.view === 'detail') {
       if(options.entity==='events'||options.entity==='articles'){
@@ -233,5 +234,5 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
 export async function getPublicRead(options: PublicReadOptions): Promise<PublicReadEnvelope> {
   const result=await getStoredPublicRead(options);
   const now=new Date().toISOString();
-  return {...result,data:{...result.data,serverTime:now},version:resetWatchVersion(result.version,undefined,now),contentVersion:resetWatchVersion(result.contentVersion,undefined,now)};
+  return {...result,data:{...result.data,notices:result.data.notices.filter(customerNotice),serverTime:now},version:resetWatchVersion(result.version,undefined,now),contentVersion:resetWatchVersion(result.contentVersion,undefined,now)};
 }

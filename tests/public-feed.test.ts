@@ -96,7 +96,8 @@ test('系统站内信使用对应历史公告的客户摘要，人工站内信�
   assert.equal(native.publicNoticeSummary(notice,data.publications),'额度将重置。');
   assert.equal(publicNoticeSummary({...notice,origin:'admin'},data.publications),notice.summary);
   assert.equal(publicNoticeSummary(notice,[]),notice.summary);
-  data.notices=[notice];assert.equal(native.noticeModel(data,{},[])[0].summary,'额度将重置。');
+  data.notices=[notice];assert.deepEqual(native.noticeModel(data,{},[]),[]);
+  data.notices=[{...notice,origin:'admin'}];assert.equal(native.noticeModel(data,{},[])[0].summary,notice.summary);
 });
 
 test('活动摘要去掉归档处理说明，保留时间限定、适用范围和不确定性，两端一致且原文不变',()=>{
