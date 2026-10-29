@@ -1,5 +1,5 @@
 <page-meta root-background-color="#f2f5fb" page-style="background-color:#f2f5fb" />
-<navigation-header refresh-state="{{pullRefreshState}}" refreshing="{{refreshing}}" title="模钥重置雷达" brand="{{true}}" />
+<navigation-header pulling="{{pullRefreshing}}" title="模钥重置雷达" brand="{{true}}" />
 <view class="page home-page {{motionActive && connected && !error ? 'motion-live' : ''}}">
   <view class="home-heading">
     <view class="home-heading-title">Codex 重置，一目了然</view>

@@ -99,9 +99,10 @@ test('Every configured page retains a header outside its loading branch, with ba
   }
 });
 
-test('Every native pull-enabled page exposes pending and result feedback through its persistent header', () => {
+test('Native pull loading stays in the system background; navigation has no refresh text or spinner binding', () => {
   const root = new URL('../miniprogram/', import.meta.url);
   const app = JSON.parse(readFileSync(new URL('app.json', root), 'utf8'));
+  assert.equal(app.window.backgroundTextStyle, 'dark', 'native dots contrast with the silver background');
   const enabled = app.pages.filter((page: string) => {
     const settings = JSON.parse(readFileSync(new URL(`${page}.json`, root), 'utf8'));
     return settings.enablePullDownRefresh ?? app.window.enablePullDownRefresh;
@@ -110,7 +111,10 @@ test('Every native pull-enabled page exposes pending and result feedback through
   for (const page of enabled) {
     const markup = readFileSync(new URL(`${page}.wxml`, root), 'utf8');
     const header = markup.match(/<navigation-header\b[^>]+>/)?.[0] || '';
-    assert.match(header, /refresh-state="\{\{pullRefreshState\}\}"/, page);
-    assert.match(header, /refreshing="\{\{[^}]*refreshing/, page);
+    assert.doesNotMatch(header, /refresh-state=|refreshing=/, page);
+    assert.match(header, /pulling="\{\{pullRefreshing\}\}"/, page);
   }
+  const header = readFileSync(new URL('components/navigation-header/index.wxml', root), 'utf8');
+  assert.doesNotMatch(header, /正在更新|更新失败|已更新|feedback-spinner/);
+  assert.match(header, /wx:if="\{\{pulling\}\}" class="pull-refresh-dots"/);
 });
