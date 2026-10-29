@@ -2,7 +2,7 @@ const {preserveNativeReturn}=require('../../utils/entry-navigation');
 const { createPage } = require('../../utils/page');
 const { noticeModel } = require('../../utils/model');
 // Bundled client version; keep this aligned with the development-tool upload.
-const buildVersion = '1.0.67';
+const buildVersion = '1.0.68';
 Page(createPage((data, query, page, app) => {
   const stored=app.preferences.snapshot(),notices=data?noticeModel(data,stored.preferences,stored.read):[];
   return { notices:notices.slice(0,3),unread:notices.filter(n=>!n.read).length,storageError:stored.error };
@@ -24,7 +24,9 @@ Page(createPage((data, query, page, app) => {
       // then restores the last confirmed choice through an actual checked change.
       if(this.data.wechatAction==='preferences'&&state.busy&&this._wechatPendingPreferences)displayed.reminderPreferences=this._wechatPendingPreferences;
       const patch={};for(const key of Object.keys(displayed))if(JSON.stringify(this.data.wechat?.[key])!==JSON.stringify(displayed[key]))patch['wechat.'+key]=displayed[key];
-      this._wechatSettled=!state.busy&&!state.refreshing&&!!(state.safe||state.error||state.privacyNeeded);
+      // A confirmed balance is readable before the next authorization is prepared.
+      // Keep the existing busy guards on actions; never reveal an invented count.
+      this._wechatSettled=!!state.safe||!state.busy&&!state.refreshing&&!!(state.error||state.privacyNeeded);
       if(this.settingsCanReveal())patch.settingsReady=true;
       if(Object.keys(patch).length)this.setData(patch);
     });
