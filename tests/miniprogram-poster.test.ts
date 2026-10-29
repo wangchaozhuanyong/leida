@@ -174,3 +174,12 @@ test('导出失败与用户取消、相册拒绝、隐私未同意分别提示�
   const artifact=await p.renderPoster({wxApi:{canvasToTempFilePath(options:Record<string,any>){options.success({tempFilePath:'wxfile://fixture-poster.png'});}},canvas:canvas.canvas,data:data(),publicationId:'fixture-publication'});
   for(const [reason,message]of [['cancel','取消'],['auth deny','权限'],['privacy permission','隐私'],['internal-private-details','保存失败']])await assert.rejects(p.savePoster({saveImageToPhotosAlbum(options:Record<string,any>){options.fail({errMsg:reason});}},artifact,{userInitiated:true}),new RegExp(message));
 });
+
+
+test('圆码与海报缓存严格五分钟有效，时间回退和无时间戳不能复用',()=>{
+  const at=Date.parse('2026-10-29T08:00:00Z');
+  assert.equal(p.posterCacheFresh(at,at+299999),true);
+  assert.equal(p.posterCacheFresh(at,at+300000),false);
+  assert.equal(p.posterCacheFresh(at,at-1),false);
+  assert.equal(p.posterCacheFresh(undefined,at),false);
+});
