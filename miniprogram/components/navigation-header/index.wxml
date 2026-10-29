@@ -6,11 +6,9 @@
     <image wx:else class="navigation-symbol" src="/assets/icons/{{icon}}.png" mode="aspectFit" aria-hidden="true" />
     <view class="navigation-copy">
       <view class="navigation-title">{{title}}</view>
-      <view wx:if="{{refreshState || refreshing}}" class="navigation-feedback {{refreshState === 'error' ? 'is-error' : ''}}" role="status" aria-live="polite">
-        <view wx:if="{{refreshState === 'loading' || !refreshState && refreshing}}" class="feedback-spinner" aria-hidden="true" />
-        <text wx:else class="feedback-result" aria-hidden="true">{{refreshState === 'error' ? '!' : '✓'}}</text>
-        <text class="feedback-message">{{refreshState === 'error' ? '更新失败' : refreshState === 'success' ? '已更新' : '正在更新'}}</text>
-      </view>
     </view>
   </view>
+</view>
+<view wx:if="{{pulling}}" class="pull-refresh-dots" style="top:{{totalHeight + 16}}px" role="status" aria-label="正在刷新">
+  <view class="pull-dot" aria-hidden="true"/><view class="pull-dot pull-dot-second" aria-hidden="true"/><view class="pull-dot pull-dot-third" aria-hidden="true"/>
 </view>

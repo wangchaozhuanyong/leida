@@ -1,6 +1,6 @@
 {
   "name": "moyao-reset-radar",
-  "version": "1.0.65",
+  "version": "1.0.66",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@9.15.9",

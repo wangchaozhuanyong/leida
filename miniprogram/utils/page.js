@@ -7,6 +7,7 @@ function endPull(page, gesture = activePull) {
   if (!gesture || gesture.page !== page || activePull !== gesture) return;
   clearTimeout(gesture.timer);
   activePull = null;
+  if (page.data.pullRefreshing) page.setData({ pullRefreshing:false });
   try { if (typeof wx.stopPullDownRefresh === 'function') wx.stopPullDownRefresh({ fail() {} }); }
   catch (_) { /* Native feedback cannot block data or navigation. */ }
 }
@@ -18,13 +19,6 @@ function setWindowBackground() {
   } catch (_) { /* An unavailable appearance API must never block page data. */ }
 }
 function createPage(build, extra = {}) {
-  function clearPullFeedback(page) {
-    clearTimeout(page._pullFeedbackTimer);
-    page._pullFeedbackTimer = null;
-    page._pullFeedbackGeneration = (page._pullFeedbackGeneration || 0) + 1;
-    page._pullRefreshWork = null;
-    if (page.data.pullRefreshState) page.setData({ pullRefreshState:'' });
-  }
   function stopEntrance(page) {
     if(page._entranceTimer)clearTimeout(page._entranceTimer);
     page._entranceTimer=null;
@@ -103,44 +97,40 @@ function createPage(build, extra = {}) {
 
   }
   return {
-    data: { contentMotion:'', pullRefreshState:'', navigationLoading:true, loading: true, connected: false, unconfigured: false, error: '', cutoff: '暂无记录', ...(extra.data || {}) },
+    data: { contentMotion:'', pullRefreshing:false, navigationLoading:true, loading: true, connected: false, unconfigured: false, error: '', cutoff: '暂无记录', ...(extra.data || {}) },
     onLoad(params) { setWindowBackground(); this._params = params || {}; if (extra.load) extra.load.call(this, params || {}); },
     // Keep native appearance setup on initial load. Retained tabs only need to
     // resume their subscriptions; their background is also declared in page-meta.
     onShow() { if(enterPage(this,()=>this.onShow()))return;const app=getApp();this._visible=true;this._viewKey=JSON.stringify(this.readView());const work=app.client.setView&&app.client.setView(this.readView());this._unsubscribe = app.client.subscribe(state => render(this, state));if(extra.show)extra.show.call(this);foreground(this,work); },
     nativeReturnTouched(){getApp().entryNavigation?.touched();},
     onPageScroll(event) { if(this._viewKey){this._positions=this._positions||{};this._positions[this._viewKey]=event.scrollTop;} },
-    onHide() { endPull(this);clearPullFeedback(this);stopEntrance(this);suspendEntry(this);this._visible=false;this._renderGeneration=(this._renderGeneration||0)+1;this._navigationGeneration=(this._navigationGeneration||0)+1;if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.hide)extra.hide.call(this); },
-    onUnload() { endPull(this);clearPullFeedback(this);stopEntrance(this);suspendEntry(this,true);this._visible=false;this._navigationGeneration=(this._navigationGeneration||0)+1;if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.unload)extra.unload.call(this); },
+    onHide() { endPull(this);this._pullRefreshWork=null;stopEntrance(this);suspendEntry(this);this._visible=false;this._renderGeneration=(this._renderGeneration||0)+1;this._navigationGeneration=(this._navigationGeneration||0)+1;if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.hide)extra.hide.call(this); },
+    onUnload() { endPull(this);this._pullRefreshWork=null;stopEntrance(this);suspendEntry(this,true);this._visible=false;this._navigationGeneration=(this._navigationGeneration||0)+1;if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.unload)extra.unload.call(this); },
     onPullDownRefresh() {
       if (!this._visible) return Promise.resolve();
-      if (activePull) clearTimeout(activePull.timer);
-      const gesture = { page:this, timer:null };
+      if (activePull?.page === this) return activePull.work;
+      if (activePull) {
+        clearTimeout(activePull.timer);
+        if (activePull.page.data.pullRefreshing) activePull.page.setData({ pullRefreshing:false });
+      }
+      const gesture = { page:this, timer:null, work:null };
       activePull = gesture;
-      // Show feedback before releasing the native pull area. No artificial hold
-      // while the request runs, and a fallback if the render callback is delayed.
-      gesture.timer = setTimeout(() => endPull(this, gesture), 300);
-      this.setData({ pullRefreshState:'loading' }, () => endPull(this, gesture));
-      if (this._pullRefreshWork) return this._pullRefreshWork;
-      clearTimeout(this._pullFeedbackTimer);
-      const generation = this._pullFeedbackGeneration = (this._pullFeedbackGeneration || 0) + 1;
-      let failed = false, work;
-      try {
-        work = foreground(this, () => Promise.resolve(getApp().client.refresh(false)).catch(error => { failed = true; throw error; }));
-      } catch (_) { failed = true; }
+      this.setData({ pullRefreshing:true });
+      // Keep the native pull area until this refresh settles. The header's
+      // fixed title masks the native dots, so mirror dots only in that gap.
+      // Navigation and background refresh never enable this gesture flag.
+      // Independent of the request deadline: a stalled SDK cannot pin the page.
+      gesture.timer = setTimeout(() => endPull(this, gesture), 12000);
+      let work = this._pullRefreshWork;
+      if (!work) {
+        try { work = foreground(this, () => getApp().client.refresh(false)); }
+        catch (_) { work = Promise.resolve(); }
+      }
       const settled = Promise.resolve(work).finally(() => {
+        if (this._pullRefreshWork === settled) this._pullRefreshWork = null;
         endPull(this, gesture);
-        if (!this._visible || generation !== this._pullFeedbackGeneration) return;
-        this._pullRefreshWork = null;
-        const error = failed || !!getApp().client.getState().error;
-        this.setData({ pullRefreshState:error ? 'error' : 'success' });
-        this._pullFeedbackTimer = setTimeout(() => {
-          if (!this._visible || generation !== this._pullFeedbackGeneration) return;
-          this._pullFeedbackTimer = null;
-          this.setData({ pullRefreshState:'' });
-        }, error ? 3500 : 1400);
       });
-      this._pullRefreshWork = settled;
+      this._pullRefreshWork = gesture.work = settled;
       return settled;
     },
     readView() { return extra.view ? extra.view(this._params||{},this.data) : {view:'home'}; },

@@ -1,4 +1,4 @@
-<navigation-header refresh-state="{{pullRefreshState}}" refreshing="{{refreshing}}" icon="activity" title="活动动态" back="{{true}}" />
+<navigation-header pulling="{{pullRefreshing}}" icon="activity" title="活动动态" back="{{true}}" />
 <page-loader wx:if="{{navigationLoading}}" />
 <view wx:else class="page activity-page {{contentMotion}}" bindtouchstart="nativeReturnTouched">
   <status-panel wx:if="{{!connected}}" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />

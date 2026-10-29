@@ -1,4 +1,4 @@
-<navigation-header refresh-state="{{pullRefreshState}}" refreshing="{{refreshing}}" icon="document" title="公告详情" back="{{true}}" />
+<navigation-header pulling="{{pullRefreshing}}" icon="document" title="公告详情" back="{{true}}" />
 <page-loader wx:if="{{navigationLoading}}" variant="detail" />
 <view wx:else>
 <view class="page {{contentMotion}}" bindtouchstart="nativeReturnTouched">
