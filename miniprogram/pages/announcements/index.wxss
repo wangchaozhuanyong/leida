@@ -15,9 +15,8 @@
 .month-week text{height:26px;display:grid;place-items:center}
 .month-days{gap:2px 0}
 .month-days button[disabled]{color:#b2bed0;background:transparent;opacity:1}
-.month-days button.today:not(.selected){border-color:#d8e2f4;color:#45679b}
-.month-days button.selected{color:#fff;background:#2c5dcd;box-shadow:0 4px 11px #2758ce25;font-weight:700}
-.month-days .selected .record-dot{background:#fff}
+.month-days button.today:not(.selected) .day-number{border-color:#d8e2f4;color:#45679b}
+.month-days button.selected .day-number{color:#2458ce;background:#e8efff;border-color:#d8e4ff;font-weight:700}
 .record-detail{border-top:1px solid #e9eef5;background:#f8faff;padding:16px 16px 8px}
 .record-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
 .record-heading>text:first-child{margin:0;letter-spacing:-.2px;color:#20344f;font-size:17px;font-weight:600}
@@ -38,11 +37,13 @@
 .record-note-copy{margin:0 0 14px;line-height:1.8;font-size:12px}
 .month-select{font:inherit;letter-spacing:-.5px;min-height:44px;max-width:190px;border:0;background:transparent;color:#20344f;padding:0;cursor:pointer;font-size:22px;font-weight:600;line-height:30px;display:flex;align-items:center;font-size:22px;font-weight:600;line-height:30px}
 .month-controls button{width:44px;height:44px;border:0;border-radius:50%;background:#f2f6fc;color:#526e96;font:inherit;font-size:26px;cursor:pointer;margin:0;padding:0;line-height:44px}
-.month-days button{min-width:0;position:relative;border:1px solid transparent;border-radius:12px;background:transparent;color:#52647d;font:inherit;font-size:14px;cursor:pointer;font-variant-numeric:tabular-nums;height:52px;min-height:52px;line-height:1.5;width:100%;margin:0;padding:0;box-sizing:border-box;height:52px;min-height:52px;line-height:1.5}
+.month-days button{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;min-width:0;position:relative;border:0;border-radius:0;background:transparent;color:#52647d;font:inherit;font-size:14px;cursor:pointer;font-variant-numeric:tabular-nums;height:52px;min-height:52px;line-height:1.5;width:100%;margin:0;padding:3px 0;box-sizing:border-box}
+.day-number{display:flex;align-items:center;justify-content:center;width:32px;height:32px;box-sizing:border-box;border:1px solid transparent;border-radius:50%;line-height:30px}
+.month-days button.day-pressed .day-number{background:#eef3fb}
 .month-days .blank-day{height:52px}
 .records-page .record-kinds button{min-height:46px;position:relative;border-radius:0;font-size:12px;color:#4d607b;margin:0;padding:0;line-height:46px;border:0}
 .records-page .record-kinds button.active:after{content:"";position:absolute;bottom:-1px;left:16%;right:16%;height:2px;background:#2c5dcd;border-radius:2px;width:auto;transform:none;border:0;top:auto}
-.day-markers{position:absolute;bottom:4px;left:0;right:0;display:flex;justify-content:center;gap:3px;height:5px}
+.day-markers{display:flex;align-items:center;justify-content:center;gap:3px;height:6px;min-height:6px;margin-top:4px}
 .date-record{display:flex;align-items:center;gap:12px;text-decoration:none;padding:14px 0;color:#20344f;min-height:76px;margin:0;width:100%;line-height:1.5;border:0;border-radius:0;background:transparent;text-align:left;font-weight:400;box-sizing:border-box}
 .record-seal{display:grid;place-items:center;flex-shrink:0;width:34px;height:34px;border-radius:50%;background:#e9effc;color:#3765c3;font-size:16px;display:flex;align-items:center;justify-content:center}
 .record-copy{flex:1;min-width:0;display:block}
@@ -56,7 +57,6 @@
 
 .records-page .month-heading{margin-left:0;margin-right:0}
 .record-dot.observed{background:transparent;border:1px solid #b27820;box-sizing:border-box;width:6px;height:6px}
-.month-days .selected .record-dot.observed{background:transparent;border-color:#fff}
 .record-legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin:12px 0 0;line-height:1.6;font-size:11px;color:#4d607b}
 .record-legend>view{display:flex;align-items:center;gap:5px}
 .record-seal.observed{background:#fff3df;color:#a36c18}
@@ -66,8 +66,6 @@
 .record-source{margin-top:5px;line-height:1.6;overflow-wrap:anywhere;font-size:12px;color:#4d607b}
 .record-sources{padding:0 12px 8px 42px}.record-sources>.text-button{min-height:44px;font-size:11px;text-align:left}.record-source-link{display:block;width:100%;padding:10px 0;text-align:left;white-space:normal;line-height:1.6;font-size:11px;color:#49648b;background:transparent}.record-source-link::after{border:0}
 .month-count-note{line-height:1.8;margin:0 0 10px;overflow-wrap:anywhere;font-size:11px;color:#4d607b}
-.day-observation-count{border:1px solid #b27820;border-radius:5px;color:#946016;box-sizing:border-box;background:#fff8ec;text-align:center;margin-top:-3px;font-size:10px;line-height:14px;height:16px;min-width:16px}
-.selected .day-observation-count{color:#fff;border-color:rgba(255,255,255,.85);background:transparent}
 .recent-reset-sheet{background:#fff;border:1px solid #dce5f1;overflow:hidden;margin-top:24px;padding:16px 16px 4px;border-radius:16px}
 .recent-reset-heading{display:flex;align-items:baseline;justify-content:space-between;gap:8px;color:#20344f;font-weight:600;font-size:17px;line-height:24px}
 .recent-reset-count{font-weight:400;white-space:nowrap;font-size:11px;color:#4d607b}
