@@ -8,11 +8,11 @@ import {createAdminNotice} from '../src/lib/admin-notice';
 const require=createRequire(import.meta.url),mini=require('../miniprogram/utils/model.js');
 const actual='2026-10-29T06:00:00Z';
 const entries=JSON.parse(readFileSync(new URL('../scripts/inbox-announcements-20261029.json',import.meta.url),'utf8'));
-test('三篇公告的内容、历史日期和默认置顶经正常发布校验；实际时间不倒填',()=>{
+test('三篇公告的内容、历史日期和均不置顶且经过正常发布校验；实际时间不倒填',()=>{
   assert.equal(entries.length,3);assert.equal(new Set(entries.map((n:any)=>n.requestId)).size,3);
   const rows:Notice[]=entries.map((n:any)=>createAdminNotice(n,n.requestId,actual));
   assert.deepEqual(rows.map(n=>n.createdAt),['2026-07-29T02:00:00.000Z','2026-08-29T02:00:00.000Z','2026-10-19T02:00:00.000Z']);
-  assert.equal(rows.filter(n=>n.pinned).length,1);assert.match(rows[1].body!,/每次成功授权增加一次/);
+  assert.equal(rows.filter(n=>n.pinned).length,0);assert.match(rows[1].body!,/每次成功授权增加一次/);
   assert.ok(rows.every(n=>n.origin==='admin'&&!n.eventId&&!n.publicationId&&n.body));
   assert.throws(()=>createAdminNotice({...entries[0],pinned:'true'},'bad',actual));
   assert.throws(()=>createAdminNotice({...entries[0],createdAt:'2026-10-30T10:00:00+08:00'},'bad',actual));
@@ -22,7 +22,7 @@ test('网页与小程序只展示手动公告，置顶、日期排序及稳定�
   manual[0].pinned=true;
   const automatic={...manual[0],id:'automatic',origin:undefined,categories:['result' as const]},withdrawn={...manual[0],id:'withdrawn',status:'withdrawn' as const};
   const notices=[manual[1],automatic,manual[0],withdrawn,manual[2]],before=structuredClone(notices);
-  const expected=[manual[2].id,manual[0].id,manual[1].id];
+  const expected=[manual[0].id,manual[2].id,manual[1].id];
   assert.deepEqual(notices.filter(customerNotice).sort(compareNotices).map(n=>n.id),expected);
   assert.deepEqual(mini.noticeModel({notices,publications:[]},{},[]).map((n:Notice)=>n.id),expected);
   assert.deepEqual(notices,before);

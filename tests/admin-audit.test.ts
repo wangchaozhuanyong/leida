@@ -238,7 +238,7 @@ test('三篇指定公告经现有发布命令写入，重复执行无重复消�
   const entries=JSON.parse(readFileSync(new URL('../scripts/inbox-announcements-20261029.json',import.meta.url),'utf8'));
   for(let attempt=0;attempt<2;attempt++)for(const entry of entries)await executeCommand('notice.publish',entry,actor);
   assert.equal(table('notices').length,3);assert.equal((await audits()).filter(a=>a.action==='notice.publish').length,3);
-  const messages=table('notices');assert.equal(messages.filter(n=>n.pinned).length,1);
+  const messages=table('notices');assert.equal(messages.filter(n=>n.pinned).length,0);
   assert.ok(messages.every(n=>n.origin==='admin'&&n.status==='active'&&!n.eventId&&!n.publicationId));
   assert.deepEqual(messages.map(n=>n.createdAt),['2026-07-29T02:00:00.000Z','2026-08-29T02:00:00.000Z','2026-10-19T02:00:00.000Z']);
   for(const audit of await audits())assert.ok(Date.parse(audit.createdAt)>Date.parse('2026-10-19T02:00:00Z'));

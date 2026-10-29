@@ -289,7 +289,7 @@ test('已有次数直接展示；短时间切回提醒页复用准备，不重�
   } finally {page.onUnload();}
 });
 
-test('慢速首次读取等次数和按钮就绪后整体展示，中途切回仍保持加载',async()=>{
+test('慢速首次读取在真实次数可用时展示整卡，授权准备只阻止操作',async()=>{
   const h=mock({state:'available',sessionMs:600000,challengeMs:300000}),request=h.wx.request;
   const held:Options[]=[];
   h.wx.request=(options:Options)=>{
@@ -301,9 +301,11 @@ test('慢速首次读取等次数和按钮就绪后整体展示，中途切回�
     await flush();assert.equal(held.length,1);assert.equal(page.data.wechat.safe,null);assert.equal(page.data.wechat.remainingCount,null);assert.equal(page.data.settingsReady,false);
     request(held.shift()!);await flush();
     assert.equal(held.length,1);assert.match(held[0].url,/challenge$/);
-    assert.equal(page.data.wechat.remainingCount,1);assert.equal(page.data.wechat.busy,true);assert.equal(page.data.settingsReady,false,'次数已存入但预备按钮尚未完成，提醒区域仍整体加载，站内信不被遮挡');
+    assert.equal(page.data.wechat.remainingCount,1);assert.equal(page.data.wechat.busy,true);assert.equal(page.data.settingsReady,true,'真实次数已返回，授权准备不再阻止整卡展示');
+    assert.equal(page.data.wechat.ready,false);
+    page.addWechat();await page.revokeWechat(true);assert.equal(h.subscribe,0);assert.equal(h.requests.some(r=>r.method==='DELETE'),false,'准备时不会新增授权或关闭提醒');
     page.onHide();page.onShow();
-    assert.equal(page.data.wechat.remainingCount,1,'保留已确认次数');assert.equal(page.data.settingsReady,false);
+    assert.equal(page.data.wechat.remainingCount,1,'保留已确认次数');assert.equal(page.data.settingsReady,true);
     await flush();assert.equal(held.length,1,'预备未结束时不重复请求');
     request(held.shift()!);await flush();assert.equal(page.data.wechat.ready,true);assert.equal(page.data.settingsReady,true);assert.equal(h.subscribe,0);
   }finally{held.splice(0).forEach(request);await flush();page.onUnload();}
@@ -600,4 +602,32 @@ test('取消关闭确认不撤销次数；确认文案写明作废次数和保�
  const h=mock({state:'available',sessionMs:600000,challengeMs:300000});let content='';
  const page=pageHarness(h.reader,{}, {showModal(options:Options){content=options.content;options.success({confirm:false,cancel:true});}}).page('settings');
  try{await flush();const before=h.requests.length;await page.revokeWechat();assert.equal(h.requests.length,before);assert.equal(page.data.wechat.remainingCount,1);assert.match(content,/剩余 1 次提醒授权将作废/);assert.match(content,/次数会保留/);assert.equal(page.data.wechatAction,'');}finally{page.onUnload();}
+});
+
+
+test('授权准备失败仍保留整卡与真实次数，可重试且不擅自授权',async()=>{
+  const h=mock({state:'available',sessionMs:600000,challengeMs:300000}),request=h.wx.request;
+  let held:Options|undefined;
+  h.wx.request=(options:Options)=>{if(options.url.endsWith('/challenge')){held=options;return{abort(){}};}return request(options);};
+  const page=pageHarness(h.reader).page('settings');
+  try{
+    await flush();assert.ok(held);assert.equal(page.data.settingsReady,true);assert.equal(page.data.wechat.remainingCount,1);
+    held!.success({statusCode:503,data:{error:'暂时无法准备提醒，请重试。'}});await flush();
+    assert.equal(page.data.settingsReady,true);assert.equal(page.data.wechat.remainingCount,1);assert.equal(page.data.wechat.busy,false);
+    assert.match(page.data.wechat.error,/重试/);assert.equal(h.subscribe,0);
+    page.onHide();assert.equal(page._wechatRefreshTimer,null);
+  }finally{page.onUnload();}
+});
+
+test('提醒页公告预览最多三条，先置顶再日期倒序，未读统计仍覆盖全部',async()=>{
+  const h=mock({state:'available',sessionMs:600000,challengeMs:300000}),ui=pageHarness(h.reader),page=ui.page('settings');
+  try{
+    await flush();
+    const notices=Array.from({length:5},(_,i)=>({id:'notice-'+i,title:'公告'+i,body:'公开公告正文',summary:'公开公告摘要',origin:'admin',status:'active',pinned:i===0,createdAt:new Date(Date.parse('2026-10-20T00:00:00Z')+i*86400000).toISOString(),categories:['system'],eventId:'',publicationId:''}));
+    ui.feed({data:{...ui.data,notices}});
+    assert.deepEqual(Array.from(page.data.notices,(n:Options)=>n.id),['notice-0','notice-4','notice-3']);
+    assert.equal(page.data.unread,5);
+    notices[0].pinned=false;ui.feed({data:{...ui.data,notices:[...notices]}});
+    assert.deepEqual(Array.from(page.data.notices,(n:Options)=>n.id),['notice-4','notice-3','notice-2']);
+  }finally{page.onUnload();}
 });
