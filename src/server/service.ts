@@ -4,6 +4,7 @@ import { lockTransaction, repeatableRead } from '../db';
 import { z } from 'zod';
 import { list, one, insert, put, transaction, type Client } from '../db';
 import type { AdminData, PublicData, Candidate, Evidence, RadarEvent, Article, Publication, Source, Job, Audit, Notice, Activity, DraftContent, SiteSettings } from '../lib/types';
+import { customerNotice } from '../lib/notice-display';
 import { createAdminNotice } from '../lib/admin-notice';
 import { DomainError, id, hash, now, assertVersion, draftSchema, validateDraft, mergeActions, noticeKey, safeTemplate, requireReason } from './domain';
 import { defaultAI, publicAI, encryptKey, validateEndpoint, testAI, AIServiceError, type AIRecord } from './ai';
@@ -44,7 +45,7 @@ export async function getAdminData():Promise<AdminData> { const [sources,candida
 async function getStoredPublicData():Promise<PublicData> { const rpc=configuredPublicRpc();if(rpc)return (await import('./cloudbase/public-read')).createCloudbasePublicReader(rpc).legacy();return transaction(async c=> { await repeatableRead(c); const [events,articles,publications,evidence,notices,activities,site,sources]=await Promise.all([list<RadarEvent>('events',c),list<Article>('articles',c),list<Publication>('publications',c),list<Evidence>('evidence',c),list<Notice>('notices',c),list<Activity>('activities',c),one<SiteSettings>('settings','site',c),list<Source>('sources',c)]); const publicEvidence=new Set(publications.flatMap(p=>p.article.evidenceIds)); const data=projectPublicHistory({events,articles,publications,evidence:evidence.filter(e=>publicEvidence.has(e.id)),notices,activities,site:site??defaultSite,sources:sources.map(currentSource).map(({id,name,status,lastSuccessAt})=>({id,name,status,lastSuccessAt})),serverTime:now()}); return {...data,forecasts:await getPublicForecast(c,data.serverTime,data)}; }); }
 export async function getPublicData():Promise<PublicData> {
  const data=await getStoredPublicData();
- return {...data,serverTime:new Date().toISOString()};
+ return {...data,notices:data.notices.filter(customerNotice),serverTime:new Date().toISOString()};
 }
 function actionContent(actions:RadarEvent['actions']):{title:string;summary:string;translation:string} { const stage={promised:'已有发放安排',in_progress:'正在进行',claimed_complete:'公告称已完成',cancelled:'已取消'};const names={automatic_reset:'用量重置',banked_reset:'重置卡'};const title=actions.length===1?`${names[actions[0].kind]}：${stage[actions[0].stage]}`:'用量重置与重置卡进展';return {title,summary:actions.map(a=>`${names[a.kind]}${stage[a.stage]}，适用对象：${a.eligibility}。`).join(''),translation:''}; }
 interface PublishOptions { actor:string; reason:string; existingArticle?:Article; correction?:boolean; suppressNotice?:boolean; withdrawn?:boolean; automatic?:boolean; eventTitle?:string; }
@@ -282,8 +283,8 @@ export async function previewCandidate(candidateId:string,version:number):Promis
   const observationKey=observation?hash(`reset-observation:${observation.kind}:${observation.observedAt}`):undefined;
   const observationChange=observationKey&&!await one<Notice>('notices',`notice_${observationKey}`,c);
   const materialChange=!!noticeKey(proposed,existing)||!!content.activityId&&!previousArticle||!!observationChange;const canPublish=reasons.length===0,willNotify=canPublish&&!historical&&materialChange;
-  const noticeReason=!canPublish?'内容未通过校验，不会发布提醒':historical?'首次发布历史资料，不生成实时提醒':!materialChange?'没有新的公开动作、有效观测或活动条目，不重复提醒':observationChange?'发布包含新的有效重置观测，将生成一条结果提醒':'发布包含新的公开动作变化或活动条目，将生成一条站内提醒';
-  return {canPublish,reasons:[...new Set(reasons)],changes,pages:canPublish?['首页','公告列表','事件详情','日程','分享海报',...(content.activityId?['活动页']:[]),...(willNotify?['站内提醒']:[])]:[],willNotify,noticeReason,expectedEventVersion:existing?.version};
+  const noticeReason=!canPublish?'内容未通过校验，不会发布提醒':historical?'首次发布历史资料，不生成实时提醒':!materialChange?'没有新的公开动作、有效观测或活动条目，不重复提醒':observationChange?'发布包含新的有效重置观测，将生成一条结果提醒':'发布包含新的公开动作变化或活动条目，将生成一条微信提醒记录';
+  return {canPublish,reasons:[...new Set(reasons)],changes,pages:canPublish?['首页','公告列表','事件详情','日程','分享海报',...(content.activityId?['活动页']:[]),...(willNotify?['微信提醒']:[])]:[],willNotify,noticeReason,expectedEventVersion:existing?.version};
 });}
 export async function publishCandidate(candidateId:string,version:number,actor:string,reason:string,automatic=false,expectedEventVersion?:number,requireEventVersion=false):Promise<Publication> {
   return transaction(async c=>{
@@ -404,12 +405,23 @@ export async function executeCommand(action:string,input:Record<string,unknown>,
       const notice=createAdminNotice(input,noticeId,now());
       const existing=requestId?await one<Notice>('notices',noticeId,c):undefined;
       if(existing){
-        if(existing.origin!=='admin'||existing.title!==notice.title||existing.body!==notice.body||input.createdAt!==undefined&&existing.createdAt!==notice.createdAt)throw new DomainError('这次发布内容已变化，请重新打开编辑后发布',409);
+        if(existing.origin!=='admin'||existing.title!==notice.title||existing.body!==notice.body||input.createdAt!==undefined&&existing.createdAt!==notice.createdAt||input.pinned!==undefined&&!!existing.pinned!==notice.pinned)throw new DomainError('这次发布内容已变化，请重新打开编辑后发布',409);
         return existing;
       }
       await insert('notices',notice,c);
       await audit(actor,action,notice.id,'发布站内信',undefined,notice,c);
       return notice;
+    }
+    if(action==='notice.pin') {
+      const {id:noticeId,pinned,expectedPinned}=z.object({id:z.string().min(1).max(180),pinned:z.boolean(),expectedPinned:z.boolean()}).parse(input);
+      const notice=await one<Notice>('notices',noticeId,c);
+      if(!notice||notice.origin!=='admin'||notice.status!=='active')throw new DomainError('仅可置顶已发布的手动站内信',404);
+      if(!!notice.pinned===pinned)return notice;
+      if(!!notice.pinned!==expectedPinned)throw new DomainError('置顶状态已变化，请刷新后重试',409);
+      const next={...notice,pinned};
+      await put('notices',next,c);
+      await audit(actor,action,notice.id,pinned?'置顶站内信':'取消站内信置顶',notice,next,c);
+      return next;
     }
     if(action==='notice.withdraw') {
       const notice=await one<Notice>('notices',str(input.id),c);

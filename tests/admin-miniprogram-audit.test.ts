@@ -124,6 +124,6 @@ test('小程序客户设置优先显示站内信，隐私未同意不登录，�
   } finally { page.onUnload(); }
   assert.equal(page._wechatUnsubscribe, null); assert.equal(page._wechatRefreshTimer, null);
   const template = readFileSync(resolve(root, 'miniprogram/pages/settings/index.wxml'), 'utf8');
-  assert.doesNotMatch(template, /wx:for="{{sources}}"|item\.name|item\.status|最近采集/); assert.match(template, /站内信/); assert.match(template, /查看全部提醒/); assert.doesNotMatch(template,/重新读取资料|资料截至|刷新授权状态|活动进展/);
+  assert.doesNotMatch(template, /wx:for="{{sources}}"|item\.name|item\.status|最近采集/); assert.match(template, /站内信/); assert.match(template, /查看全部站内信/); assert.doesNotMatch(template,/重新读取资料|资料截至|刷新授权状态|活动进展/);
   assert.match(template, /open-type="agreePrivacyAuthorization"/); assert.match(template, /bindtap="openPrivacyContract"/);
 });

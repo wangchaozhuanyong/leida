@@ -13,3 +13,5 @@
 
 .support-icon image{width:28px;height:28px}
 .reminder-skeleton-count,.reminder-skeleton-line,.reminder-skeleton-button{animation:reminder-breathe 1.8s ease-in-out infinite}@keyframes reminder-breathe{0%,100%{opacity:.55}50%{opacity:1}}@media(prefers-reduced-motion:reduce){.reminder-skeleton-count,.reminder-skeleton-line,.reminder-skeleton-button{animation:none}}
+
+.inbox-pin{color:#2458ce;font-size:12px;font-weight:600}
