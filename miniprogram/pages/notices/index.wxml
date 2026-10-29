@@ -1,4 +1,4 @@
-<navigation-header icon="inbox" title="站内提醒" back="{{true}}" />
+<navigation-header refresh-state="{{pullRefreshState}}" refreshing="{{refreshing}}" icon="inbox" title="站内提醒" back="{{true}}" />
 <page-loader wx:if="{{navigationLoading}}" />
 <view wx:else>
 <view class="page {{contentMotion}}">

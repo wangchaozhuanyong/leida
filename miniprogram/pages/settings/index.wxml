@@ -1,6 +1,5 @@
 <page-meta root-background-color="#f2f5fb" page-style="background-color:#f2f5fb" />
-<navigation-header icon="reminder" title="提醒" />
-<view class="refresh-track {{settingsReady && (refreshing || wechat.refreshing) ? 'is-active' : ''}}"><view/></view>
+<navigation-header refresh-state="{{pullRefreshState}}" refreshing="{{settingsReady && (refreshing || wechat.refreshing)}}" icon="reminder" title="提醒" />
 <view class="page {{contentMotion}}" bindtouchstart="nativeReturnTouched">
   <view wx:if="{{storageError}}" class="warning">{{storageError}}</view>
   <view wx:if="{{snapshotPending && connected && !error}}" class="cached-content-note" role="status">正在更新上次内容</view>
