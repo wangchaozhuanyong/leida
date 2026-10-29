@@ -15,7 +15,7 @@ Page(createPage((data, query, page) => data && !page.sceneLoading && !page.scene
   data: { detail: null,sceneLoading:false,sceneError:'',sceneCanRetry:false,posterBusy:false,posterSaving:false,posterError:'',posterPreview:'',posterReady:false,posterPrivacyNeeded:false,bodyOpen:false,evidenceOpen:false,progressOpen:false,posterTheme:'precision' },
   load(query){this._wantPoster=query.poster==='1';if(query.scene){this._params={};try{const scene=decodeURIComponent(query.scene).toLowerCase();if(!/^[a-f0-9]{32}$/.test(scene))throw new Error();this._scene=scene;this.setData({sceneLoading:true,sceneCanRetry:true});}catch(_){this.setData({sceneError:'这个小程序码无效，请返回查看最新消息。'});}}
     else if(!query.publicationId)this.setData({sceneError:'消息链接不完整，请返回查看最新消息。'});},
-  show(){this._active=true;this.setData({posterBusy:false});if(this._scene&&!this._sceneResolved)void this.resolveScene();this.maybeGeneratePoster();},hide(){stopPage(this);},unload(){stopPage(this);this.clearPosters();this._codeData=null;},
+  show(){this._active=true;this.setData({posterBusy:false});if(this._scene&&!this._sceneResolved)void this.resolveScene();if(this.invalidateExpiredPoster())this._wantPoster=true;this.maybeGeneratePoster();},hide(){stopPage(this);},unload(){stopPage(this);this.clearPosters();this._codeData=null;},
   afterRender() {
     const canShare = this.data.detail && this.data.detail.canShare;
     if (canShare && typeof wx.showShareMenu === 'function') wx.showShareMenu({ menus: ['shareAppMessage'] });
@@ -24,6 +24,11 @@ Page(createPage((data, query, page) => data && !page.sceneLoading && !page.scene
     this.maybeGeneratePoster();
   },
   methods: {
+    invalidateExpiredPoster(){
+      if(!this._codeData||poster.posterCacheFresh(this._codeAt))return false;
+      this.clearPosters();this._codeData=null;this._codeAt=undefined;
+      this.setData({posterPreview:'',posterReady:false});return true;
+    },
     clearPosters(){
       for(const artifact of Object.values(this._posterCache||{}))if(typeof wx.getFileSystemManager==='function')wx.getFileSystemManager().unlink({filePath:artifact.tempFilePath,success(){},fail(){}});
       this._posterCache={};this._posterArtifact=null;
@@ -47,12 +52,13 @@ Page(createPage((data, query, page) => data && !page.sceneLoading && !page.scene
     retryScene(){if(this._scene)void this.resolveScene();},
     async generatePoster(){
       if(this.data.posterBusy||this.data.posterSaving||!this.data.detail||!this.data.detail.canShare)return;
+      this.invalidateExpiredPoster();
       const id=this.data.detail.publicationId,generation=(this._posterGeneration||0)+1;this._posterGeneration=generation;let asset;
       this._posterCache=this._posterCache||{};const theme=this.data.posterTheme,cached=this._posterCache[theme];
       if(cached){this._posterArtifact=cached;this.setData({posterPreview:cached.tempFilePath,posterReady:true,posterError:'',posterBusy:false});return;}
       this._posterArtifact=null;this.setData({posterBusy:true,posterReady:false,posterError:'',posterPrivacyNeeded:false});
       this._posterTimeout=setTimeout(()=>{if(this._active&&generation===this._posterGeneration){this._posterGeneration++;if(this._codeRequest)this._codeRequest.abort();this.setData({posterBusy:false,posterError:'海报生成超时，请重试。'});}},20000);
-      try{if(!this._codeData){this._codeRequest=getApp().publicApi(`/api/v1/wechat/code/${encodeURIComponent(id)}`);const response=await this._codeRequest.promise;if(!this._active||generation!==this._posterGeneration)return;this._codeData=response.data;}
+      try{if(!this._codeData){this._codeRequest=getApp().publicApi(`/api/v1/wechat/code/${encodeURIComponent(id)}`);const response=await this._codeRequest.promise;if(!this._active||generation!==this._posterGeneration)return;this._codeData=response.data;this._codeAt=Date.now();}
         if(!this._active||generation!==this._posterGeneration)return;
         asset=await poster.writeCodeAsset(wx,this._codeData,id);const canvas=await canvasNode(this);
         if(!this._active||generation!==this._posterGeneration)return;
@@ -67,9 +73,11 @@ Page(createPage((data, query, page) => data && !page.sceneLoading && !page.scene
     previewPoster(){if(this.data.posterPreview&&typeof wx.previewImage==='function'){const guard=preserveNativeReturn();try{wx.previewImage({urls:[this.data.posterPreview],current:this.data.posterPreview,fail:()=>guard.cancel()});}catch(_){guard.cancel();}}},
     async savePoster(){
       if(this._savingPoster||this.data.posterBusy)return;
+      if(this.invalidateExpiredPoster()){const work=this.generatePoster(),generation=this._posterGeneration;await work;if(this._active&&generation===this._posterGeneration)this.setData({posterError:this.data.posterError||'海报已更新，请确认后再次保存。'});return;}
       if(!this._posterArtifact||!m.resolveDetail(getApp().client.getState().data,{publicationId:this._posterArtifact.publicationId}).canShare){this.setData({posterError:'请先生成仍可公开分享的海报。'});return;}
       this._savingPoster=true;this.setData({posterSaving:true});
       try{if(await privacyRequired(wx)){this.setData({posterPrivacyNeeded:true,posterError:'请先阅读并同意隐私指引。'});return;}
+        if(this.invalidateExpiredPoster()){this.setData({posterError:'海报已过期，请重新生成后保存。'});return;}
         const guard=preserveNativeReturn();try{await poster.savePoster(wx,this._posterArtifact,{userInitiated:true});}finally{guard.finish();}this.setData({posterPrivacyNeeded:false,posterError:''});wx.showToast({title:'已保存到相册',icon:'success'});}
       catch(error){this.setData({posterError:error.message||'保存失败，请重试。'});}
       finally{this._savingPoster=false;this.setData({posterSaving:false});}

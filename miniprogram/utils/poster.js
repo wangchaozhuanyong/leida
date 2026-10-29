@@ -2,6 +2,9 @@ const m = require('./model');
 /** @typedef {import('../../src/lib/types').PublicData} PublicData */
 /** @typedef {{status:'ready'|'not_configured'|'unavailable',publicationId?:string,filePath?:string}} CodeAsset */
 const exported = new WeakSet();
+// QR data and every image drawn from it share the original fetch deadline.
+// Rendering another theme must not extend the lifetime of an old QR response.
+function posterCacheFresh(at,now=Date.now()){return Number.isFinite(at)&&now>=at&&now-at<300000;}
 class PosterError extends Error {
   constructor(code, message) { super(message); this.name = 'PosterError'; this.code = code; }
 }
@@ -205,4 +208,4 @@ function writeCodeAsset(wxApi,value,publicationId){
 let assetCounter=0;
 // Official APIs: canvasToTempFilePath, Canvas.createImage, Canvas.requestAnimationFrame,
 // saveImageToPhotosAlbum. Real native compile/image export/permissions remain unverified.
-module.exports={PosterError,wrapText,posterInput,createPosterLayout,loadCanvasImage,renderPoster,exportCanvas,savePoster,writeCodeAsset};
+module.exports={PosterError,posterCacheFresh,wrapText,posterInput,createPosterLayout,loadCanvasImage,renderPoster,exportCanvas,savePoster,writeCodeAsset};
