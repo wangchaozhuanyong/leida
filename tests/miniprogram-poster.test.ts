@@ -40,12 +40,13 @@ test('海报由指定快照生成：事件版本、截止时间和当时预告�
   assert.equal(p.posterInput(original,'fixture-publication').version,2);
 });
 
-test('撤回、合并、缺失以及错版本真码阻止海报；无配置不画装饰码',()=>{
+test('撤回、合并及缺失阻止海报；公告长图始终不带扫码区域',()=>{
   for(const kind of ['withdrawn','merged','missing']){const original=data();if(kind==='withdrawn')original.articles[0].status='withdrawn';if(kind==='merged')original.events[0].status='merged';if(kind==='missing')original.events=[];assert.throws(()=>p.posterInput(original,'fixture-publication'),(error:unknown)=>error instanceof Error && (error as Error & {code:string}).code===kind);}
   const input=p.posterInput(data(),'fixture-publication'),layout=p.createPosterLayout(input,measure);
   assert.equal(layout.codeRect,undefined);assert.equal(layout.commands.some((item:{type:string})=>item.type==='image'),false);
-  assert.ok(layout.commands.some((item:{text?:string})=>item.text==='本张海报未附小程序码'));
-  assert.throws(()=>p.createPosterLayout(input,measure,{status:'ready',publicationId:'other-version',filePath:'fixture-file'}),/不一致/);
+  assert.equal(layout.codeStatus,'omitted');
+  assert.equal(layout.commands.some((item:{text?:string})=>/扫码|二维码|小程序码/.test(item.text||'')),false);
+  assert.deepEqual(p.createPosterLayout(input,measure,{status:'ready',publicationId:'other-version',filePath:'fixture-file'}),layout);
 });
 
 test('长中文摘要全部进入布局，过长明确报错，不静默删去福利事实',()=>{
@@ -61,34 +62,30 @@ test('原生Canvas画完并等待重绘后导出PNG；默认不保存相册，�
   const canvas=canvasMock(),calls:unknown[]=[];let saves=0;
   const wx={canvasToTempFilePath(options:Record<string,any>,page:unknown){calls.push({options,page});assert.equal(canvas.calls.at(-1)?.type,'frame');options.success({tempFilePath:'wxfile://fixture-poster.png'});},saveImageToPhotosAlbum(options:Record<string,any>){saves++;assert.equal(options.filePath,'wxfile://fixture-poster.png');options.success();}};
   const artifact=await p.renderPoster({wxApi:wx,canvas:canvas.canvas,data:data(),publicationId:'fixture-publication',page:'fixture-page'});
-  assert.equal(artifact.publicationId,'fixture-publication');assert.equal(artifact.codeStatus,'not_configured');assert.equal(saves,0);
+  assert.equal(artifact.publicationId,'fixture-publication');assert.equal(artifact.codeStatus,'omitted');assert.equal(saves,0);
   const exported=calls[0] as {options:Record<string,unknown>;page:string};assert.equal(exported.options.canvas,canvas.canvas);assert.equal(exported.options.fileType,'png');assert.equal(exported.page,'fixture-page');
   await assert.rejects(p.savePoster(wx,artifact),/点击/);assert.equal(saves,0);
   await p.savePoster(wx,artifact,{userInitiated:true});assert.equal(saves,1);
   await assert.rejects(p.savePoster(wx,{tempFilePath:'https://example.org/image.png'},{userInitiated:true}),/先生成/);
 });
 
-test('完整真码置于圆形白底内，保留所有像素，不裁剪或生成替代图案',async()=>{
+test('公告导出不读取圆码图片；已有圆码参数也不会出现在长图中',async()=>{
   const canvas=canvasMock();const wx={canvasToTempFilePath(options:Record<string,any>){options.success({tempFilePath:'wxfile://fixture-poster.png'});}};
   const artifact=await p.renderPoster({wxApi:wx,canvas:canvas.canvas,data:data(),publicationId:'fixture-publication',code:{status:'ready',publicationId:'fixture-publication',filePath:'wxfile://fixture-server-code.png'}});
-  assert.equal(artifact.codeStatus,'ready');assert.equal(canvas.calls.filter(item=>item.type==='image').length,1);
-  assert.equal(canvas.calls.find(item=>item.type==='load')?.value,'wxfile://fixture-server-code.png');
-  const circle=canvas.calls.find(item=>item.type==='circle') as {x:number;y:number;r:number};
-  const image=canvas.calls.find(item=>item.type==='image') as {x:number;y:number;width:number;height:number};
-  for(const x of [image.x,image.x+image.width])for(const y of [image.y,image.y+image.height])assert.ok(Math.hypot(x-circle.x,y-circle.y)<circle.r);
-  const layout=p.createPosterLayout(p.posterInput(data(),'fixture-publication'),measure,{status:'ready',publicationId:'fixture-publication',filePath:'wxfile://fixture-server-code.png'});
-  const caption=layout.commands.find((item:{text?:string})=>item.text==='扫码查看这条消息');assert.ok(caption.y>circle.y+circle.r);
+  assert.equal(artifact.codeStatus,'omitted');
+  assert.equal(canvas.calls.some(item=>['image','load','circle'].includes(String(item.type))),false);
+  assert.equal(canvas.calls.some(item=>/扫码|二维码|小程序码/.test(String(item.text||''))),false);
 });
 
-test('海报黑金与水墨切换只改样式，指定版本、完整事实及真码位置保持一致',()=>{
+test('海报黑金与暖白切换只改样式，指定版本及完整事实保持一致',()=>{
   const input=p.posterInput(data(),'fixture-publication'),code={status:'ready',publicationId:'fixture-publication',filePath:'wxfile://fixture-server-code.png'};
   const dark=p.createPosterLayout(input,measure,code,{theme:'precision'}),light=p.createPosterLayout(input,measure,code,{theme:'editorial'});
-  assert.equal(dark.background,'#0b1113');assert.equal(light.background,'#f6f0e5');
+  assert.equal(dark.background,'#101820');assert.equal(light.background,'#f6f3ed');
   assert.equal(dark.publicationId,light.publicationId);assert.deepEqual(dark.codeRect,light.codeRect);
   assert.deepEqual(dark.commands.filter((c:{type:string})=>c.type==='text').map((c:{text:string})=>c.text),light.commands.filter((c:{type:string})=>c.type==='text').map((c:{text:string})=>c.text));
 });
 
-test('长标题、多动作和完整摘要在各导出宽度下互不覆盖，事实区与底部真码保持留白',()=>{
+test('长标题、多动作和完整摘要在各导出宽度下互不覆盖，事实区与页脚保持留白',()=>{
   const input=p.posterInput(data(),'fixture-publication');
   input.title='重置发放进展及不同账户的适用范围说明'.repeat(3);
   input.summary=('公开公告包含多个独立动作，具体账户是否适用须核对原始声明。'.repeat(6))+'\n\n补充说明保留显式分段与全部限定条件。';
@@ -116,13 +113,7 @@ test('长标题、多动作和完整摘要在各导出宽度下互不覆盖，�
       const overlaps=a.x<b.x+b.width-.01&&a.x+a.width>b.x+.01&&a.y<b.y+b.height-.01&&a.y+a.height>b.y+.01;
       assert.equal(overlaps,false,`overlapping text at ${width}: ${a.text} / ${b.text}`);
     }
-    const circle=dark.commands.find((c:{type:string})=>c.type==='circle');
-    assert.ok(circle.x-circle.r>=margin&&circle.x+circle.r<=width-margin+.01);
-    for(const box of boxes){
-      const nearestX=Math.max(box.x,Math.min(circle.x,box.x+box.width));
-      const nearestY=Math.max(box.y,Math.min(circle.y,box.y+box.height));
-      assert.ok(Math.hypot(nearestX-circle.x,nearestY-circle.y)>circle.r,`code plate overlaps text: ${box.text}`);
-    }
+    assert.equal(dark.commands.some((c:{type:string})=>c.type==='image'||c.type==='circle'),false);
     assert.deepEqual(dark.codeRect,light.codeRect);
     assert.deepEqual(textCommands.map(({color,...c}:Record<string,unknown>)=>c),light.commands.filter((c:{type:string})=>c.type==='text').map(({color,...c}:Record<string,unknown>)=>c));
     assert.equal(p.createPosterLayout(input,measure,code,{width,maxHeight:dark.height}).height,dark.height);
@@ -135,9 +126,9 @@ test('简短新闻模板随实际内容收尾，无动作不留空动作框或�
   const layout=p.createPosterLayout(input,measure,{status:'unavailable'});
   assert.ok(layout.height<1200);
   assert.equal(layout.commands.some((c:{type:string;color?:string})=>c.type==='rect'&&c.color==='#141b1d'),false);
-  assert.ok(layout.commands.some((c:{text?:string})=>c.text==='小程序码暂不可用'));
+  assert.equal(layout.commands.some((c:{text?:string})=>/扫码|二维码|小程序码/.test(c.text||'')),false);
   const texts=layout.commands.filter((c:{type:string})=>c.type==='text').map((c:{text:string})=>c.text).join('');
-  assert.ok(texts.includes('具体安排请查看最新重置消息'));
+  assert.ok(texts.includes('具体安排以发布方后续消息为准'));
   assert.ok(texts.includes('新闻更新'));
 });
 
@@ -183,3 +174,11 @@ test('圆码与海报缓存严格五分钟有效，时间回退和无时间戳�
   assert.equal(p.posterCacheFresh(at,at-1),false);
   assert.equal(p.posterCacheFresh(undefined,at),false);
 });
+
+ test('公告换行保持英文单词完整，单词超出整行才拆分且不丢字符',()=>{
+   for(const input of ['付费ChatGPT Work和Codex账户','x'.repeat(100)]){
+     const lines=p.wrapText(input,(text:string)=>measure(text),180,true);
+     assert.equal(lines.join(''),input);for(const line of lines)assert.ok(measure(line)<=180);
+     if(input.includes('Codex'))assert.ok(lines.some((line:string)=>line.includes('Codex')));
+   }
+ });

@@ -8,7 +8,7 @@ import { customerNotice } from '../lib/notice-display';
 import { createAdminNotice } from '../lib/admin-notice';
 import { DomainError, id, hash, now, assertVersion, draftSchema, validateDraft, mergeActions, noticeKey, safeTemplate, requireReason } from './domain';
 import { defaultAI, publicAI, encryptKey, validateEndpoint, testAI, AIServiceError, type AIRecord } from './ai';
-import { hasExplicitCorrectionText, normalizedEligibility } from './automatic-content';
+import { hasExplicitCorrectionText, normalizedEligibility, originalProductSummary } from './automatic-content';
 import {adminWechat,saveWechatSettings} from './wechat';
 import { automationRows, workerRuntimeStatus } from '../lib/automation';
 import {activityHideDate} from '../lib/activity-display';
@@ -335,6 +335,17 @@ export async function publishCandidate(candidateId:string,version:number,actor:s
     // A copy can keep the original body while losing its reply relationship.
     // Missing context is not a correction to an already qualified statement.
     const canonical=previousArticle&&evidence.find(item=>item.id===previousArticle.evidenceIds[0]);
+    // The no-AI original-text fallback cannot overwrite an existing publication.
+    const productFallback=automatic&&primary&&originalProductSummary(primary,gatherEvidenceContext(primary,evidence));
+    if(productFallback&&previousArticle&&existing?.status==='published'&&canonical&&providerIdentity(primary!)===providerIdentity(canonical)&&
+      content.title===productFallback.title&&content.summary===productFallback.summary&&content.translation===productFallback.translation&&!originalConflict(primary!,[primary!,canonical])){
+      const retained=await one<Publication>('publications',previousArticle.publicationId,c);
+      if(!retained)throw new DomainError('当前文章的发布快照不存在，无法安全复用');
+      const persistedContent:DraftContent={...content,title:previousArticle.title,summary:previousArticle.summary,translation:previousArticle.translation,category:previousArticle.category,eventId:previousArticle.eventId,evidenceIds:previousArticle.evidenceIds,contextEvidenceIds:previousArticle.contextEvidenceIds,actions:retained.event.actions,publicationMode:previousArticle.publicationMode,contentOrigin:previousArticle.contentOrigin,reviewStatus:previousArticle.reviewStatus,reviewReasons:previousArticle.reviewReasons};
+      await put('candidates',{...candidate,status:'published',version:candidate.version+1,updatedAt:now(),content:persistedContent,reasons:[],automation:{...candidate.automation,state:'ready',reasonCodes:['published_product_retained'],dependencyIds:[],articleId:previousArticle.id,templatePublished:previousArticle.contentOrigin==='template',evaluatedAt:now()}},c);
+      await audit(actor,'candidate.product_retained',candidate.id,'原帖已公开，保留当前内容，不用原文摘要覆盖现有文章',candidate,{publicationId:retained.id,evidenceId:primary!.id},c);
+      return retained;
+    }
     const sameQualifiedPost=automatic&&primary&&previousArticle?.publicationMode==='state_change'&&existing?.status==='published'&&canonical?.textOrigin==='original'&&providerIdentity(primary)===providerIdentity(canonical);
     if(sameQualifiedPost&&content.publicationMode==='news_only'&&originalConflict(primary,[primary,canonical]))throw new DomainError('同一原帖正文或父帖存在冲突，不能用待确认副本替换已核验文章',409);
     const incompleteOriginalCopy=sameQualifiedPost&&primary.textOrigin==='original'&&!originalConflict(primary,[primary,canonical])&&!hasCompleteContext(primary,gatherEvidenceContext(primary,evidence));

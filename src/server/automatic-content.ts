@@ -13,12 +13,32 @@ export function isClearlyUnrelated(evidence:Evidence):boolean {
  return /^(?:@\S+\s*)?(?:嘘+|哈+|哈哈|谢谢|thank\s+you|thanks|shh+|lol)[!！。.,，\s]*$/i.test(evidence.text.trim());
 }
 
+/** Mechanically translate explicit limit announcements; unknown English still
+ * follows the existing review path rather than being labelled translated. */
+export function originalProductSummary(primary:Evidence,evidence:Evidence[]):Pick<DraftContent,'title'|'summary'|'translation'>|undefined {
+  if(primary.sourceId!=='tibo-public'||primary.provenance==='manual'||primary.textOrigin!=='original'||
+    primary.metadata?.sourceGroup!=='fxembed:thsottiaux'||primary.metadata.category!=='product'||
+    !/^https:\/\/x\.com\/thsottiaux\/status\/\d{15,20}$/.test(primary.url)||!primary.url.endsWith('/'+primary.messageId)||
+    /[\u3400-\u9fff]/.test(primary.text)||primary.text.length>12000||
+    !hasCompleteContext(primary,evidence)||!hasStandaloneContext(primary.text,'product')||
+    evidenceBenefitClaims(primary,evidence).length||/\b(?:reset|banked|refill\w*|recharg\w*|replenish\w*|maybe|might|hypothetical|rumou?r|if|unless|not|withdrawn|cancelled)\b/i.test(primary.text)||
+    hasExplicitCorrectionText(primary.text))return;
+  const doubling=primary.text.match(/(?:^|\n)\s*We are doubling all usage limits for ((?:all )?Pro\s+\d+(?:\/\d+)*\s+tiers\s+and\s+Business Premium), effective today\./i);
+  if(!doubling)return;
+  const audience=doubling[1].replace(/^all\s+/i,'').replace(/\s+tiers\b/i,'').replace(/\s+and\s+/gi,' 及 ');
+  let summary=`原文公布 ${audience} 的使用限额调整，首段称“今日起翻倍”。`;
+  if(/won[’']t be reducing usage limits for Pro 200, so your Work and Codex usage will stay the same\./i.test(primary.text))summary+='同时说明 Pro 200 不执行原定降低，Work 和 Codex 用量保持原状。';
+  if(/usage of your dot will still continue to be separate from your default usage\./i.test(primary.text))summary+='dot 用量继续独立于默认用量计算。';
+  summary+='具体适用范围和安排以完整原文为准。';
+  return {title:'Codex 使用限额调整',summary,translation:primary.text};
+}
+
 export function evidenceFingerprint(evidence:Evidence[]):string {
   const inputs=createHash('sha256').update(JSON.stringify(evidence.map(item=>({id:item.id,hash:item.hash,parentId:item.parentId,contextComplete:item.contextComplete,textOrigin:item.textOrigin,metadata:item.metadata})).sort((a,b)=>a.id.localeCompare(b.id)))).digest('hex');
   // A changed observation template must re-evaluate persisted machine drafts,
   // even when the upstream text is unchanged. Keep other fact rules untouched.
   const observation=evidence[0]&&observedEvidence(evidence[0],evidence[0].collectedAt);
-  return `${AUTOMATIC_RULES_VERSION}${observation?'-observation-template-2':''}${evidence[0]&&attributedActivityExcerpt(evidence[0])?'-activity-attribution-1':''}:${inputs}`;
+  return `${AUTOMATIC_RULES_VERSION}${observation?'-observation-template-2':''}${evidence[0]&&attributedActivityExcerpt(evidence[0])?'-activity-attribution-1':''}${evidence[0]&&originalProductSummary(evidence[0],evidence)?'-original-product-1':''}:${inputs}`;
 }
 
 export function classifyBlockers(reasons:string[],evidence:Evidence[]):CandidateAutomation {
@@ -82,6 +102,8 @@ export function buildAutomaticTemplate(evidence:Evidence[]):DraftContent|undefin
   if(!/[\u3400-\u9fff]/.test(primary.text)){
     const summary=primary.metadata?.summary;
     if(primary.provenance==='archive'&&summary&&/[\u3400-\u9fff]/.test(summary)&&!isTruncated(summary)&&/重置|额度|发卡|落地|传播|发放/.test(summary))return attributedNews({...primary,text:summary},base);
+    const product=originalProductSummary(primary,evidence);
+    if(product)return {...base,...product};
     return;
   }
   if(complete&&hasStandaloneContext(primary.text,'product'))return {...base,title:primary.metadata?.title&&/[\u3400-\u9fff]/.test(primary.metadata.title)?primary.metadata.title.slice(0,160):'Codex 产品功能更新',summary:`${primary.provenance==='archive'?'公开归档收录的产品动态':'公开产品动态'}：${primary.text.slice(0,1800)}`,translation:primary.text.slice(0,12000)};

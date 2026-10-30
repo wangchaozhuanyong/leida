@@ -240,19 +240,23 @@ export function createWechatService(dependencies:WechatDependencies={}) {
     // Re-read after acquiring the same lock used by login/preferences writes.
     return reader(sessionToken,client);
   }
-  async function wechatLogin(code:string,clientHint='anonymous'):Promise<{sessionToken:string;expiresAt:string}> {
+  async function wechatLogin(code:string,clientHint='anonymous',options:SubscriptionViewOptions={}):Promise<{sessionToken:string;expiresAt:string;subscriptionState?:WechatSubscriptionState}> {
     const input=z.string().min(1).max(512).parse(code);
     if(!ready(await config(),'subscription'))throw new WechatServiceError('微信功能尚未配置或已关闭','configuration');
     const clientKey=await admitLogin(input,clientHint),settings=await usage('login');
     let openid:string;
     try{openid=await provider.login(settings.appId,open(settings.encryptedSecret!),input);}catch(error){if(error instanceof WechatServiceError&&[40029,40163].includes(error.errorCode??0))await failedLogin(clientKey);throw error;}
     const openidHash=digest(`${settings.appId}:${openid}`),readerId=`wxreader_${openidHash}`,sessionToken=randomBytes(32).toString('base64url'),expiresAt=new Date(clock()+7*24*3600_000).toISOString();
-    await store.transaction(async client=>{
+    const subscriptionState=await store.transaction(async client=>{
       await lock(client,readerId);const existing=await store.one<WechatReader>('wechat_readers',readerId,client);
       if(existing?.status==='disabled')throw new DomainError('微信提醒身份已停用',403);
       const sessions=[...(existing?.sessions??[]).filter(session=>Date.parse(session.expiresAt)>clock()).slice(-4),{hash:digest(sessionToken),createdAt:timestamp(),expiresAt}];
-      await store.put('wechat_readers',{...existing,id:readerId,appId:settings.appId,openidHash,encryptedOpenid:existing?.encryptedOpenid??seal(openid),status:'active',createdAt:existing?.createdAt??timestamp(),lastLoginAt:timestamp(),sessions} satisfies WechatReader,client);
-    });return {sessionToken,expiresAt};
+      const next={...existing,id:readerId,appId:settings.appId,openidHash,encryptedOpenid:existing?.encryptedOpenid??seal(openid),status:'active',createdAt:existing?.createdAt??timestamp(),lastLoginAt:timestamp(),sessions} satisfies WechatReader;
+      await store.put('wechat_readers',next,client);
+      // Only the native summary caller opts in. Authentication and grant writes
+      // stay unchanged; return this reader's live balance without delivery history.
+      if(options.includeLastResult===false)return subscriptionView(await reader(sessionToken,client),client,options);
+    });return {sessionToken,expiresAt,...(subscriptionState?{subscriptionState}:{})};
   }
   async function subscriptionView(value:WechatReader,client?:Client,options:SubscriptionViewOptions={}):Promise<WechatSubscriptionState> {
     const preferences={reminderPreferences:reminderPreferencesOf(value),preferencesSupported:true};

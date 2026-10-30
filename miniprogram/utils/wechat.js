@@ -19,10 +19,14 @@ function createWechatReader({wxApi,config,now=()=>Date.now()}){
   function view(){const remainingCount=state.safe?(state.safe.remainingCount??(['available','reserved'].includes(state.safe.state)?1:0)):null;const preferences=reminderPreferences(state.safe?.reminderPreferences);return{...state,reminderPreferences:preferences,allTypesOff:!!state.safe&&reminderKeys.every(key=>!preferences[key]),canChooseTypes:!!state.safe?.preferencesSupported&&!state.busy&&!state.privacyNeeded&&!state.preferencesUncertain,ready:state.ready&&challengeValid(),remainingCount,confirmNeeded:!!confirmation,label:state.safe?labels[state.safe.state]:'加载中',canPrepare:!state.busy&&!state.ready,canRevoke:!!state.safe&&(remainingCount>0||state.safe.state==='unknown')};}
   async function login(){
     if(session&&Date.parse(session.expiresAt)>now())return;
-    session=undefined;challenge=undefined;
+    const version=generation;session=undefined;challenge=undefined;
     if(typeof wxApi.login!=='function')throw new Error('当前微信不支持登录，请更新微信。');
     const code=await new Promise((resolve,reject)=>wxApi.login({timeout:10000,success(result){result&&typeof result.code==='string'&&result.code?resolve(result.code):reject(new Error('微信登录暂时不可用，请重试。'));},fail(){reject(new Error('微信登录暂时不可用，请重试。'));}}));
-    const result=await request('/api/wechat/login',{method:'POST',data:{code}}).promise;session=result.data;
+    if(version!==generation)return;
+    const result=await request('/api/wechat/login',{method:'POST',data:{code}}).promise;
+    if(version!==generation)return;
+    session={sessionToken:result.data.sessionToken,expiresAt:result.data.expiresAt};
+    if(result.data.subscriptionState){const safe=safeState(result.data.subscriptionState);lastConnectedCheck=now();acceptState(safe);return safe;}
   }
   async function rpc(path,options={}){const version=generation,result=await request(path,{...options,sessionToken:session&&session.sessionToken}).promise;if(version!==generation){const stale=new Error('旧读取已失效');stale.obsolete=true;throw stale;}return result.data;}
   function failed(error){if(error.obsolete)return;if(error.status===401){session=undefined;challenge=undefined;}emit({busy:false,ready:false,error:error.message||'微信提醒暂时无法读取。'});}
@@ -31,7 +35,7 @@ function createWechatReader({wxApi,config,now=()=>Date.now()}){
     if(pending)return !background&&state.refreshing?pending.then(()=>action(work,userInitiated,connectedOnly,background)):pending;
     const problem=configurationError(config);if(problem){emit({error:problem});return Promise.resolve();}
     const version=generation;emit(background?{busy:!state.safe,refreshing:!!state.safe,error:''}:{busy:true,error:'',privacyNeeded:false});
-    const promise=(async()=>{try{const privacy=await privacyRequired(wxApi);if(version!==generation)return;if(privacy){emit({busy:false,privacyNeeded:true,error:'请先阅读并同意隐私指引。'});return;}if(!connectedOnly)await login();if(version!==generation)return;await work();}catch(error){if(version===generation)failed(error);}finally{if(version===generation)emit({refreshing:false,busy:false});}})();
+    const promise=(async()=>{try{const privacy=await privacyRequired(wxApi);if(version!==generation)return;if(privacy){emit({busy:false,privacyNeeded:true,error:'请先阅读并同意隐私指引。'});return;}const initialState=connectedOnly?undefined:await login();if(version!==generation)return;await work(initialState);}catch(error){if(version===generation)failed(error);}finally{if(version===generation)emit({refreshing:false,busy:false});}})();
     pending=promise;promise.finally(()=>{if(pending===promise)pending=undefined;});return promise;
   }
   function displayState(safe){
@@ -69,8 +73,10 @@ function createWechatReader({wxApi,config,now=()=>Date.now()}){
       if(confirmation)return Promise.resolve();
       const refresh=!sessionValid()||!state.safe||!!state.error||state.preferencesUncertain||now()-lastConnectedCheck>=300000;
       if(!refresh&&!state.privacyNeeded&&(challengeValid(30000)||!state.safe.configured||!state.safe.enabled))return Promise.resolve();
-      return action(async()=>{
-        const prepared=challenge,safe=refresh?await refreshWork():state.safe;
+      return action(async initialState=>{
+        // New servers include a live state in login; old servers use the same GET
+        // fallback. Neither path invents a count or persists a private session.
+        const prepared=challenge,safe=initialState||(refresh?await refreshWork():state.safe);
         if(safe.configured&&safe.enabled&&!['unknown','revoked'].includes(safe.state)&&prepared&&prepared.templateId===safe.templateId&&Date.parse(prepared.expiresAt)>now()+30000){challenge=prepared;emit({ready:true});}
         else await prime(safe);
       },true,false,true);
