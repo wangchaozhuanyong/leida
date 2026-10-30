@@ -2,12 +2,18 @@ const {preserveNativeReturn}=require('../../utils/entry-navigation');
 const { createPage } = require('../../utils/page');
 const { noticeModel } = require('../../utils/model');
 // Bundled client version; keep this aligned with the development-tool upload.
-const buildVersion = '1.0.73';
+const buildVersion = '1.0.74';
 Page(createPage((data, query, page, app) => {
   const stored=app.preferences.snapshot(),notices=data?noticeModel(data,stored.preferences,stored.read):[];
-  return { notices:notices.slice(0,3),unread:notices.filter(n=>!n.read).length,storageError:stored.error };
-}, { view:()=>({view:'notices'}),data: { wechatAction:'',notices:[],unread:0,storageError: '', clientVersion:buildVersion, wechat:{safe:null,label:'加载中',busy:true,ready:false,canPrepare:false,canRevoke:false,error:'',privacyNeeded:false} },
+  const state=app.wechat?.getState();
+  const reveal=page.awaitingWechat&&!!(state?.safe||state?.error||state?.privacyNeeded);
+  return { notices:notices.slice(0,3),unread:notices.filter(n=>!n.read).length,storageError:stored.error,
+    awaitingWechat:page.awaitingWechat&&!reveal,...(reveal?{wechat:state}:{}) };
+}, { view:()=>({view:'notices'}),presentable(patch){return !patch.awaitingWechat;},data: { awaitingWechat:true,wechatAction:'',notices:[],unread:0,storageError: '', clientVersion:buildVersion, wechat:{safe:null,label:'加载中',busy:true,ready:false,canPrepare:false,canRevoke:false,error:'',privacyNeeded:false} },
   load(){
+    const state=getApp().wechat?.getState();
+    // Seed the first render from memory; never render a fake count then replace it.
+    if(state)this.setData({wechat:state,awaitingWechat:!state.safe&&!state.error&&!state.privacyNeeded});
     try {
       const info=typeof wx.getAccountInfoSync==='function' ? wx.getAccountInfoSync().miniProgram : null;
       const channel=info && ({develop:'开发版',trial:'体验版',release:'正式版'})[info.envVersion];
@@ -16,8 +22,9 @@ Page(createPage((data, query, page, app) => {
   },
   show(){
     const reader=getApp().wechat;
-    if(!reader){this.setData({'wechat.busy':false,'wechat.error':'微信提醒暂时无法读取，请重新打开小程序。'});return;}
+    if(!reader){this.setData({awaitingWechat:false,'wechat.busy':false,'wechat.error':'微信提醒暂时无法读取，请重新打开小程序。'});return;}
     this._wechatUnsubscribe=reader.subscribe(state=>{
+      if(this.data.awaitingWechat&&(state.safe||state.error||state.privacyNeeded)){this.redraw();return;}
       const displayed={...state};
       // Keep the tapped native switch in place while saving; an uncertain result
       // then restores the last confirmed choice through an actual checked change.

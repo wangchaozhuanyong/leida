@@ -51,7 +51,7 @@ function harness(wxOverrides:Options={}){
     subscribe(fn:(state:Options)=>void){listeners.add(fn);fn(state);return()=>listeners.delete(fn);},refresh(){return Promise.resolve();}};
   app.publicApi=(path:string)=>{const work=deferred();const request={path,...work,aborted:0};requests.push(request);return{promise:work.promise,abort(){request.aborted++;}};};
   const readerState={ready:true,busy:false,privacyNeeded:false,safe:{configured:true,enabled:true,state:'available'},remainingCount:2};
-  app.wechat={getState:()=>readerState,loadForPage:()=>Promise.resolve(),nextRefreshDelay:()=>300000,
+  app.wechat={warmup:()=>Promise.resolve(),getState:()=>readerState,loadForPage:()=>Promise.resolve(),nextRefreshDelay:()=>300000,
     subscribe(fn:(state:Options)=>void){fn(readerState);return()=>{};},authorize(){calls.push('authorize');return Promise.resolve();},retryConfirmation(){calls.push('confirm');return Promise.resolve();}};
   function instantiate(definition:Options,route:string,params:Options={}){
     const instance:Options={...definition,route,data:structuredClone(definition.data||{}),setData(patch:Options,done?:()=>void){

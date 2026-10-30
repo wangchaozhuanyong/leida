@@ -12,3 +12,10 @@
 .support-icon image{width:28px;height:28px}
 
 .inbox-pin{color:#2458ce;font-size:12px;font-weight:600}
+
+/* Only an unresolved first entry waits. Existing content never returns here. */
+.reminder-entry-wait{height:128px;display:flex;align-items:center;justify-content:center;gap:6px}
+.reminder-entry-wait>view{width:5px;height:5px;border-radius:50%;background:#5578af;animation:reminder-entry-pulse .9s ease-in-out infinite}
+.reminder-entry-wait>view:nth-child(2){animation-delay:.15s}.reminder-entry-wait>view:nth-child(3){animation-delay:.3s}
+@keyframes reminder-entry-pulse{0%,80%,100%{opacity:.35;transform:scale(.8)}40%{opacity:1;transform:scale(1.15)}}
+@media(prefers-reduced-motion:reduce){.reminder-entry-wait>view{animation:none;opacity:.65}}

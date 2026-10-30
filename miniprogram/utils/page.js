@@ -26,7 +26,7 @@ function createPage(build, extra = {}) {
   }
   function entrance(page, patch) {
     // Content is committed immediately. Motion never waits for a timer or network.
-    if(!patch.connected){
+    if(!patch.connected||(extra.presentable&&!extra.presentable.call(page,patch))){
       if(page._entranceTimer)clearTimeout(page._entranceTimer);
       page._entranceTimer=null;
       patch.contentMotion='';

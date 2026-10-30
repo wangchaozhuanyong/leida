@@ -6,12 +6,17 @@ const reminderPreferences=value=>Object.fromEntries(reminderKeys.map(key=>[key,v
 const safeState=value=>({configured:value.configured,enabled:value.enabled,state:value.state,templateId:value.templateId,acceptedAt:value.acceptedAt,lastResult:value.lastResult,remainingCount:value.remainingCount,pendingCount:value.pendingCount,preferencesSupported:value.preferencesSupported===true,reminderPreferences:reminderPreferences(value.reminderPreferences)});
 function privacyRequired(wxApi){
   if(typeof wxApi.getPrivacySetting!=='function')return Promise.resolve(false);
-  return new Promise((resolve,reject)=>wxApi.getPrivacySetting({success(result){resolve(!!result.needAuthorization);},fail(){reject(new Error('暂时无法读取隐私授权状态，请重试。'));}}));
+  return new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(new Error('暂时无法读取隐私授权状态，请重试。')),10000);
+    try{wxApi.getPrivacySetting({success(result){clearTimeout(timer);if(typeof result?.needAuthorization!=='boolean'){reject(new Error('暂时无法读取隐私授权状态，请重试。'));return;}resolve(result.needAuthorization);},fail(){clearTimeout(timer);reject(new Error('暂时无法读取隐私授权状态，请重试。'));}});}
+    catch(error){clearTimeout(timer);reject(error);}
+  });
 }
-/** Opening the reminder page may connect its reader; only an explicit tap may subscribe. */
+/** Consented app entry may read state; only an explicit tap may subscribe. */
 function createWechatReader({wxApi,config,now=()=>Date.now()}){
   const request=createWechatTransport(wxApi,config),listeners=new Set();
-  let lastConnectedCheck=-Infinity, generation=0;
+  let lastConnectedCheck=-Infinity, lastWarmupAttempt=-Infinity, generation=0;
+  let warming;
   let session,challenge,confirmation,pending,state={safe:null,busy:false,refreshing:false,ready:false,error:'',privacyNeeded:false,preferencesMessage:'',preferencesUncertain:false};
   const emit=patch=>{state={...state,...patch};listeners.forEach(fn=>fn(view()));};
   const sessionValid=()=>!!session&&Date.parse(session.expiresAt)>now();
@@ -35,7 +40,7 @@ function createWechatReader({wxApi,config,now=()=>Date.now()}){
     if(pending)return !background&&state.refreshing?pending.then(()=>action(work,userInitiated,connectedOnly,background)):pending;
     const problem=configurationError(config);if(problem){emit({error:problem});return Promise.resolve();}
     const version=generation;emit(background?{busy:!state.safe,refreshing:!!state.safe,error:''}:{busy:true,error:'',privacyNeeded:false});
-    const promise=(async()=>{try{const privacy=await privacyRequired(wxApi);if(version!==generation)return;if(privacy){emit({busy:false,privacyNeeded:true,error:'请先阅读并同意隐私指引。'});return;}const initialState=connectedOnly?undefined:await login();if(version!==generation)return;await work(initialState);}catch(error){if(version===generation)failed(error);}finally{if(version===generation)emit({refreshing:false,busy:false});}})();
+    const promise=(async()=>{try{const privacy=await privacyRequired(wxApi);if(version!==generation)return;if(privacy){emit({busy:false,privacyNeeded:true,error:'请先阅读并同意隐私指引。'});return;}if(state.privacyNeeded)emit({privacyNeeded:false});const initialState=connectedOnly?undefined:await login();if(version!==generation)return;await work(initialState);}catch(error){if(version===generation)failed(error);}finally{if(version===generation)emit({refreshing:false,busy:false});}})();
     pending=promise;promise.finally(()=>{if(pending===promise)pending=undefined;});return promise;
   }
   function displayState(safe){
@@ -64,9 +69,24 @@ function createWechatReader({wxApi,config,now=()=>Date.now()}){
     confirmation=undefined;acceptState(safe);
     if(selected.result==='accept')try{await prime(safe);}catch(_){emit({ready:false,error:'本次次数已记录，稍后可继续增加。'});}
   }
-  return{
+  const reader={
     subscribe(fn){listeners.add(fn);fn(view());return()=>listeners.delete(fn);},getState:view,
+    warmup(){
+      // No prompt, nonce, confirmation, preference write or durable private cache.
+      if(typeof wxApi.getPrivacySetting!=='function')return Promise.resolve();
+      if(pending)return pending;
+      if(confirmation||now()-lastWarmupAttempt<300000)return Promise.resolve();
+      if(sessionValid()&&state.safe&&!state.error&&now()-lastConnectedCheck<300000)return Promise.resolve();
+      lastWarmupAttempt=now();
+      const task=action(async initialState=>{if(!initialState)await refreshWork();},true,false,true);
+      warming=task;task.finally(()=>{if(warming===task)warming=undefined;});return task;
+    },
     loadForPage(){
+      // Join app warmup before preparing a visible-page nonce, never duplicate login.
+      if(warming){const version=generation;return warming.then(()=>{
+        if(version!==generation||!state.safe||state.error||state.privacyNeeded)return;
+        return reader.loadForPage();
+      });}
       // Only the visible reminder page calls this. Never request subscription or
       // retry an uncertain confirmation here, including after a page re-entry.
       if(pending)return pending;
@@ -121,7 +141,8 @@ function createWechatReader({wxApi,config,now=()=>Date.now()}){
         catch(error){if(chosen&&error.status!==401)emit({error:'这次提醒次数尚未确认，请点击重试。'});else failed(error);}finally{emit({busy:false});}})();
       pending=work;work.finally(()=>{if(pending===work)pending=undefined;});return work;
     },
-    clearSession(){++generation;session=undefined;challenge=undefined;confirmation=undefined;emit({safe:null,busy:false,refreshing:false,ready:false,error:'',privacyNeeded:false,preferencesMessage:'',preferencesUncertain:false});}
+    clearSession(){++generation;pending=undefined;warming=undefined;lastWarmupAttempt=-Infinity;session=undefined;challenge=undefined;confirmation=undefined;emit({safe:null,busy:false,refreshing:false,ready:false,error:'',privacyNeeded:false,preferencesMessage:'',preferencesUncertain:false});}
   };
+  return reader;
 }
 module.exports={privacyRequired,createWechatReader};
