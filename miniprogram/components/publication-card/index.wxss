@@ -8,4 +8,4 @@
 
 
 
-.publication-card.is-compact{padding:16px;border-color:#e4ebf6;background:rgba(255,255,255,.92);border-radius:16px}.is-compact .announcement-title{font-size:16px;line-height:1.55}.is-compact .publication-summary{font-size:13px;-webkit-line-clamp:2}.is-compact .publication-footer{margin-top:6px}.is-compact .time{font-size:11px}
+.publication-card.is-compact{padding:16px;border-color:#e4ebf6;background:rgba(255,255,255,.92);border-radius:16px}.is-compact .announcement-title{font-size:16px;line-height:24px;margin:12px 0 8px}.is-compact .publication-summary{font-size:14px;line-height:23px;color:#14263e;-webkit-line-clamp:2}.is-compact .publication-footer{margin-top:6px}.is-compact .time{font-size:12px;line-height:20px}

@@ -17,3 +17,11 @@
 .motion-preference{position:absolute;left:0;top:0;width:0;height:1px;visibility:hidden;pointer-events:none}
 @media(prefers-reduced-motion:no-preference){.motion-preference{width:1px}}
 @media(prefers-reduced-motion:reduce){.is-ready .neural-canvas{visibility:hidden}.is-ready .neural-static{visibility:visible}}
+
+/* Static sphere remains legible when animation/canvas is unavailable. */
+.sphere-face{position:absolute;left:50%;top:50%;width:224px;max-width:81%;height:224px;max-height:100%;transform:translate(-50%,-50%);border:1px solid #7ea5d52e;border-radius:50%;background:radial-gradient(ellipse,#edf5ff00 52%,#dcecff20 84%,#edf5ff00)}
+.sphere-meridian,.sphere-latitude{position:absolute;border:1px solid #7ea5d52e;border-radius:50%}
+.sphere-meridian{top:0;height:100%;width:52%;left:24%;transform:rotate(24deg)}.sphere-meridian.second{transform:rotate(-28deg)}
+.sphere-latitude{left:0;width:100%;height:45%;top:27.5%;transform:rotate(16deg)}.sphere-latitude.second{transform:rotate(-32deg)}
+.sphere-node{position:absolute;width:4px;height:4px;border-radius:50%;background:#4286e8aa;box-shadow:0 0 0 4px #4b92f70a}
+.sphere-node.first{left:14%;top:22%}.sphere-node.second{right:9%;bottom:30%}.sphere-node.third{left:39%;bottom:3%}
