@@ -7,7 +7,7 @@ import {createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {LoadingContent} from '../src/components/public/LoadingContent';
 
-function harness(extra:any={}) {
+function harness() {
   const source=new URL('../miniprogram/utils/page.js',import.meta.url);
   const localRequire=createRequire(source),module={exports:{} as any};
   const timers=new Map<number,()=>void>(),writes:any[]=[];let id=0,listener:any;
@@ -15,7 +15,7 @@ function harness(extra:any={}) {
   const app={client:{setView:()=>Promise.resolve(),subscribe(fn:any){listener=fn;fn(state);return ()=>{listener=null;};},getState:()=>state}};
   const entry={exports:{}};new Script(readFileSync(new URL('../miniprogram/utils/entry-navigation.js',import.meta.url),'utf8')).runInNewContext({module:entry,getApp:()=>app,wx:{}});
   new Script(readFileSync(source,'utf8')).runInNewContext({module,require:(name:string)=>name==='./entry-navigation'?entry.exports:localRequire(name),getApp:()=>app,wx:{},Date,Set,setTimeout(fn:()=>void,ms:number){assert.equal(ms,560);timers.set(++id,fn);return id;},clearTimeout(key:number){timers.delete(key);}});
-  const definition=module.exports.createPage((data:any)=>({title:data?.title||'',items:data?.items||[]}),{view:(p:any)=>({view:'news',filter:p.filter||'all'}),...extra});
+  const definition=module.exports.createPage((data:any)=>({title:data?.title||'',items:data?.items||[]}),{view:(p:any)=>({view:'news',filter:p.filter||'all'})});
   const page={...definition,data:{...definition.data},setData(patch:any,done?:()=>void){writes.push(patch);Object.assign(this.data,patch);done?.();}};
   page.onLoad({});page.onShow();
   return {page,timers,writes,send(patch:any){state={...state,...patch};listener?.(state);},ready(){this.send({data:{serverTime:new Date().toISOString(),publications:[],title:'真实消息',items:[{id:'first'}]},loading:false,error:''});}};
@@ -75,15 +75,4 @@ test('快速请求移除占位时不闪骨架，持续等待才显示；卸载�
  const fast:any=instance();definition.lifetimes.attached.call(fast);assert.equal(fast.data.visible,false);const late=timers.get(0)!;
  definition.lifetimes.detached.call(fast);assert.equal(timers.size,0);late();assert.equal(fast.writes.length,0);
  const slow:any=instance();definition.lifetimes.attached.call(slow);assert.equal(slow.data.visible,false);const show=timers.get(1)!;timers.delete(1);show();assert.equal(slow.data.visible,true);assert.equal(slow.writes.length,1);definition.lifetimes.detached.call(slow);
-});
-
-
-test('附加读者参加共用首屏就绪条件，慢读者不提前消耗入场，返回不重新等待',()=>{
-  let readerReady=false;const h=harness({ready(state:any){return readerReady&&(state.connected||!state.loading);},data:{contentReady:false}});
-  try{
-    h.ready();assert.equal(h.page.data.connected,true);assert.equal(h.page.data.contentReady,false);assert.equal(h.page.data.contentMotion,'');assert.equal(h.timers.size,0);
-    readerReady=true;h.page.redraw();assert.equal(h.page.data.contentReady,true);assert.equal(h.page.data.contentMotion,'content-enter');assert.equal(h.timers.size,1);
-    h.page.onHide();h.page.onShow();assert.equal(h.page.data.contentReady,true);assert.equal(h.page.data.contentMotion,'');assert.equal(h.timers.size,0);
-    h.send({loading:true});assert.equal(h.page.data.contentReady,true);assert.equal(h.timers.size,0);
-  }finally{h.page.onUnload();}
 });

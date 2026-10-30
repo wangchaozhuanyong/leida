@@ -26,7 +26,7 @@ function createPage(build, extra = {}) {
   }
   function entrance(page, patch) {
     // Content is committed immediately. Motion never waits for a timer or network.
-    if(!patch.connected || patch.contentReady===false){
+    if(!patch.connected){
       if(page._entranceTimer)clearTimeout(page._entranceTimer);
       page._entranceTimer=null;
       patch.contentMotion='';
@@ -60,9 +60,6 @@ function createPage(build, extra = {}) {
     const cutoff = data && data.publications.reduce((latest, item) => item.cutoffAt > latest ? item.cutoffAt : latest, '');
     const pagination=state.page||null;
     const patch={ snapshotPending:!!state.snapshotPending,clockUntrusted,snapshotReadAt:state.snapshotPending?displayTime(new Date(state.receivedAt).toISOString()):'',navigationLoading: !data && !!state.loading, initialLoading: !data && !!state.loading, refreshing: !!data && !!state.loading && !state.loadingMore, loadingMore: !!state.loadingMore, moreError: state.moreError || '', updateAvailable: !!state.updateAvailable, loading: state.loading, connected: !!data&&!clockUntrusted, unconfigured: state.unconfigured, error: state.error, cutoff: displayTime(cutoff), pagination, ...(build(clockData, page._params || {}, {...page.data,pagination}, getApp()) || {}) };
-    // A page with an additional reader joins the same first-ready transition.
-    // Public connected/loading flags still describe the public request only.
-    if(extra.ready)patch.contentReady=!!extra.ready.call(page,patch);
     if(extra.title)patch.navigationTitle=extra.title({...page.data,...patch}) || '';
     const generation=(page._renderGeneration||0)+1;page._renderGeneration=generation;
     const current=()=>page._visible&&generation===page._renderGeneration;

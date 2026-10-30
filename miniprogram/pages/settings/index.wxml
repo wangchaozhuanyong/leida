@@ -1,8 +1,6 @@
 <page-meta root-background-color="#f2f5fb" page-style="background-color:#f2f5fb" />
 <navigation-header pulling="{{pullRefreshing}}" icon="reminder" title="提醒" />
 <view class="page {{contentMotion}}" bindtouchstart="nativeReturnTouched">
-  <page-loader wx:if="{{!contentReady}}" inset="{{true}}" />
-  <block wx:else>
   <view wx:if="{{storageError}}" class="warning">{{storageError}}</view>
   <view wx:if="{{snapshotPending && connected && !error}}" class="cached-content-note" role="status">正在更新上次内容</view>
   <view class="card inbox-card"><view class="row"><view class="heading">站内信 <text wx:if="{{unread}}" class="inbox-unread">{{unread}} 未读</text></view><button class="text-button" data-path="/pages/notices/index" bindtap="navigate">查看全部站内信 →</button></view>
@@ -12,14 +10,14 @@
     <view wx:if="{{connected && !notices.length}}" class="inbox-empty">暂无站内信，有新消息会显示在这里。</view>
   </view>
   <button class="support-card" open-type="contact" bindtap="contactStart" bindcontact="contactReturn" binderror="contactError" aria-label="联系小程序客服"><view class="support-icon" aria-hidden="true"><image src="/assets/icons/inbox.png" mode="aspectFit" /></view><view class="support-copy"><view class="support-title">联系小程序客服</view><view class="support-caption">记录缺失、提醒问题，都可以告诉我们</view></view><view class="support-arrow" aria-hidden="true">→</view></button>
-  <view class="card reminder-card"><view class="row"><view class="heading">微信提醒</view><text class="badge muted">{{!wechat.safe ? (wechat.busy ? '加载中' : '未连接') : !wechat.safe.configured || !wechat.safe.enabled ? '暂不可用' : wechat.safe.state === 'revoked' ? '已关闭' : wechat.safe.state === 'unknown' || wechat.allTypesOff ? '已暂停' : wechat.remainingCount > 0 ? '已开启' : '按次提醒'}}</text></view>
+  <view class="card reminder-card"><view class="row"><view class="heading">微信提醒</view><text class="badge muted">{{!wechat.safe ? (wechat.error || wechat.privacyNeeded ? '待连接' : '读取中') : !wechat.safe.configured || !wechat.safe.enabled ? '暂不可用' : wechat.safe.state === 'revoked' ? '已关闭' : wechat.safe.state === 'unknown' || wechat.allTypesOff ? '已暂停' : wechat.remainingCount > 0 ? '已开启' : '按次提醒'}}</text></view>
     <view class="reminder-count"><text class="muted">剩余提醒</text><text class="reminder-number">{{wechat.safe ? wechat.remainingCount : '—'}}</text><text class="muted">次</text></view>
     <view class="muted lead">只接收你开启的类型，每成功发送一条使用一次。</view>
     <view class="reminder-types">
       <view class="row reminder-types-heading"><text>提醒内容</text><text class="small muted" aria-live="polite">{{wechatAction === 'preferences' ? '正在保存' : wechat.preferencesMessage}}</text></view>
-      <view class="reminder-type-row"><view class="grow"><view>重置预告</view><view class="small muted">有新的重置计划或发放进展时提醒</view></view><switch aria-label="接收重置预告" color="#2458ce" checked="{{wechat.reminderPreferences.announcement}}" disabled="{{!wechat.canChooseTypes || wechatAction}}" data-kind="announcement" bindchange="changeWechatPreference" /></view>
-      <view class="reminder-type-row"><view class="grow"><view>重置结果提醒</view><view class="small muted">收到完成声明或重置观测时提醒，并注明来源</view></view><switch aria-label="接收重置结果与来源观测提醒" color="#2458ce" checked="{{wechat.reminderPreferences.result}}" disabled="{{!wechat.canChooseTypes || wechatAction}}" data-kind="result" bindchange="changeWechatPreference" /></view>
-      <view class="reminder-type-row"><view class="grow"><view>重要更正</view><view class="small muted">已发布的重置信息被更正时提醒</view></view><switch aria-label="接收重要更正" color="#2458ce" checked="{{wechat.reminderPreferences.correction}}" disabled="{{!wechat.canChooseTypes || wechatAction}}" data-kind="correction" bindchange="changeWechatPreference" /></view>
+      <view class="reminder-type-row"><view class="grow"><view>重置预告</view><view class="small muted">有新的重置计划或发放进展时提醒</view></view><switch aria-label="接收重置预告" color="#2458ce" checked="{{wechat.safe && wechat.reminderPreferences.announcement}}" disabled="{{!wechat.canChooseTypes || wechatAction}}" data-kind="announcement" bindchange="changeWechatPreference" /></view>
+      <view class="reminder-type-row"><view class="grow"><view>重置结果提醒</view><view class="small muted">收到完成声明或重置观测时提醒，并注明来源</view></view><switch aria-label="接收重置结果与来源观测提醒" color="#2458ce" checked="{{wechat.safe && wechat.reminderPreferences.result}}" disabled="{{!wechat.canChooseTypes || wechatAction}}" data-kind="result" bindchange="changeWechatPreference" /></view>
+      <view class="reminder-type-row"><view class="grow"><view>重要更正</view><view class="small muted">已发布的重置信息被更正时提醒</view></view><switch aria-label="接收重要更正" color="#2458ce" checked="{{wechat.safe && wechat.reminderPreferences.correction}}" disabled="{{!wechat.canChooseTypes || wechatAction}}" data-kind="correction" bindchange="changeWechatPreference" /></view>
     </view>
     <view wx:if="{{wechat.allTypesOff}}" class="reminder-paused">已暂停所有类型，剩余次数保留。开启任一类型即可继续接收新消息。</view>
     <view wx:elif="{{wechat.safe && !wechat.safe.preferencesSupported}}" class="small muted lead">提醒类型暂不可设置，请稍后重新加载。</view>
@@ -34,5 +32,4 @@
   </view>
   <button class="row-button" data-path="/pages/privacy/index" bindtap="navigate"><text>关于与隐私</text><text>→</text></button>
   <view class="foot">版本 {{clientVersion}}</view>
-  </block>
 </view>
