@@ -82,9 +82,9 @@ test('缓存读取悬挂200毫秒后退出，迟到回调无效，网络不用�
  let callback:any,timeout:any;const store=storage();await seed(store);const loader=createPublicSnapshot({getStorage(o:any){callback=o;}},config,{now:()=>baseTime,timers:{setTimeout(fn:any,ms:number){assert.equal(ms,200);timeout=fn;return 1;},clearTimeout(){}}});
  const work=loader.load();timeout();assert.equal(await work,null);callback.success({data:store.value});assert.equal(await work,null);
 });
-test('海报背景仅放在已有分包，内容原字节保留；提醒模板不再用整体遮罩',()=>{
+test('海报背景仅放在已有分包，内容原字节保留；提醒页复用整页加载与入场，不再有独立提醒骨架',()=>{
  for(const name of ['precision','editorial']){assert(existsSync(new URL('../miniprogram/packages/poster/'+name+'.jpg',import.meta.url)));assert(!existsSync(new URL('../miniprogram/assets/posters/'+name+'.jpg',import.meta.url)));}
- const view=readFileSync(new URL('../miniprogram/pages/settings/index.wxml',import.meta.url),'utf8');assert.doesNotMatch(view,/<page-loader/);assert.match(view,/wx:if="\{\{!settingsReady\}\}" class="card reminder-skeleton"/);assert.match(view,/inbox-card/);
+ const view=readFileSync(new URL('../miniprogram/pages/settings/index.wxml',import.meta.url),'utf8');assert.match(view,/<page-loader wx:if="\{\{!contentReady\}\}"/);assert.doesNotMatch(view,/reminder-skeleton|settled-reveal/);assert.match(view,/inbox-card/);
 });
 
 test('约100KB真实故障规模的ASCII公开资料可保存与恢复；中英文及emoji仍按实际容量限制',async()=>{

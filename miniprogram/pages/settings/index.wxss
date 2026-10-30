@@ -7,11 +7,8 @@
 .reminder-card .reminder-add.is-pending{color:#fff;background:linear-gradient(115deg,#1d45a3,#2458ce);border-color:#2458ce}
 .reminder-card .reminder-close.is-pending{color:#2458ce;background:#e8eef8;border-color:#91aaca}
 
-.reminder-skeleton{min-height:470px}.reminder-skeleton-count{width:100px;height:42px;background:#e8eef8;border-radius:8px;margin:22px 0 30px}.reminder-skeleton-line{height:65px;background:#eef3fa;border-radius:8px;margin:15px 0}.reminder-skeleton-button{height:46px;background:#e8eef8;border-radius:8px;margin-top:26px}
-
 .support-card{display:flex;align-items:center;gap:12px;min-height:88px;width:100%;background:linear-gradient(115deg,#e7f2ff,#f0edff);border:1px solid #d5e4f8;text-align:left;line-height:1.5;white-space:normal;margin:0 0 12px;padding:16px;border-radius:16px}.support-card::after{border:0}.support-icon{display:flex;align-items:center;justify-content:center;width:40px;height:40px;flex:none;background:#fff;color:#376ed5;font-size:24px;box-shadow:0 3px 10px #5c88ce12;font-weight:600;border-radius:12px}.support-copy{flex:1;min-width:0}.support-title{color:#294b7a;font-size:17px;font-weight:600}.support-caption{margin-top:4px;font-size:12px;color:#4d607b}.support-arrow{color:#467bd0;font-size:21px;flex:none}.support-card:active{background:#e4edfc}
 
 .support-icon image{width:28px;height:28px}
-.reminder-skeleton-count,.reminder-skeleton-line,.reminder-skeleton-button{animation:reminder-breathe 1.8s ease-in-out infinite}@keyframes reminder-breathe{0%,100%{opacity:.55}50%{opacity:1}}@media(prefers-reduced-motion:reduce){.reminder-skeleton-count,.reminder-skeleton-line,.reminder-skeleton-button{animation:none}}
 
 .inbox-pin{color:#2458ce;font-size:12px;font-weight:600}
