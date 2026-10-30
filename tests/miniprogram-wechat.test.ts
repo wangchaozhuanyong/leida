@@ -298,10 +298,10 @@ test('慢速首次读取在真实次数可用时展示整卡，授权准备只�
   };
   const page=pageHarness(h.reader).page('settings');
   try{
-    await flush();assert.equal(held.length,1);assert.equal(page.data.wechat.safe,null);assert.equal(page.data.wechat.remainingCount,null);assert.equal(page.data.settingsReady,false);
+    await flush();assert.equal(held.length,1);assert.equal(page.data.wechat.safe,null);assert.equal(page.data.wechat.remainingCount,null);assert.equal(page.data.settingsReady,false);assert.equal(page.data.contentReady,false);assert.equal(page.data.contentMotion,'');
     request(held.shift()!);await flush();
     assert.equal(held.length,1);assert.match(held[0].url,/challenge$/);
-    assert.equal(page.data.wechat.remainingCount,1);assert.equal(page.data.wechat.busy,true);assert.equal(page.data.settingsReady,true,'真实次数已返回，授权准备不再阻止整卡展示');
+    assert.equal(page.data.wechat.remainingCount,1);assert.equal(page.data.wechat.busy,true);assert.equal(page.data.settingsReady,true,'真实次数已返回，授权准备不再阻止整页展示');assert.equal(page.data.contentReady,true);assert.equal(page.data.contentMotion,'content-enter');
     assert.equal(page.data.wechat.ready,false);
     page.addWechat();await page.revokeWechat(true);assert.equal(h.subscribe,0);assert.equal(h.requests.some(r=>r.method==='DELETE'),false,'准备时不会新增授权或关闭提醒');
     page.onHide();page.onShow();
@@ -320,21 +320,21 @@ test('超过缓存时间切回仍立即保留次数，慢速核对返回后更�
       if(options.url.endsWith('/subscription')){held=options;return{abort(){}};}
       return request(options);
     };
-    page.onShow();assert.equal(page.data.wechat.remainingCount,1);
+    page.onShow();assert.equal(page.data.wechat.remainingCount,1);assert.equal(page.data.contentReady,true);assert.equal(page.data.contentMotion,'');
     await flush();assert.ok(held);assert.equal(page.data.wechat.remainingCount,1);assert.equal(page.data.settingsReady,true);assert.equal(page.data.wechatAction,'');
     request(held);held=undefined;await flush();
     assert.equal(page.data.wechat.remainingCount,0);assert.equal(h.login,1);assert.equal(h.subscribe,0);
   }finally{if(held)request(held);await flush();page.onUnload();}
 });
 
-test('提醒先就绪时独立展示，不等待站内信首次读取；站内信结果不改变提醒次数',async()=>{
+test('提醒先就绪时等待整页统一入场；站内信成功或失败都解除等待且不改变提醒次数',async()=>{
   for(const outcome of ['success','error','unconfigured']){
     const h=mock({state:'available',sessionMs:600000,challengeMs:300000});
     const harness=pageHarness(h.reader,{data:null,loading:true}),page=harness.page('settings');
     try{
-      await flush();assert.equal(page.data.wechat.ready,true);assert.equal(page.data.settingsReady,true);assert.equal(page.data.connected,false);
+      await flush();assert.equal(page.data.wechat.ready,true);assert.equal(page.data.settingsReady,true);assert.equal(page.data.connected,false);assert.equal(page.data.contentReady,false);assert.equal(page.data.contentMotion,'');
       harness.feed({loading:false,...(outcome==='success'?{data:harness.data}:outcome==='error'?{error:'站内信暂时无法读取'}:{unconfigured:true})});
-      assert.equal(page.data.settingsReady,true);assert.equal(page.data.wechat.remainingCount,1);
+      assert.equal(page.data.settingsReady,true);assert.equal(page.data.wechat.remainingCount,1);assert.equal(page.data.contentReady,true);assert.equal(page.data.contentMotion,outcome==='success'?'content-enter':'');
     }finally{page.onUnload();}
   }
 });
@@ -344,7 +344,7 @@ test('微信首次读取失败或需要隐私授权时显示可操作页面，�
     const h=mock(options),page=pageHarness(h.reader).page('settings');
     try{
       await flush();assert.equal(page.data.settingsReady,true);assert.equal(page.data.wechat.remainingCount,null);
-      assert.ok(page.data.wechat.error||page.data.wechat.privacyNeeded);assert.equal(page.data.wechatAction,'');assert.equal(h.subscribe,0);
+      assert.ok(page.data.wechat.error||page.data.wechat.privacyNeeded);assert.equal(page.data.contentReady,true);assert.equal(page.data.wechatAction,'');assert.equal(h.subscribe,0);
     }finally{page.onUnload();}
   }
 });
@@ -683,4 +683,14 @@ test('登录摘要保留关闭、已用完及未知结果，不把准备或进�
 });
 test('登录摘要仍先检查隐私；未同意前不请求身份或私人次数',async()=>{
  const h=mock({privacy:true,loginSnapshot:true});await h.reader.loadForPage();assert.equal(h.login,0);assert.equal(h.requests.length,0);assert.equal(h.reader.getState().remainingCount,null);assert.equal(h.reader.getState().privacyNeeded,true);
+});
+
+
+test('已入场后会话清理只清除私人次数，不让整个提醒页退回骨架',async()=>{
+  const h=mock({state:'available',loginSnapshot:true,sessionMs:600000,challengeMs:300000}),harness=pageHarness(h.reader),page=harness.page('settings');
+  try{
+    await flush();assert.equal(page.data.contentReady,true);page.onHide();page.onShow();
+    h.reader.clearSession();harness.feed({loading:true});
+    assert.equal(page.data.wechat.remainingCount,null);assert.equal(page.data.contentReady,true);assert.equal(page.data.contentMotion,'');assert.equal(h.subscribe,0);
+  }finally{page.onUnload();}
 });
