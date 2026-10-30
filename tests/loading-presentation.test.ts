@@ -81,7 +81,7 @@ test('快速请求移除占位时不闪骨架，持续等待才显示；卸载�
 test('真实切换页面后返回重播全局轻入场，后台返回和数据刷新不重播',()=>{
  const h=harness();h.ready();h.page.onHide();
  const other=h.sibling();other.onLoad({});other.onShow();assert.equal(other.data.contentMotion,'content-enter');other.onHide();
- h.page.onShow();assert.equal(h.page.data.contentMotion,'content-enter');assert.equal(h.page.data.title,'真实消息');
+ h.page.onShow();assert.equal(h.page.data.contentMotion,'content-return');assert.equal(h.page.data.title,'真实消息');
  const finish=[...h.timers.values()][0];h.timers.clear();finish();
  h.send({loading:true});assert.equal(h.page.data.contentMotion,'');h.page.onHide();h.page.onShow();assert.equal(h.page.data.contentMotion,'');h.page.onUnload();
 });
@@ -91,4 +91,14 @@ test('小程序全局等待只提供三个动态点，不绘制卡片或正文�
  assert.equal((template.match(/class="loading-dot"/g)||[]).length,3);assert.match(template,/role="status"/);
  assert.doesNotMatch(template+style,/bone|skeleton|loading-card|loading-calendar|loading-orbit|loading-pill/);
  assert.match(style,/prefers-reduced-motion/);assert.match(style,/loading-dot-pulse/);
+});
+
+
+test('已显示内容切回、刷新和动画结束均不先清空正文或重新进入首次淡入',()=>{
+ const h=harness();h.ready();h.page.onHide();const other=h.sibling();other.onLoad({});other.onShow();other.onHide();
+ const before=h.writes.length;h.page.onShow();
+ assert.equal(h.page.data.contentMotion,'content-return');assert.equal(h.page.data.items[0].id,'first');
+ assert.equal(h.writes.slice(before).some(frame=>frame.connected===false||frame.items?.length===0),false);
+ const finish=[...h.timers.values()][0];h.timers.clear();finish();assert.equal(h.page.data.contentMotion,'');assert.equal(h.page.data.items[0].id,'first');
+ h.send({loading:true});h.send({loading:false});assert.equal(h.page.data.contentMotion,'');assert.equal(h.timers.size,0);h.page.onUnload();
 });
