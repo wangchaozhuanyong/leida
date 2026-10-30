@@ -2,11 +2,11 @@ const {preserveNativeReturn}=require('../../utils/entry-navigation');
 const { createPage } = require('../../utils/page');
 const { noticeModel } = require('../../utils/model');
 // Bundled client version; keep this aligned with the development-tool upload.
-const buildVersion = '1.0.72';
+const buildVersion = '1.0.73';
 Page(createPage((data, query, page, app) => {
   const stored=app.preferences.snapshot(),notices=data?noticeModel(data,stored.preferences,stored.read):[];
   return { notices:notices.slice(0,3),unread:notices.filter(n=>!n.read).length,storageError:stored.error };
-}, { view:()=>({view:'notices'}),ready(state){return this.data.contentReady||this._wechatSettled&&(state.connected||!state.loading);},data: { contentReady:false,settingsReady:false,wechatAction:'',notices:[],unread:0,storageError: '', clientVersion:buildVersion, wechat:{safe:null,label:'加载中',busy:true,ready:false,canPrepare:false,canRevoke:false,error:'',privacyNeeded:false} },
+}, { view:()=>({view:'notices'}),data: { wechatAction:'',notices:[],unread:0,storageError: '', clientVersion:buildVersion, wechat:{safe:null,label:'加载中',busy:true,ready:false,canPrepare:false,canRevoke:false,error:'',privacyNeeded:false} },
   load(){
     try {
       const info=typeof wx.getAccountInfoSync==='function' ? wx.getAccountInfoSync().miniProgram : null;
@@ -14,22 +14,16 @@ Page(createPage((data, query, page, app) => {
       if(channel)this.setData({clientVersion:`${buildVersion} · ${channel}`});
     }catch(_){ /* Version information is optional and never blocks settings. */ }
   },
-  afterRender(){this.revealSettings();},
   show(){
     const reader=getApp().wechat;
-    if(!reader){this._wechatSettled=true;this.setData({'wechat.busy':false,'wechat.error':'微信提醒暂时无法读取，请重新打开小程序。'});this.revealSettings();return;}
+    if(!reader){this.setData({'wechat.busy':false,'wechat.error':'微信提醒暂时无法读取，请重新打开小程序。'});return;}
     this._wechatUnsubscribe=reader.subscribe(state=>{
       const displayed={...state};
       // Keep the tapped native switch in place while saving; an uncertain result
       // then restores the last confirmed choice through an actual checked change.
       if(this.data.wechatAction==='preferences'&&state.busy&&this._wechatPendingPreferences)displayed.reminderPreferences=this._wechatPendingPreferences;
       const patch={};for(const key of Object.keys(displayed))if(JSON.stringify(this.data.wechat?.[key])!==JSON.stringify(displayed[key]))patch['wechat.'+key]=displayed[key];
-      // A confirmed balance is readable before the next authorization is prepared.
-      // Keep the existing busy guards on actions; never reveal an invented count.
-      this._wechatSettled=!!state.safe||!state.busy&&!state.refreshing&&!!(state.error||state.privacyNeeded);
-      if(this.settingsCanReveal())patch.settingsReady=true;
       if(Object.keys(patch).length)this.setData(patch);
-      if(patch.settingsReady)this.redraw();
     });
     void this.loadWechat();
   },
@@ -39,8 +33,6 @@ Page(createPage((data, query, page, app) => {
   contactStart(){this._contactReturn=preserveNativeReturn();},
   contactReturn(){this._contactReturn?.finish();},
   contactError(){this._contactReturn?.cancel();wx.showToast({title:'客服会话暂不可用，请稍后重试',icon:'none'});},
-  settingsCanReveal(){return !this.data.settingsReady&&this._wechatSettled;},
-  revealSettings(){if(this.settingsCanReveal()){this.setData({settingsReady:true});if(this._visible)this.redraw();}},
   runWechatAction(action,work){
     this.setData({wechatAction:action});
     // Invoke work synchronously so WeChat subscription still belongs to the tap.
