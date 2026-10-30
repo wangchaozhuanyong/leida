@@ -12,7 +12,6 @@
     <view wx:if="{{error}}" class="warning">连接暂时中断，正在显示上次内容。<button class="text-button" bindtap="retry" loading="{{loading}}">重新连接 →</button></view>
     <view wx:if="{{historical}}" class="warning">当前公告为历史收录，不代表刚刚发放。</view>
     <view class="reset-tabs" role="tablist" aria-label="重置类型"><button wx:for="{{resetCards}}" wx:key="kind" data-kind="{{item.kind}}" bindtap="selectResetKind" class="reset-tab kind-{{item.kind}} {{selectedResetKind === item.kind ? 'selected' : ''}}" role="tab" aria-selected="{{selectedResetKind === item.kind}}" hover-class="tab-pressed"><image src="/assets/icons/{{item.kind==='banked_reset'?'card':'reset'}}.png" class="reset-tab-icon" aria-hidden="true"/><text>{{item.kind==='banked_reset'?'重置卡发放':'额度重置'}}</text></button></view>
-    <view wx:if="{{stateWarning}}" class="reset-state-warning">{{stateWarning}}</view>
     <block wx:for="{{resetCards}}" wx:key="kind"><template wx:if="{{selectedResetKind === item.kind}}" is="reset-state" data="{{card:item,expanded:expandedSourceKind===item.kind,collectedAt:collectedAt,motionAllowed:motionActive && !error}}"/></block>
     <view wx:if="{{untypedSignal}}" class="untyped-signal"><view class="untyped-title">发现相关消息</view><view>{{untypedSignal.description}}</view><view wx:if="{{untypedSignal.window}}">信号发布时推测：{{untypedSignal.window}}</view><button class="text-button" data-kind="untyped" bindtap="openStatusEvidence">查看信号依据 →</button><view wx:if="{{expandedSourceKind==='untyped'}}" class="reset-state-source"><view>来源：{{untypedSignal.sourceName}}</view><view>{{untypedSignal.watchNote}}</view><button wx:if="{{untypedSignal.sourceUrl}}" class="text-button" data-url="{{untypedSignal.sourceUrl}}" bindtap="copyStatusSource">复制来源原文链接 ↗</button></view></view>
     <view wx:if="{{signalExpiredNote}}" class="reset-expired">{{signalExpiredNote}}</view>
@@ -42,7 +41,7 @@
           </view>
         </view>
       </view>
-      <view wx:if="{{!(card.state==='observed' && card.hero.description==='来源：'+card.sourceName+'。' && card.hero.footnote==='实际额度以账户显示为准。')}}" class="orbit-message"><view class="orbit-description">{{card.hero.description}}</view><view class="orbit-footnote">{{card.hero.footnote}}</view></view>
+      <view wx:if="{{card.state!=='completed' && !(card.state==='observed' && card.hero.description==='来源：'+card.sourceName+'。' && card.hero.footnote==='实际额度以账户显示为准。')}}" class="orbit-message"><view class="orbit-description">{{card.hero.description}}</view><view class="orbit-footnote">{{card.hero.footnote}}</view></view>
     </view>
     <view class="orbit-facts">
       <view wx:if="{{card.timeAt}}" class="orbit-schedule"><view class="orbit-date-label">{{card.hero.timeLabel}}<view>北京时间</view></view><view class="orbit-date"><view>{{card.dateText || card.time}}</view><view wx:if="{{card.clockText}}" class="orbit-clock">{{card.clockText}}<view wx:if="{{card.timeQualifier}}" class="orbit-qualifier">{{card.timeQualifier}}</view></view></view></view>
