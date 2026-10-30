@@ -8,8 +8,13 @@ view,text,button,scroll-view{box-sizing:border-box}button{margin:0;font-size:14p
 @media(prefers-reduced-motion:reduce){button{transition:none}}
 
 /* Refresh feedback is owned by navigation-header on every live page. */
-/* A single first-ready entrance. Updates, clock ticks and native returns do not replay it. */
-.content-enter>view,.content-enter>publication-card{animation:content-arrive .24s cubic-bezier(.22,.7,.3,1) both}.content-enter>view:nth-child(2){animation-delay:.02s}.content-enter>view:nth-child(3){animation-delay:.04s}.content-enter>view:nth-child(n+4),.content-enter>publication-card{animation-delay:.06s}.settled-reveal{animation:content-arrive .24s cubic-bezier(.22,.7,.3,1) both}@keyframes content-arrive{from{opacity:.3;transform:translateY(-6px)}to{opacity:1;transform:none}}@media(prefers-reduced-motion:reduce){.content-enter>view,.content-enter>publication-card,.settled-reveal{animation:none!important;transform:none!important;opacity:1!important}}
+/* One shared motion: gentle first reveal; retained pages keep their brightness.
+   Lists and buttons move together rather than replaying staggered card flashes. */
+.content-enter>view,.content-enter>publication-card,.content-enter>button,.settled-reveal{animation:content-arrive .36s cubic-bezier(.22,1,.36,1) both}
+.content-return>view,.content-return>publication-card,.content-return>button{animation:content-settle .36s cubic-bezier(.22,1,.36,1) both}
+@keyframes content-arrive{from{opacity:.9;transform:translateY(-3px)}to{opacity:1;transform:none}}
+@keyframes content-settle{from{transform:translateY(-2px)}to{transform:none}}
+@media(prefers-reduced-motion:reduce){.content-enter>view,.content-enter>publication-card,.content-enter>button,.content-return>view,.content-return>publication-card,.content-return>button,.settled-reveal{animation:none!important;transform:none!important;opacity:1!important}}
 
 
 /* Shared page rhythm; safe-area height belongs exclusively to navigation-header. */

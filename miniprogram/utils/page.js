@@ -39,7 +39,8 @@ function createPage(build, extra = {}) {
     seen.add(key);
     if(seen.size>20)seen.delete(seen.values().next().value);
     if(page._entranceTimer)clearTimeout(page._entranceTimer);
-    patch.contentMotion='content-enter';
+    // Retained content is already visible when native tabs resume. Never dim it again.
+    patch.contentMotion=page._entryHadContent?'content-return':'content-enter';
     page._entranceTimer=setTimeout(()=>{
       page._entranceTimer=null;
       if(page._visible&&page._viewKey===key)page.setData({contentMotion:''});
@@ -102,7 +103,7 @@ function createPage(build, extra = {}) {
     onLoad(params) { setWindowBackground(); this._params = params || {}; if (extra.load) extra.load.call(this, params || {}); },
     // Keep native appearance setup on initial load. Retained tabs only need to
     // resume their subscriptions; their background is also declared in page-meta.
-    onShow() { if(enterPage(this,()=>this.onShow()))return;const app=getApp();this._visible=true;this._viewKey=JSON.stringify(this.readView());if(lastShownPage!==this)this._presentedViews?.delete(this._viewKey);lastShownPage=this;const work=app.client.setView&&app.client.setView(this.readView());this._unsubscribe = app.client.subscribe(state => render(this, state));if(extra.show)extra.show.call(this);foreground(this,work); },
+    onShow() { if(enterPage(this,()=>this.onShow()))return;const app=getApp();this._visible=true;this._entryHadContent=!!this.data.connected&&(!extra.presentable||extra.presentable.call(this,this.data));this._viewKey=JSON.stringify(this.readView());if(lastShownPage!==this)this._presentedViews?.delete(this._viewKey);lastShownPage=this;const work=app.client.setView&&app.client.setView(this.readView());this._unsubscribe = app.client.subscribe(state => render(this, state));if(extra.show)extra.show.call(this);foreground(this,work); },
     nativeReturnTouched(){getApp().entryNavigation?.touched();},
     onPageScroll(event) { if(this._viewKey){this._positions=this._positions||{};this._positions[this._viewKey]=event.scrollTop;} },
     onHide() { endPull(this);this._pullRefreshWork=null;stopEntrance(this);suspendEntry(this);this._visible=false;this._renderGeneration=(this._renderGeneration||0)+1;this._navigationGeneration=(this._navigationGeneration||0)+1;if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.hide)extra.hide.call(this); },
