@@ -18,7 +18,7 @@ function harness() {
   const definition=module.exports.createPage((data:any)=>({title:data?.title||'',items:data?.items||[]}),{view:(p:any)=>({view:'news',filter:p.filter||'all'})});
   const page={...definition,data:{...definition.data},setData(patch:any,done?:()=>void){writes.push(patch);Object.assign(this.data,patch);done?.();}};
   page.onLoad({});page.onShow();
-  return {page,timers,writes,send(patch:any){state={...state,...patch};listener?.(state);},ready(){this.send({data:{serverTime:new Date().toISOString(),publications:[],title:'真实消息',items:[{id:'first'}]},loading:false,error:''});}};
+  return {page,timers,writes,sibling(){return {...definition,data:{...definition.data},setData(patch:any,done?:()=>void){writes.push(patch);Object.assign(this.data,patch);done?.();}};},send(patch:any){state={...state,...patch};listener?.(state);},ready(){this.send({data:{serverTime:new Date().toISOString(),publications:[],title:'真实消息',items:[{id:'first'}]},loading:false,error:''});}};
 }
 
 test('冷启动占位不伪造业务内容；响应当次提交即显示，没有入场等待',()=>{
@@ -75,4 +75,20 @@ test('快速请求移除占位时不闪骨架，持续等待才显示；卸载�
  const fast:any=instance();definition.lifetimes.attached.call(fast);assert.equal(fast.data.visible,false);const late=timers.get(0)!;
  definition.lifetimes.detached.call(fast);assert.equal(timers.size,0);late();assert.equal(fast.writes.length,0);
  const slow:any=instance();definition.lifetimes.attached.call(slow);assert.equal(slow.data.visible,false);const show=timers.get(1)!;timers.delete(1);show();assert.equal(slow.data.visible,true);assert.equal(slow.writes.length,1);definition.lifetimes.detached.call(slow);
+});
+
+
+test('真实切换页面后返回重播全局轻入场，后台返回和数据刷新不重播',()=>{
+ const h=harness();h.ready();h.page.onHide();
+ const other=h.sibling();other.onLoad({});other.onShow();assert.equal(other.data.contentMotion,'content-enter');other.onHide();
+ h.page.onShow();assert.equal(h.page.data.contentMotion,'content-enter');assert.equal(h.page.data.title,'真实消息');
+ const finish=[...h.timers.values()][0];h.timers.clear();finish();
+ h.send({loading:true});assert.equal(h.page.data.contentMotion,'');h.page.onHide();h.page.onShow();assert.equal(h.page.data.contentMotion,'');h.page.onUnload();
+});
+test('小程序全局等待只提供三个动态点，不绘制卡片或正文骨架',()=>{
+ const template=readFileSync(new URL('../miniprogram/components/page-loader/index.wxml',import.meta.url),'utf8');
+ const style=readFileSync(new URL('../miniprogram/components/page-loader/index.wxss',import.meta.url),'utf8');
+ assert.equal((template.match(/class="loading-dot"/g)||[]).length,3);assert.match(template,/role="status"/);
+ assert.doesNotMatch(template+style,/bone|skeleton|loading-card|loading-calendar|loading-orbit|loading-pill/);
+ assert.match(style,/prefers-reduced-motion/);assert.match(style,/loading-dot-pulse/);
 });

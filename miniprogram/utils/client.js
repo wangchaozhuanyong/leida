@@ -46,6 +46,21 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
     }).finally(()=>{if(hydration?.promise===work)hydration=undefined;});
     hydration={key,promise:work};
   }
+  // Read each tab's existing public snapshot at launch, without waiting for the
+  // homepage request or serial network prefetch. Never reuse another view's data.
+  function primePublicSnapshots(){
+    const generation=prefetchEpoch;
+    for(const next of primaryViews){
+      const key=query(next);if(views.get(key)?.data)continue;
+      const snapshot=snapshotFor(next);if(!snapshot)continue;
+      void snapshot.load().then(saved=>{
+        if(!saved||suspended||generation!==prefetchEpoch||views.get(key)?.data)return;
+        const value={...empty(),data:saved.data,version:saved.version,contentVersion:saved.contentVersion,page:saved.page||null,receivedAt:saved.savedAt,snapshotPending:true,validatedAt:-Infinity,pagesLoaded:1};
+        views.set(key,value);pinnedKeys.add(key);
+        if(query(view)===key&&!state.data)emit({...value,loading:state.loading,error:state.error});
+      });
+    }
+  }
   const canPrefetch=()=>!suspended&&!pending&&!state.loading&&!state.snapshotPending&&!!state.data&&!state.error&&!state.unconfigured;
   function prefetch(next,queued=false){
     const key=query(next),cached=views.get(key);
@@ -177,7 +192,7 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
     },
     applyUpdates() { if(state.candidate)emit({...state.candidate,candidate:null,updateAvailable:false}); },
     more() { if(state.snapshotPending||state.moreError&&!state.page?.nextCursor)return refresh(false);if(state.candidate)emit({...state.candidate,candidate:null,updateAvailable:false}); return state.page?.nextCursor ? refresh(false,state.page.nextCursor) : Promise.resolve(); },
-    start() { if(active)return pending||Promise.resolve(); active=true;suspended=false;restoreSnapshot();const first=state.data&&!state.snapshotPending&&now()-lastCheckAt>=0&&now()-lastCheckAt<60000?Promise.resolve():refresh(!!state.data);first.finally(schedule);return first; },
+    start() { if(active)return pending||Promise.resolve(); active=true;suspended=false;restoreSnapshot();const first=state.data&&!state.snapshotPending&&now()-lastCheckAt>=0&&now()-lastCheckAt<60000?Promise.resolve():refresh(!!state.data);primePublicSnapshots();first.finally(schedule);return first; },
     stop() { active=false;suspended=true;prefetchEpoch++;warmQueue.length=0;if(prefetchTask)prefetchTask.task.abort();prefetchTask=undefined;cancel();if(timer!==undefined)timers.clearTimeout(timer);timer=undefined;emit({loading:false,loadingMore:false}); }
   };
 }

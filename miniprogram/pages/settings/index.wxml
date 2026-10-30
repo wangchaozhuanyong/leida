@@ -1,7 +1,7 @@
 <page-meta root-background-color="#f2f5fb" page-style="background-color:#f2f5fb" />
 <navigation-header pulling="{{pullRefreshing}}" icon="reminder" title="提醒" />
-<view wx:if="{{awaitingWechat}}" class="reminder-entry-wait" role="status" aria-label="正在读取提醒"><view></view><view></view><view></view></view>
-<view wx:if="{{!awaitingWechat}}" class="page {{contentMotion}}" bindtouchstart="nativeReturnTouched">
+<page-loader wx:if="{{awaitingWechat || navigationLoading}}" />
+<view wx:if="{{!awaitingWechat && !navigationLoading}}" class="page {{contentMotion}}" bindtouchstart="nativeReturnTouched">
   <view wx:if="{{storageError}}" class="warning">{{storageError}}</view>
   <view wx:if="{{snapshotPending && connected && !error}}" class="cached-content-note" role="status">正在更新上次内容</view>
   <view class="card inbox-card"><view class="row"><view class="heading">站内信 <text wx:if="{{unread}}" class="inbox-unread">{{unread}} 未读</text></view><button class="text-button" data-path="/pages/notices/index" bindtap="navigate">查看全部站内信 →</button></view>

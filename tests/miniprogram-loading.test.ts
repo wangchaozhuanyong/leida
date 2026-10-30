@@ -84,7 +84,7 @@ test('缓存读取悬挂200毫秒后退出，迟到回调无效，网络不用�
 });
 test('海报背景仅放在已有分包，内容原字节保留；提醒页直接沿用全局入场，不增加整页或局部骨架',()=>{
  for(const name of ['precision','editorial']){assert(existsSync(new URL('../miniprogram/packages/poster/'+name+'.jpg',import.meta.url)));assert(!existsSync(new URL('../miniprogram/assets/posters/'+name+'.jpg',import.meta.url)));}
- const view=readFileSync(new URL('../miniprogram/pages/settings/index.wxml',import.meta.url),'utf8');assert.doesNotMatch(view,/page-loader|reminder-skeleton|settled-reveal|contentReady/);assert.match(view,/inbox-card/);
+ const view=readFileSync(new URL('../miniprogram/pages/settings/index.wxml',import.meta.url),'utf8');assert.doesNotMatch(view,/reminder-skeleton|settled-reveal|contentReady/);assert.match(view,/<page-loader wx:if="{{awaitingWechat \|\| navigationLoading}}"/);assert.match(view,/inbox-card/);
 });
 
 test('约100KB真实故障规模的ASCII公开资料可保存与恢复；中英文及emoji仍按实际容量限制',async()=>{
@@ -171,4 +171,42 @@ test('连续点击同一预取页面复用同一个前台等待，预取中的�
   const a=client.setView({view:'calendar'}),b=client.setView({view:'calendar'});assert.equal(a,b);assert.equal(n.calls.length,2);
   n.reply(1,response('v2'));await Promise.all([a,b]);assert.equal(client.getState().version,'v2');assert.equal(client.getState().loading,false);assert.equal(n.calls.length,2);
  }finally{client.stop();}
+});
+
+
+test('启动即读取三个主页面的独立公开快照，首页请求未结束也能切页直显已有内容',async()=>{
+ const store=multiStorage();
+ for(const view of ['news','calendar','notices']){
+  const value=response('saved-'+view);value.data.site.name='saved-'+view;
+  createPublicSnapshot(store.api,config,{now:()=>baseTime,view}).save({...value,receivedAt:baseTime});
+ }
+ await flush();
+ const calls:any[]=[],client=createClient({wxApi:{...store.api,request(o:any){calls.push(o);return{abort(){}};}},config,now:()=>baseTime});
+ const home=client.start();await flush();assert.equal(calls.length,1,'读取缓存不额外发送网络请求');
+ for(const view of ['calendar','news','notices']){
+  const job=client.setView(view==='news'?{view,filter:'all'}:{view});
+  assert.equal(client.getState().data.site.name,'saved-'+view,'切换当次同步取得本页快照');assert.equal(client.getState().snapshotPending,true);
+  calls.at(-1).success({statusCode:200,data:response('fresh-'+view)});await job;
+ }
+ calls[0].success({statusCode:200,data:response('late-home')});await home;
+ assert.equal(client.getState().version,'fresh-notices');client.stop();
+});
+test('启动预读的旧快照晚返回不覆盖新网络数据',async()=>{
+ const store=multiStorage();const saved=response('old');saved.data.site.name='old';
+ createPublicSnapshot(store.api,config,{now:()=>baseTime,view:'calendar'}).save({...saved,receivedAt:baseTime});await flush();
+ const callbacks:any[]=[],calls:any[]=[],client=createClient({wxApi:{...store.api,getStorage(o:any){callbacks.push(o);},request(o:any){calls.push(o);return{abort(){}};}},config,now:()=>baseTime});
+ const home=client.start(),calendar=client.setView({view:'calendar'});
+ calls.at(-1).success({statusCode:200,data:response('new-network')});await calendar;
+ for(const cb of callbacks)cb.success({data:store.values.get('radar:public-'+(cb.key.includes('calendar')?'calendar':'none')+':v1')});
+ await flush();assert.equal(client.getState().version,'new-network');assert.equal(client.getState().snapshotPending,false);
+ calls[0].success({statusCode:200,data:response('late-home')});await home;client.stop();
+});
+
+test('退出后的启动快照回调不能填入另一页面缓存',async()=>{
+ const store=multiStorage();createPublicSnapshot(store.api,config,{now:()=>baseTime,view:'calendar'}).save({...response('saved'),receivedAt:baseTime});await flush();
+ const callbacks:any[]=[],calls:any[]=[],client=createClient({wxApi:{...store.api,getStorage(o:any){callbacks.push(o);},request(o:any){calls.push(o);return{abort(){}};}},config,now:()=>baseTime});
+ const home=client.start();client.stop();
+ for(const cb of [...callbacks])cb.success({data:store.values.get(cb.key)});await flush();
+ const calendar=client.setView({view:'calendar'});assert.equal(client.getState().data,null,'后台迟到快照没有填入页面缓存');
+ calls.at(-1).success({statusCode:200,data:response('foreground')});await calendar;calls[0].success({statusCode:200,data:response('late-home')});await home;client.stop();
 });
