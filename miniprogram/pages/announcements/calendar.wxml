@@ -3,8 +3,8 @@
   <status-panel wx:if="{{!connected}}" variant="calendar" loading="{{loading}}" unconfigured="{{unconfigured}}" error="{{error}}" bindretry="retry" />
   <block wx:else>
     <view wx:if="{{error}}" class="warning">{{error}}<button class="text-button" bindtap="retry">重新加载</button></view>
-    <view class="record-sheet">
-      <view class="month-calendar">
+    <view class="record-sheet motion-container">
+      <view class="month-calendar motion-step motion-step-0">
         <view class="month-heading">
           <view><picker mode="selector" range="{{months}}" range-key="label" value="{{monthIndex}}" bindchange="selectMonth"><view class="month-select">{{months[monthIndex].label}} ⌄</view></picker></view>
           <view class="month-controls"><button aria-label="上个月" disabled="{{monthIndex===months.length-1}}" bindtap="previousMonth">‹</button><button aria-label="下个月" disabled="{{monthIndex===0}}" bindtap="nextMonth">›</button></view>
@@ -16,7 +16,7 @@
         <view class="month-days"><block wx:for="{{days}}" wx:key="date"><view wx:if="{{item.blank}}" class="blank-day" /><button wx:else class="{{item.selected?'selected':''}} {{item.today?'today':''}}" disabled="{{item.disabled}}" aria-label="{{item.date}}，完成确认{{item.confirmedCount}}条，来源观测{{item.observedCount}}条" aria-pressed="{{item.selected}}" data-date="{{item.date}}" bindtap="selectDay" hover-class="day-pressed"><view class="day-number">{{item.day}}</view><view class="day-markers" aria-hidden="true"><view wx:if="{{item.confirmedAutomatic}}" class="record-dot automatic_reset"/><view wx:if="{{item.confirmedBanked}}" class="record-dot banked_reset"/><view wx:if="{{item.observed}}" class="record-dot observed"/></view></button></block></view>
         <view class="record-legend"><view><view class="record-dot automatic_reset"/>额度确认</view><view><view class="record-dot banked_reset"/>重置卡确认</view><view><view class="record-dot observed"/>来源观测</view></view>
       </view>
-      <view class="record-detail">
+      <view class="record-detail motion-step motion-step-1">
         <view class="record-heading"><text>{{selectedLabel}}</text><text class="record-count">{{selectedItems.length}} 条记录 · 北京时间</text></view>
         <block wx:for="{{selectedItems}}" wx:key="id">
           <button class="date-record" aria-label="{{item.title}}，{{item.timeLabel}} {{item.time}}，{{item.statusLabel}}，查看依据" data-path="{{item.path}}" bindtap="navigate"><text class="record-seal {{item.kind}} {{item.evidenceType}}" aria-hidden="true">{{item.evidenceType==='observed'?'◎':'✓'}}</text><view class="record-copy"><view class="record-meta"><text class="record-label {{item.kind}}">{{item.label}}</text><text class="record-status {{item.evidenceType}}">{{item.statusLabel}}</text><text class="record-time">{{item.time}}</text></view><view class="record-title">{{item.title}}</view><view wx:if="{{item.evidenceType==='observed'}}" class="record-source">{{item.isObservationSummary ? item.sourceCount+'个来源 · '+item.timeLabel+' '+item.time : item.sourceName}}</view></view><text class="record-chevron" aria-hidden="true">›</text></button>
@@ -25,7 +25,7 @@
         <view wx:if="{{!selectedItems.length}}" class="date-empty"><view>这一天暂无已收录记录</view><view class="small muted">选择有标记的日期，查看完成声明或来源观测。</view><button wx:if="{{recentDate && recentDate!==selected}}" class="text-button" bindtap="recentRecord">查看最近一次记录 →</button></view>
       </view>
     </view>
-    <view class="recent-reset-sheet">
+    <view class="recent-reset-sheet motion-step motion-step-2">
       <view class="recent-reset-heading"><text>近半年重置记录</text><text class="recent-reset-count">已显示 {{recentRecords.length}} / {{recentTotal}} 条</text></view>
       <view class="recent-reset-note">{{periodLabel}} · 北京时间</view>
       <block wx:for="{{recentRecords}}" wx:key="id"><button class="recent-reset-row" data-path="{{item.path}}" bindtap="navigate" aria-label="{{item.recordTitle}}，{{item.timeLabel}} {{item.date}} {{item.time}}，{{item.statusLabel}}{{item.sourceName ? '，'+item.sourceName : ''}}，查看依据" hover-class="recent-reset-pressed">
@@ -40,6 +40,6 @@
       <button wx:elif="{{recentHasMore}}" class="recent-reset-more" bindtap="moreRecords" hover-class="recent-reset-pressed">查看更早记录 ↓</button>
       <view wx:else class="recent-reset-end">已显示当前类型全部已收录记录</view>
     </view>
-    <view class="record-notes"><button aria-expanded="{{recordNotesOpen}}" bindtap="toggleRecordNotes"><text>近半年记录</text><text>收录说明 {{recordNotesOpen?'⌃':'⌄'}}</text></button><view wx:if="{{recordNotesOpen}}" class="record-note-copy">{{periodLabel}}<view>记录来自公开完成声明和第三方观测，均可查看来源。时间为北京时间；未收录的日期不代表没有重置。活动日期请以活动页标注为准。</view></view></view>
+    <view class="record-notes motion-step motion-step-3"><button aria-expanded="{{recordNotesOpen}}" bindtap="toggleRecordNotes"><text>近半年记录</text><text>收录说明 {{recordNotesOpen?'⌃':'⌄'}}</text></button><view wx:if="{{recordNotesOpen}}" class="record-note-copy">{{periodLabel}}<view>记录来自公开完成声明和第三方观测，均可查看来源。时间为北京时间；未收录的日期不代表没有重置。活动日期请以活动页标注为准。</view></view></view>
   </block>
 </view>
