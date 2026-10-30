@@ -30,6 +30,7 @@ function createPage(build, extra = {}) {
     if(!patch.connected||(extra.presentable&&!extra.presentable.call(page,patch))){
       if(page._entranceTimer)clearTimeout(page._entranceTimer);
       page._entranceTimer=null;
+      page._entryRetainedKey=null;
       patch.contentMotion='';
       return;
     }
@@ -39,12 +40,13 @@ function createPage(build, extra = {}) {
     seen.add(key);
     if(seen.size>20)seen.delete(seen.values().next().value);
     if(page._entranceTimer)clearTimeout(page._entranceTimer);
-    // The old page is primed while hidden, before native tab presentation resumes.
-    patch.contentMotion='content-enter';
+    // Only a previously presented, still-available view uses the shorter return.
+    const retained=page._entryRetainedKey===key;
+    patch.contentMotion=retained?'content-return':'content-enter';
     page._entranceTimer=setTimeout(()=>{
       page._entranceTimer=null;
       if(page._visible&&page._viewKey===key)page.setData({contentMotion:''});
-    },1000);
+    },retained?350:650);
   }
   function foreground(page, work) {
     const generation=(page._navigationGeneration||0)+1;page._navigationGeneration=generation;
@@ -103,7 +105,7 @@ function createPage(build, extra = {}) {
     onLoad(params) { setWindowBackground(); this._params = params || {}; if (extra.load) extra.load.call(this, params || {}); },
     // Keep native appearance setup on initial load. Retained tabs only need to
     // resume their subscriptions; their background is also declared in page-meta.
-    onShow() { if(enterPage(this,()=>this.onShow()))return;const app=getApp();this._visible=true;this._viewKey=JSON.stringify(this.readView());if(lastShownPage!==this){const previous=lastShownPage;if(previous&&!previous._visible&&!previous._unloaded&&previous.data.connected)previous.setData({contentMotion:'content-primed'});this._presentedViews?.delete(this._viewKey);}lastShownPage=this;const work=app.client.setView&&app.client.setView(this.readView());this._unsubscribe = app.client.subscribe(state => render(this, state));if(extra.show)extra.show.call(this);foreground(this,work); },
+    onShow() { if(enterPage(this,()=>this.onShow()))return;const app=getApp();this._visible=true;this._viewKey=JSON.stringify(this.readView());this._entryRetainedKey=this.data.connected&&(!extra.presentable||extra.presentable.call(this,this.data))&&this._presentedViews?.has(this._viewKey)?this._viewKey:null;if(lastShownPage!==this){const previous=lastShownPage;if(previous&&!previous._visible&&!previous._unloaded&&previous.data.connected)previous.setData({contentMotion:'content-primed'});this._presentedViews?.delete(this._viewKey);}lastShownPage=this;const work=app.client.setView&&app.client.setView(this.readView());this._unsubscribe = app.client.subscribe(state => render(this, state));if(extra.show)extra.show.call(this);foreground(this,work); },
     nativeReturnTouched(){getApp().entryNavigation?.touched();},
     onPageScroll(event) { if(this._viewKey){this._positions=this._positions||{};this._positions[this._viewKey]=event.scrollTop;} },
     onHide() { endPull(this);this._pullRefreshWork=null;stopEntrance(this);suspendEntry(this);this._visible=false;this._renderGeneration=(this._renderGeneration||0)+1;this._navigationGeneration=(this._navigationGeneration||0)+1;if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.hide)extra.hide.call(this); },

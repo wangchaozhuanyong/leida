@@ -8,15 +8,36 @@ view,text,button,scroll-view{box-sizing:border-box}button{margin:0;font-size:14p
 @media(prefers-reduced-motion:reduce){button{transition:none}}
 
 /* Refresh feedback is owned by navigation-header on every live page. */
-/* Prepare retained content only while hidden; reveal actual groups top to bottom.
-   All groups use one bounded 70ms cadence, finishing within 910ms. */
+/* Shared top-to-bottom entry: first content within 600ms, retained return within 300ms.
+   Prepare retained content only while hidden; requests and gestures keep their own lifecycle. */
 .content-primed>view:not(.motion-static):not(.motion-container),.content-primed>publication-card,.content-primed>button,.content-primed .motion-step{opacity:0;transform:translateY(-8px)}
-.content-enter>view:not(.motion-static):not(.motion-container),.content-enter>publication-card,.content-enter>button,.content-enter .motion-step,.settled-reveal{animation:content-arrive .42s cubic-bezier(.22,.8,.24,1) both}
-.content-enter>view:nth-child(2),.content-enter>publication-card:nth-child(2),.content-enter>button:nth-child(2){animation-delay:.07s}.content-enter>view:nth-child(3),.content-enter>publication-card:nth-child(3),.content-enter>button:nth-child(3){animation-delay:.14s}.content-enter>view:nth-child(4),.content-enter>publication-card:nth-child(4),.content-enter>button:nth-child(4){animation-delay:.21s}.content-enter>view:nth-child(5),.content-enter>publication-card:nth-child(5),.content-enter>button:nth-child(5){animation-delay:.28s}.content-enter>view:nth-child(6),.content-enter>publication-card:nth-child(6),.content-enter>button:nth-child(6){animation-delay:.35s}.content-enter>view:nth-child(7),.content-enter>publication-card:nth-child(7),.content-enter>button:nth-child(7){animation-delay:.42s}.content-enter>view:nth-child(n+8),.content-enter>publication-card:nth-child(n+8),.content-enter>button:nth-child(n+8){animation-delay:.49s}
-.content-enter .motion-step-0{animation-delay:0s}.content-enter .motion-step-1{animation-delay:.07s}.content-enter .motion-step-2{animation-delay:.14s}.content-enter .motion-step-3{animation-delay:.21s}
+.content-enter>view:not(.motion-static):not(.motion-container),.content-enter>publication-card,.content-enter>button,.content-enter .motion-step,.settled-reveal{animation:content-arrive .32s cubic-bezier(.22,.8,.24,1) both}
+.content-return>view:not(.motion-static):not(.motion-container),.content-return>publication-card,.content-return>button,.content-return .motion-step{animation:content-return-arrive .18s cubic-bezier(.22,.8,.24,1) both}
+.content-enter>view:nth-child(2),.content-enter>publication-card:nth-child(2),.content-enter>button:nth-child(2){animation-delay:0.04s}
+.content-enter>view:nth-child(3),.content-enter>publication-card:nth-child(3),.content-enter>button:nth-child(3){animation-delay:0.08s}
+.content-enter>view:nth-child(4),.content-enter>publication-card:nth-child(4),.content-enter>button:nth-child(4){animation-delay:0.12s}
+.content-enter>view:nth-child(5),.content-enter>publication-card:nth-child(5),.content-enter>button:nth-child(5){animation-delay:0.16s}
+.content-enter>view:nth-child(6),.content-enter>publication-card:nth-child(6),.content-enter>button:nth-child(6){animation-delay:0.20s}
+.content-enter>view:nth-child(7),.content-enter>publication-card:nth-child(7),.content-enter>button:nth-child(7){animation-delay:0.24s}
+.content-enter>view:nth-child(n+8),.content-enter>publication-card:nth-child(n+8),.content-enter>button:nth-child(n+8){animation-delay:0.28s}
+.content-enter .motion-step-0{animation-delay:0.00s}
+.content-enter .motion-step-1{animation-delay:0.04s}
+.content-enter .motion-step-2{animation-delay:0.08s}
+.content-enter .motion-step-3{animation-delay:0.12s}
+.content-return>view:nth-child(2),.content-return>publication-card:nth-child(2),.content-return>button:nth-child(2){animation-delay:0.02s}
+.content-return>view:nth-child(3),.content-return>publication-card:nth-child(3),.content-return>button:nth-child(3){animation-delay:0.04s}
+.content-return>view:nth-child(4),.content-return>publication-card:nth-child(4),.content-return>button:nth-child(4){animation-delay:0.06s}
+.content-return>view:nth-child(5),.content-return>publication-card:nth-child(5),.content-return>button:nth-child(5){animation-delay:0.08s}
+.content-return>view:nth-child(6),.content-return>publication-card:nth-child(6),.content-return>button:nth-child(6){animation-delay:0.10s}
+.content-return>view:nth-child(7),.content-return>publication-card:nth-child(7),.content-return>button:nth-child(7){animation-delay:0.12s}
+.content-return>view:nth-child(n+8),.content-return>publication-card:nth-child(n+8),.content-return>button:nth-child(n+8){animation-delay:0.12s}
+.content-return .motion-step-0{animation-delay:0.00s}
+.content-return .motion-step-1{animation-delay:0.02s}
+.content-return .motion-step-2{animation-delay:0.04s}
+.content-return .motion-step-3{animation-delay:0.06s}
 @keyframes content-arrive{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
-@media(prefers-reduced-motion:reduce){.content-primed>view,.content-primed>publication-card,.content-primed>button,.content-primed .motion-step,.content-enter>view,.content-enter>publication-card,.content-enter>button,.content-enter .motion-step,.settled-reveal{animation:none!important;transform:none!important;opacity:1!important}}
-
+@keyframes content-return-arrive{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.content-primed>view,.content-primed>publication-card,.content-primed>button,.content-enter>view,.content-enter>publication-card,.content-enter>button,.content-return>view,.content-return>publication-card,.content-return>button,.content-primed .motion-step,.content-enter .motion-step,.content-return .motion-step,.settled-reveal{animation:none!important;transform:none!important;opacity:1!important}}
 
 
 /* Shared page rhythm; safe-area height belongs exclusively to navigation-header. */
