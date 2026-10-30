@@ -18,10 +18,14 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
   let prefetchTask, prefetchEpoch = 0;
   const warmQueue=[],snapshots=new Map();
   const primaryViews=[{view:'calendar'},{view:'news',filter:'all'},{view:'notices'}];
+  const newsViews=[{view:'news',filter:'all'},{view:'news',filter:'activity'},{view:'news',filter:'product'},{view:'history',filter:'all'}];
+  const resetViews=[{view:'history',filter:'automatic_reset'},{view:'history',filter:'banked_reset'}];
   function snapshotFor(target){
-    if(!['home','calendar','news','notices'].includes(target.view)||Object.keys(target).some(key=>key!=='view'&&(key!=='filter'||target.view!=='news'||!['','all',undefined].includes(target.filter))))return null;
-    if(!snapshots.has(target.view))snapshots.set(target.view,createPublicSnapshot(wxApi,config,{now,timers,view:target.view}));
-    return snapshots.get(target.view);
+    const filter=target.filter||'all';
+    if(!['home','calendar','news','notices','history'].includes(target.view)||Object.keys(target).some(key=>key!=='view'&&key!=='filter')||!(target.view==='news'?['all','activity','product'].includes(filter):target.view==='history'?['all','automatic_reset','banked_reset'].includes(filter):filter==='all'))return null;
+    const key=target.view+':'+filter;
+    if(!snapshots.has(key))snapshots.set(key,createPublicSnapshot(wxApi,config,{now,timers,view:target.view,filter}));
+    return snapshots.get(key);
   }
   let hydration,networkRevision=0;
   const emit = patch => {
@@ -50,7 +54,7 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
   // homepage request or serial network prefetch. Never reuse another view's data.
   function primePublicSnapshots(){
     const generation=prefetchEpoch;
-    for(const next of primaryViews){
+    for(const next of [...primaryViews,...newsViews.slice(1),...resetViews]){
       const key=query(next);if(views.get(key)?.data)continue;
       const snapshot=snapshotFor(next);if(!snapshot)continue;
       void snapshot.load().then(saved=>{
@@ -169,6 +173,14 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
     prefetchPrimaryViews(){
       for(const next of primaryViews)if(query(next)!==query(view)&&!warmQueue.some(item=>query(item)===query(next))&&prefetchTask?.key!==query(next))warmQueue.push(next);
       pumpPrefetch();
+    },
+    // Warm only bounded, exact category responses while public content is ready.
+    // Pagination and counts remain those returned for that category, never a
+    // filtered fragment of the default feed's first page.
+    prefetchNewsViews(){
+      const targets=view.view==='history'?[...newsViews,...resetViews]:newsViews;
+      const queued=targets.filter(next=>query(next)!==query(view)&&!warmQueue.some(item=>query(item)===query(next))&&prefetchTask?.key!==query(next));
+      warmQueue.unshift(...queued);pumpPrefetch();
     },
     setView(next) {
       if (query(next)===query(view)) {restoreSnapshot();return current() ? pending||Promise.resolve() : refresh(true);}
