@@ -1,7 +1,7 @@
 const {validateBootstrap}=require('./transport');
 const {currentModel}=require('./cadence');
 const MAX_AGE=86400000;
-const limits={home:262144,news:262144,calendar:524288,notices:262144};
+const limits={home:262144,news:262144,calendar:524288,notices:262144,history:262144};
 // Count encoded bytes, not the worst case for every character. Works without
 // Buffer/TextEncoder in the native runtime and stops once the bound is crossed.
 function utf8Size(text,limit){
@@ -33,18 +33,19 @@ function projection(data){
  return JSON.parse(JSON.stringify(result,(key,value)=>/^(?:authorization|cookie|password|secret|appsecret|token|sessiontoken|apikey|privatekey|nonce|openid|unionid|code)$/i.test(key)?undefined:value));
 }
 const connection=config=>JSON.stringify([config.mode,config.baseUrl||'',config.cloudEnv||'',config.serviceName||'']);
-function validEnvelope(value,config,now,view){
+function validEnvelope(value,config,now,view,scope=view){
  try{
   const limit=limits[view];
-  if(!limit||!value||value.schema!==view+'-v1:'+currentModel||value.connection!==connection(config)||typeof value.version!=='string'||!value.version||typeof value.contentVersion!=='string'
+  if(!limit||!value||value.schema!==scope+'-v1:'+currentModel||value.connection!==connection(config)||typeof value.version!=='string'||!value.version||typeof value.contentVersion!=='string'
    ||!Number.isFinite(value.savedAt)||now<value.savedAt||now-value.savedAt>=MAX_AGE||utf8Size(JSON.stringify(value),limit)>limit||!validateBootstrap(value.data))return false;
   if(value.page&&(!Array.isArray(value.page.ids)||!value.page.ids.every(id=>typeof id==='string')||!(value.page.nextCursor===null||typeof value.page.nextCursor==='string')||!Number.isSafeInteger(value.page.total)||value.page.total<0))return false;
   const data=value.data,events=new Set(data.events.map(e=>e.id)),articles=new Set(data.articles.map(a=>a.id));
   return data.publications.every(p=>events.has(p.eventId)&&articles.has(p.articleId))&&Number.isFinite(Date.parse(data.serverTime))&&Date.parse(data.serverTime)<=value.savedAt+300000;
  }catch(_){return false;}
 }
-function createPublicSnapshot(wxApi,config,{now=Date.now,timers={setTimeout,clearTimeout},view='home'}={}){
- const supported=Object.prototype.hasOwnProperty.call(limits,view),key='radar:public-'+view+':v1';
+function createPublicSnapshot(wxApi,config,{now=Date.now,timers={setTimeout,clearTimeout},view='home',filter='all'}={}){
+ const supported=Object.prototype.hasOwnProperty.call(limits,view)&&(view==='news'?['all','activity','product'].includes(filter):view==='history'?['all','automatic_reset','banked_reset'].includes(filter):filter==='all');
+ const scope=view+(filter==='all'?'':':'+filter),key='radar:public-'+scope+':v1';
  let queued,writing=false;
  function flush(){
   if(writing||!queued||typeof wxApi.setStorage!=='function')return;
@@ -58,14 +59,14 @@ function createPublicSnapshot(wxApi,config,{now=Date.now,timers={setTimeout,clea
    return new Promise(resolve=>{
     let settled=false;const finish=value=>{if(settled)return;settled=true;timers.clearTimeout(timeout);resolve(value);};
     const timeout=timers.setTimeout(()=>finish(null),200);
-    try{wxApi.getStorage({key,success:({data})=>{try{finish(validEnvelope(data,config,now(),view)?{...data,data:projection(data.data)}:null);}catch(_){finish(null);}},fail:()=>finish(null)});}catch(_){finish(null);}
+    try{wxApi.getStorage({key,success:({data})=>{try{finish(validEnvelope(data,config,now(),view,scope)?{...data,data:projection(data.data)}:null);}catch(_){finish(null);}},fail:()=>finish(null)});}catch(_){finish(null);}
    });
   },
   save(state){
    try{
     if(!supported||(state.pagesLoaded||1)>1)return;
-    const value={schema:view+'-v1:'+currentModel,connection:connection(config),version:state.version,contentVersion:state.contentVersion||'',savedAt:state.receivedAt,data:projection(state.data),...(state.page?{page:pick(state.page,'ids nextCursor total')}:{})};
-    if(!validEnvelope(value,config,now(),view))return;
+    const value={schema:scope+'-v1:'+currentModel,connection:connection(config),version:state.version,contentVersion:state.contentVersion||'',savedAt:state.receivedAt,data:projection(state.data),...(state.page?{page:pick(state.page,'ids nextCursor total')}:{})};
+    if(!validEnvelope(value,config,now(),view,scope))return;
     queued=value;flush();
    }catch(_){/* Storage is optional; network and navigation remain available. */}
   }

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {readFileSync,existsSync} from 'node:fs';
+import {Script} from 'node:vm';
 const require=createRequire(import.meta.url);
 const {createClient}=require('../miniprogram/utils/client');
 const {createPublicSnapshot}=require('../miniprogram/utils/public-snapshot');
@@ -21,7 +22,7 @@ function multiStorage(){
  const values=new Map<string,any>(),writes:string[]=[];
  return {values,writes,api:{getStorage(o:any){queueMicrotask(()=>values.has(o.key)?o.success({data:structuredClone(values.get(o.key))}):o.fail());},setStorage(o:any){values.set(o.key,structuredClone(o.data));writes.push(o.key);queueMicrotask(()=>o.success?.());}}};
 }
-function network(store=storage(),clock=baseTime){const calls:any[]=[];let now=clock;const api={...store.api,request(o:any){calls.push(o);return{abort(){}};}};return {calls,store,api,now:()=>now,advance:(ms:number)=>now+=ms,reply(i:number,body=response(),status=200){calls[i].success({statusCode:status,data:body});},client(){return createClient({wxApi:api,config,now:()=>now});}};}
+function network(store:ReturnType<typeof storage>|ReturnType<typeof multiStorage>=storage(),clock=baseTime){const calls:any[]=[];let now=clock;const api={...store.api,request(o:any){calls.push(o);return{abort(){}};}};return {calls,store,api,now:()=>now,advance:(ms:number)=>now+=ms,reply(i:number,body=response(),status=200){calls[i].success({statusCode:status,data:body});},client(){return createClient({wxApi:api,config,now:()=>now});}};}
 async function seed(store:ReturnType<typeof storage>,value=response(),time=baseTime){createPublicSnapshot(store.api,config,{now:()=>time}).save({...value,receivedAt:time});await flush();assert(store.value);}
 
 test('冷启动并行读取快照和一个首页请求；快照先显示但不能视为已联网验证',async()=>{
@@ -209,4 +210,82 @@ test('退出后的启动快照回调不能填入另一页面缓存',async()=>{
  for(const cb of [...callbacks])cb.success({data:store.values.get(cb.key)});await flush();
  const calendar=client.setView({view:'calendar'});assert.equal(client.getState().data,null,'后台迟到快照没有填入页面缓存');
  calls.at(-1).success({statusCode:200,data:response('foreground')});await calendar;calls[0].success({statusCode:200,data:response('late-home')});await home;client.stop();
+});
+
+
+const categoryViews=[{view:'news',filter:'all'},{view:'news',filter:'activity'},{view:'news',filter:'product'},{view:'history',filter:'all'},{view:'history',filter:'automatic_reset'},{view:'history',filter:'banked_reset'}];
+const categoryResponse=(name:string)=>{const value=response();value.data.site.name=name;return {...value,page:{ids:['p1'],total:23,nextCursor:'category-next'}};};
+test('六种动态分类快照独立保存来源、类型、分页与真实总数，不存私人提醒状态',async()=>{
+ const store=multiStorage();
+ for(const target of categoryViews){
+  const value=categoryResponse(target.view+':'+target.filter);(value.data as any).wechat={remainingCount:123,sessionToken:'PRIVATE_CATEGORY_FIXTURE'};
+  const snapshot=createPublicSnapshot(store.api,config,{now:()=>baseTime,...target});snapshot.save({...value,receivedAt:baseTime});await flush();
+  const saved=await snapshot.load();assert.equal(saved.data.site.name,target.view+':'+target.filter);assert.deepEqual(saved.page,{ids:['p1'],total:23,nextCursor:'category-next'});
+ }
+ assert.equal(store.values.size,6);assert.doesNotMatch(JSON.stringify([...store.values]),/PRIVATE_CATEGORY_FIXTURE|remainingCount/);
+ const productKey='radar:public-news:product:v1',original=store.values.get(productKey);store.values.set(productKey,store.values.get('radar:public-news:activity:v1'));
+ assert.equal(await createPublicSnapshot(store.api,config,{now:()=>baseTime,view:'news',filter:'product'}).load(),null,'错放的另一分类不能作为当前分类');store.values.set(productKey,original);
+ for(const extra of [{now:()=>baseTime+86400000},{now:()=>baseTime-1}])assert.equal(await createPublicSnapshot(store.api,config,{view:'news',filter:'product',...extra}).load(),null);
+ assert.equal(await createPublicSnapshot(store.api,{...config,baseUrl:'https://another.example.org'},{now:()=>baseTime,view:'news',filter:'product'}).load(),null);
+ for(const target of [{view:'news',filter:'unknown'},{view:'home',filter:'product'},{view:'history',filter:'product'}]){const invalid=createPublicSnapshot(store.api,config,{now:()=>baseTime,...target});invalid.save({...response(),receivedAt:baseTime});assert.equal(await invalid.load(),null);}
+ assert.equal(store.values.size,6);
+});
+test('动态分类按精确请求串行预读；点击在途分类复用，预读完成后连续切换不清空也不请求',async()=>{
+ const n=network(),client=n.client(),frames:any[]=[];client.subscribe((state:any)=>frames.push(state));
+ try{
+  const first=client.setView({view:'news',filter:'all'});n.reply(0,categoryResponse('all'));await first;
+  client.prefetchNewsViews();client.prefetchNewsViews();assert.equal(n.calls.length,2);assert.match(n.calls[1].url,/filter=activity&view=news/);
+  const enter=client.setView({view:'news',filter:'activity'});assert.equal(n.calls.length,2,'同一分类共享正在预读的请求');n.reply(1,categoryResponse('activity'));await enter;await flush();
+  assert.equal(n.calls.length,3);assert.match(n.calls[2].url,/filter=product&view=news/);n.reply(2,categoryResponse('product'));await flush();
+  assert.equal(n.calls.length,4);assert.match(n.calls[3].url,/filter=all&view=history/);n.reply(3,categoryResponse('reset'));await flush();
+  for(const [target,name] of [[{view:'news',filter:'product'},'product'],[{view:'history',filter:'all'},'reset'],[{view:'news',filter:'all'},'all'],[{view:'news',filter:'activity'},'activity']] as const){
+   const before=frames.length,work=client.setView(target);assert.equal(client.getState().data.site.name,name);assert.equal(client.getState().page.total,23);assert.equal(frames.slice(before).some(s=>!s.data),false);await work;
+  }
+  assert.equal(n.calls.length,4);client.prefetchNewsViews();await flush();assert.equal(n.calls.length,4,'有效分类重复调度不增加请求');
+ }finally{client.stop();}
+});
+test('打开重置分类后才预读两种福利筛选，发卡与额度总数和游标各自保留',async()=>{
+ const n=network(),client=n.client();
+ try{
+  const first=client.setView({view:'history',filter:'all'});n.reply(0,categoryResponse('reset'));await first;client.prefetchNewsViews();
+  const expected=[['filter=all&view=news','all'],['filter=activity&view=news','activity'],['filter=product&view=news','product'],['filter=automatic_reset&view=history','automatic'],['filter=banked_reset&view=history','banked']];
+  for(let i=0;i<expected.length;i++){assert.ok(n.calls[i+1].url.endsWith(expected[i][0]));const value=categoryResponse(expected[i][1]);value.page.total=i+30;value.page.nextCursor='cursor-'+i;n.reply(i+1,value);await flush();}
+  const count=n.calls.length;await client.setView({view:'history',filter:'banked_reset'});assert.equal(client.getState().data.site.name,'banked');assert.equal(client.getState().page.total,34);assert.equal(client.getState().page.nextCursor,'cursor-4');
+  await client.setView({view:'history',filter:'automatic_reset'});assert.equal(client.getState().data.site.name,'automatic');assert.equal(client.getState().page.total,33);assert.equal(n.calls.length,count);
+ }finally{client.stop();}
+});
+test('重开后分类缓存同步恢复；旧分类迟到响应不能覆盖新分类，失败保留本分类内容',async()=>{
+ const store=multiStorage();
+ for(const target of categoryViews){const value=categoryResponse(target.view+':'+target.filter);createPublicSnapshot(store.api,config,{now:()=>baseTime,...target}).save({...value,receivedAt:baseTime});}await flush();
+ const n=network(store),client=n.client();
+ try{
+  const home=client.start();await flush();assert.equal(n.calls.length,1,'启动读取分类快照不增加网络调用');
+  const product=client.setView({view:'news',filter:'product'});assert.equal(client.getState().data.site.name,'news:product');assert.equal(client.getState().snapshotPending,true);
+  const activity=client.setView({view:'news',filter:'activity'});assert.equal(client.getState().data.site.name,'news:activity');assert.equal(client.getState().page.total,23);
+  n.reply(1,categoryResponse('late-product'));await product;assert.equal(client.getState().data.site.name,'news:activity');n.calls[2].fail();await activity;assert.ok(client.getState().error);assert.equal(client.getState().data.site.name,'news:activity');
+  n.reply(0,categoryResponse('late-home'));await home;assert.equal(client.getState().data.site.name,'news:activity');
+ }finally{client.stop();}
+});
+test('分类预读失败不清空当前正文、不循环重试；后台取消后迟到结果无效',async()=>{
+ const n=network(),client=n.client();
+ try{
+  const first=client.setView({view:'news',filter:'all'});n.reply(0,categoryResponse('all'));await first;client.prefetchNewsViews();
+  n.calls[1].fail();await flush();assert.equal(client.getState().data.site.name,'all');assert.equal(client.getState().error,'');assert.equal(n.calls.length,3);assert.match(n.calls[2].url,/filter=product/);
+  client.stop();n.reply(2,categoryResponse('late-product'));await flush();assert.equal(client.getState().data.site.name,'all');assert.equal(n.calls.length,3);
+ }finally{client.stop();}
+});
+test('动态页重复点击当前分类不重载，分类就绪才调度一次预读，隐藏后停止调度',()=>{
+ let definition:any,warm=0,reloads=0;
+ new Script(readFileSync(new URL('../miniprogram/pages/news/index.js',import.meta.url),'utf8')).runInNewContext({
+  Page(value:any){definition=value;},getApp:()=>({client:{prefetchNewsViews(){warm++;}}}),
+  require:(name:string)=>name.includes('/page')?{createPage:(_build:any,extra:any)=>extra}:{}
+ });
+ const page={...definition.methods,_visible:true,data:{...definition.data,connected:true,snapshotPending:false,loading:false,error:''},setData(patch:any){Object.assign(this.data,patch);},reloadView(){reloads++;}};
+ const tap=(value:string)=>({currentTarget:{dataset:{value}}});
+ page.selectCategory(tap('all'));page.selectKind(tap('all'));page.selectCategory(tap('invalid'));assert.equal(reloads,0);
+ definition.afterRender.call(page);definition.afterRender.call(page);assert.equal(warm,1);
+ page.selectCategory(tap('product'));assert.equal(page.data.category,'product');assert.equal(reloads,1);definition.afterRender.call(page);assert.equal(warm,2);
+ page.data.loading=true;page.selectCategory(tap('reset'));definition.afterRender.call(page);assert.equal(warm,2);page.data.loading=false;definition.afterRender.call(page);assert.equal(warm,3);
+ page.selectKind(tap('banked_reset'));assert.equal(page.data.kind,'banked_reset');assert.equal(reloads,3);definition.afterRender.call(page);assert.equal(warm,4);
+ definition.hide.call(page);page._visible=false;definition.afterRender.call(page);assert.equal(warm,4);
 });
