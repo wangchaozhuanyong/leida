@@ -10,15 +10,15 @@ import {LoadingContent} from '../src/components/public/LoadingContent';
 function harness() {
   const source=new URL('../miniprogram/utils/page.js',import.meta.url);
   const localRequire=createRequire(source),module={exports:{} as any};
-  const timers=new Map<number,()=>void>(),writes:any[]=[];let id=0,listener:any;
+  const timers=new Map<number,()=>void>(),delays=new Map<number,number>(),writes:any[]=[];let id=0,listener:any;
   let state:any={data:null,loading:true,error:'',unconfigured:false,receivedAt:Date.now()};
   const app={client:{setView:()=>Promise.resolve(),subscribe(fn:any){listener=fn;fn(state);return ()=>{listener=null;};},getState:()=>state}};
   const entry={exports:{}};new Script(readFileSync(new URL('../miniprogram/utils/entry-navigation.js',import.meta.url),'utf8')).runInNewContext({module:entry,getApp:()=>app,wx:{}});
-  new Script(readFileSync(source,'utf8')).runInNewContext({module,require:(name:string)=>name==='./entry-navigation'?entry.exports:localRequire(name),getApp:()=>app,wx:{},Date,Set,setTimeout(fn:()=>void,ms:number){assert.equal(ms,1000);timers.set(++id,fn);return id;},clearTimeout(key:number){timers.delete(key);}});
+  new Script(readFileSync(source,'utf8')).runInNewContext({module,require:(name:string)=>name==='./entry-navigation'?entry.exports:localRequire(name),getApp:()=>app,wx:{},Date,Set,setTimeout(fn:()=>void,ms:number){assert.ok(ms===650||ms===350);timers.set(++id,fn);delays.set(id,ms);return id;},clearTimeout(key:number){timers.delete(key);}});
   const definition=module.exports.createPage((data:any)=>({title:data?.title||'',items:data?.items||[]}),{view:(p:any)=>({view:'news',filter:p.filter||'all'})});
   const page={...definition,data:{...definition.data},setData(patch:any,done?:()=>void){writes.push(patch);Object.assign(this.data,patch);done?.();}};
   page.onLoad({});page.onShow();
-  return {page,timers,writes,sibling(){return {...definition,data:{...definition.data},setData(patch:any,done?:()=>void){writes.push(patch);Object.assign(this.data,patch);done?.();}};},send(patch:any){state={...state,...patch};listener?.(state);},ready(){this.send({data:{serverTime:new Date().toISOString(),publications:[],title:'真实消息',items:[{id:'first'}]},loading:false,error:''});}};
+  return {page,timers,delays,writes,sibling(){return {...definition,data:{...definition.data},setData(patch:any,done?:()=>void){writes.push(patch);Object.assign(this.data,patch);done?.();}};},send(patch:any){state={...state,...patch};listener?.(state);},ready(){this.send({data:{serverTime:new Date().toISOString(),publications:[],title:'真实消息',items:[{id:'first'}]},loading:false,error:''});}};
 }
 
 test('冷启动占位不伪造业务内容；响应当次提交即显示，没有入场等待',()=>{
@@ -81,7 +81,7 @@ test('快速请求移除占位时不闪骨架，持续等待才显示；卸载�
 test('真实切换页面后返回顺序入场，后台返回和数据刷新不重播',()=>{
  const h=harness();h.ready();h.page.onHide();
  const other=h.sibling();other.onLoad({});other.onShow();assert.equal(other.data.contentMotion,'content-enter');other.onHide();
- h.page.onShow();assert.equal(h.page.data.contentMotion,'content-enter');assert.equal(h.page.data.title,'真实消息');
+ h.page.onShow();assert.equal(h.page.data.contentMotion,'content-return');assert.equal(h.page.data.title,'真实消息');
  const finish=[...h.timers.values()][0];h.timers.clear();finish();
  h.send({loading:true});assert.equal(h.page.data.contentMotion,'');h.page.onHide();h.page.onShow();assert.equal(h.page.data.contentMotion,'');h.page.onUnload();
 });
@@ -97,7 +97,7 @@ test('小程序全局等待只提供三个动态点，不绘制卡片或正文�
 test('已显示内容切回、刷新和动画结束不清空正文',()=>{
  const h=harness();h.ready();h.page.onHide();const other=h.sibling();other.onLoad({});other.onShow();other.onHide();
  const before=h.writes.length;h.page.onShow();
- assert.equal(h.page.data.contentMotion,'content-enter');assert.equal(h.page.data.items[0].id,'first');
+ assert.equal(h.page.data.contentMotion,'content-return');assert.equal(h.page.data.items[0].id,'first');
  assert.equal(h.writes.slice(before).some(frame=>frame.connected===false||frame.items?.length===0),false);
  const finish=[...h.timers.values()][0];h.timers.clear();finish();assert.equal(h.page.data.contentMotion,'');assert.equal(h.page.data.items[0].id,'first');
  h.send({loading:true});h.send({loading:false});assert.equal(h.page.data.contentMotion,'');assert.equal(h.timers.size,0);h.page.onUnload();
@@ -107,9 +107,33 @@ test('已显示内容切回、刷新和动画结束不清空正文',()=>{
 test('下一页面显示时才将上一隐藏页预备，正文保留，返回当次开始顺序入场',()=>{
  const h=harness();h.ready();h.page.onHide();assert.equal(h.page.data.contentMotion,'');
  const other=h.sibling();other.onLoad({});other.onShow();assert.equal(h.page.data.contentMotion,'content-primed');assert.equal(h.page.data.items[0].id,'first');
- other.onHide();h.page.onShow();assert.equal(h.page.data.contentMotion,'content-enter');assert.equal(other.data.contentMotion,'content-primed');h.page.onUnload();
+ other.onHide();h.page.onShow();assert.equal(h.page.data.contentMotion,'content-return');assert.equal(other.data.contentMotion,'content-primed');h.page.onUnload();
 });
 test('原生或后台返回不先隐藏已显示内容，卸载页面不再接收预备写入',()=>{
  const h=harness();h.ready();h.page.onHide();h.page.onShow();assert.equal(h.page.data.contentMotion,'');
  h.page.onUnload();const count=h.writes.length;const other=h.sibling();other.onLoad({});other.onShow();assert.equal(h.writes.slice(count).some(p=>p.contentMotion==='content-primed'),false);other.onUnload();
+});
+
+
+test('首次内容完整入场，缓存返回缩短；真实数据当次提交且不启动额外请求',()=>{
+ const h=harness();h.ready();assert.equal(h.page.data.contentMotion,'content-enter');assert.equal([...h.delays.values()].at(-1),650);
+ h.page.onHide();const other=h.sibling();other.onLoad({});other.onShow();assert.equal(other.data.contentMotion,'content-enter');
+ other.onHide();h.page.onShow();assert.equal(h.page.data.contentMotion,'content-return');assert.equal([...h.delays.values()].at(-1),350);
+ assert.equal(h.page.data.title,'真实消息');assert.equal(h.page.data.items[0].id,'first');h.page.onUnload();
+});
+test('返回页面已无有效缓存时先等真实内容，恢复后使用首次节奏',()=>{
+ const h=harness();h.ready();h.page.onHide();const other=h.sibling();other.onLoad({});other.onShow();
+ h.send({data:null,loading:true});other.onHide();h.page.onShow();
+ assert.equal(h.page.data.connected,false);assert.equal(h.page.data.contentMotion,'');assert.equal(h.timers.size,0);
+ h.ready();assert.equal(h.page.data.contentMotion,'content-enter');assert.equal([...h.delays.values()].at(-1),650);h.page.onUnload();
+});
+test('快速十次跨页不累积计时器，后台刷新不将短入场升级为首次入场',()=>{
+ const h=harness();h.ready();const other=h.sibling();other.onLoad({});
+ for(let i=0;i<10;i++){
+  h.page.onHide();other.onShow();other.onHide();h.page.onShow();
+  assert.equal(h.page.data.contentMotion,'content-return');assert.equal(h.timers.size,1);
+ }
+ h.send({loading:true});assert.equal(h.page.data.contentMotion,'content-return');assert.equal(h.timers.size,1);
+ const finish=[...h.timers.values()][0];h.timers.clear();finish();h.send({loading:false});
+ assert.equal(h.page.data.contentMotion,'');assert.equal(h.timers.size,0);h.page.onUnload();
 });
