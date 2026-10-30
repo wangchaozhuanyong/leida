@@ -878,3 +878,35 @@ test('预算错误返回明确恢复时间和Retry-After，普通错误不能伪
  const unknown=apiError({status:429,message:'请稍后重试',retryAt:'https://example.invalid/untrusted'});
  assert.equal((await unknown.json()).retryAt,undefined);assert.equal(unknown.headers.get('retry-after'),null);
 });
+
+
+test('登录摘要只返回已验证读者的实时次数和偏好，不扫描投递历史、不创建预备或消耗次数',async()=>{
+ const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);await f.accept(session.sessionToken);
+ await f.service.saveWechatReminderPreferences(session.sessionToken,{announcement:false,result:true,correction:true});
+ const before=await f.store.list<WechatGrant>('wechat_grants'),list=f.store.list.bind(f.store);let historyReads=0;
+ f.store.list=async<T>(table:Table,client?:Client):Promise<T[]>=>{if(table==='wechat_deliveries'){historyReads++;throw new Error('历史查询不应参与首屏');}return list<T>(table,client);};
+ const login=await f.service.wechatLogin('login-with-summary','summary-client',{includeLastResult:false});
+ assert.equal(login.subscriptionState?.remainingCount,2);assert.equal(login.subscriptionState?.preferencesSupported,true);assert.deepEqual(login.subscriptionState?.reminderPreferences,{announcement:false,result:true,correction:true});
+ assert.deepEqual(await f.store.list<WechatGrant>('wechat_grants'),before);assert.equal(historyReads,0);
+ assert.doesNotMatch(JSON.stringify(login.subscriptionState),/openid|sessions|nonce|encrypted|sessionToken|secret/i);
+ const another=await f.service.wechatLogin('another-code','summary-client-other',{includeLastResult:false});assert.equal(another.subscriptionState?.remainingCount,0);
+ const legacy=await f.service.wechatLogin('legacy-login-without-summary','legacy-client');assert.deepEqual(Object.keys(legacy).sort(),['expiresAt','sessionToken']);
+ assert.equal(Date.parse(login.expiresAt)-f.now(),7*24*3600000);
+});
+test('登录摘要不会绕过停用身份，关闭后的真实状态和零次数仍保持',async()=>{
+ const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);await f.service.revokeWechatSubscription(session.sessionToken);
+ const closed=await f.service.wechatLogin('summary-closed','closed-client',{includeLastResult:false});assert.equal(closed.subscriptionState?.state,'revoked');assert.equal(closed.subscriptionState?.remainingCount,0);
+ const value=(await f.store.list<WechatReader>('wechat_readers'))[0];await f.store.put('wechat_readers',{...value,status:'disabled'});
+ await assert.rejects(f.service.wechatLogin('summary-disabled','disabled-client',{includeLastResult:false}),e=>e instanceof Error&&'status'in e&&e.status===403);
+});
+
+test('登录期间AppID变化时摘要沿用读者身份校验，不返回旧身份次数或提交旧会话',async()=>{
+ const f=await fixture(),initial=await f.login();await f.accept(initial.sessionToken);
+ const before=(await f.store.list<WechatReader>('wechat_readers'))[0].sessions.length;
+ const service=createWechatService({store:f.store,clock:f.now,encryptionKey:()=>Buffer.alloc(32,7),fetcher:(async(input:RequestInfo|URL,init?:RequestInit)=>{
+  if(String(input).includes('jscode2session'))await f.configure({appId:'wx9876543210abcdef'});
+  return f.fetcher(input,init);
+ }) as typeof fetch});
+ await assert.rejects(service.wechatLogin('identity-changed-during-login','summary-race-client',{includeLastResult:false}),e=>e instanceof Error&&'status'in e&&e.status===401);
+ assert.equal((await f.store.list<WechatReader>('wechat_readers'))[0].sessions.length,before);
+});

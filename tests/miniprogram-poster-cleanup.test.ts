@@ -48,7 +48,7 @@ test('迟到圆码遇到记录冲突不开放草稿保存，离开后响应不�
   try{await hidden.advance(1);hidden.page.onHide();await hidden.advance(6000);assert.equal(hidden.exports,1);assert.equal(hidden.page.data.posterReady,false);}finally{hidden.stop();}
 });
 
-for(const kind of ['detail','status'] as const)for(const cleanup of ['missing','fail','throw','late'] as const){
+for(const kind of ['status'] as ('detail'|'status')[])for(const cleanup of ['missing','fail','throw','late'] as const){
   test(`${kind} 成品不等待 ${cleanup} 清理回调，跨20秒和切换样式仍可用`,async()=>{
     const h=harness(kind,cleanup);
     try{
@@ -56,9 +56,9 @@ for(const kind of ['detail','status'] as const)for(const cleanup of ['missing','
       assert.equal(h.exports,1);assert.equal(h.page.data.posterBusy,false);assert.equal(h.page.data.posterError,'');assert.ok(h.preview());
       if(kind==='detail')assert.equal(h.page.data.posterReady,true);
       await h.advance(20000);assert.equal(h.page.data.posterError,'');assert.equal(h.page.data.posterBusy,false);
-      h.switchTheme();await h.advance(1);assert.equal(h.exports,2);assert.equal(h.codeRequests,1);assert.equal(h.preview(),'wxfile://isolated-poster-2.png');assert.equal(h.page.data.posterBusy,false);
+      h.switchTheme();await h.advance(1);assert.equal(h.exports,2);assert.equal(h.codeRequests,kind==='detail'?0:1);assert.equal(h.preview(),'wxfile://isolated-poster-2.png');assert.equal(h.page.data.posterBusy,false);
       await h.advance(40000);assert.equal(h.page.data.posterError,'');assert.equal(h.preview(),'wxfile://isolated-poster-2.png');
-      assert.equal(h.removed.filter(path=>path.includes('/moyao-code-')).length,2);
+      assert.equal(h.removed.filter(path=>path.includes('/moyao-code-')).length,kind==='detail'?0:2);
     }finally{h.stop();}
   });
 }
@@ -71,16 +71,16 @@ for(const kind of ['detail','status'] as const)for(const cleanup of ['missing','
       assert.equal(h.exports,1);assert.equal(h.page.data.posterBusy,false);assert.equal(h.page.data.posterError,'海报导出失败，请重试。');assert.equal(h.preview(),'');
       if(kind==='detail')assert.equal(h.page.data.posterReady,false);
       await h.advance(20000);assert.equal(h.page.data.posterError,'海报导出失败，请重试。');assert.equal(h.page.data.posterBusy,false);
-      h.retry();await h.advance(1);assert.equal(h.exports,2);assert.equal(h.codeRequests,1);assert.equal(h.preview(),'wxfile://isolated-poster-2.png');assert.equal(h.page.data.posterBusy,false);assert.equal(h.page.data.posterError,'');
+      h.retry();await h.advance(1);assert.equal(h.exports,2);assert.equal(h.codeRequests,kind==='detail'?0:1);assert.equal(h.preview(),'wxfile://isolated-poster-2.png');assert.equal(h.page.data.posterBusy,false);assert.equal(h.page.data.posterError,'');
       await h.advance(20000);assert.equal(h.page.data.posterError,'');assert.equal(h.preview(),'wxfile://isolated-poster-2.png');
-      assert.equal(h.removed.filter(path=>path.includes('/moyao-code-')).length,2);
+      assert.equal(h.removed.filter(path=>path.includes('/moyao-code-')).length,kind==='detail'?0:2);
     }finally{h.stop();}
   });
 }
 
 // Keep the actual page alive while the public QR channel changes. No server,
 // database, WeChat generation or phone save is used by this isolated harness.
-for(const kind of ['detail','status'] as const)for(const trigger of ['resume','theme','save'] as const){
+for(const kind of ['status'] as ('detail'|'status')[])for(const trigger of ['resume','theme','save'] as const){
   test(`${kind} 超过五分钟后 ${trigger} 重新获取圆码并清除旧成品`,async()=>{
     const h=harness(kind,'fail');
     try{
@@ -99,7 +99,7 @@ for(const kind of ['detail','status'] as const)for(const trigger of ['resume','t
     }finally{h.stop();}
   });
 }
-for(const kind of ['detail','status'] as const){
+for(const kind of ['status'] as ('detail'|'status')[]){
   test(`${kind} 切换主题不会延长圆码期限，过期核对失败不能再保存旧图`,async()=>{
     const h=harness(kind,'fail');
     try{
@@ -141,3 +141,21 @@ for(const kind of ['detail','status'] as const){
     }finally{h.stop();}
   });
 }
+
+for(const trigger of ['resume','theme','save'] as const){
+  test(`公告长图 ${trigger} 超期重新绘制，切换主题不续期且始终不请求圆码`,async()=>{
+    const h=harness('detail','fail',false,6000,410);
+    try{
+      await h.advance(1);const old=h.preview();assert.ok(old);assert.equal(h.page.data.posterReady,true);assert.equal(h.codeRequests,0);assert.equal(h.codeImages.length,0);
+      await h.advance(290000);h.switchTheme();await h.advance(1);const themed=h.preview();assert.notEqual(themed,old);
+      if(trigger==='resume')h.page.onHide();await h.advance(10000);
+      if(trigger==='resume')h.page.onShow();else if(trigger==='theme')h.page.selectPosterTheme({currentTarget:{dataset:{theme:'precision'}}});else void h.page.savePoster();
+      await h.advance(1);assert.notEqual(h.preview(),themed);assert.ok(h.preview());assert.equal(h.page.data.posterReady,true);assert.equal(h.codeRequests,0);assert.equal(h.saved.length,0);assert.ok(h.removed.includes(old));assert.ok(h.removed.includes(themed));
+      if(trigger==='save'){await h.page.savePoster();assert.deepEqual(h.saved,[h.preview()]);}
+    }finally{h.stop();}
+  });
+}
+test('公告长图离开后未完成的画布结果不能更新页面',async()=>{
+  const h=harness('detail','fail');
+  try{h.page.onHide();await h.advance(1);assert.equal(h.exports,0);assert.equal(h.preview(),'');assert.equal(h.codeRequests,0);}finally{h.stop();}
+});

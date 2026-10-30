@@ -47,7 +47,7 @@ function validWechatBody(path,value) {
   if(!value || typeof value!=='object') return false;
   if(path.startsWith('/api/v1/wechat/code/')) {let id;try{id=decodeURIComponent(path.slice(path.lastIndexOf('/')+1));}catch(_){return false;}return value.publicationId===id && ['image/png','image/jpeg'].includes(value.contentType) && typeof value.imageBase64==='string' && value.imageBase64.length<=3000000 && /^[a-f0-9]{32}$/.test(value.scene);}
   if(path.startsWith('/api/v1/wechat/scene/')) return typeof value.publicationId==='string' && !!value.publicationId;
-  if(path==='/api/wechat/login') return typeof value.sessionToken==='string' && !!value.sessionToken && Number.isFinite(Date.parse(value.expiresAt));
+  if(path==='/api/wechat/login') return typeof value.sessionToken==='string' && !!value.sessionToken && Number.isFinite(Date.parse(value.expiresAt)) && (value.subscriptionState===undefined || validateSubscription(value.subscriptionState));
   if(path.endsWith('/challenge')) return typeof value.templateId==='string' && (subscriptionStates.includes(value.state) || validateSubscription(value.state)) && (value.nonce===undefined || (typeof value.nonce==='string' && Number.isFinite(Date.parse(value.expiresAt))));
   return validateSubscription(value);
 }
@@ -92,7 +92,7 @@ function createTransport(wxApi, config, {privateRequests=false}={}) {
       if(privateRequests){header['content-type']='application/json';if(options.sessionToken)header.Authorization=`Bearer ${options.sessionToken}`;}
       // Counts still come from the reader's live grant. The screen does not use
       // delivery-history details; older servers may safely ignore this hint.
-      if(privateRequests&&(path==='/api/wechat/subscription'&&method==='GET'||path==='/api/wechat/subscription/challenge'&&method==='POST'))header['X-Radar-Subscription-View']='summary';
+      if(privateRequests&&(path==='/api/wechat/login'&&method==='POST'||path==='/api/wechat/subscription'&&method==='GET'||path==='/api/wechat/subscription/challenge'&&method==='POST'))header['X-Radar-Subscription-View']='summary';
       const receive = response => {
         if (cancelled) return;
         if (response.statusCode === 304) { if (versionPath && etag) resolve({ unchanged: true }); else reject(new Error('暂未获取到消息，请重新加载。')); return; }

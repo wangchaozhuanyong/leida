@@ -13,7 +13,7 @@ const config={mode:'https',baseUrl:'https://public.example.org',cloudEnv:'',serv
 const now=Date.parse('2026-10-10T04:00:00Z'),scene='a'.repeat(32);
 const safe=(state='none')=>({configured:true,enabled:true,state,templateId:'fixture-template'});
 type Options=Record<string,any>;
-function mock(options:{state?:string;challengeState?:string;result?:string;privacy?:boolean;failConfirm?:boolean;failState?:boolean;failRevoke?:boolean;codeStatus?:number;sessionMs?:number;challengeMs?:number;legacyPreferences?:boolean;failPreferencesAfterSave?:boolean;invalidPreferences?:boolean;cancelRevoke?:boolean}={}){
+function mock(options:{state?:string;challengeState?:string;result?:string;privacy?:boolean;failConfirm?:boolean;failState?:boolean;failRevoke?:boolean;codeStatus?:number;sessionMs?:number;challengeMs?:number;legacyPreferences?:boolean;failPreferencesAfterSave?:boolean;invalidPreferences?:boolean;cancelRevoke?:boolean;loginSnapshot?:boolean;invalidLoginSnapshot?:boolean}={}){
   let state=options.state||'none',login=0,subscribe=0,clock=now,count=['available','reserved'].includes(state)?1:0,challenges=0;
   let preferences={announcement:true,result:true,correction:true};
   const confirmed=new Set<string>();const current=()=>({...safe(state),remainingCount:count,pendingCount:state==='reserved'?1:0,...(options.legacyPreferences?{}:{preferencesSupported:true,reminderPreferences:options.invalidPreferences?{...preferences,result:'yes'}:preferences})});
@@ -25,7 +25,7 @@ function mock(options:{state?:string;challengeState?:string;result?:string;priva
     requestSubscribeMessage(option:Options){subscribe++;queueMicrotask(()=>option.success({[option.tmplIds[0]]:options.result||'accept'}));},
     request(option:Options){requests.push(option);queueMicrotask(()=>{
       const path=option.url.replace(config.baseUrl,'');let response:unknown;
-      if(path==='/api/wechat/login')response={sessionToken:'fixture-reader-session',expiresAt:new Date(clock+(options.sessionMs||60000)).toISOString()};
+      if(path==='/api/wechat/login')response={sessionToken:'fixture-reader-session',expiresAt:new Date(clock+(options.sessionMs||60000)).toISOString(),...(options.loginSnapshot?{subscriptionState:options.invalidLoginSnapshot?{...current(),remainingCount:-1}:{...current(),extraPrivateField:'must-not-reach-ui'}}:{})};
       else if(path==='/api/wechat/subscription'){
         if(options.failState){option.success({statusCode:401,data:{error:'当前读者会话已失效，请重新连接。'}});return;}
         if(option.method==='DELETE'){if(options.failRevoke){option.fail({});return;}state='revoked';count=0;}response=current();
@@ -157,7 +157,7 @@ test('次数读取和预备请求采用摘要，确认、关闭和登录沿用�
   const h=mock({sessionMs:600000,challengeMs:300000});await h.reader.loadForPage();
   await h.reader.authorize({userInitiated:true});await h.reader.revoke({userInitiated:true});
   for(const request of h.requests){
-    const summary=request.url.endsWith('/subscription')&&request.method==='GET'||request.url.endsWith('/challenge');
+    const summary=request.url.endsWith('/login')||request.url.endsWith('/subscription')&&request.method==='GET'||request.url.endsWith('/challenge');
     assert.equal(request.header['X-Radar-Subscription-View'],summary?'summary':undefined);
   }
   assert.equal(h.reader.getState().remainingCount,0);assert.equal(h.subscribe,1);
@@ -530,10 +530,10 @@ test('实际扫码详情落在固定旧版本；隐藏时取消，迟到scene响
   h.requests[0].resolve({data:{publicationId:'fixture-new'}});await flush();assert.equal(page.data.detail.title,'测试旧版本标题');assert.equal(h.calls.filter(item=>item==='refresh').length,1);page.onUnload();assert.equal(h.subscriptions,0);
 });
 
-test('实际详情无效scene不发请求、不回退最新；未配置真实码失败不创建图片或开启保存',async()=>{
-  const invalid=pageHarness(),bad=invalid.page('detail',{scene:'../latest',publicationId:'fixture-new'});assert.equal(invalid.requests.length,0);assert.equal(bad.data.detail,null);assert.match(bad.data.sceneError,/无效/);
-  const h=pageHarness(),page=h.page('detail',{publicationId:'fixture-old'});const pending=page.generatePoster();assert.equal(h.requests.length,1);assert.equal(h.requests[0].path,'/api/v1/wechat/code/fixture-old');
-  h.requests[0].reject(Object.assign(new Error('微信小程序码尚未配置'),{status:503}));await pending;assert.equal(page.data.posterBusy,false);assert.equal(page.data.posterPreview,'');assert.equal(page._posterArtifact,null);assert.match(page.data.posterError,/未配置/);
+test('实际详情无效scene不发请求、不回退最新；公告长图不请求圆码且画布不可用时可重试',async()=>{
+  const invalid=pageHarness(),bad=invalid.page('detail',{scene:'../latest',publicationId:'fixture-new'});assert.equal(invalid.requests.length,0);assert.equal(bad.data.detail,null);assert.match(bad.data.sceneError,/无效/);bad.onUnload();
+  const h=pageHarness(),page=h.page('detail',{publicationId:'fixture-old'});await page.generatePoster();assert.equal(h.requests.length,0);
+  assert.equal(page.data.posterBusy,false);assert.equal(page.data.posterPreview,'');assert.equal(page._posterArtifact,null);assert.match(page.data.posterError,/不支持生成海报/);
   await page.savePoster();assert.match(page.data.posterError,/先生成/);page.onUnload();
 });
 
@@ -541,6 +541,7 @@ test('公告样式选择在首次生成前只改变选择，生成后切换复�
   const h=pageHarness(),page=h.page('detail',{publicationId:'fixture-old'});
   page.selectPosterTheme({currentTarget:{dataset:{theme:'editorial'}}});
   assert.equal(page.data.posterTheme,'editorial');assert.equal(h.requests.length,0);assert.equal(page.data.posterBusy,false);
+  page._posterAt=Date.now();
   page._posterCache={precision:{tempFilePath:'wxfile://cached-dark.png'},editorial:{tempFilePath:'wxfile://cached-light.png'}};
   page.setData({posterPreview:'wxfile://cached-light.png',posterReady:true});
   page.selectPosterTheme({currentTarget:{dataset:{theme:'precision'}}});
@@ -556,9 +557,9 @@ test('公告更换样式生成失败时保留预览但禁用保存，不把旧�
   page.setData({posterPreview:'wxfile://previous-dark.png',posterReady:true,posterTheme:'editorial'});
   const pending=page.generatePoster();
   assert.equal(page.data.posterReady,false);assert.equal(page.data.posterBusy,true);
-  h.requests[0].reject(new Error('小程序码暂不可用'));await pending;
+  assert.equal(h.requests.length,0);await pending;
   assert.equal(page.data.posterPreview,'wxfile://previous-dark.png');assert.equal(page.data.posterReady,false);assert.equal(page._posterArtifact,null);
-  assert.equal(page.data.posterBusy,false);assert.match(page.data.posterError,/暂不可用/);
+  assert.equal(page.data.posterBusy,false);assert.match(page.data.posterError,/不支持生成海报/);
   page.onUnload();
 });
 
@@ -630,4 +631,56 @@ test('提醒页公告预览最多三条，先置顶再日期倒序，未读统�
     notices[0].pinned=false;ui.feed({data:{...ui.data,notices:[...notices]}});
     assert.deepEqual(Array.from(page.data.notices,(n:Options)=>n.id),['notice-4','notice-3','notice-2']);
   }finally{page.onUnload();}
+});
+
+
+test('登录摘要在首个后台返回时显示真实次数，慢预备不阻止整卡且总计只需两次请求',async()=>{
+ const h=mock({state:'available',sessionMs:600000,challengeMs:300000,loginSnapshot:true}),request=h.wx.request;
+ let held:Options|undefined;
+ h.wx.request=(o:Options)=>{if(o.url.endsWith('/challenge')){held=o;return{abort(){}};}return request(o);};
+ const page=pageHarness(h.reader).page('settings');
+ try{
+  await flush();assert.equal(h.requests.length,1);assert.ok(held);assert.equal(page.data.settingsReady,true);assert.equal(page.data.wechat.remainingCount,1);assert.equal(page.data.wechat.ready,false);
+  assert.doesNotMatch(JSON.stringify(page.data.wechat),/sessionToken|fixture-reader-session|extraPrivateField|openid/);
+  assert.equal(h.requests[0].header['X-Radar-Subscription-View'],'summary');assert.equal(h.requests[0].header.Authorization,undefined);
+  page.onHide();page.onShow();await flush();assert.equal(h.requests.length,1);assert.equal(page.data.wechat.remainingCount,1);
+  request(held!);held=undefined;await flush();assert.equal(h.requests.length,2);assert.equal(page.data.wechat.ready,true);assert.equal(h.subscribe,0);
+  assert.equal(h.requests.some(r=>r.url.endsWith('/subscription')),false);
+ }finally{if(held)request(held);await flush();page.onUnload();}
+});
+test('登录摘要兼容旧服务器；新服务器少一次次数往返，重入复用与过期重连仍准确',async()=>{
+ for(const loginSnapshot of [false,true]){
+  const h=mock({state:'available',loginSnapshot,sessionMs:600000,challengeMs:300000});await h.reader.loadForPage();
+  assert.equal(h.requests.length,loginSnapshot?2:3);assert.equal(h.reader.getState().remainingCount,1);
+  const before=h.requests.length;await h.reader.loadForPage();assert.equal(h.requests.length,before);
+  h.advance(600001);h.changeState('consumed');await h.reader.loadForPage();
+  assert.equal(h.requests.length-before,loginSnapshot?2:3);assert.equal(h.reader.getState().remainingCount,0);assert.equal(h.login,2);assert.equal(h.subscribe,0);
+ }
+});
+test('登录摘要预备失败保留真实次数并允许重新准备，不重复登录或自动授权',async()=>{
+ const h=mock({state:'available',loginSnapshot:true,sessionMs:600000,challengeMs:300000}),request=h.wx.request;
+ let fail=true;h.wx.request=(o:Options)=>{if(fail&&o.url.endsWith('/challenge')){queueMicrotask(()=>o.success({statusCode:503,data:{error:'微信服务暂不可用，请稍后重试。'}}));return{abort(){}};}return request(o);};
+ await h.reader.loadForPage();assert.equal(h.reader.getState().remainingCount,1);assert.equal(h.reader.getState().ready,false);assert.ok(h.reader.getState().error);assert.equal(h.login,1);
+ fail=false;await h.reader.loadForPage();assert.equal(h.reader.getState().ready,true);assert.equal(h.reader.getState().remainingCount,1);assert.equal(h.login,1);assert.equal(h.subscribe,0);
+});
+test('登录摘要非法次数不进入界面，也不继续预备或弹出授权',async()=>{
+ const h=mock({loginSnapshot:true,invalidLoginSnapshot:true});await h.reader.loadForPage();assert.equal(h.reader.getState().safe,null);assert.equal(h.reader.getState().remainingCount,null);assert.ok(h.reader.getState().error);assert.equal(h.requests.length,1);assert.equal(h.subscribe,0);
+});
+test('清除会话后迟到的登录摘要不能恢复身份、次数或授权预备',async()=>{
+ for(const phase of ['native-login','server-login']){
+  const h=mock({state:'available',loginSnapshot:true}),request=h.wx.request,login=h.wx.login;let held:Options|undefined;
+  if(phase==='native-login')h.wx.login=(o:Options)=>{held=o;};else h.wx.request=(o:Options)=>{if(o.url.endsWith('/login')){held=o;return{abort(){}};}return request(o);};
+  const pending=h.reader.loadForPage();await flush();assert.ok(held);h.reader.clearSession();
+  if(phase==='native-login')login(held!);else request(held!);await pending;
+  assert.equal(h.reader.getState().safe,null);assert.equal(h.reader.getState().ready,false);assert.equal(h.requests.some(r=>r.url.endsWith('/challenge')),false);
+  assert.equal(h.requests.length,phase==='native-login'?0:1);assert.equal(h.subscribe,0);
+ }
+});
+test('登录摘要保留关闭、已用完及未知结果，不把准备或进入页面当作增加次数',async()=>{
+ for(const state of ['revoked','consumed','unknown','reserved']){
+  const h=mock({state,loginSnapshot:true});await h.reader.loadForPage();assert.equal(h.reader.getState().safe.state,state);assert.equal(h.reader.getState().remainingCount,state==='reserved'?1:0);assert.equal(h.subscribe,0);assert.equal(h.requests.some(r=>r.url.endsWith('/confirm')),false);
+ }
+});
+test('登录摘要仍先检查隐私；未同意前不请求身份或私人次数',async()=>{
+ const h=mock({privacy:true,loginSnapshot:true});await h.reader.loadForPage();assert.equal(h.login,0);assert.equal(h.requests.length,0);assert.equal(h.reader.getState().remainingCount,null);assert.equal(h.reader.getState().privacyNeeded,true);
 });
