@@ -8,13 +8,15 @@ view,text,button,scroll-view{box-sizing:border-box}button{margin:0;font-size:14p
 @media(prefers-reduced-motion:reduce){button{transition:none}}
 
 /* Refresh feedback is owned by navigation-header on every live page. */
-/* One shared motion: gentle first reveal; retained pages keep their brightness.
-   Lists and buttons move together rather than replaying staggered card flashes. */
-.content-enter>view,.content-enter>publication-card,.content-enter>button,.settled-reveal{animation:content-arrive .36s cubic-bezier(.22,1,.36,1) both}
-.content-return>view,.content-return>publication-card,.content-return>button{animation:content-settle .36s cubic-bezier(.22,1,.36,1) both}
-@keyframes content-arrive{from{opacity:.9;transform:translateY(-3px)}to{opacity:1;transform:none}}
-@keyframes content-settle{from{transform:translateY(-2px)}to{transform:none}}
-@media(prefers-reduced-motion:reduce){.content-enter>view,.content-enter>publication-card,.content-enter>button,.content-return>view,.content-return>publication-card,.content-return>button,.settled-reveal{animation:none!important;transform:none!important;opacity:1!important}}
+/* Prepare retained content only while hidden; reveal actual groups top to bottom.
+   All groups use one bounded 70ms cadence, finishing within 910ms. */
+.content-primed>view:not(.motion-static):not(.motion-container),.content-primed>publication-card,.content-primed>button,.content-primed .motion-step{opacity:0;transform:translateY(-8px)}
+.content-enter>view:not(.motion-static):not(.motion-container),.content-enter>publication-card,.content-enter>button,.content-enter .motion-step,.settled-reveal{animation:content-arrive .42s cubic-bezier(.22,.8,.24,1) both}
+.content-enter>view:nth-child(2),.content-enter>publication-card:nth-child(2),.content-enter>button:nth-child(2){animation-delay:.07s}.content-enter>view:nth-child(3),.content-enter>publication-card:nth-child(3),.content-enter>button:nth-child(3){animation-delay:.14s}.content-enter>view:nth-child(4),.content-enter>publication-card:nth-child(4),.content-enter>button:nth-child(4){animation-delay:.21s}.content-enter>view:nth-child(5),.content-enter>publication-card:nth-child(5),.content-enter>button:nth-child(5){animation-delay:.28s}.content-enter>view:nth-child(6),.content-enter>publication-card:nth-child(6),.content-enter>button:nth-child(6){animation-delay:.35s}.content-enter>view:nth-child(7),.content-enter>publication-card:nth-child(7),.content-enter>button:nth-child(7){animation-delay:.42s}.content-enter>view:nth-child(n+8),.content-enter>publication-card:nth-child(n+8),.content-enter>button:nth-child(n+8){animation-delay:.49s}
+.content-enter .motion-step-0{animation-delay:0s}.content-enter .motion-step-1{animation-delay:.07s}.content-enter .motion-step-2{animation-delay:.14s}.content-enter .motion-step-3{animation-delay:.21s}
+@keyframes content-arrive{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.content-primed>view,.content-primed>publication-card,.content-primed>button,.content-primed .motion-step,.content-enter>view,.content-enter>publication-card,.content-enter>button,.content-enter .motion-step,.settled-reveal{animation:none!important;transform:none!important;opacity:1!important}}
+
 
 
 /* Shared page rhythm; safe-area height belongs exclusively to navigation-header. */

@@ -22,7 +22,7 @@ function harness(){
  function page(name:string){
   current=name;const def=module.exports.createPage((data:any)=>({title:data?.title}));
   const p={...def,data:{...def.data},setData(patch:any,done?:()=>void){Object.assign(this.data,patch);if(done){if(deferCommit)commits.push(done);else done();}}};
-  p.onLoad({});p.onShow();timers.tick(560);return p;
+  p.onLoad({});p.onShow();timers.tick(1000);return p;
  }
  return {timers,stops,requests,app,api,page,state,commits,defer(value:boolean){deferCommit=value;},select(name:string){current=name;}};
 }
