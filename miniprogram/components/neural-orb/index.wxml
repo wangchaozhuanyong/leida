@@ -1,8 +1,9 @@
 <view class="neural-art {{ready ? 'is-ready' : ''}}" aria-hidden="true">
-  <view class="neural-static" aria-hidden="true">
+  <view wx:if="{{variant !== 'sphere'}}" class="neural-static" aria-hidden="true">
     <view class="radar-face"><view class="radar-ring middle"/><view class="radar-ring inner"/><view class="radar-axis horizontal"/><view class="radar-axis vertical"/><view class="radar-sweep"/><view class="radar-point first"/><view class="radar-point second"/><view class="radar-point third"/><view class="radar-center"/></view>
     <view class="radar-marker north"/><view class="radar-marker east"/><view class="radar-marker south"/><view class="radar-marker west"/>
   </view>
+  <view wx:else class="neural-static sphere-static" aria-hidden="true"><view class="sphere-face"><view class="sphere-meridian first"/><view class="sphere-meridian second"/><view class="sphere-latitude first"/><view class="sphere-latitude second"/><view class="sphere-node first"/><view class="sphere-node second"/><view class="sphere-node third"/></view></view>
   <canvas class="neural-canvas" id="neural-canvas" type="2d" binderror="onCanvasError" aria-hidden="true" />
   <view class="motion-preference" id="motion-preference" aria-hidden="true" />
 </view>

@@ -11,19 +11,19 @@ new Script(readFileSync(component, 'utf8')).runInNewContext({
   require: createRequire(component),
 });
 
-function fixture(options: {offscreen?: boolean; noCanvas?: boolean; static?: boolean; lateQuery?: boolean} = {}) {
+function fixture(options: {offscreen?: boolean; noCanvas?: boolean; static?: boolean; lateQuery?: boolean; sphere?: boolean; active?: boolean; width?: number; height?: number} = {}) {
   let frameId = 0;
   const frames = new Map<number, (time: number) => void>();
   const calls = { draws: 0, patches: [] as Record<string, unknown>[], disconnected: 0, scales: [] as number[][], cancelled: 0 };
-  const ctx = { clearRect() { calls.draws++; }, save() {}, restore() {}, translate() {}, scale(...args: number[]) { calls.scales.push(args); }, beginPath() {}, arc() {}, fill() {}, moveTo() {}, lineTo() {}, stroke() {} };
+  const ctx = { clearRect() { calls.draws++; }, save() {}, restore() {}, translate() {}, scale(...args: number[]) { calls.scales.push(args); }, beginPath() {}, arc() {}, fill() {}, moveTo() {}, lineTo() {}, stroke() {}, fillRect() {}, createRadialGradient(){return {addColorStop(){}};} };
   const canvas = { width: 300, height: 150, getContext: () => ctx, requestAnimationFrame(callback: (time: number) => void) { frames.set(++frameId, callback); return frameId; }, cancelAnimationFrame(id: number) { calls.cancelled++; frames.delete(id); } };
-  const instance: any = { data: { ready: false }, ...definition.methods };
+  const instance: any = { data: { ready: false }, properties:{variant:options.sphere?'sphere':'radar',active:options.active!==false}, ...definition.methods };
   instance.setData = (patch: Record<string, unknown>) => { Object.assign(instance.data, patch); calls.patches.push(patch); };
   let intersection: (entry: {intersectionRatio: number}) => void;
   instance.createIntersectionObserver = () => ({ relativeToViewport() { return this; }, observe(selector: string, callback: typeof intersection) { intersection = callback; callback({ intersectionRatio: options.offscreen ? 0 : 1 }); }, disconnect() { calls.disconnected++; } });
   const queries: Array<() => void> = [];
   instance.createSelectorQuery = () => ({ select() { return this; }, fields() { return this; }, boundingClientRect() { return this; }, exec(callback: (result: any[]) => void) {
-    const result = [{ node: options.noCanvas ? null : canvas, width: 160, height: 80 }, { width: options.static ? 0 : 1 }];
+    const result = [{ node: options.noCanvas ? null : canvas, width: options.width||160, height: options.height||80 }, { width: options.static ? 0 : 1 }];
     if (options.lateQuery) queries.push(() => callback(result)); else callback(result);
   } });
   definition.lifetimes.attached.call(instance);
@@ -93,4 +93,35 @@ check('A late selector response after detach cannot draw or setData', () => {
 check('A late ready callback after detach does not recreate observers', () => {
   const f = fixture(); f.detach(); definition.lifetimes.ready.call(f.instance);
   assert.equal(f.calls.disconnected, 1); assert.equal(f.frames.size, 0);
+});
+
+
+check('Home sphere measures the full stage, caps DPR and retains one 24fps loop',()=>{
+  const f=fixture({sphere:true,width:358,height:288});
+  assert.equal(f.canvas.width,Math.round(358*1.6));assert.equal(f.canvas.height,Math.round(288*1.6));
+  const before=f.calls.draws;for(let step=0;step<=60;step++)f.tick(step*1000/60);
+  assert.ok(f.calls.draws-before>=19&&f.calls.draws-before<=25);assert.equal(f.calls.patches.length,1);
+  f.hide();assert.equal(f.frames.size,0);f.show();assert.equal(f.frames.size,1);f.detach();assert.equal(f.frames.size,0);
+});
+check('Home sphere active flag cancels motion and stale queued frames cannot resume it',()=>{
+  const f=fixture({sphere:true,width:320,height:224});const queued=[...f.frames.values()][0]!;
+  f.instance.properties.active=false;definition.properties.active.observer.call(f.instance);
+  assert.equal(f.frames.size,0);const before=f.calls.draws;queued(100);assert.equal(f.calls.draws,before);assert.equal(f.frames.size,0);
+  f.instance.properties.active=true;definition.properties.active.observer.call(f.instance);assert.equal(f.frames.size,1);f.detach();
+});
+check('Home sphere reduced motion and missing canvas keep readable native content and static decoration',()=>{
+  for(const options of [{static:true},{noCanvas:true},{active:false}]){
+    const f=fixture({sphere:true,width:290,height:224,...options});assert.equal(f.frames.size,0);f.hide();f.show();assert.equal(f.frames.size,0);f.detach();
+  }
+});
+check('Sphere drawing is deterministic, finite at narrow widths and changes continuously with time',()=>{
+  const require=createRequire(component),{drawNeuralSphere}=require('../../utils/neural-art.js');
+  function render(t:number,width=288){
+    const points:number[][]=[];let arcs=0,lines=0;
+    const record=(...args:number[])=>{assert.ok(args.every(Number.isFinite));points.push(args);};
+    const ctx={clearRect:record,save(){},restore(){},translate:record,scale:record,createRadialGradient(...args:number[]){record(...args);return{addColorStop(){}};},fillRect:record,beginPath(){},arc(...args:number[]){arcs++;record(...args);},fill(){},moveTo:record,lineTo(...args:number[]){lines++;record(...args);},stroke(){}};
+    drawNeuralSphere(ctx,width,224,t);return{points,arcs,lines};
+  }
+  const first=render(1.4);assert.ok(first.arcs>=145);assert.ok(first.lines>144);assert.deepEqual(first,render(1.4));assert.notDeepEqual(first.points,render(1.45).points);
+  for(const width of [250,288,358,448])assert.ok(render(1.4,width).arcs>=145);
 });
