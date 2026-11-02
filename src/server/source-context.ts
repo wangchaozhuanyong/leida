@@ -1,3 +1,4 @@
+import { bankedSeriesClaim, bankedSeriesContext, originalBenefitSignal } from './benefit-signal';
 import {referenceCompletionClaim,REFERENCE_RESET_SOURCE} from './reference-reset-source';
 import type { Evidence } from '../lib/types';
 import { extractBenefitClaims, extractReplyClaims, hasDayEndDeadline, isTruncatedBenefitText, type BenefitClaim } from './benefit-rules';
@@ -41,7 +42,7 @@ export function hasCompleteContext(evidence: Evidence, cited: Evidence[], allowM
   }
   // An archive description never becomes original evidence because an old flag says complete.
   if (evidence.textOrigin === 'archive_excerpt') return false;
-  if (referenceCompletionClaim(evidence)||campaignClaim(evidence,cited) || isCampaignRule(evidence)) return true;
+  if (referenceCompletionClaim(evidence)||campaignClaim(evidence,cited) || isCampaignRule(evidence)||originalBenefitSignal(evidence).length||bankedSeriesClaim(evidence,cited)) return true;
   const relayOriginal=evidence.sourceId==='tibo-public'&&evidence.metadata?.sourceGroup==='fxembed:thsottiaux'&&evidence.textOrigin==='original'&&/^https:\/\/x\.com\/thsottiaux\/status\/\d{15,20}$/.test(evidence.url)&&/^\d{15,20}$/.test(evidence.messageId)&&evidence.url.endsWith('/'+evidence.messageId)&&Math.abs(Number((BigInt(evidence.messageId)>>22n)+1288834974657n)-Date.parse(evidence.publishedAt))<=1000;
   if ((evidence.contextComplete || relayOriginal) && (evidence.textOrigin === 'structured' && evidence.contextComplete || hasStandaloneContext(evidence.text,'reset') || hasStandaloneContext(evidence.text,'product'))) return true;
   const next = new Set(visited).add(evidence.id);
@@ -72,6 +73,8 @@ export function evidenceBenefitClaims(evidence: Evidence, cited: Evidence[], all
   if (visited.has(evidence.id) || !hasCompleteContext(evidence,cited,allowManual)) return [];
   const direct = directEvidenceBenefitClaims(evidence,cited);
   if (direct.length) return direct.map(claim => withArchivedDayEnd(evidence, claim));
+  const series=bankedSeriesClaim(evidence,cited);
+  if(series)return [series];
   const parent = selectOriginal(cited.filter(item => isExplicitParent(evidence,item,allowManual)));
   if (!parent) return [];
   return extractReplyClaims(evidence.text,evidence.publishedAt,evidenceBenefitClaims(parent,cited,allowManual,new Set(visited).add(evidence.id)));
@@ -168,10 +171,14 @@ export function directEvidenceBenefitClaims(item:Evidence,all:Evidence[]):Benefi
   if(reference)return [reference];
   const direct=extractBenefitClaims(item.text,item.publishedAt);
   const campaign=campaignClaim(item,all);
-  return direct.length?direct:campaign?[campaign]:[];
+  const additional=originalBenefitSignal(item);
+  // The fallback may describe the same action in a shorter clause and with an
+  // unknown audience. It supplements missing benefit kinds, never duplicates
+  // a verified kind or creates a new round from a restatement.
+  return [...direct,...(campaign&&!direct.length?[campaign]:[]),...additional.filter(c=>!direct.some(d=>d.kind===c.kind))];
 }
 export function gatherEvidenceContext(primary:Evidence,all:Evidence[]):Evidence[] {
-  const lineage=gatherExplicitEvidenceContext(primary,all);
+  const lineage=[...gatherExplicitEvidenceContext(primary,all),...bankedSeriesContext(primary,all)];
   const dayItem=lineage.find(e=>/(?:^|\n)\s*(?:Roundup of )?Day\s+\d+\s*\//i.test(e.text));
   const proof=dayItem?campaignProof(dayItem,all):undefined;
   const versions=all.filter(e=>e.textOrigin==='original'&&lineage.some(p=>namespace(p)===namespace(e)&&p.messageId===e.messageId));

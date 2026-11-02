@@ -8,6 +8,7 @@ import {Script} from 'node:vm';
 import type {PublicData,Publication,ActionKind,ActionStage} from '../src/lib/types';
 const require=createRequire(import.meta.url);
 const {homeResetStatus,selectedHomeStatus}=require('../miniprogram/utils/home-reset-status');
+const {createHomeTabNotices}=require('../miniprogram/utils/home-tab-notice');
 const {statusPosterInput,statusPosterAvailable,createStatusPosterLayout}=require('../miniprogram/packages/poster/status-poster');
 const NOW='2026-10-24T03:00:00Z',T='2026-10-24T02:00:00Z',START='2026-10-23T14:00:00Z';
 function fixture():PublicData{return{serverTime:NOW,events:[],articles:[],publications:[],evidence:[],sources:[{id:'test-public',name:'public',status:'healthy',lastSuccessAt:NOW}],activities:[],notices:[],site:{name:'隔离闭环测试',description:'',version:1,autoPublish:false}};}
@@ -31,21 +32,49 @@ function limitsObservation(data:PublicData,id:string,at:string){
 }
 const card=(data:PublicData,at=data.serverTime,kind='automatic_reset')=>selectedHomeStatus(data,kind,at);
 
+test('额度和重置卡共用预告、倒计时、进展、超时及完成计时，数字批次不覆盖首页状态',()=>{
+ const cases:[ActionStage,string,boolean,string][]=[
+  ['promised','2026-10-24T01:00:00Z',false,'announced'],
+  ['promised','2026-10-24T01:00:00Z',true,'scheduled'],
+  ['in_progress','2026-10-24T01:00:00Z',false,'progress'],
+  ['in_progress','2026-10-24T03:00:00Z',true,'overdue'],
+  ['promised','2026-10-25T02:00:00Z',true,'waiting'],
+  ['claimed_complete','2026-10-27T03:00:00Z',false,'completed'],
+ ];
+ for(const [stage,now,timed,expected] of cases){
+  const cards=(['automatic_reset','banked_reset'] as ActionKind[]).map(kind=>{
+   const data=fixture();data.serverTime=now;
+   const p=action(data,'same',stage,START,T,kind);
+   for(const event of [p.event,data.events[0]]){
+    if(!timed)delete event.actions[0].expectedAt;
+    event.actions[0].timeNote=kind==='banked_reset'&&stage==='in_progress'?'发布者报告重置卡发放进度 1/2，后续批次待更新':'最晚之前';
+   }
+   const c=card(data,now,kind);assert.equal(c.state,expected);
+   assert.doesNotMatch(c.hero.title,/1\/2/);
+   const input=statusPosterInput(data,kind,now);
+   assert.equal(input.label,c.hero.label);assert.equal(input.title,c.hero.title||c.title);
+   return c;
+  });
+  const clock=(c:any)=>({state:c.state,completed:c.completedDisplay,anchor:c.clockAt,parts:c.clockParts,metric:c.metric,expires:c.validUntil});
+  assert.deepEqual(clock(cards[1]),clock(cards[0]),`${stage} at ${now}`);
+ }
+});
+
 // Execute the actual native page and its local modules with a controlled wall clock.
 // Intervals are deliberately throttled: the explicit boundary timer must still work.
-function nativeHome(data:PublicData|null,at:number,kind='automatic_reset') {
+function nativeHome(data:PublicData|null,at:number,kind='automatic_reset',options:{notices?:any;snapshotPending?:boolean;nextTick?:(fn:()=>void)=>void}={}) {
  let definition:any,time=at,id=0,refreshes=0;
  const receivedAt=at,root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
  const timeouts=new Map<number,{at:number;fn:()=>void}>(),intervals=new Map<number,()=>void>(),cache=new Map<string,{exports:any}>();
  const navigations:string[]=[],tabs:string[]=[];
  class Clock extends Date {static now(){return time;}}
- const state=()=>({data,receivedAt,loading:!data,unconfigured:false,error:''});
- const app={client:{getState:state,subscribe(fn:(value:ReturnType<typeof state>)=>void){fn(state());return()=>{};},refresh(){refreshes++;return Promise.resolve();}}};
+ const state=()=>({data,receivedAt,loading:!data,unconfigured:false,error:'',snapshotPending:!!options.snapshotPending});
+ const app={homeTabNotices:options.notices,client:{getState:state,subscribe(fn:(value:ReturnType<typeof state>)=>void){fn(state());return()=>{};},refresh(){refreshes++;return Promise.resolve();}}};
  function load(filename:string):any {
   if(cache.has(filename))return cache.get(filename)!.exports;
   const module={exports:{}};cache.set(filename,module);
   new Script(readFileSync(filename,'utf8'),{filename}).runInNewContext({module,exports:module.exports,Date:Clock,Page(value:unknown){definition=value;},getApp:()=>app,
-   wx:{navigateTo({url}:{url:string}){navigations.push(url);},switchTab({url}:{url:string}){tabs.push(url);},showToast(){}},
+   wx:{nextTick:options.nextTick,navigateTo({url}:{url:string}){navigations.push(url);},switchTab({url}:{url:string}){tabs.push(url);},showToast(){}},
    setTimeout(fn:()=>void,delay:number){timeouts.set(++id,{at:time+delay,fn});return id;},clearTimeout(timer:number){timeouts.delete(timer);},
    setInterval(fn:()=>void){intervals.set(++id,fn);return id;},clearInterval(timer:number){intervals.delete(timer);},
    require(path:string){const file=resolve(dirname(filename),path.endsWith('.js')?path:path+'.js');assert.ok(file.startsWith(resolve(root,'miniprogram')+'/'));return load(file);}});
@@ -200,4 +229,65 @@ test('原生类别切换和海报入口携带同一状态版本，转发不会�
   h.page.openPoster();const entry=new URL(h.navigations[0],'https://isolated.test');assert.equal(entry.searchParams.get('kind'),'banked_reset');assert.equal(entry.searchParams.get('revision'),selected.revision);
   h.page.selectResetKind({currentTarget:{dataset:{kind:'automatic_reset'}}});assert.equal(h.page.onShareAppMessage().title,card(d).shareTitle);assert.equal(h.page.data.sharePath,card(d).sharePath);
  } finally {h.page.onUnload();}
+});
+
+
+const newsConfig={mode:'cloud',cloudEnv:'isolated-public-env',serviceName:'isolated-radar'};
+function noticeStorage(fail=false){let value:any;const writes:any[]=[];return {writes,api:{getStorageSync(){return value;},setStorageSync(_key:string,next:any){if(fail)throw new Error('isolated storage unavailable');value=structuredClone(next);writes.push(value);}}};}
+function bankedFixture(stage:ActionStage='promised',at=START){const d=fixture();action(d,'card-news',stage,at,stage==='promised'?T:undefined,'banked_reset','card-round');return d;}
+
+test('首页重置卡预告提示、查看后消除、返回及重新打开保持已读；真实进展再次提示',()=>{
+ const d=bankedFixture(),store=noticeStorage(),notices=createHomeTabNotices(store.api,newsConfig);
+ const h=nativeHome(d,Date.parse(NOW),'automatic_reset',{notices});
+ assert.equal(h.page.data.bankedResetUnread,true);assert.equal(store.writes.length,0);
+ h.page.selectResetKind({currentTarget:{dataset:{kind:'banked_reset'}}});assert.equal(h.page.data.bankedResetUnread,false);assert.equal(store.writes.length,1);
+ h.page.selectResetKind({currentTarget:{dataset:{kind:'automatic_reset'}}});assert.equal(h.page.data.bankedResetUnread,false);
+ const reopened=nativeHome(d,Date.parse(NOW),'automatic_reset',{notices:createHomeTabNotices(store.api,newsConfig)});assert.equal(reopened.page.data.bankedResetUnread,false);
+ action(d,'card-complete','claimed_complete','2026-10-24T02:30:00Z',undefined,'banked_reset','card-round');reopened.page.redraw();assert.equal(reopened.page.data.bankedResetUnread,true);
+ for(const page of [h.page,reopened.page])page.onHide();
+});
+
+test('卡片提示依据真实消息版本；倒计时跨点、来源刷新和普通产品消息不重新提示',()=>{
+ const d=bankedFixture(),store=noticeStorage(),notices=createHomeTabNotices(store.api,newsConfig);
+ notices.markRead(homeResetStatus(d,START).cards,d);
+ for(const at of ['2026-10-24T01:59:00Z','2026-10-24T02:00:00Z','2026-10-24T03:00:00Z']){
+  d.serverTime=at;assert.equal(notices.unread(homeResetStatus(d,at).cards,d),false);
+ }
+ d.sources[0].lastSuccessAt=NOW;d.notices.push({id:'ordinary-news'} as any);assert.equal(notices.unread(homeResetStatus(d).cards,d),false);assert.equal(store.writes.length,1);
+});
+
+test('重置卡时间调整与取消属于新消息；同一预告的重复发布不属于新消息',()=>{
+ const d=bankedFixture(),notices=createHomeTabNotices(noticeStorage().api,newsConfig);
+ notices.markRead(homeResetStatus(d).cards,d);
+ action(d,'card-duplicate','promised',START,T,'banked_reset','card-round');assert.equal(notices.unread(homeResetStatus(d).cards,d),false);
+ action(d,'card-adjust','promised','2026-10-24T00:00:00Z','2026-10-24T04:00:00Z','banked_reset','card-round');assert.equal(notices.unread(homeResetStatus(d).cards,d),true);
+ notices.markRead(homeResetStatus(d).cards,d);action(d,'card-cancel','cancelled','2026-10-24T01:00:00Z',undefined,'banked_reset','card-round');assert.equal(notices.unread(homeResetStatus(d).cards,d),true);
+});
+
+test('无消息、旧完成记录、历史补采不提示；近期完成与仍有效预告可提示',()=>{
+ const notices=createHomeTabNotices(noticeStorage().api,newsConfig),empty=fixture();assert.equal(notices.unread(homeResetStatus(empty).cards,empty),false);
+ const old=bankedFixture('claimed_complete','2026-10-08T03:44:55Z');assert.equal(notices.unread(homeResetStatus(old).cards,old),false);
+ const recent=bankedFixture('claimed_complete','2026-10-24T01:00:00Z');assert.equal(notices.unread(homeResetStatus(recent).cards,recent),true);
+ for(const a of recent.articles)a.historical=true;for(const p of recent.publications)p.article.historical=true;assert.equal(notices.unread(homeResetStatus(recent).cards,recent),false);
+ const pending=bankedFixture('promised','2026-10-20T01:00:00Z');pending.publications[0].event.actions[0].expectedAt='2026-10-25T02:00:00Z';pending.events[0].actions[0].expectedAt='2026-10-25T02:00:00Z';assert.equal(notices.unread(homeResetStatus(pending).cards,pending),true);
+});
+
+test('晚到旧缓存不恢复已读提示；本地存储故障不影响本次已读及页面导航',()=>{
+ const older=bankedFixture(),fresh=bankedFixture('claimed_complete','2026-10-24T02:30:00Z'),notices=createHomeTabNotices(noticeStorage(true).api,newsConfig);
+ notices.markRead(homeResetStatus(fresh).cards,fresh);assert.equal(notices.unread(homeResetStatus(older).cards,older),false);assert.equal(notices.markRead(homeResetStatus(older).cards,older),false);
+ const h=nativeHome(fresh,Date.parse(NOW),'automatic_reset',{notices});assert.equal(h.page.data.bankedResetUnread,false);h.page.selectResetKind({currentTarget:{dataset:{kind:'banked_reset'}}});h.page.onHide();
+});
+
+test('只有实际可见的新内容才确认已读：缓存等待、隐藏和快速切回不能误清提示',()=>{
+ const d=bankedFixture(),store=noticeStorage(),notices=createHomeTabNotices(store.api,newsConfig),ticks:Array<()=>void>=[];
+ const cached=nativeHome(d,Date.parse(NOW),'banked_reset',{notices,snapshotPending:true});assert.equal(store.writes.length,0);cached.page.onHide();
+ const h=nativeHome(d,Date.parse(NOW),'automatic_reset',{notices,nextTick:fn=>ticks.push(fn)});
+ h.page.selectResetKind({currentTarget:{dataset:{kind:'banked_reset'}}});h.page.selectResetKind({currentTarget:{dataset:{kind:'automatic_reset'}}});ticks.splice(0).forEach(fn=>fn());assert.equal(store.writes.length,0);assert.equal(h.page.data.bankedResetUnread,true);
+ h.page.selectResetKind({currentTarget:{dataset:{kind:'banked_reset'}}});h.page.onHide();ticks.splice(0).forEach(fn=>fn());assert.equal(store.writes.length,0);
+});
+
+test('已读只存公共消息身份并按环境隔离，不包含登录、次数或提醒授权',()=>{
+ const d=bankedFixture(),store=noticeStorage(),notices=createHomeTabNotices(store.api,newsConfig);notices.markRead(homeResetStatus(d).cards,d);
+ const raw=JSON.stringify(store.writes);assert.doesNotMatch(raw,/token|session|remaining|templateId|openid|secret/i);
+ const other=createHomeTabNotices(store.api,{...newsConfig,cloudEnv:'another-isolated-env'});assert.equal(other.unread(homeResetStatus(d).cards,d),true);
 });

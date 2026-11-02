@@ -1,3 +1,5 @@
+import {ownBenefitClause} from './benefit-language';
+import { bankedProgress } from './benefit-signal';
 import type { CadenceObservation } from '../lib/reset-cadence';
 import type { Evidence, Source } from '../lib/types';
 import { benefitClauses, benefitStage, extractBenefitClaims, isTruncatedBenefitText } from './benefit-rules';
@@ -21,7 +23,7 @@ const explicitEligibility = /\b(?:if|unless|except|excluding|eligible|created|re
 const unrestrictedClaim = (claim: ReturnType<typeof extractBenefitClaims>[number]) => claim.scope === 'public' &&
   !/（(?:资格原文|地区原文|限定范围)[:：]/u.test(claim.eligibility) &&
   // A readable historical product announcement is not proof of an unrestricted audience.
-  !/用户（原帖未列明具体套餐）/u.test(claim.eligibility);
+  !/用户（原帖未列明具体套餐）|适用范围未说明/u.test(claim.eligibility);
 
 function strictTime(value:string):number {
   if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value))return NaN;
@@ -93,6 +95,7 @@ function statementKind(evidence: Evidence): CadenceObservation['kind'] | undefin
   const clauses = benefitClauses(evidence.text).map(normalize);
   if (/\b(?:correction|retracted|withdrawn|cancelled|canceled)\b|更正|撤回|取消/iu.test(evidence.text) && clauses.some(clause => negatedAction.test(clause))) return;
   for (const [index, original] of clauses.entries()) {
+    if(!ownBenefitClause(normalize(evidence.text),original))continue;
     if (/[?？]/.test(original) || /^(?:if|unless|suppose|hypothetically)\b|\b(?:rumou?rs?|unconfirmed)\b|如果|假如|假设|传闻|据说/iu.test(original)) continue;
     // A milestone or an incident report before the assertion is not the reset's
     // eligibility. Keep all modifiers after the actual reset predicate.
@@ -140,7 +143,7 @@ function statementKind(evidence: Evidence): CadenceObservation['kind'] | undefin
 }
 
 function contextStatement(primary: Evidence, latest: Map<string, Evidence[]>,calendars:Map<string,Evidence[]>,latestEvidence:Evidence[]): CadenceStatement | undefined {
-  if (!primary.parentId) return;
+  if (!primary.parentId||bankedProgress(primary.text)) return;
   if (privateAction.test(normalize(primary.text)) || limitedAudience.test(primary.text) || explicitEligibility.test(primary.text) || negatedAction.test(primary.text) || /^(?:if|unless|suppose|hypothetically)\b|如果|假如|假设/iu.test(primary.text.trim())) return;
   const chain = [primary];
   const seen = new Set([canonicalUrl(primary.url)!]);

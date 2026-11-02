@@ -1,6 +1,6 @@
 {
-  "version": "1.0.82",
-  "sourceDigest": "54d10828e76e974b51867d1b4473c648714a46a5c59dbc0778ef82eabc4881d7",
-  "sourceFiles": 374,
-  "modelVersion": "conditional-empirical-global-20261018-1"
+  "version": "1.0.83",
+  "sourceDigest": "a65d68fd491d5ee451786710cb50a600e6ab9ff6a0a8cbec091469967e1cdc6d",
+  "sourceFiles": 382,
+  "modelVersion": "conditional-beta-reset-cadence-20261101-evidence-3"
 }

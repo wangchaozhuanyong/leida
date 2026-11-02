@@ -787,6 +787,7 @@ test('应用前台生命周期启动公共读取后并行预读，后退后台�
   const creates:Record<string,Options>={
     './utils/client':{createClient:()=>({start(){calls.push('public');},stop(){calls.push('stop');}})},
     './utils/preferences':{createPreferences:()=>({})},'./utils/transport':{createTransport:()=>({})},
+    './utils/home-tab-notice':{createHomeTabNotices:require('../miniprogram/utils/home-tab-notice').createHomeTabNotices},
     './utils/wechat':{createWechatReader:()=>({warmup(){calls.push('private');return Promise.resolve();}})},
     './utils/entry-navigation':{createEntryNavigation:()=>({show(){},hide(){}})},
     './utils/app-update':{createAppUpdate:()=>({show(){},hide(){}})}

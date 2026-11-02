@@ -1,0 +1,127 @@
+[
+  {
+    "name": "control-promise",
+    "text": "We will reset usage limits for all paid users in 2 hours.",
+    "expectation": "promised"
+  },
+  {
+    "name": "control-complete",
+    "text": "We have reset usage limits for all paid users.",
+    "expectation": "claimed_complete"
+  },
+  {
+    "name": "control-progress",
+    "text": "We are resetting usage limits for all paid users.",
+    "expectation": "in_progress"
+  },
+  {
+    "name": "quota-no-audience",
+    "text": "We have reset Codex usage limits.",
+    "expectation": "claimed_complete_unknown_audience"
+  },
+  {
+    "name": "quota-refreshed",
+    "text": "We have refreshed Codex usage limits for all paid users.",
+    "expectation": "claimed_complete"
+  },
+  {
+    "name": "quota-refilled",
+    "text": "We have refilled Codex usage limits for all paid users.",
+    "expectation": "claimed_complete"
+  },
+  {
+    "name": "quota-replenished",
+    "text": "Codex quotas have been replenished for all paid users.",
+    "expectation": "claimed_complete"
+  },
+  {
+    "name": "quota-topped-up",
+    "text": "We have topped up everyone's Codex allowance.",
+    "expectation": "extra_quota_not_proven_full_reset"
+  },
+  {
+    "name": "quota-fully-restored",
+    "text": "Every paid user's consumed Codex quota has been restored to its full allowance.",
+    "expectation": "claimed_complete"
+  },
+  {
+    "name": "quota-half-bonus",
+    "text": "We have added 50% extra Codex quota to all paid accounts.",
+    "expectation": "extra_quota_not_full_reset"
+  },
+  {
+    "name": "quota-higher-limit",
+    "text": "We have doubled Codex usage limits for all paid users.",
+    "expectation": "higher_limit_not_full_reset"
+  },
+  {
+    "name": "quota-refresh-preview",
+    "text": "We will refresh Codex usage limits for all paid users in 2 hours.",
+    "expectation": "promised"
+  },
+  {
+    "name": "quota-limits-only",
+    "text": "We have reset Codex limits for everyone.",
+    "expectation": "claimed_complete"
+  },
+  {
+    "name": "quota-already-reset",
+    "text": "Codex usage limits are now reset for all paid users.",
+    "expectation": "claimed_complete"
+  },
+  {
+    "name": "mixed-quota-complete-card-preview",
+    "text": "We have reset usage limits for all paid users. We will grant a banked reset.",
+    "expectation": "two_actions"
+  },
+  {
+    "name": "mixed-card-complete-quota-preview",
+    "text": "We have loaded banked resets for all paid users. We will reset usage limits.",
+    "expectation": "two_actions"
+  },
+  {
+    "name": "negated-quota",
+    "text": "We have not reset usage limits for all paid users.",
+    "expectation": "no_public_claim"
+  },
+  {
+    "name": "negated-stored",
+    "text": "No stored resets are available for all users.",
+    "expectation": "no_public_claim"
+  },
+  {
+    "name": "negated-reserve",
+    "text": "No reserve resets are now ready for all users.",
+    "expectation": "no_public_claim"
+  },
+  {
+    "name": "quoted-quota",
+    "text": "Someone said: We have reset usage limits for all paid users.",
+    "expectation": "not_first_party_completion"
+  },
+  {
+    "name": "rumour-quota",
+    "text": "Rumour: we have reset usage limits for all paid users.",
+    "expectation": "not_first_party_completion"
+  },
+  {
+    "name": "quoted-card",
+    "text": "Someone said: We have loaded banked resets for all paid users.",
+    "expectation": "not_first_party_completion"
+  },
+  {
+    "name": "private-quota",
+    "text": "I have reset usage limits for my account.",
+    "expectation": "no_public_claim"
+  },
+  {
+    "name": "targeted-quota",
+    "text": "We have reset usage limits for selected users.",
+    "expectation": "targeted_only"
+  },
+  {
+    "name": "conditional-quota",
+    "text": "If we reset usage limits for all users, it might help.",
+    "expectation": "no_public_claim"
+  }
+]

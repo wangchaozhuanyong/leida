@@ -18,3 +18,11 @@
 .connection-card{text-align:center;padding:28px 16px;background:#fff;border:1px solid #dce5f1;border-radius:16px}.connection-symbol{font-size:46px;color:#87b5f6;line-height:1.5}.connection-title{font-size:20px;line-height:28px;margin:10px 0;font-weight:600}.connection-description{font-size:14px;line-height:22px;color:#4d607b;margin-bottom:16px}.connection-card .primary{min-height:46px}.home-content>.empty{font-size:14px;line-height:24px;padding:24px 16px}
 @media(max-width:380px){.home-page{padding-left:14px;padding-right:14px}.reset-tabs .reset-tab{font-size:13px}.reset-tab-icon{width:19px;height:19px}.orbit-schedule>.orbit-date-label{width:72px}.orbit-schedule{gap:8px}.orbit-facts{padding-left:14px;padding-right:14px}.orbit-core{width:184px;max-width:82%}.orbit-number{font-size:36px}.with-days .orbit-number{font-size:34px}.is-long .orbit-number{font-size:25px;letter-spacing:-.5px}}
 @media(min-width:600px){.home-page{max-width:480px;margin:auto}}
+
+/* A message cue is independent of page entry and never changes tab geometry. */
+.reset-tabs .reset-tab.has-news{position:relative;background:#eee7ff;color:#6947ab;overflow:visible}
+.reset-tab.has-news::before{content:"";position:absolute;inset:0;border:1px solid #9a7ad8;border-radius:8px;pointer-events:none;opacity:.55}
+.reset-tab.news-pulse::before{animation:card-news-breathe 2s ease-in-out infinite}
+.reset-tab-unread{position:absolute;top:-8px;right:4px;z-index:1;padding:0 5px;border:1px solid #f2f5fb;border-radius:8px;background:#7450b8;color:#fff;font-size:10px;line-height:16px;white-space:nowrap;pointer-events:none}
+@keyframes card-news-breathe{0%,100%{opacity:.3;box-shadow:0 0 0 0 #9672d900}50%{opacity:.9;box-shadow:0 0 0 3px #9672d91c}}
+@media(prefers-reduced-motion:reduce){.reset-tab.news-pulse::before{animation:none}}

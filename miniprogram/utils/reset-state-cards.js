@@ -66,7 +66,7 @@ function resetStateCards(data, now=data.serverTime) {
       sourceTarget(card,active);
       const timed=valid(active.expectedAt),overdue=timed&&Date.parse(active.expectedAt)<=current;
       const adjusted=valid(active.previousExpectedAt)&&Date.parse(active.previousExpectedAt)!==Date.parse(active.expectedAt);
-      const timing=/(?:日终|最晚|之前|以内|截止|\bby\b|\bwithin\b)/i.test(active.timeNote||'')?'deadline':/^原文近似时间/.test(active.timeNote||'')?'approximate':'point';
+      const note=active.timeNote||'',timing=/^原文近似时间/.test(note)?'approximate':/^原文预计时刻/.test(note)?'point':/(?:日终|最晚|之前|以内|截止|\bby\b|\bwithin\b)/i.test(note)?'deadline':'point';
       Object.assign(card,{tone:'blue',badge:'已预告',state:'announced',evidence:'公开预告',title:kind==='banked_reset'?'已预告发放重置卡':'已预告额度重置',description:'已公布相关安排，具体时间仍待说明。',icon:'calendar',timeLabel:'预告发布',time:at(active.statementAt),timeAt:active.statementAt,action:'查看预告原文'});
       if(active.stage==='in_progress')Object.assign(card,{state:'progress',tone:'teal',badge:'进行中',evidence:'公开进展消息',title:kind==='banked_reset'?'重置卡正在发放':'额度重置进行中',description:'公开消息称已开始，完成情况等待后续声明。',icon:'progress',timeLabel:'进展消息',action:'查看最新进展'});
       else if(timed){

@@ -114,7 +114,7 @@ function pendingCard(base, round, now) {
     card.hero=homeOrbitPresentation(card,now);Object.assign(card.hero,{title:'暂无新消息',label:'公开消息追踪',badge:'持续关注',description:'暂未收到新的重置消息。',footnote:'有新进展会及时更新。'});
     return card;
   }
-  const adjusted=valid(round.previousExpectedAt),timing=/(?:日终|最晚|之前|以内|截止|\bby\b|\bwithin\b)/i.test(round.timeNote||'')?'deadline':/^原文近似时间/.test(round.timeNote||'')?'approximate':'point';
+  const adjusted=valid(round.previousExpectedAt),note=round.timeNote||'',timing=/^原文近似时间/.test(note)?'approximate':/^原文预计时刻/.test(note)?'point':/(?:日终|最晚|之前|以内|截止|\bby\b|\bwithin\b)/i.test(note)?'deadline':'point';
   const qualifier=timing==='deadline'?'前':timing==='approximate'?'左右':'';
   const progress=round.stage==='in_progress';
   card.state=overdue?'overdue':progress?'progress':timed?adjusted?'revised':'scheduled':'announced';
