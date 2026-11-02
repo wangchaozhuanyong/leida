@@ -198,10 +198,17 @@ async function withdrawalNotice(publication:Publication, kind:'event'|'article',
   const title=`${kind==='event'?'事件':'文章'}已撤回：${publication.article.title}`;
   await insert('notices',{id:`notice_${semanticKey}`,semanticKey,eventId:publication.eventId,publicationId:publication.id,title,summary:`撤回原因：${reason}`,categories:['correction'],status:'active',createdAt:now()} satisfies Notice,c);
 }
-/** Internal maintenance only. Uses normal fact validation and never emits historical alerts. */
-export async function publishHistoricalDraft(content:DraftContent,c:Client,reason:string,existingArticle?:Article):Promise<Publication> {
+/** Internal maintenance only. Captured recovery is pinned to a stored original,
+ * never a public request option. It preserves real times and suppresses alerts. */
+export async function publishHistoricalDraft(content:DraftContent,c:Client,reason:string,existingArticle?:Article,captured?:{evidenceId:string;evidenceHash:string;capturedBefore:string}):Promise<Publication> {
   const evidence=await list<Evidence>('evidence',c),cited=evidence.filter(row=>content.evidenceIds.includes(row.id));
-  if(cited.length!==new Set(content.evidenceIds).size||!isHistoricalContent(cited,now())||!cited.every(row=>Number.isFinite(Date.parse(row.publishedAt))&&Date.parse(row.publishedAt)<=Date.now()))throw new DomainError('历史补录证据范围不符');
+  if(cited.length!==new Set(content.evidenceIds).size||!cited.every(row=>Number.isFinite(Date.parse(row.publishedAt))&&Date.parse(row.publishedAt)<=Date.now()))throw new DomainError('历史补录证据范围不符');
+  if(captured){
+    const cutoff=Date.parse(captured.capturedBefore),primary=cited.find(row=>row.id===content.evidenceIds[0]);
+    const source=primary?await one<Source>('sources',primary.sourceId,c):undefined;
+    const candidates=primary?(await list<Candidate>('candidates',c)).filter(row=>row.evidenceId===primary.id):[];
+    if(!Number.isFinite(cutoff)||cutoff>Date.now()||!primary||primary.id!==captured.evidenceId||primary.hash!==captured.evidenceHash||primary.textOrigin!=='original'||primary.provenance==='manual'||!source?.enabled||!source.validated||source.publicationPaused||source.status==='paused'||!candidates.length||candidates.some(row=>row.humanEdited||row.status==='ignored')||!cited.every(row=>Number.isFinite(Date.parse(row.collectedAt))&&Date.parse(row.collectedAt)<=cutoff&&Date.parse(row.publishedAt)<=cutoff)||content.contentOrigin!=='template'||validateDraft(content,evidence,true).length)throw new DomainError('已采集原文静默补录范围不符');
+  }else if(!isHistoricalContent(cited,now()))throw new DomainError('历史补录证据范围不符');
   if(existingArticle&&(existingArticle.status!=='published'||existingArticle.publicationMode!=='news_only'||existingArticle.contentOrigin!=='template'||existingArticle.manualFields?.length))throw new DomainError('历史文章不符合自动补证范围');
   const previous=existingArticle&&content.eventId!==existingArticle.eventId?await one<RadarEvent>('events',existingArticle.eventId,c):undefined;
   if(existingArticle&&content.eventId!==existingArticle.eventId&&!previous)throw new DomainError('历史文章的原事件不存在');

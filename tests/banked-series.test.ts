@@ -4,7 +4,7 @@ import {createRequire} from 'node:module';
 import type {Evidence,RadarEvent} from '../src/lib/types';
 import {hash,validateDraft} from '../src/server/domain';
 import {gatherEvidenceContext,evidenceBenefitClaims} from '../src/server/source-context';
-import {bankedSeriesContext} from '../src/server/benefit-signal';
+import {bankedProgress,bankedSeriesContext} from '../src/server/benefit-signal';
 import {buildAutomaticTemplate,evidenceFingerprint,needsSemanticReview} from '../src/server/automatic-content';
 import {actionIdentityEvidence,resolveLinkedEvents} from '../src/server/worker';
 import {automaticNewsContextUpgrade} from '../src/server/service';
@@ -12,7 +12,8 @@ import {automaticNewsContextUpgrade} from '../src/server/service';
 const previewText='Day 26/ You can now easily switch between multiple accounts on mobile, and coming soon to desktop too. Next two days will be resets… banked… do with this what you may 👀.\n\nhttps://t.co/iQxsqbuk0f';
 const post=(text:string,id='2116405414921384099',at='2026-10-31T05:42:26.000Z',patch:Partial<Evidence>={}):Evidence=>({id:'e-'+id,messageId:id,sourceId:'tibo-public',url:'https://x.com/thsottiaux/status/'+id,text,hash:hash(text),publishedAt:at,collectedAt:at,contextComplete:true,textOrigin:'original',provenance:'archive',historical:false,metadata:{sourceGroup:'fxembed:thsottiaux'},...patch});
 const preview=post(previewText),first=post('Banked 1/2','2116692529970311254','2026-11-01T00:43:20.000Z');
-const second=post('Banked 2/2','last','2026-11-02T00:43:20.000Z');
+// Actual captured completion; Day 28 is a source label, not a third counter.
+const second=post('Day 28/ Banked 2/2','2117035794678546764','2026-11-01T23:27:20.000Z');
 const template=(p:Evidence,all:Evidence[])=>buildAutomaticTemplate(gatherEvidenceContext(p,all));
 
 test('real preview becomes a qualified announcement without tomorrow posts or a fabricated deadline',()=>{
@@ -35,6 +36,22 @@ test('1/2 advances the same announcement, 2/2 completes it; identities and citat
  }
  assert.equal(template(first,[first])?.actions.length??0,0);
  assert.ok(validateDraft({...template(first,[preview,first])!,actions:[{...template(first,[preview,first])!.actions[0],stage:'claimed_complete'}]},[preview,first],true).length);
+});
+
+test('activity-prefixed counters preserve the original quote and require the same independent series proof',()=>{
+ for(const [index,text] of ['Day 28/ Banked 2/2','Day 28 /\nBanked 2/2','Day 27/ Banked 1/2'].entries()){
+  const p=post(text,'prefixed-'+index,second.publishedAt,{contextComplete:false});
+  assert.deepEqual(bankedProgress(text),{index:text.endsWith('1/2')?1:2,total:2});
+  assert.equal(template(p,[p])?.actions.length??0,0,'a day label cannot invent its missing announcement');
+  const all=[preview,p],draft=template(p,all)!;
+  assert.equal(draft.actions[0]?.stage,text.endsWith('1/2')?'in_progress':'claimed_complete');
+  assert.equal(draft.actions[0]?.evidenceQuote,text);assert.equal(draft.actions[0]?.statementAt,p.publishedAt);
+  assert.deepEqual(validateDraft(draft,all,true),[]);
+ }
+ for(const text of ['Day 28/ Not Banked 2/2','Day 28/ Maybe Banked 2/2','Day 28/ My Banked 2/2','Day 28/ Banked 2/2 for selected users','Day 28/ Banked 2/2?','Day 28/ Banked 3/2','Day 28/ Banked 2/2; reset cancelled']){
+  assert.equal(bankedProgress(text),undefined,text);
+  const p=post(text);assert.equal(template(p,[preview,p])?.actions.filter(a=>a.stage==='claimed_complete'&&a.scope==='public').length??0,0,text);
+ }
 });
 
 test('series proof rejects competing announcements, future evidence, different author, withdrawal and conflicting progress',()=>{
