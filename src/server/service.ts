@@ -1,3 +1,6 @@
+import {validSemanticProof,type SemanticBenefitProof} from './semantic-benefit-review';
+import {analyzeBenefitEvidence} from './benefit-analysis';
+import { bankedProgress, bankedSeriesContext } from './benefit-signal';
 import {sourceCollectionSchedule,sourceForecastConfiguration} from './source-collection-policy';
 import {markForecastInputsChanged} from './reset-cadence-runtime';
 import { lockTransaction, repeatableRead } from '../db';
@@ -48,7 +51,7 @@ export async function getPublicData():Promise<PublicData> {
  return {...data,notices:data.notices.filter(customerNotice),serverTime:new Date().toISOString()};
 }
 function actionContent(actions:RadarEvent['actions']):{title:string;summary:string;translation:string} { const stage={promised:'已有发放安排',in_progress:'正在进行',claimed_complete:'公告称已完成',cancelled:'已取消'};const names={automatic_reset:'用量重置',banked_reset:'重置卡'};const title=actions.length===1?`${names[actions[0].kind]}：${stage[actions[0].stage]}`:'用量重置与重置卡进展';return {title,summary:actions.map(a=>`${names[a.kind]}${stage[a.stage]}，适用对象：${a.eligibility}。`).join(''),translation:''}; }
-interface PublishOptions { actor:string; reason:string; existingArticle?:Article; correction?:boolean; suppressNotice?:boolean; withdrawn?:boolean; automatic?:boolean; eventTitle?:string; }
+interface PublishOptions { semanticProof?:SemanticBenefitProof; archivedActions?:DraftContent['actions']; actor:string; reason:string; existingArticle?:Article; correction?:boolean; suppressNotice?:boolean; withdrawn?:boolean; automatic?:boolean; eventTitle?:string; }
 
 export function providerIdentity(evidence:Evidence):string {
  const observation=observedEvidence(evidence,evidence.collectedAt);
@@ -61,7 +64,7 @@ export function providerIdentity(evidence:Evidence):string {
 }
 /** Upgrade only a machine-created empty news shell after its explicit parent is known. */
 export function automaticNewsContextUpgrade(primary:Evidence,content:DraftContent,duplicate:RadarEvent,target:RadarEvent,evidence:Evidence[],articles:Article[]):Article|undefined {
- if(primary.provenance==='manual'||!primary.parentId||duplicate.id===target.id||duplicate.status!=='published'||duplicate.mergedInto||target.status!=='published'||duplicate.actions.length||duplicate.manualFields?.length||target.manualFields?.length||content.publicationMode!=='state_change'||content.actions.length!==1||target.actions.length!==1)return;
+ if(primary.provenance==='manual'||!primary.parentId&&!bankedSeriesContext(primary,evidence).length||duplicate.id===target.id||duplicate.status!=='published'||duplicate.mergedInto||target.status!=='published'||duplicate.actions.length||duplicate.manualFields?.length||target.manualFields?.length||content.publicationMode!=='state_change'||content.actions.length!==1||target.actions.length!==1)return;
  const incoming=content.actions[0],previous=target.actions[0];
  if(incoming.kind!==previous.kind||incoming.scope!=='public'||previous.scope!=='public'||previous.stage==='cancelled'||normalizedEligibility(incoming.eligibility)!==normalizedEligibility(previous.eligibility)||![incoming.statementAt,previous.statementAt,primary.publishedAt].every(value=>Number.isFinite(Date.parse(value)))||Date.parse(incoming.statementAt)<Date.parse(previous.statementAt))return;
  const context=gatherEvidenceContext(primary,evidence),ancestors=context.slice(1);
@@ -132,7 +135,7 @@ export function isStaleMachineConflict(candidate:Candidate,event:RadarEvent|unde
 export function publishedTemplateArticle(candidate:Candidate,primary:Evidence,evidence:Evidence[],articles:Article[],events:RadarEvent[]):Article|undefined {
  if(!candidate.automation?.templatePublished||candidate.humanEdited)return;
  const article=articleForPrimary(candidate,{...candidate.content,eventId:undefined},primary,evidence,articles,true);
- if(!article||article.contentOrigin==='generated'||events.find(event=>event.id===article.eventId)?.status!=='published')return;
+ if(!article||article.contentOrigin==='generated'&&!candidate.automation.reasonCodes.includes('unparsed_benefit_clause')||events.find(event=>event.id===article.eventId)?.status!=='published')return;
  return article;
 }
 const sameIds=(first:string[]|undefined,second:string[]|undefined)=>JSON.stringify([...(first??[])].sort())===JSON.stringify([...(second??[])].sort());
@@ -157,7 +160,7 @@ export function automaticCorrection(content:DraftContent,event:RadarEvent|undefi
  return true;
 }
 async function publish(content:DraftContent, c:Client, opts:PublishOptions):Promise<Publication> {
-  const evidence=await list<Evidence>('evidence',c); const reasons=validateDraft(content,evidence);
+  const evidence=await list<Evidence>('evidence',c); const reasons=validateDraft(content,evidence,!!opts.automatic,opts.semanticProof,opts.archivedActions);
   if(reasons.length && !opts.withdrawn) throw new DomainError(reasons.join('；'));
   const existing=content.eventId?await one<RadarEvent>('events',content.eventId,c,true):undefined;
   if(content.eventId&&!existing) throw new DomainError('关联事件不存在',404);
@@ -185,7 +188,7 @@ async function publish(content:DraftContent, c:Client, opts:PublishOptions):Prom
   // Linking an already published article to its campaign is enrichment, not a
   // new announcement. Actual benefit changes still have their own fact key.
   const semantic=key??(activity&&cited[0]&&!opts.existingArticle?hash(`activity:${activity.id}:${content.activityDay}:${providerIdentity(cited[0])}`):undefined);
-  if(semantic&&(!historical||(opts.correction&&opts.actor!=='worker'))&&!opts.suppressNotice&&!opts.withdrawn) { const categories:Notice['categories']=opts.correction?['correction']:observation?['result']:newsOnly?[]:content.actions.filter(a=>a.scope==='public').some(a=>a.stage==='claimed_complete')?['result']:['announcement']; if(activity) categories.push('activity'); await insert('notices',{id:`notice_${semantic}`,semanticKey:semantic,eventId,publicationId,title:article.title,summary:article.summary,categories,status:'active',createdAt:time} satisfies Notice,c); }
+  if(semantic&&(!historical||(opts.correction&&opts.actor!=='worker'))&&!opts.suppressNotice&&!opts.withdrawn) { const categories:Notice['categories']=opts.correction?['correction']:observation?['result']:newsOnly?[]:content.actions.filter(a=>a.scope==='public').some(a=>a.stage==='claimed_complete'||a.kind==='banked_reset'&&a.stage==='in_progress'&&!!bankedProgress(a.evidenceQuote??''))?['result']:['announcement']; if(activity) categories.push('activity'); await insert('notices',{id:`notice_${semantic}`,semanticKey:semantic,eventId,publicationId,title:article.title,summary:article.summary,categories,status:'active',createdAt:time} satisfies Notice,c); }
   await audit(opts.actor,opts.withdrawn?'publication.withdraw':opts.correction?'publication.correct':'publication.publish',eventId,opts.reason,existing,publication,c);
   await markForecastInputsChanged(c);
   return publication;
@@ -295,6 +298,8 @@ export async function publishCandidate(candidateId:string,version:number,actor:s
     let content=draftSchema.parse(candidate.content);
     const evidence=await list<Evidence>('evidence',c),events=await list<RadarEvent>('events',c),articles=await list<Article>('articles',c);
     const primary=evidence.find(item=>item.id===candidate.evidenceId);
+    const incomplete=primary&&analyzeBenefitEvidence(primary,gatherEvidenceContext(primary,evidence)).unresolved.length>0;
+    let processingState={state:incomplete?'deferred' as const:'ready' as const,reasonCodes:incomplete?['unparsed_benefit_clause']:[]};
     let newsUpgrade:{event:RadarEvent;article:Article}|undefined;
     if(primary&&content.evidenceIds.includes(primary.id))content={...content,evidenceIds:[primary.id,...content.evidenceIds.filter(id=>id!==primary.id)]};
     if(automatic){
@@ -316,7 +321,10 @@ export async function publishCandidate(candidateId:string,version:number,actor:s
     const existing=content.eventId?await one<RadarEvent>('events',content.eventId,c,true):undefined;
     if(content.eventId&&(requireEventVersion||expectedEventVersion!==undefined))assertVersion(existing,expectedEventVersion);
     if(content.actions.some(action=>events.some(event=>event.status==='published'&&event.id!==content.eventId&&event.actions.some(old=>old.id===action.id))))throw new DomainError('动作已经属于另一事件，请先关联事件');
-    if(automatic){const sourceErrors=validateDraft(content,evidence,true);if(sourceErrors.length)throw new DomainError(sourceErrors.join('；'));}
+    let semanticProof:SemanticBenefitProof|undefined;
+    const completedJob=content.contentOrigin==='generated'&&validateDraft(content,evidence,automatic).length?(await list<Job>('jobs',c)).find(j=>j.candidateId===candidate.id&&j.payload.generatedCandidateVersion===candidate.version&&typeof j.payload.semanticProofId==='string'):undefined;
+    if(completedJob){const saved=await one<Audit>('audits',String(completedJob.payload.semanticProofId),c);const proof=saved?.after as SemanticBenefitProof|undefined;const ai=await one<AIRecord>('settings','ai',c);if(saved?.actor==='worker'&&saved.action==='candidate.semantic_review'&&saved.objectId===candidate.id&&proof?.aiVersion===ai?.version&&validSemanticProof(proof,evidence,content))semanticProof=proof;}
+    if(automatic){const sourceErrors=validateDraft(content,evidence,true,semanticProof);if(sourceErrors.length)throw new DomainError(sourceErrors.join('；'));}
     const originalContent=structuredClone(content);
     const partition=automatic?partitionAutomaticActions(content,existing):{current:content.actions,stale:[]};
     const archiveOnly=partition.stale.length>0&&partition.current.length===0;
@@ -325,7 +333,8 @@ export async function publishCandidate(candidateId:string,version:number,actor:s
       if(archiveOnly){const statementTime=new Date(partition.stale.map(action=>action.statementAt).sort()[0]).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false});content={...content,title:'较早公告记录',summary:`来源较早公告（${statementTime}，北京时间）：${content.summary}`.slice(0,2400),publicationMode:'news_only'};}
     }
     if(automatic&&existing&&!archiveOnly)content=preserveManualFields(content,existing);
-    const errors=validateDraft(content,evidence,automatic);
+    if(semanticProof&&primary){const remaining=analyzeBenefitEvidence(primary,gatherEvidenceContext(primary,evidence)).unresolved.filter(clause=>!semanticProof!.claims.some(c=>c.claim.quote.includes(clause)||clause.includes(c.claim.quote)));processingState={state:remaining.length?'deferred':'ready',reasonCodes:remaining.length?['unparsed_benefit_clause']:[]};}
+    const errors=validateDraft(content,evidence,automatic,semanticProof,partition.stale);
     if(automatic&&primary?.metadata?.activity){const definition=primary.metadata.activity,current=await one<Activity>('activities',definition.id,c);const manuallyConfigured=(await list<Audit>('audits',c)).some(entry=>entry.action==='activity.save'&&entry.objectId===definition.id);if(current&&manuallyConfigured&&(['timezone','startsOn','days','rules'] as const).some(field=>current[field]!==definition[field]))errors.push('活动来源规则与人工配置冲突，暂缓关联');}
     if(automatic&&candidate.automation?.state==='conflict')errors.push(...candidate.reasons);
     if(errors.length)throw new DomainError([...new Set(errors)].join('；'));
@@ -367,12 +376,12 @@ export async function publishCandidate(candidateId:string,version:number,actor:s
       const result=await one<Publication>('publications',previousArticle.publicationId,c);
       if(!result)throw new DomainError('当前文章的发布快照不存在，无法安全复用');
       const persistedContent=archivedAgain?{...originalContent,title:previousArticle.title,summary:previousArticle.summary,translation:previousArticle.translation,category:previousArticle.category,evidenceIds:previousArticle.evidenceIds,contextEvidenceIds:previousArticle.contextEvidenceIds,publicationMode:previousArticle.publicationMode??'state_change',contentOrigin:previousArticle.contentOrigin}:content;
-      await put('candidates',{...candidate,status:'published',version:candidate.version+1,updatedAt:now(),content:{...persistedContent,eventId:result.eventId},reasons:[],automation:{...candidate.automation,state:'ready',reasonCodes:[],dependencyIds:[],articleId:result.articleId,templatePublished:persistedContent.contentOrigin==='template',evaluatedAt:now()}},c);
+      await put('candidates',{...candidate,status:'published',version:candidate.version+1,updatedAt:now(),content:{...persistedContent,eventId:result.eventId},reasons:[],automation:{...candidate.automation,...processingState,dependencyIds:[],articleId:result.articleId,templatePublished:persistedContent.contentOrigin==='template'||processingState.state==='deferred',evaluatedAt:now()}},c);
       await audit(actor,'candidate.publication_unchanged',candidate.id,'重新核验通过，复用已有发布版本；事实和内容未变化',candidate,{publicationId:result.id,articleId:result.articleId,archived:archiveOnly},c);
       return result;
     }
     const eventTitle=automatic?mixedAutomaticEventTitle(content,existing,!!partition.stale.length,correction):undefined;
-    const result=await publish(content,c,{actor,reason,existingArticle:previousArticle,correction,automatic,eventTitle});
+    const result=await publish(content,c,{actor,reason,existingArticle:previousArticle,correction,automatic,eventTitle,semanticProof,archivedActions:partition.stale});
     if(newsUpgrade){
       const merged={...newsUpgrade.event,status:'merged' as const,mergedInto:result.eventId,version:newsUpgrade.event.version+1,updatedAt:now()};
       await put('events',merged,c);
@@ -382,7 +391,7 @@ export async function publishCandidate(candidateId:string,version:number,actor:s
       }
       await audit(actor,'event.news_context_link',newsUpgrade.event.id,'核验明确父帖后，空动作模板新闻关联到已有预告；旧发布快照保留',newsUpgrade.event,{event:merged,articleId:result.articleId,publicationId:result.id},c);
     }
-    await put('candidates',{...candidate,status:'published',version:candidate.version+1,updatedAt:now(),content:{...content,eventId:result.eventId},reasons:[],automation:{...candidate.automation,state:'ready',reasonCodes:[],dependencyIds:[],articleId:result.articleId,templatePublished:content.contentOrigin==='template',evaluatedAt:now()}},c);
+    await put('candidates',{...candidate,status:'published',version:candidate.version+1,updatedAt:now(),content:{...content,eventId:result.eventId},reasons:[],automation:{...candidate.automation,...processingState,dependencyIds:[],articleId:result.articleId,templatePublished:content.contentOrigin==='template'||processingState.state==='deferred',evaluatedAt:now()}},c);
     return result;
   });
 }

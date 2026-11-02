@@ -75,3 +75,21 @@ test('同帖选择官方副本但保持原分组位置，输入对象与排列�
   assert.deepEqual(uniqueDisplayEvidence(rows).map(row=>row.id),['official','different']);
   assert.deepEqual(rows,before);
 });
+
+test('进展详情来源摘要使用新进展，完成依据优先，原文返回顺序不影响两端展示',()=>{
+  const preview=evidence('preview',{messageId:'preview',url:'https://example.org/preview',text:'Banked resets tomorrow.',publishedAt:'2026-10-31T05:42:26Z'});
+  const progress=evidence('progress',{messageId:'progress',url:'https://example.org/progress',text:'Banked 1/2',publishedAt:'2026-11-01T00:43:20Z'});
+  for(const rows of [[preview,progress],[progress,preview]]){
+    const data=fixture(rows),action=data.publications[0].event.actions[0];
+    action.kind='banked_reset';action.stage='in_progress';action.statementAt=progress.publishedAt;
+    const before=structuredClone(data);
+    assert.equal(resolveDetail(data,{publicationId:'publication'}).evidence[0].id,'progress');
+    const render=()=>renderToStaticMarkup(createElement(SearchParamsContext.Provider,{value:new URLSearchParams()},createElement(EventPage,{data,id:'event',onPoster(){},onShare:async()=>{}})));
+    assert.ok(render().indexOf('Banked 1/2')<render().indexOf('Banked resets tomorrow.'));
+    assert.deepEqual(data,before);
+    action.stage='claimed_complete';action.statementAt=preview.publishedAt;
+    assert.equal(resolveDetail(data,{publicationId:'publication'}).evidence[0].id,'preview');
+    assert.ok(render().indexOf('Banked resets tomorrow.')<render().indexOf('Banked 1/2'));
+    assert.equal(resolveDetail(data,{publicationId:'publication'}).evidence.length,2);
+  }
+});

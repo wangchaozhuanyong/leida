@@ -1,8 +1,9 @@
+import {validSemanticProof,type SemanticBenefitProof} from './semantic-benefit-review';
 import {referenceCompletionClaim} from './reference-reset-source';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { BenefitAction, DraftContent, Evidence, RadarEvent } from '../lib/types';
-import { evidenceBenefitClaims, hasCompleteContext, isTruncatedText, isVerifiedCampaignCalendar } from './source-context';
+import { directEvidenceBenefitClaims, evidenceBenefitClaims, hasCompleteContext, isTruncatedText, isVerifiedCampaignCalendar } from './source-context';
 import { canUseNewsOnlyAttribution, normalizedEligibility } from './automatic-content';
 import { benefitClauses, benefitKinds, benefitStage, eligibilityMatches, extractReplyClaims } from './benefit-rules';
 export class DomainError extends Error { constructor(message: string, public status = 400) { super(message); } }
@@ -14,7 +15,7 @@ export const actionSchema = z.object({ id:z.string().min(1).max(180),kind:z.enum
 export const draftSchema = z.object({ title:z.string().trim().min(2).max(160), summary:z.string().trim().min(2).max(2400), translation:z.string().max(12000), category:z.enum(['reset','product','activity']), eventId:z.string().optional(), actions:z.array(actionSchema).max(20), evidenceIds:z.array(z.string()).min(1).max(30), contextEvidenceIds:z.array(z.string()).max(20).optional(), activityId:z.string().optional(), activityDay:z.number().int().min(1).max(366).optional(),publicationMode:z.enum(['news_only','state_change']).optional(),contentOrigin:z.enum(['template','generated']).optional(),reviewStatus:z.enum(['pending','targeted_update']).optional(),reviewReasons:z.array(z.string().min(1).max(300)).max(10).optional() });
 const benefitWords = /reset|重置|发卡|存卡|额度|banked/i;
 export function hasCompletion(text: string): boolean { return !isTruncatedText(text)&&benefitClauses(text).some(clause=>benefitStage(clause)==='claimed_complete'&&(benefitKinds(clause).length>0||/confirmed\s+landed|已确认.{0,12}(?:落地|到账)/i.test(clause))); }
-export function isBenefitText(text: string): boolean { return benefitWords.test(text); }
+export function isBenefitText(text: string): boolean { return benefitWords.test(text)||benefitKinds(text).length>0; }
 export function hasCancellation(text:string):boolean {
  return benefitClauses(text).some(clause=>benefitStage(clause)==='cancelled');
 }
@@ -24,8 +25,9 @@ export function hasAmbiguousTimeNote(note: string): boolean {
   // such as PST/EOD and free-form deadlines need their intended meaning checked.
   return !/^(?:(?:已)?(?:统一)?(?:换算|转换)(?:为|成)?|统一使用|原文|北京时间|中国标准时间|(?:UTC|GMT)(?:[+-](?:0?[0-9]|1[0-4])(?::[0-5][0-9])?)?|[\s（）(),，。:：])+$/i.test(note.trim());
 }
-export function validateDraft(content: DraftContent, evidence: Evidence[], automatic = false): string[] {
+export function validateDraft(content: DraftContent, evidence: Evidence[], automatic = false, semanticProof?:SemanticBenefitProof, archivedActions:BenefitAction[]=[]): string[] {
   const reasons:string[] = [];
+  const reviewed=validSemanticProof(semanticProof,evidence,content)?semanticProof:undefined;
   const all = new Map(evidence.map(e => [e.id,e]));
   const cited = content.evidenceIds.map(e => all.get(e));
   if (cited.some(e => !e)) reasons.push('引用的原文不存在');
@@ -36,7 +38,7 @@ export function validateDraft(content: DraftContent, evidence: Evidence[], autom
   if(content.reviewStatus&&(!newsOnly||content.actions.length||!content.reviewReasons?.length))reasons.push('待确认或定向跟踪必须说明原因且不能包含福利动作');
   if(newsOnly&&content.actions.length)reasons.push('仅新闻更新不能包含福利动作');
   const attributed=canUseNewsOnlyAttribution(content,validCited)||(!automatic&&newsOnly&&content.actions.length===0&&/公开归档|消息记录|来源/.test(content.summary));
-  if (cited.some(e => e && !hasCompleteContext(e,validCited,!automatic) && !isVerifiedCampaignCalendar(e,validCited) && !(!automatic && !isTruncatedText(e.text) && supplemental.some(parent=>parent&&hasCompleteContext(parent,evidence,true))))&&!attributed) reasons.push('原文上下文不完整，请补充父帖或完整证据');
+  if (cited.some(e => e && !hasCompleteContext(e,validCited,!automatic) && !reviewed?.evidenceIds.includes(e.id) && !isVerifiedCampaignCalendar(e,validCited) && !(!automatic && !isTruncatedText(e.text) && supplemental.some(parent=>parent&&hasCompleteContext(parent,evidence,true))))&&!attributed) reasons.push('原文上下文不完整，请补充父帖或完整证据');
   if (!/[\u3400-\u9fff]/.test(content.title) || !/[\u3400-\u9fff]/.test(content.summary)) reasons.push('标题和摘要必须使用中文');
   if (/已(?:全部)?(?:发放|到账|重置|落地)|发放完成/.test(content.title) && !content.actions.some(a=>a.stage==='claimed_complete')) reasons.push('标题宣称完成，但动作尚无完成状态');
   if (content.category === 'reset' && content.actions.length === 0&&!newsOnly) reasons.push('重置新闻必须明确至少一个福利动作');
@@ -60,10 +62,12 @@ export function validateDraft(content: DraftContent, evidence: Evidence[], autom
     if(action.scope==='public'&&/just (?:you|your)|your account only|my account|private|仅你|仅该账户|私人|个人结转/i.test(quote))reasons.push('个人或定向证据不能标记普发');
     if(action.scope==='public'&&/selected|subset|specific\s+(?:users|accounts)|affected\s+(?:users|accounts)|\b\d+[km]?\s+(?:users|accounts)|部分|特定|选定|受(?:故障)?影响|定向补偿/i.test(quote))reasons.push('部分或受影响账户的定向补偿不能标记普发');
     if (action.kind === 'automatic_reset' && /banked|reset\s+bank|重置卡|存卡|备用重置/i.test(quote) && !/usage|用量|使用额度/i.test(quote)) reasons.push('重置卡证据不能证明用量已重置');
-    if (action.kind === 'banked_reset' && !/banked|reset\s+bank|重置卡|存卡|备用重置/i.test(text)) reasons.push('证据未明确指向重置卡');
+    const reviewedAction=reviewed?.claims.some(c=>c.evidenceId===statement.id&&c.claim.kind===action.kind&&c.claim.quote===quote);
+    if (action.kind === 'banked_reset' && !benefitKinds(text).includes('banked_reset')&&!reviewedAction) reasons.push('证据未明确指向重置卡');
     if (action.kind === 'banked_reset' && /usage|用量|使用额度/i.test(quote)&&!/banked|reset\s+bank|重置卡|存卡|备用重置/i.test(quote)) reasons.push('用量重置声明不能证明重置卡动作');
-    if (!isBenefitText(text)&&!actionEvidence.some(e=>e&&referenceCompletionClaim(e))) reasons.push('原文未明确说明福利类型，需补全原承诺');
+    if (!reviewed&&!isBenefitText(text)&&!actionEvidence.some(e=>e&&referenceCompletionClaim(e))) reasons.push('原文未明确说明福利类型，需补全原承诺');
     let semantics=evidenceBenefitClaims(statement,validCited,!automatic);
+    if(reviewed)semantics=[...semantics,...reviewed.claims.filter(c=>c.evidenceId===statement.id&&!semantics.some(s=>s.kind===c.claim.kind&&s.quote===c.claim.quote)).map(c=>c.claim)];
     // Explicit human association is retained, but arbitrary citations never unlock automatic replies.
     if(!semantics.length&&!automatic&&!isTruncatedText(statement.text)&&supplemental.length){
       const parents=supplemental.flatMap(parent=>parent?evidenceBenefitClaims(parent,validCited,true):[]);
@@ -80,11 +84,23 @@ export function validateDraft(content: DraftContent, evidence: Evidence[], autom
     }else{
       if(!eligibilityMatches(semantic.eligibility,action.eligibility))reasons.push('套餐、付费、免费或其他资格限制与原文不一致，不能扩大适用账户');
       if(semantic.scope!==action.scope)reasons.push('个人或定向补偿证据不能标记普发');
+      if((action.stage==='promised'||action.stage==='in_progress')&&semantic.expectedAt&&!action.expectedAt)reasons.push('遗漏原文明确的预计时间');
+      if(automatic&&semantic.timeNote&&!action.timeNote&&(action.stage==='promised'||action.stage==='in_progress'))reasons.push('遗漏原文时间范围或限定说明');
       if(action.expectedAt&&(!semantic.expectedAt||Date.parse(action.expectedAt)!==Date.parse(semantic.expectedAt)))reasons.push('预计时间缺少明确时区或原文依据，不能强配精确截止');
       if(action.timeNote&&automatic&&hasAmbiguousTimeNote(action.timeNote)&&action.timeNote!==semantic.timeNote)reasons.push('时间歧义说明必须忠实引用原文，不得自行猜测');
       if(semantic.timeNote?.includes('未生成精确截止')&&action.expectedAt)reasons.push('时间存在歧义，不得生成精确截止');
     }
     if (Math.abs(Date.parse(action.statementAt)-Date.parse(statement.publishedAt))>60_000) reasons.push('声明时间必须对应动作引用原文的发布时间');
+  }
+  // Coverage concerns this post, not every supporting historical ancestor.
+  // Publication merges preserve previous actions; a generator must not silently
+  // drop another independently verified action from the current declaration.
+  if(!newsOnly){
+    const primary=validCited[0];
+    const expected=primary?directEvidenceBenefitClaims(primary,validCited):[];
+    for(const claim of expected.filter(c=>c.scope==='public')){
+      if(![...content.actions,...archivedActions].some(a=>a.kind===claim.kind&&a.stage===claim.stage&&a.scope===claim.scope&&eligibilityMatches(claim.eligibility,a.eligibility)&&a.evidenceQuote?.includes(claim.quote)))reasons.push('遗漏原文已明确的福利动作');
+    }
   }
   if (automatic && cited.some(e => e?.provenance === 'manual')) reasons.push('人工补录需要审核');
   return [...new Set(reasons)];

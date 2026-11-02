@@ -46,6 +46,7 @@ Page(createPage((data, query, page, app) => {
   return {
     name: data.site.name || '模钥重置雷达',
     resetCards:states.cards,untypedSignal:states.untyped,stateWarning:states.sourceWarning,signalExpiredNote:states.expiredNote,selectedResetKind,
+    bankedResetUnread:selectedResetKind!=='banked_reset'&&!!app.homeTabNotices?.unread(states.cards,data),
     historicalProbability: m.referenceCadenceView(data.forecasts?.referenceCadence,data.serverTime),
     lastReset: recentMessage(selectedResetKind==='banked_reset'?states.lastCard:states.lastReset),
     latest: latest ? { title: latest.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', elapsed: m.elapsed(latest.statementAt, data.serverTime), time: m.completionTime(latest.statementAt), eligibility: latestAction.eligibility, path: pathFor(latest) } : null,
@@ -68,7 +69,21 @@ Page(createPage((data, query, page, app) => {
     shareLabel: '分享这条公告给朋友',
     historical: data.articles.length > 0 && data.articles.every(article => m.isHistoricalArticle(article, data.evidence))
   };
-}, { view:()=>({view:'home'}), load(query) { this.setData({selectedResetKind:validKind(query.kind)}); }, data: { name: '模钥重置雷达', freshnessOpen: false, motionActive: false }, show() { this.setData({motionActive: true}); }, afterRender() { this.queuePrimaryPrefetch(); this.syncCountdown(); this.syncForecastExpiry(); }, hide() { this.setData({motionActive: false}); this.cancelPrimaryPrefetch(); this.stopCountdown(); this.stopForecastExpiry(); }, unload() { this.setData({motionActive: false}); this.cancelPrimaryPrefetch(); this.stopCountdown(); this.stopForecastExpiry(); }, methods: {
+}, { view:()=>({view:'home'}), load(query) { this.setData({selectedResetKind:validKind(query.kind)}); }, data: { name: '模钥重置雷达', freshnessOpen: false, motionActive: false, bankedResetUnread:false }, show() { this.setData({motionActive: true}); }, afterRender() { this.queuePrimaryPrefetch(); this.syncCountdown(); this.syncForecastExpiry(); this.syncHomeTabNotice(); }, hide() { this.setData({motionActive: false}); this.cancelPrimaryPrefetch(); this.stopCountdown(); this.stopForecastExpiry(); }, unload() { this.setData({motionActive: false}); this.cancelPrimaryPrefetch(); this.stopCountdown(); this.stopForecastExpiry(); }, methods: {
+  syncHomeTabNotice() {
+    const data=this._renderedData,notices=getApp().homeTabNotices;
+    if(!this._visible||!data||!notices)return;
+    const selected=this.data.selectedResetKind==='banked_reset';
+    const unread=!selected&&notices.unread(this.data.resetCards,data);
+    if(unread!==this.data.bankedResetUnread)this.setData({bankedResetUnread:unread});
+    if(!selected||this.data.snapshotPending||this.data.error||!this.data.connected)return;
+    const generation=this._renderGeneration;
+    const acknowledge=()=>{
+      if(this._visible&&this._renderedData===data&&generation===this._renderGeneration&&this.data.selectedResetKind==='banked_reset'
+        &&!this.data.snapshotPending&&!this.data.error)notices.markRead(this.data.resetCards,data);
+    };
+    if(typeof wx.nextTick==='function')wx.nextTick(acknowledge);else this.setData({},acknowledge);
+  },
   queuePrimaryPrefetch() {
     if(!this.data.connected || this.data.snapshotPending || this.data.loading || this.data.error || this._primaryPrefetched || this._primaryPrefetchTimer || !getApp().client.prefetchPrimaryViews)return;
     this._primaryPrefetchTimer=setTimeout(()=>{this._primaryPrefetchTimer=null;if(this._visible){this._primaryPrefetched=true;void getApp().client.prefetchPrimaryViews();}},80);
@@ -138,7 +153,7 @@ Page(createPage((data, query, page, app) => {
     else for(const [key,value] of Object.entries(history))if(value!==this.data.lastReset[key])patch['lastReset.'+key]=value;
     return patch;
   },
-  selectResetKind(event) { const kind=event.currentTarget.dataset.kind;if(['automatic_reset','banked_reset'].includes(kind)){this.setData({selectedResetKind:kind,expandedSourceKind:''});this.tickCountdown();this.syncCountdown();} },
+  selectResetKind(event) { const kind=event.currentTarget.dataset.kind;if(['automatic_reset','banked_reset'].includes(kind)){this.setData({selectedResetKind:kind,expandedSourceKind:''});this.tickCountdown();this.syncCountdown();this.syncHomeTabNotice();} },
   openStatusEvidence(event) {
     const kind=event.currentTarget.dataset.kind,card=kind==='untyped'?this.data.untypedSignal:this.data.resetCards.find(item=>item.kind===kind);
     if(!card)return;

@@ -1,3 +1,5 @@
+import {analyzeBenefitEvidence} from './benefit-analysis';
+import { bankedProgress, eligibleOriginal } from './benefit-signal';
 import {referenceCompletionClaim} from './reference-reset-source';
 import {observedEvidence} from '../lib/reset-observations';
 import { createHash } from 'node:crypto';
@@ -33,12 +35,13 @@ export function originalProductSummary(primary:Evidence,evidence:Evidence[]):Pic
   return {title:'Codex 使用限额调整',summary,translation:primary.text};
 }
 
-export function evidenceFingerprint(evidence:Evidence[]):string {
-  const inputs=createHash('sha256').update(JSON.stringify(evidence.map(item=>({id:item.id,hash:item.hash,parentId:item.parentId,contextComplete:item.contextComplete,textOrigin:item.textOrigin,metadata:item.metadata})).sort((a,b)=>a.id.localeCompare(b.id)))).digest('hex');
+export function evidenceFingerprint(evidence:Evidence[],semanticVersion?:number):string {
+  const inputs=createHash('sha256').update(JSON.stringify(evidence.map(item=>({id:item.id,hash:item.hash,publishedAt:item.publishedAt,url:item.url,parentId:item.parentId,contextComplete:item.contextComplete,textOrigin:item.textOrigin,metadata:item.metadata})).sort((a,b)=>a.id.localeCompare(b.id)))).digest('hex');
   // A changed observation template must re-evaluate persisted machine drafts,
   // even when the upstream text is unchanged. Keep other fact rules untouched.
   const observation=evidence[0]&&observedEvidence(evidence[0],evidence[0].collectedAt);
-  return `${AUTOMATIC_RULES_VERSION}${observation?'-observation-template-2':''}${evidence[0]&&attributedActivityExcerpt(evidence[0])?'-activity-attribution-1':''}${evidence[0]&&originalProductSummary(evidence[0],evidence)?'-original-product-1':''}:${inputs}`;
+  const semantic=semanticVersion!==undefined&&needsSemanticReview(buildAutomaticTemplate(evidence),evidence)?`-semantic-${semanticVersion}`:'';
+  return `${AUTOMATIC_RULES_VERSION}${semantic}${observation?'-observation-template-2':''}${evidence[0]&&attributedActivityExcerpt(evidence[0])?'-activity-attribution-1':''}${evidence[0]&&originalProductSummary(evidence[0],evidence)?'-original-product-1':''}:${inputs}`;
 }
 
 export function classifyBlockers(reasons:string[],evidence:Evidence[]):CandidateAutomation {
@@ -85,7 +88,8 @@ export function buildAutomaticTemplate(evidence:Evidence[]):DraftContent|undefin
     });
     const name=(kind:BenefitAction['kind'])=>kind==='banked_reset'?'重置卡':'用量重置';
     const label:Record<BenefitAction['stage'],string>={promised:'发放预告',in_progress:'发放中',claimed_complete:'公告称已完成',cancelled:'公告宣布取消'};
-    const title=referenceCompletionClaim(primary)?'参考来源确认：用量重置已完成':actions.map(action=>`${name(action.kind)}：${label[action.stage]}`).join('；');
+    const progress=bankedProgress(primary.text);
+    const title=progress?`重置卡：${progress.index===progress.total?'本系列发放进度已完成':`已报告第 ${progress.index}/${progress.total} 批进展`}`:referenceCompletionClaim(primary)?'参考来源确认：用量重置已完成':actions.map(action=>`${name(action.kind)}：${label[action.stage]}`).join('；');
     const sourceTime=new Date(primary.publishedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false});
     const summary=actions.map(action=>`${name(action.kind)}${label[action.stage]}，适用对象：${action.eligibility}。${action.expectedAt?`预计时间：${new Date(action.expectedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})}（北京时间）。`:''}${action.timeNote??''}`).join('\n');
     if(title.length>160||summary.length>2100||actions.some(action=>action.evidenceQuote!.length>3000))return;
@@ -170,6 +174,13 @@ function attributedContextLengthUpdate(primary:Evidence):string|undefined {
 
 function attributedNews(primary:Evidence,base:DraftContent):DraftContent {
   return {...base,title:'公开归档收录重置相关动态',category:base.activityId?'activity':'reset',summary:`公开归档收录消息：“${primary.text.slice(0,1700)}”。此条仅作消息记录，福利类型、资格或对应轮次尚待确认。`};
+}
+
+export function needsSemanticReview(draft:DraftContent|undefined,context:Evidence[]):boolean {
+  const primary=context[0];
+  return !!primary&&eligibleOriginal(primary)&&!isTruncatedText(primary.text)&&!originalConflict(primary,context)&&
+    (!primary.parentId||context.some(e=>e.messageId===primary.parentId))&&
+    (analyzeBenefitEvidence(primary,context).unresolved.length>0||draft?.reviewStatus==='pending');
 }
 
 export function canUseNewsOnlyAttribution(content:DraftContent,evidence:Evidence[]):boolean {

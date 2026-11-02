@@ -26,7 +26,7 @@ function resolveStatusTimeline(outlook, now, completion = outlook.latestCompleti
   const signal=!active?activeResetWatch(forecasts?.watch,now,resolvedAt):undefined;
   const referenceSignal=!active&&forecasts?.referenceSignal&&Date.parse(forecasts.referenceSignal.publishedAt)<=Date.parse(now)&&(!resolvedAt||Date.parse(forecasts.referenceSignal.publishedAt)>Date.parse(resolvedAt))?forecasts.referenceSignal:undefined;
   const deadlineNote=active?.timeNote??'';
-  const timing=/(?:日终|最晚|之前|以内|截止|\bby\b|\bwithin\b)/i.test(deadlineNote)?'deadline':/^原文近似时间/.test(deadlineNote)?'approximate':'point';
+  const timing=/^原文近似时间/.test(deadlineNote)?'approximate':/^原文预计时刻/.test(deadlineNote)?'point':/(?:日终|最晚|之前|以内|截止|\bby\b|\bwithin\b)/i.test(deadlineNote)?'deadline':'point';
   const timingLabel=timing==='deadline'?'预计最晚':timing==='approximate'?'预计约':'预计';
   const base = {
     sourceName:'Codex Resets',watching:false,estimating:false,detail:overdue?'预计时间已到，等待公开完成确认。':scheduled?'预计时间仅供参考，以实际发放为主。':'',sourceUrl:remote?.sourceUrl??'',sourceType:remote?.sourceType??'x_post',sourceCredit:!!remote,sourceId:remote?.id??'',forecastWindow:'',chanceLabel:'',observedLabel:'',expiresAt:'',

@@ -1,14 +1,15 @@
+import {bankedObject,languageKinds,languageStage,speechDisposition,ownBenefitClause} from './benefit-language';
 import type { ActionKind, ActionStage, BenefitAction } from '../lib/types';
 
 /** Change only when fact interpretation changes, so unchanged inputs are evaluated once. */
-export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261023-1';
+export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261101-3';
 export interface BenefitClaim {
   kind: ActionKind; stage: ActionStage; eligibility: string; scope: BenefitAction['scope'];
   quote: string; expectedAt?: string; timeNote?: string;
 }
 interface Qualification { label: string; key: string; scope: BenefitAction['scope']; }
 const normalize = (text: string) => text.replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim();
-const banked = /banked\s*(?:resets?|重置)|reset\s+bank|重置卡|存卡|备用重置|累积(?:重置)?额度/i;
+const banked = bankedObject;
 const usage = /(?:usage(?:\s+limits?)?|rate\s+limits?|用量|使用(?:额度|限制|限额|量)).{0,40}(?:reset|重置)|(?:reset|重置).{0,40}(?:usage(?:\s+limits?)?|rate\s+limits?|用量|使用(?:额度|限制|限额|量))/i;
 const globalReset = /\bglobal\s+(?:(?:usage|rate\s+limits?)\s+)?reset\b|全局(?:用量)?重置/i;
 // A short completion can inherit a benefit only through extractReplyClaims' explicit parent.
@@ -25,12 +26,7 @@ export function isTruncatedBenefitText(text: string): boolean {
   return /(?:…|\.{3})\s*$|(?:而是|但是|并且|包括|例如|分别是|以及|这些|因为|已经|即将|我们已|要求如下|具体要求如下|has been|we have|will be|but a|but|and|including|such as)\s*[:：,，]?\s*$/i.test(tail) || /(?:^|\n)\s*(?:[-*•]|\d+[.)、])\s*$/.test(tail);
 }
 
-export function benefitKinds(text: string): ActionKind[] {
-  const result: ActionKind[] = [];
-  if (banked.test(text)) result.push('banked_reset');
-  if (usage.test(text) || globalReset.test(text)) result.push('automatic_reset');
-  return result;
-}
+export function benefitKinds(text:string):ActionKind[] { return languageKinds(text); }
 
 export function hasDayEndDeadline(text: string): boolean {
   return dayEndDeadline.test(normalize(text));
@@ -80,7 +76,8 @@ function isQuestionOrHypothesis(text: string): boolean {
 
 export function benefitStage(text: string): ActionStage | undefined {
   const s = normalize(text);
-  if (isQuestionOrHypothesis(s) || excluded.test(s)) return;
+  if (speechDisposition(s)!=='own'||isQuestionOrHypothesis(s) || excluded.test(s)) return;
+  const interpreted=languageStage(s);if(interpreted)return interpreted;
   // "No banked resets have been loaded" denies the benefit itself, even though
   // its verb otherwise resembles a completion. Do not treat unrelated "no
   // delays/issues" wording as a negated benefit.
@@ -100,10 +97,16 @@ export function benefitStage(text: string): ActionStage | undefined {
   if (/^all\s+reset\s+for\s+everyone[.!]?$/i.test(s)) return 'claimed_complete';
   // The original's short announcement omits "will", but a global action with
   // a prospective deadline still states a promise, not a completed reset.
+  // Predicate families cover delivery wording independently of word order.
+  if(banked.test(s)){
+    if(/\b(?:will|scheduled|plan|expect)\b.{0,80}\b(?:issu\w*|send|deliver\w*|arriv\w*|available|ready)\b/i.test(s))return 'promised';
+    if(/\b(?:are|is)\s+(?:now\s+)?being\s+(?:issued|sent|delivered)\b/i.test(s))return 'in_progress';
+    if(/\b(?:have|has)\s+(?:just\s+|now\s+)?been\s+(?:issued|sent|delivered)\b|\b(?:are|is)\s+(?:now\s+)?(?:available|ready|delivered)\b/i.test(s))return 'claimed_complete';
+  }
   if (globalReset.test(s) && /^(?:a\s+)?global\b|^(?:全局|今日|今天|当日|当天|明天)/i.test(s) && hasDayEndDeadline(s) && !/\b(?:yesterday|last\s+(?:day|week))\b|昨天|昨日|上周/i.test(s)) return 'promised';
 }
 
-function qualification(text: string, inferredAudience?: string): Qualification | undefined {
+export function claimQualification(text: string, inferredAudience?: string): Qualification | undefined {
   const s = normalize(text);
   if (excluded.test(s) || /not all|并非所有|不是所有/i.test(s)) return;
   if(/\b(?:except|excluding)\b|除了|排除|除.{0,25}以外/i.test(s))return;
@@ -163,8 +166,8 @@ export function eligibilityKey(value: string): string {
 
 export function eligibilityMatches(source: string, candidate: string): boolean {
   if (eligibilityKey(source) === eligibilityKey(candidate)) return true;
-  const expected = qualification(source);
-  const actual = qualification(candidate);
+  const expected = claimQualification(source);
+  const actual = claimQualification(candidate);
   return Boolean(expected && actual && expected.key === actual.key);
 }
 
@@ -209,7 +212,8 @@ export function benefitTime(text: string, publishedAt: string): Pick<BenefitClai
   const zoneNote = namedZone ? `按原文${namedZone}字面${namedZone === 'PST' ? 'UTC-8' : 'UTC-7'}换算，未自行改用当地夏令时；这是公告预计时间，仍待实际确认。` : '已换算为北京时间（UTC+8）';
   const approximate = /~|\b(?:about|approximately|roughly|around|or so)\b|约|大约/i.test(s);
   const note = approximate ? `原文近似时间：约略预计时刻，并非最晚截止，未给出误差范围；${zoneNote}` : zoneNote;
-  const pointNote = approximate || /\b(?:by|before|within)\b|(?:小时|分钟)内|最晚|之前|点前/i.test(s) ? note : `原文预计时刻：并非最晚截止；${note}`;
+  const deadline = /\b(?:by|before|within)\b|(?:小时|分钟)内|最晚|之前|点前/i.test(s);
+  const pointNote = approximate ? note : deadline ? `原文最晚期限：${note}` : `原文预计时刻：并非最晚截止；${note}`;
   const isoTimes = [...s.matchAll(/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})\b/g)];
   if(isoTimes.length>1&&(isoTimes.some(item=>!validIsoBenefitTime(item[0]))||new Set(isoTimes.map(item=>Date.parse(item[0]))).size>1))return {timeNote:'原文包含多个不同或无效时刻，尚未确认唯一预计时间。'};
   const iso = isoTimes[0];
@@ -277,6 +281,7 @@ export function extractBenefitClaims(text: string, publishedAt: string): Benefit
   for (let index = 0; index < clauses.length; index++) {
     const clause = clauses[index];
     const next = clauses[index + 1];
+    if(!ownBenefitClause(text,clause))continue;
     // A product reset followed by a direct invitation to burn usage identifies
     // a usage action. It does not assert paid plans or expand to every plan.
     const declaredProductReset=/\b(?:i|we)(?:\s+have|'ve)\s+(?:now\s+|just\s+|already\s+)*reset\s+(?:usage|rate)\s+limits\s+(?:for|across)\s+(?:Codex\s+and\s+ChatGPT\s+Work|ChatGPT\s+Work\s+and\s+Codex)[.!]?$/i.test(normalize(clause)) &&
@@ -307,7 +312,7 @@ export function extractBenefitClaims(text: string, publishedAt: string): Benefit
     // The purpose of spending restored usage is not account eligibility.
     audienceClause = audienceClause.split(/\s+so\s+that\s+you\s+can\b/i)[0];
     const productAudience: Qualification | undefined = productUsageAnnouncement ? {label:'Codex和ChatGPT Work用户（原帖未列明具体套餐）',key:eligibilityKey('Codex和ChatGPT Work用户（原帖未列明具体套餐）'),scope:'public'} : undefined;
-    const audience = qualification(`${audienceClause}${audienceFollowup ? ' ' + audienceFollowup : ''}`,inferredAudience) ?? productAudience;
+    const audience = claimQualification(`${audienceClause}${audienceFollowup ? ' ' + audienceFollowup : ''}`,inferredAudience) ?? productAudience;
     if (!stage || !audience) continue;
     // A neighboring time sentence may qualify this one action, never a different benefit.
     const following = clauses.slice(index + (audienceFollowup ? 2 : 1), index + 4);
@@ -329,7 +334,7 @@ export function extractReplyClaims(text: string, publishedAt: string, parents: B
   if (isTruncatedBenefitText(text) || parents.length !== 1 || kinds.length > 1 || kinds.length === 1 && kinds[0] !== parents[0].kind || excluded.test(text)) return [];
   // An explicit-kind reply still requires its saved parent when it omits the
   // audience. Accept direct reset assertions, not reports about another user.
-  if (kinds.length && !/^(?:the\s+)?(?:banked\s+resets?|(?:usage|rate)\s+limits?(?:\s+reset)?|global\s+reset)\b|^(?:重置卡|用量重置)/i.test(normalize(text))) return [];
+  if (kinds.length && !/^(?:the\s+)?(?:banked\s+resets?|(?:usage|rate)\s+limits?(?:\s+reset)?|global\s+reset)\b|^(?:重置卡|用量重置)/i.test(normalize(text)) && !/^(?:good\s+\w+[.!]?\s*)?(?:the\s+)?reset\s+has\s+been\s+propagated\b/i.test(normalize(text))) return [];
   const clauses = benefitClauses(text);
   const isReplyStatement = (clause: string) => deicticCompletion.test(normalize(clause)) || /land(?:ed|ing)?|propagated|credited|loaded|completed|be there|^all\s+reset\s+for\s+everyone|\b(?:cancel(?:led|ed)?|withdraw(?:n)?|withdrew)\b|已确认|落地|到账|传播|取消|撤回/i.test(clause);
   const statement = clauses.find(clause => benefitStage(clause) && isReplyStatement(clause)) ?? text;
@@ -343,7 +348,7 @@ export function extractReplyClaims(text: string, publishedAt: string, parents: B
     return !!other && other !== stage && /reset|land|propagat|load|credit|cancel|withdraw/i.test(clause);
   })) return [];
   const parent = parents[0];
-  const explicit = qualification(text);
+  const explicit = claimQualification(text);
   // "All accounts" in a reply does not expand its parent's qualified accounts.
   if (explicit && eligibilityKey(explicit.label) !== 'all' && !eligibilityMatches(parent.eligibility, explicit.label)) return [];
   const nextStage = stage === 'promised' && parent.stage === 'in_progress' ? 'in_progress' : stage;
