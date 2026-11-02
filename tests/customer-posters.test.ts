@@ -99,12 +99,12 @@ test('固定海报十次切换和预览返回复用两张成品，撤回立即�
 });
 
 
-test('小程序完成历史持续计时并绑定本轮圆码，网页仍维持既有24小时展示',()=>{
+test('小程序完成满24小时切周期海报，不借历史文章制造当前扫码目标',()=>{
   const data=fixture('claimed_complete');
   for(const event of [data.events[0],data.publications[0].event])event.actions[0].statementAt='2026-10-10T20:00:00Z';
   const input=native.statusPosterInput(data),snapshot=statusPosterSnapshot(data);
-  assert.equal(input.publicationId,'fixed-publication');assert.equal(input.codePublicationId,'fixed-publication');
-  assert.equal(input.value,'4天4小时0分钟');assert.equal(input.statementAt,'2026-10-10T20:00:00Z');
+  assert.equal(input.publicationId,'');assert.equal(input.codePublicationId,'');
+  assert.equal(input.value,'2天20小时0分钟');assert.equal(input.statementAt,'2026-10-17T20:00:00.000Z');assert.match(input.sourceLabel,/周期推算/);
   assert.equal(snapshot.publicationId,'');assert.equal(snapshot.value,'等待下一次 Reset');
   data.articles[0].status='withdrawn';assert.equal(native.statusPosterAvailable(input,data),false);
 });

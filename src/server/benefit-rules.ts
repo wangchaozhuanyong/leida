@@ -2,7 +2,7 @@ import {bankedObject,languageKinds,languageStage,speechDisposition,ownBenefitCla
 import type { ActionKind, ActionStage, BenefitAction } from '../lib/types';
 
 /** Change only when fact interpretation changes, so unchanged inputs are evaluated once. */
-export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261102-1';
+export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261102-4';
 export interface BenefitClaim {
   kind: ActionKind; stage: ActionStage; eligibility: string; scope: BenefitAction['scope'];
   quote: string; expectedAt?: string; timeNote?: string;
@@ -17,6 +17,15 @@ const deicticCompletion = /^(?:done(?:\s+and\s+dusted)?|(?:it|that|this)(?:'s|\s
 const allPaidResetGreeting=/^enjoy\s+reset\s+usage\s+limits\s+for\s+all\s+paid\s+users\s+(?:of|for)\s+(?:Codex\s+and\s+ChatGPT\s+Work|ChatGPT\s+Work\s+and\s+Codex)[.!]?$/i;
 const dayEndDeadline = /\b(?:by|before)\s+(?:the\s+)?(?:end\s+of\s+(?:the\s+)?(?:day|today|tomorrow)|EOD)\b|(?:今日|今天|当日|当天|明天)结束(?:之)?前|日终(?:之)?前/i;
 const excluded = /\b(?:purchase[ds]?|buy|bought|referral|invitation|invite[ds]?|redeem(?:ed|ing)?|carry(?:ing)? over|carried over|my resets?|my account|just you|your account only|inventory|store|stock|option)\b|购买|邀请|推荐奖励|个人结转|私人|仅你|仅该账户|自行使用|主动用卡|商店|库存|已有的重置卡/i;
+/** Only an explicitly delivered/granted object may have a neutral location
+ * suffix. Conditions, use/redeem instructions and existing balances stay intact. */
+export function benefitAssertionText(text:string):string {
+  const suffix=text.match(/[,，]\s*(?:and\s+)?(?:(?:it|they|the (?:card|reset|cards|resets))\s+(?:is|are|will be)\s+)?(?:available|stored|visible)\s+in\s+(?:their|your|the)\s+(?:reset\s+)?(?:inventory|bank)[.!。]?\s*$/i);
+  if(suffix?.index===undefined)return text;
+  const core=text.slice(0,suffix.index);
+  return banked.test(core)&&/\b(?:we|i)(?:\s+(?:have|will)|'ve|'ll)\s+(?:now\s+|just\s+|already\s+)*(?:grant(?:ed)?|give|given|load(?:ed)?|credit(?:ed)?|deliver(?:ed)?)\b/i.test(core)?core:text;
+}
+export const excludedBenefitAssertion=(text:string)=>excluded.test(benefitAssertionText(text));
 const targeted = /\b(?:some|certain|selected|subset|specific|affected)\s+(?:\w+\s+){0,3}(?:users?|accounts?)|\b\d[\d,]*(?:\.\d+)?[km]?\s+(?:\w+\s+){0,2}(?:users?|accounts?)\b|部分|特定|选定|受(?:故障)?影响|定向补偿/i;
 
 export function isTruncatedBenefitText(text: string): boolean {
@@ -76,7 +85,7 @@ function isQuestionOrHypothesis(text: string): boolean {
 
 export function benefitStage(text: string): ActionStage | undefined {
   const s = normalize(text);
-  if (speechDisposition(s)!=='own'||isQuestionOrHypothesis(s) || excluded.test(s)) return;
+  if (speechDisposition(s)!=='own'||isQuestionOrHypothesis(s) || excludedBenefitAssertion(s)) return;
   const interpreted=languageStage(s);if(interpreted)return interpreted;
   // "No banked resets have been loaded" denies the benefit itself, even though
   // its verb otherwise resembles a completion. Do not treat unrelated "no
@@ -84,16 +93,17 @@ export function benefitStage(text: string): ActionStage | undefined {
   if (/\bno\s+(?:(?:further|additional|more|new|extra|global|automatic)\s+)*(?:banked\s+resets?|usage(?:\s+limits?)?(?:\s+resets?)?|rate\s+limits?(?:\s+resets?)?|resets?)\b/i.test(s)) return;
   if (globalReset.test(s) && /\b(?:no|not|never|won't|cannot|can't|might|may|could|possible|potential|rumou?rs?|rumou?red|unconfirmed|hope|wish)\b|\b(?:only|just)\s+(?:for\s+)?(?:you|me|my|your|one|a\s+single)\b|\b(?:my|your|our)\s+(?:team|account|workspace)\b|不会|并无|没有|未有|传闻|据说|可能|或许|希望|假设|(?:仅|只)(?:为|给|针对)?(?:你|我|个人)/i.test(s)) return;
   if(/\b(?:users?|customers?|subscribers?|accounts?|people|members?)\s+(?:have|has)\s+(?:already\s+|now\s+|just\s+|fully\s+)*(?:added|loaded|given|granted|deposited|reset)\b|(?:用户|账户|客户)(?:已|已经).{0,12}(?:自行|主动)(?:添加|重置|使用)/i.test(s))return;
-  if (/(?:not|never|won't|haven't|hasn't|didn't|cannot|can't|not yet).{0,35}(?:reset|giv|add|load|credit|grant|land|propagat|complet|cancel|withdraw)|(?:尚未|没有|并未|未曾|不会|不再|不).{0,15}(?:发放|重置|添加|存入|到账|落地|取消|撤回)/i.test(s) && !/不再发放/.test(s)) return;
+  if (/\b(?:not|never|won't|haven't|hasn't|didn't|cannot|can't|not yet)\b.{0,35}(?:reset|giv|add|load|credit|grant|land|propagat|complet|cancel|withdraw)|(?:尚未|没有|并未|未曾|不会|不再|不).{0,15}(?:发放|重置|添加|存入|到账|落地|取消|撤回)/i.test(s) && !/不再发放/.test(s)) return;
   if (/\b(?:cancelled|canceled|withdrawn|withdrew|cancel|withdraw)\b|取消|撤回|不再发放/i.test(s)) return 'cancelled';
   if (/\b(?:will|(?:we|i|they)'ll|going to|scheduled to|plan to|should|expect(?:ed)?)\b.{0,80}(?:reset|giv|add|load|credit|grant|land|propagat|complet|be there|be showing)|将(?:会|于)?|计划|预计|安排|承诺|(?:改为|调整为)(?:稍后|之后|以后).{0,12}(?:发放|重置)/i.test(s)) return 'promised';
+  if (/^give\s+us\s+\d+(?:\.\d+)?\s+(?:hours?|minutes?)\s+to\s+(?:reset|refill|refresh|restore)\b/i.test(s)) return 'promised';
   if (/\b(?:landing|lands?)\b.{0,60}(?:\btomorrow\b|\btoday\b|\bsoon\b|\bin\b|\bwithin\b|\bby\b|\d{1,2}(?::\d{2})?\s*[ap]m\b)/i.test(s)) return 'promised';
   if (/\b(?:are|is|we're)\s+(?:(?:now|once\s+again)\s+)?(?:giving|loading|crediting|granting|reset{1,2}ing)|\b(?:loading|rolling out|propagating|in progress)\b|正在|发放中|传播中|加载中/i.test(s)) return 'in_progress';
   if (deicticCompletion.test(s)) return 'claimed_complete';
   // This exact all-paid announcement describes already reset limits. A bare
   // "Enjoy a reset" or any future landing sentence still has no completion.
   if(allPaidResetGreeting.test(s))return 'claimed_complete';
-  if (/\b(?:have|has|(?:i|we|they)'ve)\s+(?:now\s+|already\s+|just\s+|been\s+|fully\s+)*(?:reset|added|credited|granted|given|loaded|deposited|landed|propagated|completed|processed)\b|^(?:added|credited|granted|loaded)\b|\b(?:confirmed|fully|all)\s+(?:landed|propagated|credited|loaded|completed)\b|\b(?:reset|resets)\s+(?:have\s+)?(?:all\s+)?(?:landed|propagated|completed)\b|已(?:经|全部)?(?:为.{0,80})?(?:确认|重置|发放|到账|落地|传播|加载|存入|添加)|全部.{0,20}(?:落地|传播)/i.test(s)) return 'claimed_complete';
+  if (/\b(?:have|has|(?:i|we|they)'ve)\s+(?:now\s+|already\s+|just\s+|been\s+|fully\s+)*(?:reset|added|credited|granted|given|loaded|deposited|landed|propagated|completed|processed)\b|^(?:added|credited|granted|loaded)\b|\b(?:confirmed|fully|all)\s+(?:landed|propagated|credited|loaded|completed)\b|\b(?:reset|resets)\s+(?:(?:has|have)\s+)?(?:all\s+)?(?:landed|propagated|completed)\b|已(?:经|全部)?(?:为.{0,80})?(?:确认|重置|发放|到账|落地|传播|加载|存入|添加)|全部.{0,20}(?:落地|传播)/i.test(s)) return 'claimed_complete';
   if (/^all\s+reset\s+for\s+everyone[.!]?$/i.test(s)) return 'claimed_complete';
   // The original's short announcement omits "will", but a global action with
   // a prospective deadline still states a promise, not a completed reset.
@@ -107,7 +117,7 @@ export function benefitStage(text: string): ActionStage | undefined {
 }
 
 export function claimQualification(text: string, inferredAudience?: string): Qualification | undefined {
-  const s = normalize(text);
+  const s = normalize(benefitAssertionText(text));
   if (excluded.test(s) || /not all|并非所有|不是所有/i.test(s)) return;
   if(/\b(?:except|excluding)\b|除了|排除|除.{0,25}以外/i.test(s))return;
   const plans = ['Plus', 'Pro', 'Business'].filter(plan => new RegExp(`\\b${plan}\\b`, 'i').test(s));
@@ -203,16 +213,23 @@ function validIsoBenefitTime(value: string): boolean {
 }
 
 export function benefitTime(text: string, publishedAt: string): Pick<BenefitClaim, 'expectedAt' | 'timeNote'> {
-  const s = normalize(text);
+  const original=normalize(text);
+  // Keep independent temporal roles separate. Splitting is for timing only:
+  // qualification/negation continue to validate the unchanged source quote.
+  const parts=original.split(/\s*[,，;；]\s*|\s+and\s+(?=(?:this|the|these|that|it|accounts?|users?|valid|expires?)\b)/i);
+  const qualification=(s:string)=>/\b(?:created|registered|upgraded)\b.{0,80}\b(?:before|after|within)\b|(?:注册|创建|升级).{0,60}(?:前|之后)|(?:前|之后).{0,30}(?:注册|创建|升级)/i.test(s);
+  const validity=(s:string)=>/有效期|过期|到期失效|自行使用|\bexpires?\b|\bvalid for\b|use (?:it|the reset)|apply (?:it|the reset)/i.test(s);
+  const delivery=parts.filter(part=>!qualification(part)&&!validity(part));
+  const s=delivery.length&&delivery.length<parts.length?delivery.join(', '):original;
   if(!Number.isFinite(Date.parse(publishedAt)))return {timeNote:'原帖发布时间无效，未生成精确预计时间。'};
-  if(/\b(?:created|upgraded)\b.{0,80}\b(?:before|after)\b|(?:注册|创建|升级).{0,60}(?:前|之后)|(?:前|之后).{0,30}(?:注册|创建|升级)/i.test(s))return {timeNote:'原文时间用于账户资格截止，不作为发放截止。'};
-  if (/有效期|过期|到期失效|自行使用|expire|valid for|use (?:it|the reset)|apply (?:it|the reset)/i.test(s)) return { timeNote: '原文描述重置卡使用或有效期，不作为发放截止。' };
+  if(qualification(s))return {timeNote:'原文时间用于账户资格截止，不作为发放截止。'};
+  if(validity(s))return {timeNote:'原文描述使用或有效期，不作为发放截止。'};
   const offset = fixedOffset(s);
   const namedZone = s.match(/\b(PST|PDT)\b/i)?.[1]?.toUpperCase();
   const zoneNote = namedZone ? `按原文${namedZone}字面${namedZone === 'PST' ? 'UTC-8' : 'UTC-7'}换算，未自行改用当地夏令时；这是公告预计时间，仍待实际确认。` : '已换算为北京时间（UTC+8）';
   const approximate = /~|\b(?:about|approximately|roughly|around|or so)\b|约|大约/i.test(s);
   const note = approximate ? `原文近似时间：约略预计时刻，并非最晚截止，未给出误差范围；${zoneNote}` : zoneNote;
-  const deadline = /\b(?:by|before|within)\b|(?:小时|分钟)内|最晚|之前|点前/i.test(s);
+  const deadline = /\b(?:by|before|within)\b|\bover\s+(?:the\s+)?next\b|^give\s+us\s+\d|(?:小时|分钟)内|最晚|之前|点前/i.test(s);
   const pointNote = approximate ? note : deadline ? `原文最晚期限：${note}` : `原文预计时刻：并非最晚截止；${note}`;
   const isoTimes = [...s.matchAll(/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})\b/g)];
   if(isoTimes.length>1&&(isoTimes.some(item=>!validIsoBenefitTime(item[0]))||new Set(isoTimes.map(item=>Date.parse(item[0]))).size>1))return {timeNote:'原文包含多个不同或无效时刻，尚未确认唯一预计时间。'};
@@ -232,7 +249,7 @@ export function benefitTime(text: string, publishedAt: string): Pick<BenefitClai
     const date = new Date(Date.UTC(year, month - 1, day, hour, minute));
     if (hour < 24 && minute < 60 && date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day) return { expectedAt: new Date(date.getTime() - offset * 60_000).toISOString(), timeNote: pointNote };
   }
-  const relative = s.match(/(?:\bin\s+(?:the\s+next\s+)?|\bwithin\s+(?:the\s+next\s+)?|发布后|接下来|在)(?:~\s*|about\s+|approximately\s+|roughly\s+|约|大约)?(\d+(?:\.\d+)?|an?|一|二|两|三|四|五|六|七|八|九|十)?\s*(hours?|minutes?|小时|分钟)(?:(?:\s+(?:and\s+)?|\s*(?:和|又)\s*|(?<=小时))(\d+(?:\.\d+)?)\s*(minutes?|分钟))?(?:内)?/i);
+  const relative = s.match(/(?:\bin\s+(?:the\s+next\s+)?|\bwithin\s+(?:the\s+next\s+)?|\bover\s+(?:the\s+)?next\s+|^give\s+us\s+|发布后|接下来|在)(?:~\s*|about\s+|approximately\s+|roughly\s+|约|大约)?(\d+(?:\.\d+)?|an?|一|二|两|三|四|五|六|七|八|九|十)?\s*(hours?|minutes?|小时|分钟)(?:(?:\s+(?:and\s+)?|\s*(?:和|又)\s*|(?<=小时))(\d+(?:\.\d+)?)\s*(minutes?|分钟))?(?:内)?/i);
   if (relative) {
     const numbers: Record<string, number> = { 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };
     const amount = !relative[1] ? /^(?:hour|minute)$/i.test(relative[2]) ? 1 : NaN : /^an?$/i.test(relative[1]) ? 1 : numbers[relative[1]] ?? Number(relative[1]);
@@ -261,7 +278,7 @@ export function benefitTime(text: string, publishedAt: string): Pick<BenefitClai
       return { expectedAt: new Date(Date.UTC(sourceDay.getUTCFullYear(), sourceDay.getUTCMonth(), sourceDay.getUTCDate() + days, hour24, minute) - offset * 60_000).toISOString(), timeNote: pointNote };
     }
   }
-  if (hasDayEndDeadline(s) || /\b(?:PST|PDT|EOD|tomorrow|today|hours?|minutes?)\b|\d{4}[-年]|明天|后天|今晚|今日|今天|稍后|小时|分钟|日终|当地时间/i.test(s)) return { timeNote: `原文预计时间：${s.slice(0,180)}；日期、精度或时区尚不明确，未生成精确截止。` };
+  if (hasDayEndDeadline(s) || /\b(?:PST|PDT|EOD|tomorrow|today|hours?|minutes?|within|before|by)\b|\d{4}[-年]|明天|后天|今晚|今日|今天|稍后|小时|分钟|日终|当地时间/i.test(s)) return { timeNote: `原文预计时间：${s.slice(0,180)}；日期、精度或时区尚不明确，未生成精确截止。` };
   return {};
 }
 
@@ -282,6 +299,13 @@ export function extractBenefitClaims(text: string, publishedAt: string): Benefit
     const clause = clauses[index];
     const next = clauses[index + 1];
     if(!ownBenefitClause(text,clause))continue;
+    // "another one" is a distinct promised occurrence, bound only to the
+    // single completed action earlier in this very original, never a nearby post.
+    if (/^(?:and\s+)?another\s+one\s+will\s+(?:come|land)\s+(?:later\s+in\s+the\s+day|later\s+today|tomorrow)[.!]?$/i.test(normalize(clause)) && claims.length===1 && claims[0].stage==='claimed_complete') {
+      const prior=claims[0];
+      claims.push({...prior,stage:'promised',quote:text.slice(text.indexOf(prior.quote),text.indexOf(clause)+clause.length),...benefitTime(clause,publishedAt)});
+      continue;
+    }
     // A product reset followed by a direct invitation to burn usage identifies
     // a usage action. It does not assert paid plans or expand to every plan.
     const declaredProductReset=/\b(?:i|we)(?:\s+have|'ve)\s+(?:now\s+|just\s+|already\s+)*reset\s+(?:usage|rate)\s+limits\s+(?:for|across)\s+(?:Codex\s+and\s+ChatGPT\s+Work|ChatGPT\s+Work\s+and\s+Codex)[.!]?$/i.test(normalize(clause)) &&
@@ -290,20 +314,26 @@ export function extractBenefitClaims(text: string, publishedAt: string): Benefit
       !!next && /^I\s+challenge\s+you\s+to\s+burn\s+(?:as\s+much\s+)?usage\b/i.test(normalize(next)) &&
       !excluded.test(text) && !targeted.test(text) &&
       !/\b(?:banked|not|never|unconfirmed|rumou?rs?|maybe|only|except|excluding|selected|specific|affected|if|unless|created|registered|upgraded|region|country)\b|\b(?:my|your|our)\s+accounts?\b/i.test(text);
-    const kinds = productUsageAnnouncement ? ['automatic_reset' as const] : benefitKinds(clause);
+    const namedUsageAnnouncement=/^(?:new day,\s*)?(?:new|another)\s+(?:usage(?:\s+limit)?\s+)?reset\s+for\b/i.test(normalize(clause))&&/\bCodex\b/i.test(clause)&&/ChatGPT\s*Work/i.test(clause)&&!banked.test(clause);
+    const kinds = productUsageAnnouncement||namedUsageAnnouncement ? ['automatic_reset' as const] : benefitKinds(clause);
     if (kinds.length !== 1 || /^(?:as (?:mentioned|promised)|previously|yesterday|see (?:above|parent))\b|之前提到|接上|参见父帖/i.test(clause)) continue;
     const greetingLanding=allPaidResetGreeting.test(normalize(clause))&&next&&/^(?:it\s+)?(?:lands?|landing|will\s+(?:land|be\s+there))\b/i.test(normalize(next))&&/\b(?:tomorrow|today|soon|in|within|by|next)\b/i.test(next);
-    const stage = greetingLanding?'promised':benefitStage(clause);
+    const rolloutFollowup=next&&ownBenefitClause(text,next)&&/^(?:propagating|landing|lands?|should\s+land)\b.{0,30}\b(?:in|over|within)\b/i.test(normalize(next))&&benefitKinds(next).length===0?next:undefined;
+    const rolloutAnnouncement=namedUsageAnnouncement||/^(?:enjoy\s+(?:a\s+)?full\s+reset\b|(?:another\s+)?usage\s+limit\s+reset\b)/i.test(normalize(clause));
+    const stage = greetingLanding?'promised':benefitStage(clause)??(rolloutAnnouncement&&rolloutFollowup?'in_progress':undefined);
     // A possessive "everyone's account" may refer to one explicitly introduced
     // product-user audience in this same original post. It never lends plan/region/tense.
     const antecedents=clauses.slice(0,index).filter(item=>/(?:active\s+)?users\s+(?:who\s+are\s+(?:now\s+)?using|across|of)\b/i.test(item)&&/\bCodex\b|ChatGPT\s*Work/i.test(item));
     const antecedent=/\beveryone(?:'s|’s)\s+(?:paid\s+)?accounts?\b/i.test(clause)&&!(/\bCodex\b|ChatGPT/i.test(clause))&&antecedents.length===1?antecedents[0]:undefined;
-    const inferredAudience=antecedent?[/ChatGPT\s*Work/i.test(antecedent)?'ChatGPT Work':'',/\bCodex\b/i.test(antecedent)?'Codex':''].filter(Boolean).join('和'):undefined;
+    const productAntecedents=clauses.slice(0,index).filter(item=>/\b(?:active\s+)?users\s+(?:who\s+are\s+(?:now\s+)?using|across|of)\b/i.test(item)&&/\bCodex\b|ChatGPT\s*Work/i.test(item));
+    const allAntecedent=/\bfor\s+all[.!]?$/i.test(normalize(clause))&&productAntecedents.length===1?productAntecedents[0]:undefined;
+    const audienceAntecedent=antecedent??allAntecedent;
+    const inferredAudience=audienceAntecedent?[/ChatGPT\s*Work/i.test(audienceAntecedent)?'ChatGPT Work':'',/\bCodex\b/i.test(audienceAntecedent)?'Codex':''].filter(Boolean).join('和'):undefined;
     // A directly following "For all paid users ..." sentence qualifies the
     // preceding single action, not a different action elsewhere in the post.
     const audienceFollowup = next && benefitKinds(next).length === 0 && /^(?:for|to)\s+(?:all|every|paid|plus|pro|business)\b/i.test(next) ? next : undefined;
-    const predicate = clause.match(/\bwe\s+have\s+(?:now\s+|just\s+|already\s+)*reset\s+usage\b/i);
-    const milestonePrefix = predicate?.index !== undefined && /\b(?:hit|reached)\b.{0,40}\bactive\s+users\b.{0,40}\b(?:to celebrate|celebrat)/i.test(clause.slice(0, predicate.index));
+    const predicate = clause.match(/\bwe\s+have\s+(?:now\s+|just\s+|already\s+)*reset\s+usage\b|\bare\s+landing\s+(?:a\s+)?usage\s+reset\b|\bgrant\s+(?:the\s+)?first\s+banked\s+reset\b/i);
+    const milestonePrefix = predicate?.index !== undefined && /\b(?:hit|reached|celebrate)\b.{0,50}\bactive\s+users\b/i.test(clause.slice(0, predicate.index));
     let audienceClause = milestonePrefix ? clause.slice(predicate!.index) : clause;
     // In "credit every user with a BANKED reset", "with" introduces the
     // delivered object, not an existing-membership condition on the user.
@@ -311,8 +341,13 @@ export function extractBenefitClaims(text: string, publishedAt: string): Benefit
     if (deliveryObject) audienceClause = audienceClause.slice(0, audienceClause.indexOf(deliveryObject[1], deliveryObject.index));
     // The purpose of spending restored usage is not account eligibility.
     audienceClause = audienceClause.split(/\s+so\s+that\s+you\s+can\b/i)[0];
-    const productAudience: Qualification | undefined = productUsageAnnouncement ? {label:'Codex和ChatGPT Work用户（原帖未列明具体套餐）',key:eligibilityKey('Codex和ChatGPT Work用户（原帖未列明具体套餐）'),scope:'public'} : undefined;
-    const audience = claimQualification(`${audienceClause}${audienceFollowup ? ' ' + audienceFollowup : ''}`,inferredAudience) ?? productAudience;
+    const namedProducts=/\bCodex\b/.test(clause)&&/ChatGPT\s*Work/i.test(clause);
+    const recipientText=clause.replace(/\b(?:in|within|over)\s+(?:the\s+)?(?:next\s+)?(?:\d+(?:\.\d+)?|an?)\s+(?:hours?|minutes?)\b/gi,'');
+    const productReset=namedProducts&&/\b(?:reset\w*|usage\s+limit\s+reset)\b/i.test(clause)&&!/\b(?:only|except|excluding|selected|specific|affected|if|unless|created|registered|upgraded|region|country|in|from|with|without|who|that|my\s+account|your\s+account)\b/i.test(recipientText);
+    const productAudience: Qualification | undefined = productUsageAnnouncement||productReset ? {label:'Codex和ChatGPT Work用户（原帖未列明具体套餐）',key:eligibilityKey('Codex和ChatGPT Work用户（原帖未列明具体套餐）'),scope:'public'} : undefined;
+    const milestoneAudience:Qualification|undefined=milestonePrefix&&/\bare\s+landing\s+(?:a\s+)?usage\s+reset\b/i.test(audienceClause)&&!/\bfor\b|\bto\b/i.test(audienceClause)?{label:'适用范围未说明',key:eligibilityKey('适用范围未说明'),scope:'public'}:undefined;
+    const explicitAudience=allAntecedent?`${audienceClause.replace(/\bfor\s+all([.!]?)$/i,`for all ${inferredAudience} users$1`)}`:audienceClause;
+    const audience = claimQualification(`${explicitAudience}${audienceFollowup ? ' ' + audienceFollowup : ''}`,inferredAudience) ?? productAudience ?? milestoneAudience;
     if (!stage || !audience) continue;
     // A neighboring time sentence may qualify this one action, never a different benefit.
     const following = clauses.slice(index + (audienceFollowup ? 2 : 1), index + 4);
@@ -321,8 +356,8 @@ export function extractBenefitClaims(text: string, publishedAt: string): Benefit
       (position === 0 || /^(?:First one will land|Lands?\b)/i.test(item)) &&
       /^(?:Should be showing|First one will land|Will be there|Lands?\b|预计|将在|应在)/i.test(item));
     const timeFollowup = timeCandidate && benefitKinds(timeCandidate).length === 0 && /^(?:Should be showing|First one will land|Will be there|Lands?\b|预计|将在|应在)/i.test(timeCandidate) ? timeCandidate : undefined;
-    const last = timeFollowup ?? audienceFollowup ?? (productUsageAnnouncement ? next : undefined);
-    const quote = last || antecedent ? text.slice(text.indexOf(antecedent??clause), last?text.indexOf(last,text.indexOf(clause))+last.length:text.indexOf(clause)+clause.length) : clause;
+    const last = rolloutFollowup ?? timeFollowup ?? audienceFollowup ?? (productUsageAnnouncement&&!declaredProductReset ? next : undefined);
+    const quote = last || audienceAntecedent ? text.slice(text.indexOf(audienceAntecedent??clause), last?text.indexOf(last,text.indexOf(clause))+last.length:text.indexOf(clause)+clause.length) : clause;
     claims.push({ kind: kinds[0], stage, eligibility: audience.label, scope: audience.scope, quote, ...(stage === 'claimed_complete' || stage === 'cancelled' ? {} : benefitTime(quote, publishedAt)) });
   }
   return claims;

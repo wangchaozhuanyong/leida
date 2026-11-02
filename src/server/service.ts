@@ -1,6 +1,6 @@
 import {validSemanticProof,type SemanticBenefitProof} from './semantic-benefit-review';
 import {analyzeBenefitEvidence} from './benefit-analysis';
-import { bankedProgress, bankedSeriesContext } from './benefit-signal';
+import { bankedProgress, bankedSeriesContext, matchingBenefitActions } from './benefit-signal';
 import {sourceCollectionSchedule,sourceForecastConfiguration} from './source-collection-policy';
 import {markForecastInputsChanged} from './reset-cadence-runtime';
 import { lockTransaction, repeatableRead } from '../db';
@@ -17,7 +17,7 @@ import { automationRows, workerRuntimeStatus } from '../lib/automation';
 import {activityHideDate} from '../lib/activity-display';
 import { isHistoricalContent, projectPublicHistory } from '../lib/history';
 import {getPublicForecast} from './forecast';
-import {gatherEvidenceContext,hasCompleteContext,originalConflict} from './source-context';
+import {gatherEvidenceContext,gatherExplicitEvidenceContext,directEvidenceBenefitClaims,hasCompleteContext,originalConflict} from './source-context';
 import {TIBO_PUBLIC_SOURCE} from './tibo-public';
 import {configuredPublicRpc} from './cloudbase/public-config';
 import {observedEvidence} from '../lib/reset-observations';
@@ -64,19 +64,29 @@ export function providerIdentity(evidence:Evidence):string {
 }
 /** Upgrade only a machine-created empty news shell after its explicit parent is known. */
 export function automaticNewsContextUpgrade(primary:Evidence,content:DraftContent,duplicate:RadarEvent,target:RadarEvent,evidence:Evidence[],articles:Article[]):Article|undefined {
- if(primary.provenance==='manual'||!primary.parentId&&!bankedSeriesContext(primary,evidence).length||duplicate.id===target.id||duplicate.status!=='published'||duplicate.mergedInto||target.status!=='published'||duplicate.actions.length||duplicate.manualFields?.length||target.manualFields?.length||content.publicationMode!=='state_change'||content.actions.length!==1||target.actions.length!==1)return;
- const incoming=content.actions[0],previous=target.actions[0];
- if(incoming.kind!==previous.kind||incoming.scope!=='public'||previous.scope!=='public'||previous.stage==='cancelled'||normalizedEligibility(incoming.eligibility)!==normalizedEligibility(previous.eligibility)||![incoming.statementAt,previous.statementAt,primary.publishedAt].every(value=>Number.isFinite(Date.parse(value)))||Date.parse(incoming.statementAt)<Date.parse(previous.statementAt))return;
- const context=gatherEvidenceContext(primary,evidence),ancestors=context.slice(1);
- if(!hasCompleteContext(primary,context)||!ancestors.length||ancestors.at(-1)?.parentId||context.some(item=>item.provenance==='manual')||ancestors.some(item=>!Number.isFinite(Date.parse(item.publishedAt))||Date.parse(item.publishedAt)>Date.parse(primary.publishedAt)))return;
+ if(primary.provenance==='manual'||!primary.parentId&&!bankedSeriesContext(primary,evidence).length||duplicate.id===target.id||duplicate.status!=='published'||duplicate.mergedInto||target.status!=='published'||duplicate.manualFields?.length||target.manualFields?.length||content.publicationMode!=='state_change'||content.actions.length!==1||!target.actions.length)return;
+ const incoming=content.actions[0],batch=incoming.kind==='banked_reset'&&bankedProgress(primary.text)&&bankedSeriesContext(primary,evidence).length;
+ if(!batch&&target.actions.length!==1||batch&&target.actions.some(action=>action.kind!=='banked_reset'||action.scope!=='public'||action.stage==='cancelled'||normalizedEligibility(action.eligibility)!==normalizedEligibility(incoming.eligibility)))return;
+ const previous=matchingBenefitActions(incoming,target.actions)[0]??target.actions[0];
+ if(incoming.kind!==previous.kind||incoming.scope!=='public'||previous.scope!=='public'||previous.stage==='cancelled'||normalizedEligibility(incoming.eligibility)!==normalizedEligibility(previous.eligibility)||![incoming.statementAt,previous.statementAt,primary.publishedAt].every(value=>Number.isFinite(Date.parse(value)))||!batch&&Date.parse(incoming.statementAt)<Date.parse(previous.statementAt))return;
+ const context=gatherEvidenceContext(primary,evidence),lineage=gatherExplicitEvidenceContext(primary,evidence);
+ const referent=lineage.findIndex((item,index)=>index>0&&hasCompleteContext(item,context)&&directEvidenceBenefitClaims(item,context).length>0);
+ // Equivalent source versions are not ancestors. A complete typed referent
+ // bounds this round even when it replies to an older product announcement.
+ const ancestors=batch?bankedSeriesContext(primary,evidence):referent>0?lineage.slice(1,referent+1):[];
+ if(!hasCompleteContext(primary,context)||!ancestors.length||context.some(item=>item.provenance==='manual')||ancestors.some(item=>!Number.isFinite(Date.parse(item.publishedAt))||Date.parse(item.publishedAt)>Date.parse(primary.publishedAt)))return;
+ const qualifiedCopy=duplicate.actions.length===1&&sameActionFacts(duplicate.actions[0],incoming)&&duplicate.actions[0].evidenceQuote===incoming.evidenceQuote&&Math.abs(Date.parse(duplicate.actions[0].statementAt)-Date.parse(incoming.statementAt))<1000;
+ if(duplicate.actions.length&&!qualifiedCopy)return;
  const parentKeys=new Set(ancestors.map(providerIdentity));
  if(!target.evidenceIds.some(id=>{const item=evidence.find(e=>e.id===id);return item&&item.provenance!=='manual'&&parentKeys.has(providerIdentity(item));}))return;
+ const targetArticles=articles.filter(article=>article.eventId===target.id);
+ if(!targetArticles.some(article=>article.status==='published'&&article.publicationMode==='state_change'&&article.contentOrigin==='template'&&!article.manualFields?.length&&evidence.some(item=>item.id===article.evidenceIds[0]&&parentKeys.has(providerIdentity(item))))||targetArticles.some(article=>article.manualFields?.length))return;
  const childKey=providerIdentity(primary);
  if(!duplicate.evidenceIds.length||duplicate.evidenceIds.some(id=>{const item=evidence.find(e=>e.id===id);return !item||item.provenance==='manual'||providerIdentity(item)!==childKey;}))return;
  const linked=articles.filter(article=>article.eventId===duplicate.id);
  if(linked.length!==1)return;
  const article=linked[0],main=evidence.find(item=>item.id===article.evidenceIds[0]);
- if(article.status!=='published'||article.publicationMode!=='news_only'||article.contentOrigin!=='template'||article.manualFields?.length||!main||main.provenance==='manual'||providerIdentity(main)!==childKey)return;
+ if(article.status!=='published'||article.publicationMode!==(qualifiedCopy?'state_change':'news_only')||article.contentOrigin!=='template'||article.manualFields?.length||!main||main.provenance==='manual'||providerIdentity(main)!==childKey||qualifiedCopy&&originalConflict(primary,[primary,main]))return;
  return article;
 }
 function articleForPrimary(candidate:Candidate,content:DraftContent,primary:Evidence|undefined,evidence:Evidence[],articles:Article[],automatic:boolean):Article|undefined {
@@ -104,17 +114,53 @@ function preserveManualFields(content:DraftContent,event:RadarEvent):DraftConten
  return result;
 }
 function sameActionFacts(first:RadarEvent['actions'][number],second:RadarEvent['actions'][number]):boolean {
- return first.kind===second.kind&&first.stage===second.stage&&normalizedEligibility(first.eligibility)===normalizedEligibility(second.eligibility)&&first.scope===second.scope&&first.expectedAt===second.expectedAt&&first.timeNote===second.timeNote;
+ // A rule release renamed the generated batch note. Both recognized forms
+ // describe the same completed ordinal; arbitrary timing text is still a fact.
+ const batch=first.evidenceQuote===second.evidenceQuote&&bankedProgress(first.evidenceQuote??'');
+ const batchNotes=batch?new Set([
+  `发布者报告重置卡发放进度 ${batch.index}/${batch.total}${batch.index<batch.total?'，后续批次待更新':'，本系列进度已完成'}；个人到账以账户显示为准。`,
+  `发布者报告第 ${batch.index}/${batch.total} 批重置卡已发放${batch.index<batch.total?'，后续批次待更新':'，本系列发放已结束'}；个人到账以账户显示为准。`,
+ ]):undefined;
+ const sameNote=first.timeNote===second.timeNote||first.kind==='banked_reset'&&first.stage==='claimed_complete'&&second.stage==='claimed_complete'&&!first.expectedAt&&!second.expectedAt&&!!batchNotes?.has(first.timeNote??'')&&batchNotes.has(second.timeNote??'');
+ return first.kind===second.kind&&first.stage===second.stage&&normalizedEligibility(first.eligibility)===normalizedEligibility(second.eligibility)&&first.scope===second.scope&&first.expectedAt===second.expectedAt&&sameNote;
+}
+/** Only fill a missing machine deadline from the very same complete original.
+ * This comparison projection never mutates the published event or a snapshot.
+ * Changed deadlines, stages, audiences, manual fields and withdrawn facts remain conflicts. */
+function deadlineRepairComparison(content:DraftContent,event:RadarEvent|undefined,article:Article|undefined,primary:Evidence|undefined,evidence:Evidence[]):RadarEvent|undefined {
+ if(!event||event.status!=='published'||event.manualFields?.length||!article||article.status!=='published'||article.manualFields?.length||article.contentOrigin!=='template'||content.contentOrigin!=='template'||!primary||primary.textOrigin!=='original')return event;
+ const canonical=evidence.find(item=>item.id===article.evidenceIds[0]);
+ if(!canonical||providerIdentity(primary)!==providerIdentity(canonical)||originalConflict(primary,[primary,canonical])||!hasCompleteContext(primary,gatherEvidenceContext(primary,evidence)))return event;
+ return {...event,actions:event.actions.map(old=>{
+  const incoming=content.actions.find(action=>action.id===old.id);
+  if(!incoming||old.expectedAt||!incoming.expectedAt||!Number.isFinite(Date.parse(incoming.expectedAt))||!['promised','in_progress'].includes(old.stage)||!old.evidenceQuote||old.evidenceQuote!==incoming.evidenceQuote||!sameIds(old.evidenceIds,incoming.evidenceIds)||old.statementAt!==incoming.statementAt||!sameActionFacts({...old,expectedAt:incoming.expectedAt,timeNote:incoming.timeNote},incoming))return old;
+  return {...old,expectedAt:incoming.expectedAt,timeNote:incoming.timeNote};
+ })};
+}
+/** A prior failed parser upgrade may have labelled this safe, additive repair
+ * a same-time conflict. Reopen only that exact machine conflict on a rule change. */
+export function isMissingDeadlineConflict(candidate:Candidate,template:DraftContent|undefined,event:RadarEvent|undefined,article:Article|undefined,primary:Evidence,context:Evidence[]):boolean {
+ if(candidate.humanEdited||candidate.automation?.state!=='conflict'||!candidate.reasons.length||candidate.reasons.some(reason=>reason!=='同一动作在相同声明时间出现不同事实，存在事实冲突')||!template||!event)return false;
+ const mapped={...template,actions:template.actions.map(action=>{
+  const matches=event.actions.filter(old=>old.kind===action.kind&&old.statementAt===action.statementAt&&old.evidenceQuote===action.evidenceQuote&&sameIds(old.evidenceIds,action.evidenceIds));
+  return matches.length===1?{...action,id:matches[0].id}:action;
+ })};
+ const comparison=deadlineRepairComparison(mapped,event,article,primary,context);
+ return !!comparison&&comparison.actions.some(action=>{const old=event.actions.find(a=>a.id===action.id);return old&&!old.expectedAt&&!!action.expectedAt;})&&mapped.actions.every(action=>{const old=comparison.actions.find(a=>a.id===action.id);return !!old&&sameActionFacts(action,old);});
 }
 /** Collection order cannot authorize a change to a newer statement. */
-export function partitionAutomaticActions(content:DraftContent,event:RadarEvent|undefined):{current:DraftContent['actions'];stale:DraftContent['actions']} {
+export function partitionAutomaticActions(content:DraftContent,event:RadarEvent|undefined,evidence:Evidence[]=[]):{current:DraftContent['actions'];stale:DraftContent['actions']} {
  const current:DraftContent['actions']=[],stale:DraftContent['actions']=[];
  for(const action of content.actions){
   const old=event?.actions.find(item=>item.id===action.id);
   const incomingTime=Date.parse(action.statementAt),previousTime=Date.parse(old?.statementAt??'');
   if(old&&old.kind!==action.kind)throw new DomainError('同一动作的福利类型冲突，不能按旧声明忽略');
   if(old&&Number.isFinite(incomingTime)&&Number.isFinite(previousTime)){
-   if(incomingTime<previousTime){stale.push(action);continue;}
+   // Archives sometimes append fractional milliseconds to the same post's
+   // second-precision time. This cannot turn an equivalent original into an
+   // older announcement. Keep the existing event clock and immutable snapshots.
+   const precisionCopy=incomingTime<previousTime&&previousTime-incomingTime<1000&&sameActionFacts(action,old)&&!!action.evidenceQuote&&action.evidenceQuote===old.evidenceQuote&&evidence.some(first=>action.evidenceIds.includes(first.id)&&first.textOrigin==='original'&&first.provenance!=='manual'&&Math.abs(Date.parse(first.publishedAt)-incomingTime)<1000&&evidence.some(second=>old.evidenceIds.includes(second.id)&&second.textOrigin==='original'&&second.provenance!=='manual'&&providerIdentity(first)===providerIdentity(second)&&Math.abs(Date.parse(second.publishedAt)-previousTime)<1000&&!originalConflict(first,[first,second])));
+   if(incomingTime<previousTime&&!precisionCopy){stale.push(action);continue;}
    if(incomingTime===previousTime&&!sameActionFacts(action,old))throw new DomainError('同一动作在相同声明时间出现不同事实，存在事实冲突');
   }
   current.push(action);
@@ -150,7 +196,7 @@ export function samePublishedContent(content:DraftContent,article:Article,event:
 }
 export function automaticCorrection(content:DraftContent,event:RadarEvent|undefined,evidence:Evidence[]):boolean {
  if(!event||content.publicationMode==='news_only')return false;
- const changes=partitionAutomaticActions(content,event).current.filter(action=>{const old=event.actions.find(item=>item.id===action.id);return old&&(action.stage!==old.stage||normalizedEligibility(action.eligibility)!==normalizedEligibility(old.eligibility)||action.scope!==old.scope||action.expectedAt!==old.expectedAt);});
+ const changes=partitionAutomaticActions(content,event,evidence).current.filter(action=>{const old=event.actions.find(item=>item.id===action.id);return old&&(action.stage!==old.stage||normalizedEligibility(action.eligibility)!==normalizedEligibility(old.eligibility)||action.scope!==old.scope||action.expectedAt!==old.expectedAt);});
  const rank={promised:1,in_progress:2,claimed_complete:3,cancelled:4};
  const qualifies=changes.filter(action=>{const old=event.actions.find(item=>item.id===action.id)!;return action.stage==='cancelled'||rank[action.stage]<rank[old.stage]||normalizedEligibility(action.eligibility)!==normalizedEligibility(old.eligibility)||action.scope!==old.scope||(action.expectedAt!==old.expectedAt&&/correction|corrected|更正|改为/i.test(action.evidenceQuote??''));});
  if(!qualifies.length)return false;
@@ -171,7 +217,11 @@ async function publish(content:DraftContent, c:Client, opts:PublishOptions):Prom
   const actions=newsOnly?(existing?.actions??[]):opts.correction?(opts.automatic?mergeActions(existing?.actions??[],content.actions,true):content.actions):mergeActions(existing?.actions??[],content.actions);
   const manualFields=existing?.manualFields??[];
   const event:RadarEvent=newsOnly&&existing?existing:{id:eventId,title:opts.eventTitle??content.title,version:(existing?.version??0)+1,status:opts.withdrawn?'withdrawn':'published',actions,evidenceIds:[...new Set([...(existing?.evidenceIds??[]),...content.evidenceIds])],publicationId,updatedAt:time,manualFields:opts.correction&&!opts.automatic&&existing?[...new Set([...manualFields,...changedManualFields(existing,content)])]:manualFields};
-  const cited=evidence.filter(e=>content.evidenceIds.includes(e.id)); const cutoffAt=new Date(Math.max(...cited.map(e=>Date.parse(e.collectedAt)))).toISOString();
+  const cited=evidence.filter(e=>content.evidenceIds.includes(e.id));
+  // A late recovered batch joins the current snapshot, which already contains
+  // later batches. Its knowledge cutoff must cover those retained facts too.
+  const snapshotEvidence=actions.filter(a=>a.kind==='banked_reset').length>1?evidence.filter(e=>event.evidenceIds.includes(e.id)):cited;
+  const cutoffAt=new Date(Math.max(...snapshotEvidence.map(e=>Date.parse(e.collectedAt)))).toISOString();
   const firstPublishedAt=opts.existingArticle?.publishedAt??time;
   const historical=isHistoricalContent(cited,firstPublishedAt);
   const article:Article={id:articleId,eventId,title:content.title,summary:content.summary,translation:content.translation,category:content.category,version:(opts.existingArticle?.version??0)+1,status:opts.withdrawn?'withdrawn':'published',publicationId,evidenceIds:content.evidenceIds,contextEvidenceIds:content.contextEvidenceIds,publishedAt:firstPublishedAt,updatedAt:time,publicationMode:content.publicationMode??'state_change',contentOrigin:content.contentOrigin,reviewStatus:content.reviewStatus,reviewReasons:content.reviewReasons,manualFields:opts.existingArticle?.manualFields,sourcePublishedAt:new Date(Math.max(...cited.map(e=>Date.parse(e.publishedAt)))).toISOString(),historical};
@@ -209,7 +259,18 @@ export async function publishHistoricalDraft(content:DraftContent,c:Client,reaso
     const candidates=primary?(await list<Candidate>('candidates',c)).filter(row=>row.evidenceId===primary.id):[];
     if(!Number.isFinite(cutoff)||cutoff>Date.now()||!primary||primary.id!==captured.evidenceId||primary.hash!==captured.evidenceHash||primary.textOrigin!=='original'||primary.provenance==='manual'||!source?.enabled||!source.validated||source.publicationPaused||source.status==='paused'||!candidates.length||candidates.some(row=>row.humanEdited||row.status==='ignored')||!cited.every(row=>Number.isFinite(Date.parse(row.collectedAt))&&Date.parse(row.collectedAt)<=cutoff&&Date.parse(row.publishedAt)<=cutoff)||content.contentOrigin!=='template'||validateDraft(content,evidence,true).length)throw new DomainError('已采集原文静默补录范围不符');
   }else if(!isHistoricalContent(cited,now()))throw new DomainError('历史补录证据范围不符');
-  if(existingArticle&&(existingArticle.status!=='published'||existingArticle.publicationMode!=='news_only'||existingArticle.contentOrigin!=='template'||existingArticle.manualFields?.length))throw new DomainError('历史文章不符合自动补证范围');
+  const primary=cited.find(row=>row.id===content.evidenceIds[0]);
+  const batchUpgrade=!!(captured&&primary&&bankedProgress(primary.text)&&bankedSeriesContext(primary,evidence).length&&existingArticle?.publicationMode==='state_change'&&content.actions.length===1&&content.actions[0].kind==='banked_reset'&&content.actions[0].stage==='claimed_complete'&&existingArticle.eventId===content.eventId&&evidence.some(row=>row.id===existingArticle.evidenceIds[0]&&providerIdentity(row)===providerIdentity(primary)));
+  if(existingArticle&&(existingArticle.status!=='published'||existingArticle.publicationMode!=='news_only'&&!batchUpgrade||existingArticle.contentOrigin!=='template'||existingArticle.manualFields?.length))throw new DomainError('历史文章不符合自动补证范围');
+  if(batchUpgrade){
+    const event=await one<RadarEvent>('events',content.eventId!,c);
+    if(!event||event.status!=='published'||event.manualFields?.length)throw new DomainError('批次记录已被人工处理或撤回，不能自动恢复');
+    if(samePublishedContent(content,existingArticle!,event)){
+      const retained=await one<Publication>('publications',existingArticle!.publicationId,c);
+      if(!retained)throw new DomainError('批次发布快照缺失，不能安全复用');
+      return retained;
+    }
+  }
   const previous=existingArticle&&content.eventId!==existingArticle.eventId?await one<RadarEvent>('events',existingArticle.eventId,c):undefined;
   if(existingArticle&&content.eventId!==existingArticle.eventId&&!previous)throw new DomainError('历史文章的原事件不存在');
   if(previous){const primary=evidence.find(e=>e.id===content.evidenceIds[0]),target=await one<RadarEvent>('events',content.eventId!,c);if(!primary||!target||automaticNewsContextUpgrade(primary,content,previous,target,evidence,await list<Article>('articles',c))?.id!==existingArticle!.id)throw new DomainError('历史文章父帖关联未通过核对');}
@@ -321,7 +382,8 @@ export async function publishCandidate(candidateId:string,version:number,actor:s
         const duplicate=await one<RadarEvent>('events',duplicates[0].id,c,true),target=await one<RadarEvent>('events',content.eventId!,c,true);
         const provisional=duplicate&&target&&primary?automaticNewsContextUpgrade(primary,content,duplicate,target,evidence,articles):undefined;
         const article=provisional?await one<Article>('articles',provisional.id,c,true):undefined;
-        if(!duplicate||!target||!primary||!article||!automaticNewsContextUpgrade(primary,content,duplicate,target,evidence,articles.map(item=>item.id===article.id?article:item))||content.actions[0].id!==target.actions[0].id)throw new DomainError('原帖已有事件，关联冲突');
+        const ownBatch=primary&&bankedProgress(primary.text)&&bankedSeriesContext(primary,evidence).length&&content.actions[0].kind==='banked_reset'&&content.actions[0].id===`action_${hash(`${providerIdentity(primary)}:banked_reset:${content.actions[0].scope}:0`)}`;
+        if(!duplicate||!target||!primary||!article||!automaticNewsContextUpgrade(primary,content,duplicate,target,evidence,articles.map(item=>item.id===article.id?article:item))||!target.actions.some(action=>action.id===content.actions[0].id)&&!ownBatch)throw new DomainError('原帖已有事件，关联冲突');
         newsUpgrade={event:duplicate,article};
       }
     }
@@ -333,7 +395,9 @@ export async function publishCandidate(candidateId:string,version:number,actor:s
     if(completedJob){const saved=await one<Audit>('audits',String(completedJob.payload.semanticProofId),c);const proof=saved?.after as SemanticBenefitProof|undefined;const ai=await one<AIRecord>('settings','ai',c);if(saved?.actor==='worker'&&saved.action==='candidate.semantic_review'&&saved.objectId===candidate.id&&proof?.aiVersion===ai?.version&&validSemanticProof(proof,evidence,content))semanticProof=proof;}
     if(automatic){const sourceErrors=validateDraft(content,evidence,true,semanticProof);if(sourceErrors.length)throw new DomainError(sourceErrors.join('；'));}
     const originalContent=structuredClone(content);
-    const partition=automatic?partitionAutomaticActions(content,existing):{current:content.actions,stale:[]};
+    const repairArticle=enrichment&&primary?articleForPrimary(candidate,content,primary,evidence,articles,true):undefined;
+    const comparisonEvent=automatic?deadlineRepairComparison(content,existing,repairArticle,primary,evidence):existing;
+    const partition=automatic?partitionAutomaticActions(content,comparisonEvent,evidence):{current:content.actions,stale:[]};
     const archiveOnly=partition.stale.length>0&&partition.current.length===0;
     if(automatic&&partition.stale.length){
       content={...content,actions:partition.current};
@@ -375,7 +439,7 @@ export async function publishCandidate(candidateId:string,version:number,actor:s
       return retained;
     }
     if(automatic&&previousArticle?.manualFields)for(const field of previousArticle.manualFields)content[field]=previousArticle[field];
-    const correction=automatic&&automaticCorrection(content,existing,evidence);
+    const correction=automatic&&automaticCorrection(content,comparisonEvent,evidence);
     const activity=content.activityId?await one<Activity>('activities',content.activityId,c):undefined;
     // Re-evaluation of an already archived source is not a new publication.
     const archivedAgain=archiveOnly&&existing?.status==='published'&&previousArticle&&sameIds(content.evidenceIds,previousArticle.evidenceIds)&&sameIds(content.contextEvidenceIds,previousArticle.contextEvidenceIds)&&(!content.activityId||activity?.items.some(item=>item.articleId===previousArticle.id&&item.day===content.activityDay));
@@ -388,7 +452,7 @@ export async function publishCandidate(candidateId:string,version:number,actor:s
       return result;
     }
     const eventTitle=automatic?mixedAutomaticEventTitle(content,existing,!!partition.stale.length,correction):undefined;
-    const result=await publish(content,c,{actor,reason,existingArticle:previousArticle,correction,automatic,eventTitle,semanticProof,archivedActions:partition.stale});
+    const result=await publish(content,c,{actor,reason,existingArticle:previousArticle,correction,automatic,eventTitle,semanticProof,archivedActions:partition.stale,suppressNotice:!!(enrichment&&previousArticle?.publicationMode==='state_change'&&primary&&(bankedProgress(primary.text)||previousArticle.contentOrigin==='template'&&content.actions.length>0&&content.actions.every(action=>existing?.actions.some(old=>old.id===action.id&&old.kind===action.kind&&old.stage===action.stage&&old.statementAt===action.statementAt&&old.scope===action.scope&&old.eligibility===action.eligibility&&sameIds(old.evidenceIds,action.evidenceIds)))))});
     if(newsUpgrade){
       const merged={...newsUpgrade.event,status:'merged' as const,mergedInto:result.eventId,version:newsUpgrade.event.version+1,updatedAt:now()};
       await put('events',merged,c);

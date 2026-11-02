@@ -1,5 +1,5 @@
 import {ownBenefitClause} from './benefit-language';
-import { bankedProgress } from './benefit-signal';
+import { bankedProgress, equivalentCompletionOriginal } from './benefit-signal';
 import type { CadenceObservation } from '../lib/reset-cadence';
 import type { Evidence, Source } from '../lib/types';
 import { benefitClauses, benefitStage, extractBenefitClaims, isTruncatedBenefitText } from './benefit-rules';
@@ -237,8 +237,9 @@ export function extractCadenceObservations(evidence: Evidence[], sources: Source
     if (kinds.some(kind => kind === undefined) || new Set(kinds).size !== 1) continue;
     const item = versions[0];
     if(versions.some(version=>publishedTime(version.publishedAt)!==publishedTime(item.publishedAt)||timePrecision(version,bySource.get(version.sourceId)!)!==timePrecision(item,bySource.get(item.sourceId)!)))continue;
-    const evidenceIds=[...new Set(statements.flatMap(statement => statement!.evidenceIds))].sort();
-    const proofEvidenceIds=[...new Set(statements.flatMap(statement=>statement!.proofEvidenceIds??statement!.evidenceIds))];
+    const repost=equivalentCompletionOriginal(item,latestEvidence);
+    const evidenceIds=[...new Set([...statements.flatMap(statement => statement!.evidenceIds),...(repost?[repost.id]:[])])].sort();
+    const proofEvidenceIds=[...new Set([...statements.flatMap(statement=>statement!.proofEvidenceIds??statement!.evidenceIds),...(repost?[repost.id]:[])])];
     const precision=timePrecision(item,bySource.get(item.sourceId)!);
     const knownAt=Math.max(...proofEvidenceIds.map(id=>{const support=byId.get(id)!;return firstKnown.get(sameVersion(support))!;}));
     result.push({ id: `cadence:${url}`, evidenceIds, at: precision==='date'?item.publishedAt.slice(0,10):new Date(item.publishedAt).toISOString(), url, kind: kinds[0]!,timePrecision:precision,firstKnownAt:new Date(knownAt).toISOString() });

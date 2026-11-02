@@ -1,0 +1,65 @@
+[
+  {
+    "id": "2066956441173323943",
+    "text": "This was fixed. You know what's coming 👀\n\nGive us 24 hours to reset the Codex rate limits across all plans.",
+    "at": "2026-06-16T18:49:52.000Z",
+    "parent": "2066865154902380796"
+  },
+  {
+    "id": "2075330198887940337",
+    "text": "Enjoy a full reset of your usage limits for ChatGPT Work and Codex. Propagating in the next hour.\n\n@_rajanagarwal just joined to work on model research and push on coding capabilities. You can thank him for pressing the button today. https://t.co/vMMwKJibBI",
+    "at": "2026-07-09T21:24:11.000Z"
+  },
+  {
+    "id": "2075452680760443190",
+    "text": "To celebrate the launch of GPT-5.6 Sol, we will reset the rate limits again (twice) across ChatGPT Work and Codex over the next 24 hours.\n\nWe want you to have the time to truly try ambitious tasks and get the hang of it. Happy exploring!",
+    "at": "2026-07-10T05:30:53.000Z"
+  },
+  {
+    "id": "2075641131002700120",
+    "text": "Hello beautiful people! We have reset usage limits across Codex and ChatGPT Work. And another one will come later in the day. Rejoice.\n\nNow that I have your attention, a quick update on ChatGPT Work, Codex and all the updates we shared yesterday.\n\nWe’ve spent the last 24 hours reading feedback, looking at usage patterns, and talking with many of you. The short version is that there is a *lot* of excitement for GPT 5.6 Sol, ChatGPT Work on mobile & web, but also that we didn't get everything quite right.\n\n- We made it too easy to use the highest-compute settings without making the impact on usage limits sufficiently clear.\n- We reorganized the desktop app in one bold move, making familiar things like chats and projects harder to find.\n- Our launch framing was focused on ChatGPT Work and to some of our Codex fans it made it feel like Codex was going away over time. Absolutely not our intention, we love Codex and it is here to stay.\n- And we introduced regressions for some existing multi-agent workflows, alongside a collection of rough edges in plugins and other parts of the experience.\n\nWe’re landing a first set of improvements today. We’re resetting usage twice so people can keep experimenting, changing defaults and the model picker so they don’t push people toward unnecessarily expensive settings, fixing several plugin submission issues, improving how we represent Codex in the product, and cleaning up some of the most immediate desktop problems.\n\nA larger set of improvements will land next week. We’re bringing chats and projects back into the sidebar in a more familiar and customizable way, making usage and reset timing much more visible, clarifying when to use ChatGPT Work and when to use Codex, and addressing the many other smaller pieces of great feedback we've had.\n\nThe ambition behind this launch hasn’t changed. We think bringing ChatGPT and Codex together into a workspace where people and agents can collaborate is a very important step forward. But an ambitious direction doesn’t excuse avoidable confusion or regressions in the first version.\n\nPlease keep the feedback coming. We’re moving quickly, and you should see the experience already get better with a few updates today; and substantially better again next week.",
+    "at": "2026-07-10T17:59:43.000Z"
+  },
+  {
+    "id": "2075820987833274448",
+    "text": "Introducing... another usage limit reset for all our ChatGPT Work and Codex users. Should land over next 30 minutes. Hope you have an awesome weekend.\n\nThank you for pushing our systems to the absolute limit, we have never seen traffic increase so quickly. Keep the feedback coming and we'll keep shipping.",
+    "at": "2026-07-11T05:54:25.000Z",
+    "parent": "2075641131002700120"
+  },
+  {
+    "id": "2076365965915467978",
+    "text": "Morning. The last 48 hours of Codex and ChatGPT Work have been intense! Three important updates:\n\n- Temporarily removing the 5 hour usage limit restriction for all Plus, Business and Pro plans\n- Rolling out changes that will make GPT 5.6 Sol more efficient across the board and that will be reflected in less usage being used so that it can take you further. Exact impact to be quantified and shared\n- We hit 6M active users, and are landing a usage reset in the next hour\n\nGo do things",
+    "at": "2026-07-12T17:59:57.000Z"
+  },
+  {
+    "id": "2076418567143408112",
+    "text": "Added a banked reset to 500k users of ChatGPT Work and Codex.\n\nWhat’s been happening:\n- Just released the ability to use a banked reset from web and mobile. Before today you could only do it in the desktop app\n- Had an issue where less than 10% of users who used a banked reset and it didn’t actually reset. This was during a 2 hour window.\n- It was hard to find all the exact users where it didn’t apply, so instead granted a banked reset to everyone who pressed the reset button in that 2 hour window. This also gives us the opportunity to validate the new infra ahead of tomorrow\n\nTomorrow we will celebrate our 7M active users milestone and grant the first banked reset across all of our ChatGPT Work and Codex users.\n\nWe will also release a bunch of updates to the desktop app, addressing a ton of your feedback.\n\nTalk soon",
+    "at": "2026-07-12T21:28:59.000Z"
+  },
+  {
+    "id": "2077114635308986427",
+    "text": "Hello. We have reached 8M active users across Codex and ChatGPT Work.\n\nWe are once again resetting the usage limits for all. And we continue to not have the 5h rate limit as well, allowing everyone to explore the boundaries of GPT-5.6 Sol and discover how ambitious you can be.\n\nSee you tomorrow for more updates on our growth!",
+    "at": "2026-07-14T19:34:54.000Z"
+  },
+  {
+    "id": "2077607697487188198",
+    "text": "Another reset for our Codex and ChatGPT Work users. Actually hit 9M active users way earlier today, but then got distracted by the approximately millions of things the team is doing to keep the systems up and reliable.\n\nShould have that sweet 100% weekly usage limit back in a few minutes. Go be your productive self and close twitter. Shoo!",
+    "at": "2026-07-16T04:14:09.000Z"
+  },
+  {
+    "id": "2087706104814023111",
+    "text": "Old news actually from a bunch of days ago, but crossed that 15M. Enjoy a nice reset everyone. Landing in the next hour or so, go /fast.",
+    "at": "2026-08-13T01:01:37.000Z",
+    "parent": "2087423996115681767"
+  },
+  {
+    "id": "2114588174249071102",
+    "text": "Day 21/ Wonder what happens the remaining seven days. But today is a reset.",
+    "at": "2026-10-26T05:21:22.000Z"
+  },
+  {
+    "id": "2115273064481218829",
+    "text": "Day 23/ Much requested iCloud Main &amp; Calendar plugins. Just kidding, today is a reset. Still much requested though!",
+    "at": "2026-10-28T02:42:53.000Z"
+  }
+]

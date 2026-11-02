@@ -65,7 +65,8 @@ function newsContextFixture(oldSourceId='reset-archive'){
  const duplicate=event({id:'old-news-event',title:'等待补充上下文的公开动态',actions:[],evidenceIds:[oldPrimary.id],publicationId:'old-news-publication'});
  const oldArticle=article({id:'old-news-article',eventId:duplicate.id,title:duplicate.title,summary:'公开动态已保存，等待对应原承诺。',evidenceIds:[oldPrimary.id],publicationMode:'news_only',contentOrigin:'template',publicationId:duplicate.publicationId});
  const content=draft({title:'重置卡：公告称已完成',summary:'公开原文及明确父帖表明所有付费账户的重置卡已发放。',eventId:target.id,evidenceIds:[primary.id,parent.id],contextEvidenceIds:[parent.id],actions:[action({id:'child-card',eligibility:'所有付费账户',evidenceIds:[primary.id,parent.id],statementAt:previousAt,evidenceQuote:primary.text})]});
- return {primary,parent,oldPrimary,content,duplicate,target,evidence:[primary,parent,oldPrimary],articles:[oldArticle],oldArticle};
+ const parentArticle=article({id:'parent-article',eventId:target.id,evidenceIds:[parent.id],publicationMode:'state_change',contentOrigin:'template',publicationId:target.publicationId});
+ return {primary,parent,oldPrimary,content,duplicate,target,evidence:[primary,parent,oldPrimary],articles:[oldArticle,parentArticle],oldArticle};
 }
 function upgradedArticle(input:ReturnType<typeof newsContextFixture>){return automaticNewsContextUpgrade(input.primary,input.content,input.duplicate,input.target,input.evidence,input.articles);}
 

@@ -144,14 +144,14 @@ test('新预告保留下一次倒计时，旧观测只作为同卡中的上次�
   }finally{h.page.onUnload();}
 });
 
-test('提前重置无需等预告到点，超过24小时仍保留已发生的重置直到出现新安排',()=>{
+test('提前重置无需等预告到点，满24小时转周期倒计时并保留真实观测锚点',()=>{
   const data=fixture();data.publications[0].event.actions[0].expectedAt='2026-10-24T18:00:00.000Z';
   const h=nativeHome(data);
   try{
     assert.equal(h.page.data.resetCards[0].completedDisplay,true);
     const card=h.page.resetCardsPatch(data,'2026-10-25T19:33:00.000Z').resetCards[0];
-    assert.equal(card.completedDisplay,true);assert.equal(card.timeAt,observedAt);assert.equal(card.metric,'2天1小时53分钟');assert.equal(card.clockParts.length,3);
-    assert.equal(card.clockParts[0].unit,'天');assert.equal(card.clockParts[0].value,'02');
+    assert.equal(card.completedDisplay,false);assert.equal(card.state,'cycle');assert.equal(card.clockAt,observedAt);assert.equal(card.expectedAt,new Date(Date.parse(observedAt)+7*86400000).toISOString());assert.equal(card.metric,'4天22小时7分钟');assert.equal(card.clockParts.length,3);
+    assert.equal(card.clockParts[0].unit,'天');assert.equal(card.clockParts[0].value,'04');
   }finally{h.page.onUnload();}
 });
 

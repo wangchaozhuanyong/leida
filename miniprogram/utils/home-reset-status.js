@@ -84,7 +84,7 @@ function completedCard(base, kind, round, observations, now) {
   const card={...base,kind,state:declared?'completed':'observed',tone:declared?'green':'teal',title,badge:declared?'发布者已确认':'第三方报告',completedDisplay:true,expiredRound:false,
     ...clock(at,now),...dateFields(at),timeLabel:observation?'来源观测时间':'完成消息时间',metricLabel:observation?round?'距本轮最早观测':'距来源观测':banked?'距上次发放':'距上次重置',
     clockAt:at,expectedAt:round?.expectedAt||'',roundKey:round?keyOf(round):'observation:'+observation.eventId,publicationId,eventId:declared?round.eventId:observation.eventId,
-    declarationAt:declared?round.statementAt:'',declarationTime:declared&&observation?m.displayTime(round.statementAt):'',evidenceType:declared?'declaration':'observation',
+    declarationAt:declared?round.statementAt:'',declarationTime:declared&&observation?m.displayTime(round.statementAt):'',evidenceType:declared?'declaration':'observation',clockEvidenceType:observation?'observation':'declaration',
     sourceName:declared?'':observation.sourceName,sourceType:declared?'announcement':'observed',sourceUrl:'',
     dialStatus:declared?'依据公开完成声明':'依据第三方观测',description:'持续关注下一次安排。',footer:declared?'公开完成消息，个人账户以实际显示为准':observation.sourceName+' · 第三方观测',
     action:'查看记录',oldTime:'',expectedElapsed:'',observationPublicationId:'',observationSourceName:'',observationTime:'',observationAt:'',watchNote:'',validUntil:'',early};
@@ -101,6 +101,25 @@ function completedCard(base, kind, round, observations, now) {
     card.hero.footnote='实际额度以账户显示为准。';
     card.action='查看来源';
   }
+  return card;
+}
+// The cycle is a display projection from a real reset, never a completion fact.
+function completionPhase(card, now) {
+  const at=millis(card.clockAt),current=millis(now),boundary=at+DAY;
+  if(current<boundary){card.validUntil=new Date(boundary).toISOString();return card;}
+  const previous={at:card.clockAt,publicationId:card.publicationId,evidenceType:card.evidenceType,clockEvidenceType:card.clockEvidenceType||card.evidenceType,sourceName:card.sourceName};
+  if(card.kind==='banked_reset'){
+    Object.assign(card,{state:'waiting',title:'等待下一次发卡预告',badge:'持续关注',completedDisplay:false,metric:'',clockParts:[],expectedAt:'',validUntil:'',evidenceType:'history',...dateFields(previous.at),timeLabel:'上次发卡消息时间',action:'查看历史记录'});
+    card.hero=homeOrbitPresentation(card,now);
+    Object.assign(card.hero,{title:card.title,description:'有新的发卡消息后及时更新。',timeLabel:card.timeLabel});
+  }else{
+    const due=at+7*DAY,reached=current>=due,expected=new Date(due).toISOString();
+    const parts=reached?[]:countdownParts(expected,now),units=parts.some(p=>p.unit==='天')?['天','小时','分钟']:['小时','分钟'];
+    Object.assign(card,{state:reached?'cycle_due':'cycle',title:reached?'周期时间已到':'距离周期预计重置',badge:'7天周期推算',completedDisplay:false,evidenceType:'cycle',expectedAt:expected,validUntil:reached?'':expected,
+      ...dateFields(expected),timeLabel:'周期预计时间',metric:reached?'':parts.map(p=>p.value+p.unit).join('')||'不足1分钟',clockParts:parts.length?units.map(unit=>({unit,value:String(parts.find(p=>p.unit===unit)?.value||0).padStart(2,'0')})):[],action:'查看历史记录'});
+    card.hero=homeOrbitPresentation(card,now);
+  }
+  card.previousCompletion=previous;
   return card;
 }
 function pendingCard(base, round, now) {
@@ -122,11 +141,11 @@ function pendingCard(base, round, now) {
   card.timeLabel=timed?overdue?'原预计安排':adjusted?'最新安排':'预计安排':progress?'进展消息':'预告发布';
   Object.assign(card,dateFields(timed?round.expectedAt:round.statementAt,timed?qualifier:''));
   if(adjusted)card.oldTime='原预计 '+m.displayTime(round.previousExpectedAt);
-  if(timed&&!overdue&&!progress){
+  if(timed&&!overdue){
     const parts=countdownParts(round.expectedAt,now),units=parts.some(p=>p.unit==='天')?['天','小时','分钟']:['小时','分钟'];
     card.metric=parts.length?parts.map(p=>p.value+p.unit).join(''):'不足1分钟';
     card.clockParts=parts.length?units.map(unit=>({unit,value:String(parts.find(p=>p.unit===unit)?.value||0).padStart(2,'0')})):[];
-    card.metricLabel=adjusted?'距离最新预计安排':timing==='deadline'?'距离预计最晚时间':timing==='approximate'?'距离预计时间（约）':'距离预计安排';
+    card.metricLabel=progress?'距离预计完成时间':adjusted?'距离最新预计安排':timing==='deadline'?'距离预计最晚时间':timing==='approximate'?'距离预计时间（约）':'距离预计安排';
   }
   card.action=overdue?'查看原预告':adjusted?'查看调整说明':progress?'查看最新进展':'查看安排依据';
   card.hero=homeOrbitPresentation(card,now);
@@ -142,7 +161,7 @@ function finalize(card, data) {
   card.shareTitle=(card.kind==='banked_reset'?'重置卡发放':'额度重置')+' · '+(card.hero.title||card.hero.label)+' · '+card.hero.badge;
   // Clock digits and collection time are intentionally excluded: a minute tick is not a new fact.
   card.revision=stateRevision(JSON.stringify([card.kind,card.roundKey,card.state,card.publicationId||'',card.timeAt||'',card.expectedAt||'',card.clockAt||'',card.declarationAt||'',card.hero.title,card.hero.badge,card.hero.description,card.hero.footnote,card.sourceName||'',card.sourceUrl||'',card.observationPublicationId||'',card.timeQualifier||'',card.oldTime||'']));
-  card.sharePath=(card.observationSummaryDate?'/pages/schedule/index?date='+card.observationSummaryDate+'&':card.publicationId?detailPath(card.publicationId)+'&':'/pages/home/index?')+'kind='+card.kind+'&revision='+card.revision;
+  card.sharePath=(['cycle','history'].includes(card.evidenceType)?'/pages/home/index?':card.observationSummaryDate?'/pages/schedule/index?date='+card.observationSummaryDate+'&':card.publicationId?detailPath(card.publicationId)+'&':'/pages/home/index?')+'kind='+card.kind+'&revision='+card.revision;
   return card;
 }
 function historyMessage(record) {
@@ -183,6 +202,7 @@ function homeResetStatus(data, now=data.serverTime) {
     else card={...base,completedDisplay:false,expiredRound:false};
     // A genuinely newer classified signal replaces history, never a still-active arrangement.
     if(['signal','estimated'].includes(base.state) && (!latest || millis(base.timeAt)>Math.max(millis(latest.statementAt),millis(card.clockAt))) && !['scheduled','revised','announced','progress','overdue'].includes(card.state))card={...base,completedDisplay:false,expiredRound:false};
+    if(card.completedDisplay)card=completionPhase(card,now);
     card.lastMessage=historyMessage(record);
     return finalize(card,input);
   });

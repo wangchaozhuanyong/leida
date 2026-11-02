@@ -1,4 +1,4 @@
-import type { PublicData, Publication, RadarEvent } from './types';
+import type { BenefitAction, PublicData, Publication, RadarEvent } from './types';
 import { isHistoricalArticle } from './history';
 import {resetObservations} from './reset-observations';
 export type PublicFactsData = Pick<PublicData, 'events' | 'articles' | 'publications' | 'evidence' | 'serverTime'>;
@@ -15,6 +15,21 @@ export const statePublication = (data: PublicFactsData, event: RadarEvent) => {
   return data.publications.filter(p => p.eventId === event.id && !isNewsOnly(p))
     .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))[0];
 };
+/** A series snapshot retains every batch; an article describes its own batch. */
+export function publicationActions(publication:Publication):BenefitAction[] {
+  const actions=publication.event.actions,primary=publication.article.evidenceIds[0],at=publication.article.sourcePublishedAt;
+  if(!at||actions.filter(a=>a.kind==='banked_reset'&&a.scope==='public').length<2)return actions;
+  const own=actions.filter(a=>a.kind==='banked_reset'&&a.scope==='public'&&a.evidenceIds.includes(primary)&&Date.parse(a.statementAt)===Date.parse(at));
+  return own.length?actions.filter(a=>a.kind!=='banked_reset'||a.scope!=='public'||own.includes(a)):actions;
+}
+/** Separate batches may share an event, but each record opens its own current
+ * source article. A later batch does not turn an earlier batch into old news. */
+export function actionPublication(data:PublicFactsData,event:RadarEvent,action:BenefitAction,current:Publication):Publication {
+  if(action.kind!=='banked_reset'||event.actions.filter(a=>a.kind==='banked_reset'&&a.scope==='public').length<2)return current;
+  const facts=(a:BenefitAction)=>JSON.stringify([a.id,a.kind,a.scope,a.stage,a.statementAt,a.eligibility,a.expectedAt,a.timeNote,a.evidenceQuote]);
+  return data.publications.filter(p=>p.eventId===event.id&&!publicationWithdrawn(data,p)&&data.articles.some(a=>a.id===p.articleId&&a.publicationId===p.id)&&data.evidence.some(e=>e.id===p.article.evidenceIds[0]&&action.evidenceIds.includes(e.id)&&Date.parse(e.publishedAt)===Date.parse(action.statementAt))&&p.event.actions.some(a=>facts(a)===facts(action)))
+    .sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt))[0]??current;
+}
 export function publicActions(data: PublicFactsData) {
   const seen = new Set<string>();
   return data.events.filter(e => e.status === 'published').flatMap(event => {
@@ -24,7 +39,7 @@ export function publicActions(data: PublicFactsData) {
       const key = action.id;
       if (action.scope !== 'public' || seen.has(key)) return false;
       seen.add(key); return true;
-    }).map(action => ({ action, event: publication.event, publication }));
+    }).map(action => ({ action, event: publication.event, publication:actionPublication(data,publication.event,action,publication) }));
   });
 }
 
@@ -52,7 +67,7 @@ export function pendingPublicActions(data: PublicFactsData, currentTime = data.s
 /** Import and rewording time must not move an old benefit announcement above new evidence. */
 export function publicationSourceTime(publication: Publication): string {
   if (isNewsOnly(publication)) return publication.article.sourcePublishedAt ?? publication.article.publishedAt;
-  const times = [publication.article.sourcePublishedAt, ...publication.event.actions.map(action => action.statementAt)]
+  const times = [publication.article.sourcePublishedAt, ...publicationActions(publication).map(action => action.statementAt)]
     .filter((value): value is string => !!value && Number.isFinite(Date.parse(value)));
   return times.sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? publication.article.publishedAt;
 }

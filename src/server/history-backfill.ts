@@ -36,7 +36,15 @@ export function validateHistoryBundle(value:HistoryBundle,digest=BUNDLE_DIGEST):
 export function historicalDraft(primary:Evidence,all:Evidence[],message:HistoryMessage):DraftContent {
   const context=gatherEvidenceContext(primary,all),generated=buildAutomaticTemplate(context);
   const facts=generated?.actions.map(a=>({kind:a.kind,stage:a.stage}));
-  if(!message.referenceOnly&&generated&&JSON.stringify(facts)===JSON.stringify(message.expectedActions)&&!validateDraft(generated,all).length)return generated;
+  // Keep the frozen import and receipt unchanged. The newly reviewed explicit
+  // "another one will come" adds a promise, never an extra completed reset.
+  const additionalPromise=generated?.actions.length===2&&message.expectedActions.length===1&&
+    JSON.stringify(facts?.slice(0,1))===JSON.stringify(message.expectedActions)&&
+    generated.actions[0].stage==='claimed_complete'&&generated.actions[1].stage==='promised'&&
+    generated.actions[0].kind===generated.actions[1].kind&&generated.actions[0].eligibility===generated.actions[1].eligibility&&
+    /(?:^|[.!]\s*)And another one will come later in the day\./.test(primary.text)&&
+    generated.actions[1].evidenceQuote?.endsWith('And another one will come later in the day.');
+  if(!message.referenceOnly&&generated&&(JSON.stringify(facts)===JSON.stringify(message.expectedActions)||additionalPromise)&&!validateDraft(generated,all).length)return generated;
   return {title:'重置相关历史消息',summary:'公开来源曾发布这条重置相关消息。其类型、适用对象或完成状态仍需结合原文核对，暂不计入已完成次数。',translation:'',category:'reset',actions:[],evidenceIds:[primary.id],publicationMode:'news_only',contentOrigin:'template',reviewStatus:'pending',reviewReasons:['历史来源记录，尚不足以确认公共发放动作']};
 }
 
@@ -98,7 +106,7 @@ export async function applyBundledHistory():Promise<HistoryReceipt> {
           if(prior.length>1)throw new DomainError('历史补录动作轮次不明确');
           return {...action,id:prior[0]?.id??`action_${hash(`${key(root)}:${action.kind}:${action.scope}:${index}`)}`};
         })};
-        const partition=partitionAutomaticActions(draft,target);
+        const partition=partitionAutomaticActions(draft,target,all);
         if(partition.stale.length)draft={...draft,actions:partition.current,...(!partition.current.length?{publicationMode:'news_only' as const,title:'较早公告记录',summary:`公开来源的较早声明：${draft.summary}`}:{})};
         const errors=validateDraft(draft,all);if(errors.length)throw new DomainError('历史补录事实校验未通过');
         const previousCandidate=candidates.find(candidate=>candidate.id.startsWith('candidate_history_')&&!candidate.humanEdited&&identity.get(candidate.evidenceId)===key(primary));

@@ -1,0 +1,66 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {automaticNewsContextUpgrade} from '../src/server/service';
+import {buildAutomaticTemplate} from '../src/server/automatic-content';
+import {gatherEvidenceContext} from '../src/server/source-context';
+import type {Evidence,RadarEvent,Article} from '../src/lib/types';
+const at='2026-10-02T00:00:00Z';
+const post=(id:string,text:string,patch:Partial<Evidence>={}):Evidence=>({id,sourceId:'tibo-public',messageId:id,url:'https://x.com/thsottiaux/status/'+id,text,hash:id,publishedAt:at,collectedAt:at,contextComplete:true,textOrigin:'original',provenance:'archive',historical:false,...patch});
+function fixture(qualified=false){
+ const product=post('200000000000000001','We shipped a new Codex feature.');
+ const parent=post('200000000000000002','We will reset usage limits for all paid Codex users in 2 hours.',{parentId:product.messageId,publishedAt:'2026-10-02T01:00:00Z'});
+ const child=post('200000000000000003','Done and dusted',{parentId:parent.messageId,publishedAt:'2026-10-02T02:00:00Z'});
+ const copy={...child,id:'copy',sourceId:'aiplanwatch-history',parentId:undefined};const all=[product,parent,child,copy];
+ const draft=buildAutomaticTemplate(gatherEvidenceContext(child,all))!,p=buildAutomaticTemplate(gatherEvidenceContext(parent,all))!;
+ assert.equal(draft.actions[0].stage,'claimed_complete');
+ const target:RadarEvent={id:'target',title:p.title,status:'published',version:1,publicationId:'parent-pub',actions:p.actions,evidenceIds:[parent.id],updatedAt:at};
+ const duplicate:RadarEvent={...target,id:'duplicate',actions:qualified?[{...draft.actions[0],evidenceIds:[copy.id]}]:[],evidenceIds:[copy.id]};
+ const article:Article={id:'child-article',eventId:duplicate.id,title:'Child',summary:'Child',translation:'',category:'reset',version:1,status:'published',publicationId:'child-pub',evidenceIds:[copy.id],publishedAt:at,updatedAt:at,publicationMode:qualified?'state_change':'news_only',contentOrigin:'template'};
+ const parentArticle:Article={...article,id:'parent-article',eventId:target.id,evidenceIds:[parent.id],publicationMode:'state_change'};
+ return {product,parent,child,copy,all,draft,target,duplicate,article,parentArticle};
+}
+test('equivalent versions do not become the last ancestor and block a typed completion upgrade',()=>{
+ const f=fixture();assert.equal(automaticNewsContextUpgrade(f.child,f.draft,f.duplicate,f.target,f.all,[f.article,f.parentArticle])?.id,f.article.id);
+ assert.deepEqual(f.duplicate.actions,[],'read-only preflight');
+});
+test('same source identity and exact qualified copy can attach to its explicit promise without losing snapshots',()=>{
+ const f=fixture(true);assert.equal(automaticNewsContextUpgrade(f.child,f.draft,f.duplicate,f.target,f.all,[f.article,f.parentArticle])?.id,f.article.id);
+ for(const patch of [{stage:'promised' as const},{eligibility:'不同资格'},{statementAt:'2026-10-03T00:00:00Z'}])assert.equal(automaticNewsContextUpgrade(f.child,f.draft,{...f.duplicate,actions:[{...f.duplicate.actions[0],...patch}]},f.target,f.all,[f.article,f.parentArticle]),undefined);
+});
+test('manual, withdrawn, different-identity and untyped parent records stay protected',()=>{
+ const f=fixture();
+ assert.equal(automaticNewsContextUpgrade(f.child,f.draft,f.duplicate,f.target,f.all,[f.article]),undefined,'a target needs its actual published state article');
+ for(const patch of [{manualFields:['title']},{status:'withdrawn' as const}])assert.equal(automaticNewsContextUpgrade(f.child,f.draft,{...f.duplicate,...patch},f.target,f.all,[f.article,f.parentArticle]),undefined);
+ assert.equal(automaticNewsContextUpgrade({...f.child,parentId:'another'},f.draft,f.duplicate,f.target,f.all,[f.article,f.parentArticle]),undefined);
+ const foreign={...f.copy,url:f.copy.url.replace('thsottiaux','another')};assert.equal(automaticNewsContextUpgrade(f.child,f.draft,f.duplicate,f.target,[f.product,f.parent,f.child,foreign],[f.article,f.parentArticle]),undefined);
+});
+
+test('isolated worker: a completed first reset plus another promise keep separate identities through repeat and later completion',{skip:process.env.RADAR_INTEGRATION!=='1'},async()=>{
+ const {pool,list,one,put}=await import('../src/db');
+ const {createEvidence}=await import('../src/server/service');
+ const {runOne,scheduleDue}=await import('../src/server/worker');
+ const url=new URL(process.env.DATABASE_URL!);assert.equal(url.hostname,'127.0.0.1');assert.equal(url.port,'55489');assert.match(url.pathname,/^\/radar_qa_/);
+ const sourceId='half-year-wording-qa',start=new Date(Date.now()-2*3600_000).toISOString();
+ await put('sources',{id:sourceId,name:'隔离回放回归',kind:'archive',url:'https://example.invalid',enabled:true,validated:true,intervalMinutes:60,version:1,status:'healthy',nextRunAt:'2100-01-01T00:00:00Z'});
+ await put('settings',{id:'site',name:'本地测试',description:'本地',autoPublish:true,version:1});await put('settings',{id:'ai',enabled:false,version:1});
+ const add=(id:string,text:string,time=start,parentId?:string)=>createEvidence({sourceId,messageId:id,url:'https://x.com/thsottiaux/status/'+id,text,publishedAt:time,collectedAt:time,contextComplete:true,textOrigin:'original',provenance:'archive',historical:false,parentId});
+ const drain=async()=>{for(let i=0;i<30;i++){await scheduleDue({skipSources:true,allowTemplates:true,allowEnrichment:false});if(!await runOne({schedule:false,allowTemplates:true,generate:async()=>{throw Error('no AI')},enrich:async()=>undefined,enrichQuoted:async()=>[],wechat:async()=>{throw Error('no WeChat sends')}}))return;}throw Error('queue did not converge');};
+ try{
+  const text='We have reset usage limits across Codex and ChatGPT Work. And another one will come later in the day.';
+  await add('200000000000000101',text);await drain();
+  const event=(await list<RadarEvent>('events')).find(e=>e.actions.length===2)!;assert.ok(event);assert.equal(new Set(event.actions.map(a=>a.id)).size,2);assert.deepEqual(new Set(event.actions.map(a=>a.stage)),new Set(['claimed_complete','promised']));
+  const frozen=JSON.stringify(await list('publications'));
+  await add('200000000000000101',text);await drain();assert.equal(JSON.stringify(await list('publications')),frozen);
+  // Unambiguous same-kind second occurrence, with the explicit earlier original.
+  await add('200000000000000102','Another usage reset has landed across Codex and ChatGPT Work.',new Date(Date.parse(start)+3600_000).toISOString(),'200000000000000101');await drain();
+  const final=await one<RadarEvent>('events',event.id);assert.equal(final?.actions.length,2);assert.ok(final?.actions.every(a=>a.stage==='claimed_complete'));
+  const completion='We have reset usage limits for all paid Codex users.';
+  const first=await add('200000000000000201',completion+' See you see.',start,'200000000000000190');await drain();
+  const firstEvent=(await list<RadarEvent>('events')).find(e=>e.actions.some(a=>a.evidenceIds.includes(first.evidence.id)))!;assert.ok(firstEvent);
+  const notices=(await list('notices')).length;
+  await add('200000000000000202',completion+' See you soon.',new Date(Date.parse(start)+5*60_000).toISOString(),'200000000000000190');await drain();
+  const repostEvent=await one<RadarEvent>('events',firstEvent.id);assert.equal(repostEvent?.actions.length,1);assert.equal(repostEvent?.actions[0].statementAt,start);assert.equal((await list('notices')).length,notices,'wording-only repost does not create another reminder');
+  assert.equal((await list('wechat_deliveries')).length,0);
+  assert.equal((await list<any>('jobs')).filter(j=>j.status==='failed').length,0);
+ }finally{await pool.end();}
+});
