@@ -35,7 +35,9 @@ export function eligibleOriginal(item:Evidence):boolean {
 /** A counter is progress only inside an unambiguous, independently supported
  * series. It cannot supply its own audience, forecast or invented parentId. */
 export function bankedProgress(text:string):{index:number;total:number}|undefined {
-  const match=clean(text).match(/^(?:banked(?:\s+resets?)?|重置卡)\s*(\d{1,2})\s*\/\s*(\d{1,2})[.!。！]?$/i);
+  // An activity day is a label. Keep the entire statement anchored so removing
+  // a label never drops negation, audience restrictions or additional claims.
+  const match=clean(text).match(/^(?:Day\s+[1-9]\d{0,2}\s*\/\s*)?(?:banked(?:\s+resets?)?|重置卡)\s*(\d{1,2})\s*\/\s*(\d{1,2})[.!。！]?$/i);
   if(!match)return;
   const index=Number(match[1]),total=Number(match[2]);
   return total>=2&&total<=10&&index>=1&&index<=total?{index,total}:undefined;

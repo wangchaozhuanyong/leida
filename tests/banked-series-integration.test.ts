@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {pool,list,one,put,insert} from '../src/db';
+import {pool,list,one,put,insert,transaction,lockTransaction} from '../src/db';
 import type {Source,Job,Candidate,Evidence,Notice,Publication,RadarEvent,Article} from '../src/lib/types';
-import {createEvidence} from '../src/server/service';
+import {createEvidence,publishHistoricalDraft} from '../src/server/service';
 import {scheduleDue,runOne} from '../src/server/worker';
-import {evidenceFingerprint} from '../src/server/automatic-content';
+import {buildAutomaticTemplate,evidenceFingerprint} from '../src/server/automatic-content';
 import {gatherEvidenceContext} from '../src/server/source-context';
 
 test('isolated worker restores old preview, links progress, deduplicates retries and keeps historical recovery silent', {skip:process.env.RADAR_INTEGRATION!=='1'},async()=>{
@@ -36,10 +36,30 @@ test('isolated worker restores old preview, links progress, deduplicates retries
   const snapshot=JSON.stringify(await list('publications')),noticeCount=notices.length;
   await fixture('Banked 1/2',tag+'-first',first.evidence.publishedAt);await drain();
   assert.equal(JSON.stringify(await list('publications')),snapshot);assert.equal((await list<Notice>('notices')).filter(n=>n.eventId===event.id).length,noticeCount);
-  await fixture('Banked 2/2',tag+'-second',new Date(Date.parse(at)+2*3600_000).toISOString());await drain();
+  const second=await fixture('Day 28/ Banked 2/2',tag+'-second',new Date(Date.parse(at)+2*3600_000).toISOString());
+  // Reproduce an unchanged raw post already deferred under the 1.0.83 grammar.
+  const latest=await one<Candidate>('candidates',second.candidate!.id);
+  const context=gatherEvidenceContext(second.evidence,await list<Evidence>('evidence'));
+  await put('candidates',{...latest!,automation:{state:'deferred',reasonCodes:['ambiguous_kind_or_audience'],dependencyIds:[],inputFingerprint:evidenceFingerprint(context).replace(/^[^:]+:/,'benefit-rules-20261101-3:')}});
+  await drain();
   current=await one<RadarEvent>('events',event.id);assert.equal(current?.actions.length,1);assert.equal(current?.actions[0]?.stage,'claimed_complete');
+  assert.equal(current?.actions[0]?.statementAt,second.evidence.publishedAt);
+  assert.equal((await one<Evidence>('evidence',second.evidence.id))?.text,'Day 28/ Banked 2/2');
   const before=(await list<Notice>('notices')).length;
   await fixture('We have granted a banked reset.',tag+'-history','2026-05-01T00:00:00Z',true);await drain();assert.equal((await list<Notice>('notices')).length,before);
+  // A recent captured original must remain recent: no forged historical flag
+  // or shifted timestamp is needed to recover it without sending an old alert.
+  const recent=await fixture('We have granted a banked reset.',tag+'-recent-recovery',at),draft=buildAutomaticTemplate([recent.evidence])!;
+  const cutoff=new Date().toISOString(),proof={evidenceId:recent.evidence.id,evidenceHash:recent.evidence.hash,capturedBefore:cutoff};
+  const publicationsBefore=JSON.stringify(await list('publications'));
+  await assert.rejects(transaction(c=>publishHistoricalDraft(draft,c,'QA recent without capture pin')),/历史补录证据范围不符/);
+  for(const invalid of [{...proof,evidenceHash:'wrong'},{...proof,capturedBefore:'bad'},{...proof,capturedBefore:new Date(Date.now()+60_000).toISOString()},{...proof,capturedBefore:new Date(Date.parse(at)-1).toISOString()}])await assert.rejects(transaction(c=>publishHistoricalDraft(draft,c,'QA rejected pin',undefined,invalid)),/静默补录范围不符/);
+  assert.equal(JSON.stringify(await list('publications')),publicationsBefore);
+  const recovered=await transaction(async c=>{await lockTransaction(c,'radar_publication');return publishHistoricalDraft(draft,c,'QA captured original recovery',undefined,proof);});
+  assert.equal(recovered.article.historical,false);assert.equal(recovered.event.actions[0].statementAt,at);
+  assert.deepEqual(await one('evidence',recent.evidence.id),recent.evidence);
+  assert.equal((await list<Notice>('notices')).length,before);
+  assert.equal((await list('wechat_deliveries')).length,0);
   assert.equal((await list<Job>('jobs')).filter(j=>j.status==='failed').length,0);
  }finally{await pool.end();}
 });
