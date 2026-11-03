@@ -387,3 +387,21 @@ test('同一事件内有独立动作身份也要核对旧批次的原预告',()=
   assert.equal(guard(next,{...prior,announcedAt:undefined},prior.eventId),true);
  }
 });
+
+test('两批都已发卡时按完成时间选择，补回第二批更早的预告也不能切回第一批',()=>{
+ const data=fixture();data.serverTime='2026-11-03T12:00:00Z';
+ const grantOne=action(data,'first-done','claimed_complete','2026-11-01T00:43:20Z',undefined,'banked_reset','one');
+ const grantTwo=action(data,'second-done','claimed_complete','2026-11-01T23:27:20Z',undefined,'banked_reset','two');
+ const compact=structuredClone(data);
+ const full=fixture();full.serverTime=data.serverTime;
+ action(full,'second-early-promise','promised','2026-10-31T05:42:26Z',undefined,'banked_reset','two');
+ full.publications.push(...data.publications);full.events=data.events;full.articles.push(...data.articles);
+ for(const sample of [compact,full]){
+  const current=homeResetStatus(sample).primary,poster=statusPosterInput(sample);
+  assert.equal(current.publicationId,grantTwo.id);
+  assert.notEqual(current.publicationId,grantOne.id);
+  assert.equal(current.clockAt,'2026-11-01T23:27:20Z');
+  assert.equal(poster.publicationId,current.publicationId);
+  assert.equal(poster.round,homeResetStatus(compact).primary.revision);
+ }
+});
