@@ -37,7 +37,7 @@ function posterInput(data, publicationId) {
   return { publicationId, name:data.site.name || '模钥重置雷达', title:publication.article.title, summary:m.publicArticleSummary(publication.article),
     version:newsOnly ? publication.article.version : publication.event.version, historical:m.isHistoricalArticle(publication.article,data.evidence), newsOnly,
     sourceTime:publication.article.sourcePublishedAt ? m.displayTime(publication.article.sourcePublishedAt) : '', cutoff:m.displayTime(publication.cutoffAt),
-    actions:newsOnly ? [] : publication.event.actions.map(action => ({ title:`${m.actionLabels[action.kind]} · ${m.stageText(action,publication.cutoffAt)}`, eligibility:m.publicEligibility(action),
+    actions:newsOnly ? [] : m.publicationActions(publication).map(action => ({ title:`${m.actionLabels[action.kind]} · ${m.stageText(action,publication.cutoffAt)}`, eligibility:m.publicEligibility(action),
       scope:{public:'公开发放',targeted:'定向补偿',private:'个人记录'}[action.scope], statementAt:m.displayTime(action.statementAt), expectedAt:action.expectedAt ? m.displayTime(action.expectedAt) : '', timeNote:action.timeNote ? m.publicArticleSummary({...publication.article,summary:action.timeNote}) : '', tone:action.kind === 'banked_reset' ? 'purple' : 'cyan' })) };
 }
 function createPosterLayout(input, measure, _code = {status:'not_configured'}, options = {}) {

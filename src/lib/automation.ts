@@ -29,6 +29,8 @@ const machineReasonNames: Record<string, string> = {
   missing_context: '等待补齐上下文', context_missing: '等待补齐上下文', missing_parent: '等待补齐父帖',
   truncated_text: '正文不完整，等待补证', ambiguous_time: '时间尚不明确，等待补证',
   no_explicit_action: '尚无明确福利动作证据', ai_unconfigured: '智能服务尚未配置',
+  semantic_pending: '原文尚待自动语义解释，服务恢复后继续',
+  unparsed_benefit_clause: '仍有动作或时间含义待自动解释',
   source_unvalidated: '来源尚未验证', source_paused: '来源发布已暂停',
   evidence_conflict: '来源证据冲突', qualification_conflict: '资格范围冲突',
   historical_import: '历史补录', budget: '达到今日调用上限', transient: '接口暂时不可用',

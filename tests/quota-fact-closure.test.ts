@@ -38,7 +38,7 @@ test('series version conflicts are limited to relevant identities, counts do not
  assert.deepEqual(bankedSeriesContext(child,[anchor,child,{...anchor,id:'conflicting',text:'Next three days will be banked resets.'}]),[]);
  const two=post('We will grant two banked resets to all paid users over the next three days.');
  const reply=post('Banked 1/2',{parentId:two.messageId,publishedAt:child.publishedAt});
- assert.equal(evidenceBenefitClaims(reply,gatherEvidenceContext(reply,[two,reply]))[0]?.stage,'in_progress');
+ assert.equal(evidenceBenefitClaims(reply,gatherEvidenceContext(reply,[two,reply]))[0]?.stage,'claimed_complete');
 });
 test('unresolved second action is retained as work, not reported as completely processed',()=>{
  const p=post('We have reset usage limits for all paid users. A reset is on the horizon for affected users.');

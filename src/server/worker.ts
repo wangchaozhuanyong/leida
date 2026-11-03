@@ -1,6 +1,6 @@
 import {validSemanticProof,type SemanticBenefitProof} from './semantic-benefit-review';
 import {analyzeBenefitEvidence} from './benefit-analysis';
-import { bankedSeriesContext } from './benefit-signal';
+import { bankedProgress, bankedSeriesContext, matchingBenefitActions, equivalentCompletionOriginal } from './benefit-signal';
 import {REFERENCE_RESET_SOURCE,REFERENCE_SOURCES,needsReferenceHistoryRecovery} from './reference-reset-source';
 import { lockTransaction } from '../db';
 import { configuredStorageRpc } from './cloudbase/storage-config';
@@ -15,7 +15,7 @@ import { extractBenefitClaims } from './benefit-rules';
 import { buildAutomaticTemplate, evidenceFingerprint, classifyBlockers, isClearlyUnrelated, hasExplicitCorrectionText, needsSemanticReview } from './automatic-content';
 import { enrichKnownEvidence, enrichQuotedResetContext } from './source-enrichment';
 import { DomainError, now, validateDraft, hash } from './domain';
-import { audit, createEvidence, publishCandidate, queueJob, defaultSite, publishedTemplateArticle, isStaleMachineConflict, automaticNewsContextUpgrade } from './service';
+import { audit, createEvidence, publishCandidate, queueJob, defaultSite, publishedTemplateArticle, isStaleMachineConflict, isMissingDeadlineConflict, automaticNewsContextUpgrade } from './service';
 import { isHistoricalContent } from '../lib/history';
 import {processWechatJob,scheduleWechatDeliveries} from './wechat';
 import {runForecastCycle} from './forecast';
@@ -167,22 +167,23 @@ export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichme
       const actualArticle=enrichArticle?publishedTemplateArticle(candidate,original,evidence,articles,events):undefined;
       if(enrichArticle&&!actualArticle)continue;
       const partial=enrichArticle&&(candidate.automation?.reasonCodes.includes('unparsed_benefit_clause')||analyzeBenefitEvidence(original,context).unresolved.length>0);
-      const publishedRecheck=enrichArticle&&(actualArticle?.publicationMode==='news_only'||partial)&&inputChanged;
+      const publishedRecheck=enrichArticle&&(actualArticle?.publicationMode==='news_only'||actualArticle?.contentOrigin==='template'&&ruleOnly||partial||!!bankedProgress(original.text))&&inputChanged;
       const fallbackTemplate=allowTemplates&&(!enrichArticle||publishedRecheck||partial)?buildAutomaticTemplate(context):undefined;
-      const semanticReview=ready&&needsSemanticReview(fallbackTemplate,context);
+      const semanticNeeded=needsSemanticReview(fallbackTemplate,context);
+      const semanticReview=ready&&semanticNeeded;
       const template=semanticReview?undefined:fallbackTemplate;
       const obstacles=processingObstacles(context);
       // A bare historical completion remains unsupported until its pinned
       // snapshot is recovered; that missing proof must still enter the probe queue.
       const historyProofMissing=needsReferenceHistoryRecovery(original);
       if(!template&&!ready&&!enrichArticle&&!obstacles.missing&&!historyProofMissing){
-        if(inputChanged||!savedFingerprint)await put('candidates',{...candidate,automation:{state:obstacles.conflict?'conflict':'deferred',reasonCodes:obstacles.codes,dependencyIds:[],inputFingerprint:fingerprint,evaluatedAt:now()},updatedAt:now()},c);
+        if(inputChanged||!savedFingerprint)await put('candidates',{...candidate,automation:{state:obstacles.conflict?'conflict':semanticNeeded?'configuration':'deferred',reasonCodes:semanticNeeded?['ai_unconfigured','semantic_pending',...obstacles.codes]:obstacles.codes,dependencyIds:[],inputFingerprint:fingerprint,evaluatedAt:now()},updatedAt:now()},c);
         continue;
       }
       const probeDue=(obstacles.missing||historyProofMissing) && options.allowEnrichment!==false && canEnrich(original) && (!candidate.automation?.resumeAt||Date.parse(candidate.automation.resumeAt)<=Date.now());
       const newsContextProbe=enrichArticle&&actualArticle?.publicationMode==='news_only'&&!original.messageId.startsWith('observed-')&&!hasCompleteContext(original,context)&&probeDue;
       const candidateEvent=events.find(event=>event.id===(candidate.content.eventId??actualArticle?.eventId));
-      if(ruleOnly&&candidate.automation?.state==='conflict'&&!isStaleMachineConflict(candidate,candidateEvent)&&!isResolvedNewsContextConflict(candidate,original,context,events,evidence,articles))continue;
+      if(ruleOnly&&candidate.automation?.state==='conflict'&&!isStaleMachineConflict(candidate,candidateEvent)&&!isMissingDeadlineConflict(candidate,fallbackTemplate,candidateEvent,actualArticle,original,context)&&!isResolvedNewsContextConflict(candidate,original,context,events,evidence,articles))continue;
       // A rule release may re-evaluate supported templates once, not all old long-form model inputs.
       if(ruleOnly&&!template&&!semanticReview&&!(historyProofMissing&&probeDue))continue;
       if(enrichArticle&&!ready&&!(publishedRecheck&&template)&&!newsContextProbe)continue;
@@ -255,14 +256,17 @@ function linkedBenefitContext(primary:Evidence,context:Evidence[]):{context:Evid
   const standalone=benefit&&referent<0&&directEvidenceBenefitClaims(primary,full).length>0;
   return {context:referent>0?context.slice(0,referent+1):standalone?[primary]:context,bounded:referent>0||standalone};
 }
-/** Action identity and event links must use the same verified benefit boundary. */
+/** Batch statements share their series event, but own distinct action identities. */
 export function actionIdentityEvidence(primary:Evidence,context:Evidence[]):Evidence {
+  const repost=equivalentCompletionOriginal(primary,context);if(repost)return repost;
+  if(bankedSeriesContext(primary,context).length)return primary;
   return linkedBenefitContext(primary,context).context.at(-1)??primary;
 }
 export function resolveLinkedEvents(primary:Evidence,context:Evidence[],events:RadarEvent[],all:Evidence[],articles:Article[]=[]):RadarEvent[] {
   const {context:linkedContext,bounded}=linkedBenefitContext(primary,context);
   const keys=new Set(linkedContext.flatMap((item,index)=>[messageKey(item),...(item.parentId&&(!bounded||index<linkedContext.length-1)?[messageKey(item,item.parentId)]:[])]));
   keys.add(messageKey(primary));
+  const repost=equivalentCompletionOriginal(primary,all);if(repost)keys.add(messageKey(repost));
   const linked=events.filter(event=>event.evidenceIds.some(id=>{
     const item=all.find(evidence=>evidence.id===id);
     return !!item&&item.provenance!=='manual'&&(keys.has(messageKey(item)) || !!item.parentId&&keys.has(messageKey(item,item.parentId)));
@@ -284,7 +288,10 @@ export function resolveLinkedEvents(primary:Evidence,context:Evidence[],events:R
 export function isResolvedNewsContextConflict(candidate:Candidate,primary:Evidence,context:Evidence[],events:RadarEvent[],all:Evidence[],articles:Article[]):boolean {
   if(candidate.humanEdited||candidate.automation?.state!=='conflict'||!candidate.reasons.length||candidate.reasons.some(reason=>reason!=='事件关联不明'))return false;
   const before=resolveLinkedEvents(primary,context,events,all),after=resolveLinkedEvents(primary,context,events,all,articles);
-  return before.length>1&&after.length===1&&after[0].status==='published'&&!after[0].manualFields?.length&&after[0].evidenceIds.some(id=>all.some(e=>e.id===id&&messageKey(e)===messageKey(primary)));
+  if(before.length>1&&after.length===1&&after[0].status==='published'&&!after[0].manualFields?.length&&after[0].evidenceIds.some(id=>all.some(e=>e.id===id&&messageKey(e)===messageKey(primary))))return true;
+  if(after.length!==2)return false;
+  const template=buildAutomaticTemplate(context);
+  return !!template&&after.filter(duplicate=>after.some(target=>target.id!==duplicate.id&&automaticNewsContextUpgrade(primary,template,duplicate,target,all,articles))).length===1;
 }
 function resolveTarget(event:RadarEvent,events:RadarEvent[]):RadarEvent|undefined {
   let current:RadarEvent|undefined=event;
@@ -362,7 +369,7 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
   const actualArticle=job.payload.enrichArticle?publishedTemplateArticle(candidate,primary,all,await list<Article>('articles'),await list<RadarEvent>('events')):undefined;
   if(job.payload.enrichArticle&&!actualArticle)throw new DomainError('已发布模板已撤回、被人工处理或关联发生变化，自动补充未覆盖现有内容',409);
   const partial=candidate.automation?.reasonCodes.includes('unparsed_benefit_clause')||analyzeBenefitEvidence(primary,context).unresolved.length>0;
-  const publishedRecheck=(actualArticle?.publicationMode==='news_only'||partial)&&fingerprint!==previousFingerprint;
+  const publishedRecheck=(actualArticle?.publicationMode==='news_only'||actualArticle?.contentOrigin==='template'&&fingerprintChange(previousFingerprint,fingerprint)==='rules'||partial||!!bankedProgress(primary.text))&&fingerprint!==previousFingerprint;
   const fallbackTemplate=allowTemplates&&(!job.payload.enrichArticle||publishedRecheck||partial)?buildAutomaticTemplate(context):undefined;
   const template=aiReady(ai)&&needsSemanticReview(fallbackTemplate,context)?undefined:fallbackTemplate;
   let draft:DraftContent;
@@ -373,14 +380,14 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
     const blocked=classifyBlockers(candidate.reasons,context);
     const obstacles=processingObstacles(context);
     const waiting=obstacles.missing||needsReferenceHistoryRecovery(primary);
-    await saveAutomation(candidate,{...blocked,state:waiting?'waiting_evidence':obstacles.conflict?'conflict':'deferred',reasonCodes:obstacles.codes,inputFingerprint:fingerprint,evaluatedAt:now(),resumeAt:waiting?new Date(Date.now()+CONTEXT_PROBE_INTERVAL).toISOString():undefined,articleId:candidate.automation?.articleId,templatePublished:candidate.automation?.templatePublished});
+    await saveAutomation(candidate,{...blocked,state:waiting?'waiting_evidence':obstacles.conflict?'conflict':needsSemanticReview(fallbackTemplate,context)?'configuration':'deferred',reasonCodes:needsSemanticReview(fallbackTemplate,context)?['ai_unconfigured','semantic_pending',...obstacles.codes]:obstacles.codes,inputFingerprint:fingerprint,evaluatedAt:now(),resumeAt:waiting?new Date(Date.now()+CONTEXT_PROBE_INTERVAL).toISOString():undefined,articleId:candidate.automation?.articleId,templatePublished:candidate.automation?.templatePublished});
     return false;
   }
   draft.evidenceIds=[...new Set([primary.id,...draft.evidenceIds,...context.map(item=>item.id)])];
   if(candidate.content.activityId){draft.activityId=candidate.content.activityId;draft.activityDay=candidate.content.activityDay;}
   let semanticProof:SemanticBenefitProof|undefined;
   if(typeof job.payload.semanticProofId==='string'){const saved=await one<{actor:string;action:string;objectId:string;after?:SemanticBenefitProof}>('audits',job.payload.semanticProofId);if(saved?.actor==='worker'&&saved.action==='candidate.semantic_review'&&saved.objectId===candidate.id&&saved.after?.aiVersion===ai?.version&&validSemanticProof(saved.after,all,draft))semanticProof=saved.after;}
-  if(!semanticProof&&draft.contentOrigin==='generated'&&(generator===generateContent||reviewer!==reviewBenefitContent)&&validateDraft(draft,all,true).length&&aiReady(ai))semanticProof=await reviewer(context,draft,ai!.version);
+  if(!semanticProof&&draft.contentOrigin==='generated'&&(generator===generateContent||reviewer!==reviewBenefitContent)&&draft.actions.length>0&&(needsSemanticReview(fallbackTemplate,context)||validateDraft(draft,all,true).length)&&aiReady(ai))semanticProof=await reviewer(context,draft,ai!.version);
   // Hold only the short link/publish phase, never an external model request.
   return withAutoPublicationGuard(async()=>{
     draft.evidenceIds=[...new Set([primary.id,...draft.evidenceIds,...context.map(item=>item.id)])];
@@ -402,15 +409,21 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
     draft.eventId=linked.length===1?linked[0].id:job.payload.force?candidate.content.eventId:undefined;
     const assignedEvent=events.find(event=>event.id===draft.eventId);
     const root=actionIdentityEvidence(primary,gathered);
+    const repost=equivalentCompletionOriginal(primary,gathered);
     const ambiguousActions:string[]=[];
+    const assignedActionIds=new Set<string>();
     draft.actions=draft.actions.map((action,index)=>{
-      let matching=assignedEvent?.actions.filter(previous=>previous.kind===action.kind&&previous.scope===action.scope)??[];
-      if(matching.length===0&&hasExplicitCorrectionText(action.evidenceQuote??''))matching=assignedEvent?.actions.filter(previous=>previous.kind===action.kind)??[];
+      const batch=action.kind==='banked_reset'&&bankedProgress(action.evidenceQuote??'');
+      let matching=matchingBenefitActions(action,assignedEvent?.actions??[]).filter(previous=>!assignedActionIds.has(previous.id));
+      if(matching.length===0&&hasExplicitCorrectionText(action.evidenceQuote??''))matching=assignedEvent?.actions.filter(previous=>previous.kind===action.kind&&!assignedActionIds.has(previous.id))??[];
       if(matching.length>1)ambiguousActions.push('同一事件含有多轮同类动作，请核对对应轮次');
-      const prior=candidate.content.actions.find(previous=>previous.id===action.id);
-      return {...action,id:matching.length===1?matching[0].id:prior?.id??`action_${hash(`${messageKey(root)}:${action.kind}:${action.scope}:${index}`)}`};
+      const prior=!batch?candidate.content.actions.find(previous=>previous.id===action.id&&!assignedActionIds.has(previous.id)):undefined;
+      const id=matching.length===1?matching[0].id:prior?.id??`action_${hash(`${messageKey(root)}:${action.kind}:${action.scope}:${index}`)}`;
+      assignedActionIds.add(id);
+      return {...action,id,...(repost&&action.stage==='claimed_complete'?{statementAt:repost.publishedAt,evidenceIds:[repost.id,...action.evidenceIds.filter(id=>id!==repost.id)]}:{})};
     });
     const reasons=validateDraft(draft,all,true,semanticProof);
+    if(draft.contentOrigin==='generated'&&needsSemanticReview(fallbackTemplate,context)&&!draft.actions.length)reasons.push('原文语义尚未完整解释，不能用普通摘要结束福利核对');
     if(requestedEventId&&requestedEventId!==draft.eventId&&requestedEventId!==candidate.content.eventId)reasons.push('生成内容的事件关联没有原文依据，请人工核对');
     if(linked.length>1)reasons.push('事件关联不明');
     if(matched.some(event=>event.status==='withdrawn'||!resolveTarget(event,events)))reasons.push('关联事件已撤回或无法解析，需人工核对');

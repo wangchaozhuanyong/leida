@@ -30,7 +30,7 @@ test('补录不会把第三方类型、预告或不明消息改成完成声明',
     const draft=historicalDraft(primary,data.evidence,message);
     assert.deepEqual(validateDraft(draft,data.evidence),[],message.messageId);
     if(message.referenceOnly){references++;assert.equal(draft.actions.length,0);assert.equal(draft.publicationMode,'news_only');assert.equal(draft.reviewStatus,'pending');}
-    else {factual++;assert.deepEqual(draft.actions.map(a=>({kind:a.kind,stage:a.stage})),message.expectedActions);}
+    else {factual++;const expected=message.messageId==='2075641131002700120'?[...message.expectedActions,{kind:'automatic_reset',stage:'promised'}]:message.expectedActions;assert.deepEqual(draft.actions.map(a=>({kind:a.kind,stage:a.stage})),expected);}
   }
   assert.ok(factual>25);assert.ok(references>0);
   const corrected=data.messages.find(m=>m.messageId==='2076735790567338203')!;

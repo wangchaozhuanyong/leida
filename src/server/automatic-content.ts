@@ -1,4 +1,5 @@
 import {analyzeBenefitEvidence} from './benefit-analysis';
+import {speechDisposition} from './benefit-language';
 import { bankedProgress, eligibleOriginal } from './benefit-signal';
 import {referenceCompletionClaim} from './reference-reset-source';
 import {observedEvidence} from '../lib/reset-observations';
@@ -89,7 +90,7 @@ export function buildAutomaticTemplate(evidence:Evidence[]):DraftContent|undefin
     const name=(kind:BenefitAction['kind'])=>kind==='banked_reset'?'重置卡':'用量重置';
     const label:Record<BenefitAction['stage'],string>={promised:'发放预告',in_progress:'发放中',claimed_complete:'公告称已完成',cancelled:'公告宣布取消'};
     const progress=bankedProgress(primary.text);
-    const title=progress?`重置卡：${progress.index===progress.total?'本系列发放进度已完成':`已报告第 ${progress.index}/${progress.total} 批进展`}`:referenceCompletionClaim(primary)?'参考来源确认：用量重置已完成':actions.map(action=>`${name(action.kind)}：${label[action.stage]}`).join('；');
+    const title=progress?`重置卡：第 ${progress.index} 次发放（共 ${progress.total} 次）`:referenceCompletionClaim(primary)?'参考来源确认：用量重置已完成':actions.map(action=>`${name(action.kind)}：${label[action.stage]}`).join('；');
     const sourceTime=new Date(primary.publishedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false});
     const summary=actions.map(action=>`${name(action.kind)}${label[action.stage]}，适用对象：${action.eligibility}。${action.expectedAt?`预计时间：${new Date(action.expectedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})}（北京时间）。`:''}${action.timeNote??''}`).join('\n');
     if(title.length>160||summary.length>2100||actions.some(action=>action.evidenceQuote!.length>3000))return;
@@ -180,7 +181,8 @@ export function needsSemanticReview(draft:DraftContent|undefined,context:Evidenc
   const primary=context[0];
   return !!primary&&eligibleOriginal(primary)&&!isTruncatedText(primary.text)&&!originalConflict(primary,context)&&
     (!primary.parentId||context.some(e=>e.messageId===primary.parentId))&&
-    (analyzeBenefitEvidence(primary,context).unresolved.length>0||draft?.reviewStatus==='pending');
+    (analyzeBenefitEvidence(primary,context).unresolved.length>0||draft?.reviewStatus==='pending'||
+      !draft&&primary.sourceId==='tibo-public'&&speechDisposition(primary.text)==='own'&&!isClearlyUnrelated(primary));
 }
 
 export function canUseNewsOnlyAttribution(content:DraftContent,evidence:Evidence[]):boolean {

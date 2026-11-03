@@ -1,6 +1,6 @@
 import {ownBenefitClause} from './benefit-language';
-import type { Evidence } from '../lib/types';
-import { benefitClauses, benefitKinds, benefitStage, benefitTime, extractBenefitClaims, isTruncatedBenefitText, type BenefitClaim } from './benefit-rules';
+import type { BenefitAction, Evidence } from '../lib/types';
+import { benefitClauses, benefitKinds, benefitStage, benefitTime, extractBenefitClaims, eligibilityKey, isTruncatedBenefitText, type BenefitClaim } from './benefit-rules';
 
 export const UNKNOWN_BENEFIT_AUDIENCE = '适用范围未说明';
 const clean = (s:string) => s.replace(/https?:\/\/\S+/g, '').replace(/[’‘]/g,"'").replace(/\s+/g,' ').trim();
@@ -32,12 +32,12 @@ export function eligibleOriginal(item:Evidence):boolean {
     /^https:\/\/(?:x|twitter)\.com\/[A-Za-z0-9_]+\/status\/[^/?#]+$/.test(item.url)&&item.url.endsWith('/'+item.messageId);
 }
 
-/** A counter is progress only inside an unambiguous, independently supported
- * series. It cannot supply its own audience, forecast or invented parentId. */
+/** A batch counter needs an independently supported series. It cannot supply
+ * its own audience, forecast or invented parentId. */
 export function bankedProgress(text:string):{index:number;total:number}|undefined {
   // An activity day is a label. Keep the entire statement anchored so removing
   // a label never drops negation, audience restrictions or additional claims.
-  const match=clean(text).match(/^(?:Day\s+[1-9]\d{0,2}\s*\/\s*)?(?:banked(?:\s+resets?)?|重置卡)\s*(\d{1,2})\s*\/\s*(\d{1,2})[.!。！]?$/i);
+  const match=clean(text).match(/^(?:Day\s+[1-9]\d{0,2}\s*\/\s*)?(?:banked(?:\s+resets?)?|重置卡)\s*(\d{1,2})\s*(?:\/|of)\s*(\d{1,2})[.!。！]?$/i);
   if(!match)return;
   const index=Number(match[1]),total=Number(match[2]);
   return total>=2&&total<=10&&index>=1&&index<=total?{index,total}:undefined;
@@ -47,6 +47,20 @@ function seriesTotal(text:string):number|undefined {
   return value?({two:2,three:3}[value.toLowerCase()]??Number(value)):undefined;
 }
 const author=(e:Evidence)=>e.url.match(/^https:\/\/(?:x|twitter)\.com\/([^/]+)\/status\//i)?.[1].toLowerCase();
+/** A nearby timestamp alone never joins occurrences. A correction to greeting
+ * prose may repeat the exact qualified completion under the same explicit
+ * parent; keep both originals, but retain the first completion identity. */
+export function equivalentCompletionOriginal(primary:Evidence,all:Evidence[]):Evidence|undefined {
+  if(!eligibleOriginal(primary)||!primary.parentId||/\b(?:correction|corrected|cancelled|withdrawn|another|again|second|twice|additional)\b|更正|撤回|取消|再次/i.test(primary.text))return;
+  const current=extractBenefitClaims(primary.text,primary.publishedAt);
+  if(current.length!==1||current[0].stage!=='claimed_complete'||current[0].scope!=='public')return;
+  const signature=(c:BenefitClaim)=>JSON.stringify([c.kind,c.stage,c.scope,eligibilityKey(c.eligibility),clean(c.quote)]);
+  const candidates=all.filter(e=>e.messageId!==primary.messageId&&eligibleOriginal(e)&&author(e)===author(primary)&&e.parentId===primary.parentId&&Date.parse(e.publishedAt)<Date.parse(primary.publishedAt)&&Date.parse(primary.publishedAt)-Date.parse(e.publishedAt)<=10*60_000&&
+    !/\b(?:correction|corrected|cancelled|withdrawn|another|again|second|twice|additional)\b|更正|撤回|取消|再次/i.test(e.text)&&
+    (()=>{const claims=extractBenefitClaims(e.text,e.publishedAt);return claims.length===1&&signature(claims[0])===signature(current[0]);})());
+  const identities=new Map(candidates.map(e=>[e.messageId,e]));
+  return identities.size===1?[...identities.values()][0]:undefined;
+}
 const claims=(e:Evidence)=>extractBenefitClaims(e.text,e.publishedAt).length?extractBenefitClaims(e.text,e.publishedAt):originalBenefitSignal(e);
 export function bankedSeriesContext(primary:Evidence,all:Evidence[]):Evidence[] {
   const progress=bankedProgress(primary.text);
@@ -80,6 +94,31 @@ export function bankedSeriesClaim(primary:Evidence,context:Evidence[]):BenefitCl
   const progress=bankedProgress(primary.text),proof=bankedSeriesContext(primary,context);
   if(!progress||!proof.length)return;
   const parent=claims(proof[0])[0];
-  return {...parent,quote:primary.text,stage:progress.index===progress.total?'claimed_complete':'in_progress',expectedAt:undefined,
-    timeNote:`发布者报告重置卡发放进度 ${progress.index}/${progress.total}${progress.index<progress.total?'，后续批次待更新':'，本系列进度已完成'}；个人到账以账户显示为准。`};
+  return {...parent,quote:primary.text,stage:'claimed_complete',expectedAt:undefined,
+    timeNote:`发布者报告第 ${progress.index}/${progress.total} 批重置卡已发放${progress.index<progress.total?'，后续批次待更新':'，本系列发放已结束'}；个人到账以账户显示为准。`};
+}
+
+/** Same series is not the same occurrence. A legacy unfulfilled announcement
+ * may become the first observed batch; a completed different batch may not. */
+export function matchingBenefitActions(action:BenefitAction,previous:BenefitAction[]):BenefitAction[] {
+  const peers=previous.filter(old=>old.kind===action.kind&&old.scope===action.scope);
+  const batch=action.kind==='banked_reset'&&bankedProgress(action.evidenceQuote??'');
+  if(!batch){
+    const sameQuote=peers.filter(old=>clean(old.evidenceQuote??'')===clean(action.evidenceQuote??'')&&old.stage===action.stage);
+    if(sameQuote.length===1)return sameQuote;
+    // A declared second occurrence cannot reuse an already completed first
+    // occurrence. A later completion may fulfil the sole outstanding promise.
+    if(action.stage==='promised'&&/\banother\s+one\s+will\s+(?:come|land)\b/i.test(action.evidenceQuote??''))return peers.filter(old=>old.stage==='promised'||old.stage==='in_progress');
+    if(peers.length>1&&['promised','in_progress'].includes(action.stage)&&/\b(?:another\s+(?:(?:usage|rate)(?:\s+limits?)?\s+)?reset|(?:second|next)\s+(?:reset|one))\b/i.test(action.evidenceQuote??'')){
+      const outstanding=peers.filter(old=>old.stage==='promised'||old.stage==='in_progress');
+      if(outstanding.length===1&&eligibilityKey(outstanding[0].eligibility)===eligibilityKey(action.eligibility)&&Date.parse(action.statementAt)>Math.max(...peers.map(old=>Date.parse(old.statementAt))))return outstanding;
+    }
+    if(peers.length>1&&action.stage==='claimed_complete'&&/\b(?:another|second|next)\b/i.test(action.evidenceQuote??'')){
+      const outstanding=peers.filter(old=>old.stage==='promised'||old.stage==='in_progress');
+      if(outstanding.length===1&&Date.parse(action.statementAt)>Math.max(...peers.map(old=>Date.parse(old.statementAt))))return outstanding;
+    }
+    return peers;
+  }
+  const same=peers.filter(old=>{const prior=bankedProgress(old.evidenceQuote??'');return prior&&prior.index===batch.index&&prior.total===batch.total;});
+  return same.length?same:peers.filter(old=>old.stage==='promised'&&!bankedProgress(old.evidenceQuote??''));
 }

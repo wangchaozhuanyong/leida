@@ -1,4 +1,4 @@
-import { bankedSeriesClaim, bankedSeriesContext, originalBenefitSignal } from './benefit-signal';
+import { bankedSeriesClaim, bankedSeriesContext, originalBenefitSignal, equivalentCompletionOriginal } from './benefit-signal';
 import {referenceCompletionClaim,REFERENCE_RESET_SOURCE} from './reference-reset-source';
 import type { Evidence } from '../lib/types';
 import { extractBenefitClaims, extractReplyClaims, hasDayEndDeadline, isTruncatedBenefitText, type BenefitClaim } from './benefit-rules';
@@ -115,7 +115,7 @@ export function selectOriginal(versions: Evidence[]): Evidence | undefined {
 }
 export function originalConflict(item:Evidence,all:Evidence[]):boolean {
   if(item.textOrigin!=='original')return false;
-  const clean=(s:string)=>s.replace(/\s*https?:\/\/t\.co\/\S+/g,'').replace(/(?:https?:\/\/)?\bpic\.twitter\.com\/[A-Za-z0-9]+\b/gi,'').replace(/[’‘]/g,"'").replace(/\s+/g,' ').trim();
+  const clean=(s:string)=>s.replace(/\s*https?:\/\/t\.co\/\S+/g,'').replace(/(?:https?:\/\/)?\bpic\.twitter\.com\/[A-Za-z0-9]+\b/gi,'').replace(/[’‘]/g,"'").replace(/([.!?])\s+(?=@[A-Za-z0-9_])/g,'$1').replace(/\s+/g,' ').trim();
   return all.some(other=>other.id!==item.id&&namespace(other)===namespace(item)&&other.messageId===item.messageId&&other.textOrigin==='original'&&!isTruncatedText(other.text)&&!isTruncatedText(item.text)&&
     (clean(other.text)!==clean(item.text)||!!other.parentId&&!!item.parentId&&other.parentId!==item.parentId));
 }
@@ -158,11 +158,11 @@ function campaignProof(item:Evidence,all:Evidence[]):Evidence[]|undefined {
 export function campaignClaim(item:Evidence,all:Evidence[]):BenefitClaim|undefined {
   if(item.textOrigin!=='original'||isTruncatedText(item.text)||originalConflict(item,all))return;
   const processed=item.text.match(/(?:Therefore\s*\.\.\.\s*)?(the reset has been processed[.!]?)/i);
-  const daily=/(?:^|\n)\s*Day\s+\d+\s*\//i.test(item.text)&&/\b(?:it[’']s reset day today|that[’']s a reset)[.!]?|\band reset\.\s*Enjoy\./i.test(item.text);
+  const daily=/(?:^|\n)\s*Day\s+\d+\s*\//i.test(item.text)&&/\b(?:it[’']s reset day today|that[’']s a reset|today is a reset)[.!]?|\band reset\.\s*Enjoy\./i.test(item.text);
   const lineage=gatherExplicitEvidenceContext(item,all);
   const dayItem=isCampaignResetShorthand(item)||daily?item:processed?lineage.slice(1).find(e=>/(?:^|\n)\s*(?:Roundup of )?Day\s+\d+\s*\//i.test(e.text)):undefined;
   if(!dayItem||!campaignProof(dayItem,all))return;
-  const resetParagraph=item.text.split(/\n\s*\n/).find(p=>/it[’']s reset day today|that[’']s a reset|and reset\.\s*Enjoy\./i.test(p))??item.text;
+  const resetParagraph=item.text.split(/\n\s*\n/).find(p=>/it[’']s reset day today|that[’']s a reset|today is a reset|and reset\.\s*Enjoy\./i.test(p))??item.text;
   if((processed||daily)&&/\b(?:not|never|except|if|maybe|banked|cancelled)\b|\bonly\s+for\b/i.test(processed?processed[1]:resetParagraph))return;
   return {kind:'automatic_reset',stage:processed||daily&&/\band reset\.\s*Enjoy\./i.test(item.text)?'claimed_complete':'promised',scope:'public',eligibility:'活动中的Codex/Work用户（原帖未列明具体套餐及到账资格）',quote:processed?processed[1]:item.text};
 }
@@ -178,7 +178,8 @@ export function directEvidenceBenefitClaims(item:Evidence,all:Evidence[]):Benefi
   return [...direct,...(campaign&&!direct.length?[campaign]:[]),...additional.filter(c=>!direct.some(d=>d.kind===c.kind))];
 }
 export function gatherEvidenceContext(primary:Evidence,all:Evidence[]):Evidence[] {
-  const lineage=[...gatherExplicitEvidenceContext(primary,all),...bankedSeriesContext(primary,all)];
+  const repost=equivalentCompletionOriginal(primary,all);
+  const lineage=[...gatherExplicitEvidenceContext(primary,all),...bankedSeriesContext(primary,all),...(repost?[repost]:[])];
   const dayItem=lineage.find(e=>/(?:^|\n)\s*(?:Roundup of )?Day\s+\d+\s*\//i.test(e.text));
   const proof=dayItem?campaignProof(dayItem,all):undefined;
   const versions=all.filter(e=>e.textOrigin==='original'&&lineage.some(p=>namespace(p)===namespace(e)&&p.messageId===e.messageId));

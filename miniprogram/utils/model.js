@@ -88,7 +88,7 @@ function statePublication(data, event) {
 /** @param {Publication} publication */
 function publicationSourceTime(publication) {
   if (isNewsOnly(publication)) return articleSourceTime(publication.article);
-  const times = [publication.article.sourcePublishedAt, ...publication.event.actions.map(action => action.statementAt)].filter(validTime);
+  const times = [publication.article.sourcePublishedAt, ...publicationActions(publication).map(action => action.statementAt)].filter(validTime);
   return times.sort((a, b) => Date.parse(b) - Date.parse(a))[0] || publication.article.publishedAt;
 }
 function comparePublications(a, b) {
@@ -107,8 +107,21 @@ function publicActions(data) {
     return publication.event.actions.filter(action => {
       if (action.scope !== 'public' || seen.has(action.id)) return false;
       seen.add(action.id); return true;
-    }).map(action => ({ action, event: publication.event, publication }));
+    }).map(action => ({ action, event: publication.event, publication:actionPublication(data,publication.event,action,publication) }));
   });
+}
+function publicationActions(publication) {
+  const actions=publication.event.actions,primary=publication.article.evidenceIds[0],at=publication.article.sourcePublishedAt;
+  if(!at)return actions;
+  const own=actions.filter(a=>a.scope==='public'&&a.evidenceIds.includes(primary)&&Date.parse(a.statementAt)===Date.parse(at));
+  const repeated=new Set(own.filter(a=>actions.filter(other=>other.kind===a.kind&&other.scope==='public').length>1).map(a=>a.kind));
+  return repeated.size?actions.filter(a=>a.scope!=='public'||!repeated.has(a.kind)||own.includes(a)):actions;
+}
+function actionPublication(data,event,action,current) {
+  if(event.actions.filter(a=>a.kind===action.kind&&a.scope==='public').length<2)return current;
+  const facts=a=>JSON.stringify([a.id,a.kind,a.scope,a.stage,a.statementAt,a.eligibility,a.expectedAt,a.timeNote,a.evidenceQuote]);
+  return data.publications.filter(p=>p.eventId===event.id&&!publicationWithdrawn(data,p)&&data.articles.some(a=>a.id===p.articleId&&a.publicationId===p.id)&&data.evidence.some(e=>e.id===p.article.evidenceIds[0]&&action.evidenceIds.includes(e.id)&&Date.parse(e.publishedAt)===Date.parse(action.statementAt))&&p.event.actions.some(a=>facts(a)===facts(action)))
+    .sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt))[0]||current;
 }
 /** @param {Article} article @param {import('../../src/lib/types').Evidence[]} evidence */
 function isHistoricalArticle(article, evidence) {
@@ -298,7 +311,8 @@ function resolveDetail(data, query) {
   const targetEvent = merged && data.events.find(item => item.id === currentEvent.mergedInto);
   const targetPublication = targetEvent && currentPublication(data, targetEvent);
   const newsOnly = isNewsOnly(publication);
-  const isOld = (newsOnly ? currentArticle.publicationId : currentEvent.publicationId) !== publication.id;
+  const ownedBatch=!newsOnly&&currentArticle.publicationId===publication.id&&currentEvent.actions.some(a=>a.scope==='public'&&currentEvent.actions.filter(other=>other.kind===a.kind&&other.scope==='public').length>1&&actionPublication(data,currentEvent,a,{}).id===publication.id);
+  const isOld = !ownedBatch&&(newsOnly ? currentArticle.publicationId : currentEvent.publicationId) !== publication.id;
   const current = newsOnly ? data.publications.find(item => item.id === currentArticle.publicationId) : currentPublication(data, currentEvent);
   const observationKeys=p=>p&&isNewsOnly(p)?[...new Set(data.evidence.filter(e=>p.article.evidenceIds.includes(e.id)).map(e=>observedEvidence(e,data.serverTime)).filter(Boolean).map(o=>o.kind+':'+o.observedAt))].sort():[];
   const oldObservations=observationKeys(publication),newObservations=observationKeys(current);
@@ -314,7 +328,7 @@ function resolveDetail(data, query) {
     historical: isHistoricalArticle(publication.article, data.evidence), newsOnly, withdrawn, merged, isOld, observationSourceUpdate,
     version: newsOnly ? publication.article.version : publication.event.version, cutoff: displayTime(publication.cutoffAt), publishedAt: displayTime(publication.publishedAt),
     canShare: !withdrawn && !merged, mergePath: targetPublication ? sharePath(targetPublication) : '', latestPath: !merged && isOld && current ? sharePath(current) : '',
-    actions: newsOnly ? [] : publication.event.actions.map(action => ({ id: action.id, label: actionLabels[action.kind], stage: stageText(action, isOld || merged ? publication.cutoffAt : data.serverTime), eligibility: publicEligibility(action), scope: { public: '普发', targeted: '定向', private: '私人' }[action.scope], expectedAt: action.expectedAt ? displayTime(action.expectedAt) : '暂未明确', quote: action.evidenceQuote || '' })),
+    actions: newsOnly ? [] : publicationActions(publication).map(action => ({ id: action.id, label: actionLabels[action.kind], stage: stageText(action, isOld || merged ? publication.cutoffAt : data.serverTime), eligibility: publicEligibility(action), scope: { public: '普发', targeted: '定向', private: '私人' }[action.scope], expectedAt: action.expectedAt ? displayTime(action.expectedAt) : '暂未明确', quote: action.evidenceQuote || '' })),
     sourceNotes: publicSourceNotes(publication.article, newsOnly ? [] : publication.event.actions),
     updates: (publicNewsGroups(data).find(group=>group.updates.some(p=>p.id===publication.id))?.updates || []).filter(p=>p.id!==publication.id).map(p=>({id:p.id,title:p.article.title,time:displayTime(publicationSourceTime(p)),path:sharePath(p)})),
     evidence: evidence.map(item => {
@@ -595,4 +609,4 @@ function forecastOutcomeModel(snapshot, data) {
   });
   return { available: true, entries, message: entries.length ? '按后续观测时间排列，最新记录在前。' : '尚无已关联的后续记录；不代表没有公告或不会发放。', note };
 }
-module.exports = { publicNewsGroups, homeNewsGroups, publicSourceNotes, publicEligibility, publicReviewMessage, publicNoticeSummary,referenceCadenceView, publicArticleSummary, publicArticleContent, sourceStatus, actionLabels, recentCompletedBenefits, preferenceDefaults, dateKey, displayTime, elapsed, completionTime, latestCompletedBenefits, completionElapsed, articleSourceTime, sortedArticles, isNewsOnly, currentPublication, statePublication, publicationSourceTime, sortedPublications, sortedStatePublications, publicActions, isHistoricalArticle, upcomingActions, announcementCountdown, resetOutlookModel, stageText, calendarDays, safeUrl, sharePath, publicationWithdrawn, publicationCard, calendarModel, noticeModel, resolveDetail, activityDayNumber, activityHomeVisible, activityModel, validateForecastSnapshot, validateForecastPublicData, validateResetWatch, activeResetWatch, activeResetSchedule, resetWatchWindow, probabilityText, forecastPath, forecastSnapshotModel, currentForecast, forecastReferenceModel, forecastOutcomeModel };
+module.exports = { publicNewsGroups, homeNewsGroups, publicSourceNotes, publicEligibility, publicReviewMessage, publicNoticeSummary,referenceCadenceView, publicArticleSummary, publicArticleContent, sourceStatus, actionLabels, recentCompletedBenefits, preferenceDefaults, dateKey, displayTime, elapsed, completionTime, latestCompletedBenefits, completionElapsed, articleSourceTime, sortedArticles, isNewsOnly, currentPublication, statePublication, publicationSourceTime, sortedPublications, sortedStatePublications, publicActions, isHistoricalArticle, publicationActions, upcomingActions, announcementCountdown, resetOutlookModel, stageText, calendarDays, safeUrl, sharePath, publicationWithdrawn, publicationCard, calendarModel, noticeModel, resolveDetail, activityDayNumber, activityHomeVisible, activityModel, validateForecastSnapshot, validateForecastPublicData, validateResetWatch, activeResetWatch, activeResetSchedule, resetWatchWindow, probabilityText, forecastPath, forecastSnapshotModel, currentForecast, forecastReferenceModel, forecastOutcomeModel };
