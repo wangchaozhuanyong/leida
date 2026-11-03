@@ -2,7 +2,7 @@ import {bankedObject,languageKinds,languageStage,speechDisposition,ownBenefitCla
 import type { ActionKind, ActionStage, BenefitAction } from '../lib/types';
 
 /** Change only when fact interpretation changes, so unchanged inputs are evaluated once. */
-export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261102-4';
+export const AUTOMATIC_RULES_VERSION = 'benefit-rules-20261103-5';
 export interface BenefitClaim {
   kind: ActionKind; stage: ActionStage; eligibility: string; scope: BenefitAction['scope'];
   quote: string; expectedAt?: string; timeNote?: string;
@@ -58,7 +58,7 @@ function separateResetInvestigation(sentence:string):string[] {
 export function benefitClauses(text: string): string[] {
   const result: string[] = [];
   let start = 0;
-  for (const match of text.matchAll(/[。！？；;\n]|[.!?](?=\s|$)/g)) {
+  for (const match of text.matchAll(/[。！？；;\n]|[.!?](?=\s|$|@[A-Za-z0-9_])/g)) {
     const end = match.index! + match[0].length;
     const sentence = text.slice(start, end).trim();
     if (sentence) result.push(sentence);
@@ -171,6 +171,10 @@ export function eligibilityKey(value: string): string {
   if (/^(?:all)?付费账户$/.test(s)) return 'paid';
   if (/^(?:all)?免费账户$/.test(s)) return 'free';
   if (/^(?:all)?账户$/.test(s)) return 'all';
+  // Bare product-wide audiences do not specify a paid/free plan. Keep that
+  // same qualification when a later reply says "all ... users"; conditions,
+  // plan names and regions cannot match this anchored form.
+  if (/^(?:all)?codex&chatgptwork账户(?:原帖未列明具体套餐)?$/.test(s)) return 'products:codex&chatgptwork:unspecified-plan';
   return s;
 }
 
@@ -318,7 +322,13 @@ export function extractBenefitClaims(text: string, publishedAt: string): Benefit
     const kinds = productUsageAnnouncement||namedUsageAnnouncement ? ['automatic_reset' as const] : benefitKinds(clause);
     if (kinds.length !== 1 || /^(?:as (?:mentioned|promised)|previously|yesterday|see (?:above|parent))\b|之前提到|接上|参见父帖/i.test(clause)) continue;
     const greetingLanding=allPaidResetGreeting.test(normalize(clause))&&next&&/^(?:it\s+)?(?:lands?|landing|will\s+(?:land|be\s+there))\b/i.test(normalize(next))&&/\b(?:tomorrow|today|soon|in|within|by|next)\b/i.test(next);
-    const rolloutFollowup=next&&ownBenefitClause(text,next)&&/^(?:propagating|landing|lands?|should\s+land)\b.{0,30}\b(?:in|over|within)\b/i.test(normalize(next))&&benefitKinds(next).length===0?next:undefined;
+    // The same original can place a milestone between its reset announcement
+    // and the explicit return of weekly usage. Never borrow a second benefit,
+    // recipient restriction or time statement from the intervening prose.
+    const usageReturn=namedUsageAnnouncement?clauses.slice(index+1,index+4).find((item,position)=>
+      /^Should\s+have\s+(?:that\s+)?(?:sweet\s+)?100%\s+weekly\s+usage\s+limit\s+back\s+(?:in|within)\s+(?:a\s+few|\d+)\s+minutes?[.!]?$/i.test(normalize(item))&&
+      ownBenefitClause(text,item)&&!clauses.slice(index+1,index+1+position).some(other=>benefitKinds(other).length||/\b(?:reset|banked|if|unless|only|except|selected|affected|hours?|minutes?|within|before|tomorrow)\b/i.test(other))):undefined;
+    const rolloutFollowup=usageReturn??(next&&ownBenefitClause(text,next)&&/^(?:propagating|landing|lands?|should\s+land)\b.{0,30}\b(?:in|over|within)\b/i.test(normalize(next))&&benefitKinds(next).length===0?next:undefined);
     const rolloutAnnouncement=namedUsageAnnouncement||/^(?:enjoy\s+(?:a\s+)?full\s+reset\b|(?:another\s+)?usage\s+limit\s+reset\b)/i.test(normalize(clause));
     const stage = greetingLanding?'promised':benefitStage(clause)??(rolloutAnnouncement&&rolloutFollowup?'in_progress':undefined);
     // A possessive "everyone's account" may refer to one explicitly introduced

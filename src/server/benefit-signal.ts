@@ -109,6 +109,10 @@ export function matchingBenefitActions(action:BenefitAction,previous:BenefitActi
     // A declared second occurrence cannot reuse an already completed first
     // occurrence. A later completion may fulfil the sole outstanding promise.
     if(action.stage==='promised'&&/\banother\s+one\s+will\s+(?:come|land)\b/i.test(action.evidenceQuote??''))return peers.filter(old=>old.stage==='promised'||old.stage==='in_progress');
+    if(peers.length>1&&['promised','in_progress'].includes(action.stage)&&/\b(?:another\s+(?:(?:usage|rate)(?:\s+limits?)?\s+)?reset|(?:second|next)\s+(?:reset|one))\b/i.test(action.evidenceQuote??'')){
+      const outstanding=peers.filter(old=>old.stage==='promised'||old.stage==='in_progress');
+      if(outstanding.length===1&&eligibilityKey(outstanding[0].eligibility)===eligibilityKey(action.eligibility)&&Date.parse(action.statementAt)>Math.max(...peers.map(old=>Date.parse(old.statementAt))))return outstanding;
+    }
     if(peers.length>1&&action.stage==='claimed_complete'&&/\b(?:another|second|next)\b/i.test(action.evidenceQuote??'')){
       const outstanding=peers.filter(old=>old.stage==='promised'||old.stage==='in_progress');
       if(outstanding.length===1&&Date.parse(action.statementAt)>Math.max(...peers.map(old=>Date.parse(old.statementAt))))return outstanding;

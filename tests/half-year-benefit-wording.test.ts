@@ -1,14 +1,50 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {extractBenefitClaims,benefitTime} from '../src/server/benefit-rules';
+import {extractBenefitClaims,benefitTime,eligibilityKey} from '../src/server/benefit-rules';
 import {hash,validateDraft} from '../src/server/domain';
 import {buildAutomaticTemplate} from '../src/server/automatic-content';
 import {analyzeBenefitEvidence} from '../src/server/benefit-analysis';
-import {gatherEvidenceContext} from '../src/server/source-context';
-import type {Evidence} from '../src/lib/types';
+import {gatherEvidenceContext,originalConflict} from '../src/server/source-context';
+import {matchingBenefitActions} from '../src/server/benefit-signal';
+import type {Evidence,BenefitAction} from '../src/lib/types';
 const rows=JSON.parse(readFileSync(new URL('./fixtures/half-year-benefit-wording.json',import.meta.url),'utf8'));
 const post=(id:string):Evidence=>{const r=rows.find((r:any)=>r.id===id);return {id:'replay-'+id,sourceId:'tibo-public',messageId:id,text:r.text,hash:hash(r.text),url:'https://x.com/thsottiaux/status/'+id,publishedAt:r.at,collectedAt:r.at,parentId:r.parent,contextComplete:true,textOrigin:'original',provenance:'archive',historical:false,metadata:{sourceGroup:'fxembed:thsottiaux'}};};
+test('an archive dropping the gap before a mention keeps the same original facts and prospective clock',()=>{
+ const original=post('2075330198887940337');
+ const copy={...original,id:'tight-mention-copy',sourceId:'reset-archive',text:original.text.replace(/\s+(?=@_rajanagarwal)/,'').replace('https://t.co/vMMwKJibBI','pic.twitter.com/vMMwKJibBI')};
+ assert.equal(originalConflict(original,[original,copy]),false);
+ for(const item of [original,copy]){
+  const draft=buildAutomaticTemplate(gatherEvidenceContext(item,[original,copy]))!;
+  assert.equal(draft.actions[0]?.stage,'in_progress');assert.equal(draft.actions[0]?.expectedAt,'2026-07-09T22:24:11.000Z');
+  assert.deepEqual(validateDraft(draft,[original,copy],true),[]);
+ }
+ assert.equal(originalConflict(original,[original,{...copy,text:copy.text.replace('next hour','next two hours')}]),true);
+ assert.equal(originalConflict(original,[original,{...copy,text:copy.text.replace('Codex','selected accounts')}]),true);
+});
+test('weekly usage returning in the same original supplies rollout tense without inventing a few-minute deadline',()=>{
+ const p=post('2077607697487188198'),draft=buildAutomaticTemplate([p])!;
+ assert.equal(draft.actions.length,1);assert.equal(draft.actions[0].kind,'automatic_reset');assert.equal(draft.actions[0].stage,'in_progress');assert.equal(draft.actions[0].expectedAt,undefined);
+ assert.ok(p.text.includes(draft.actions[0].evidenceQuote!));assert.deepEqual(validateDraft(draft,[p],true),[]);
+ for(const text of [p.text.replace('for our','for only selected'),p.text.replace('Actually hit','We will grant a banked reset to all paid users. Actually hit'),p.text.replace('Actually hit','Only selected US accounts are eligible. Actually hit'),p.text.replace('Actually hit','We reached the milestone in 2 hours. Actually hit')]){
+  assert.ok(!extractBenefitClaims(text,p.publishedAt).some(c=>c.kind==='automatic_reset'&&c.scope==='public'&&c.stage==='in_progress'),text);
+ }
+});
+test('an explicit second rollout fulfils the unique outstanding compatible arrangement, never the completed occurrence',()=>{
+ const oldAt='2026-07-10T17:59:43Z',newAt='2026-07-11T05:54:25Z';
+ const action=(id:string,stage:BenefitAction['stage'],quote:string,at=oldAt,eligibility='Codex和ChatGPT Work用户（原帖未列明具体套餐）'):BenefitAction=>({id,kind:'automatic_reset',stage,scope:'public',eligibility,evidenceQuote:quote,statementAt:at,evidenceIds:[]});
+ const first=action('first','claimed_complete','We have reset usage across Codex and ChatGPT Work.'),second=action('second','promised','And another one will come later in the day.');
+ const current=action('new','in_progress','another usage limit reset for all our ChatGPT Work and Codex users. Should land over next 30 minutes.',newAt,'所有ChatGPT Work和Codex账户');
+ const before=JSON.stringify([first,second]);assert.deepEqual(matchingBenefitActions(current,[first,second]),[second]);assert.equal(JSON.stringify([first,second]),before);
+ assert.notDeepEqual(matchingBenefitActions({...current,eligibility:'所有付费Codex账户'},[first,second]),[second]);
+ assert.equal(matchingBenefitActions(current,[{...first,stage:'promised'},second]).length,2);
+ assert.notDeepEqual(matchingBenefitActions({...current,evidenceQuote:'Usage reset is propagating over the next 30 minutes.'},[first,second]),[second]);
+});
+test('bare product audience wording shares identity without collapsing plans or restrictions',()=>{
+ const base=eligibilityKey('Codex和ChatGPT Work用户（原帖未列明具体套餐）');
+ assert.equal(eligibilityKey('所有ChatGPT Work和Codex账户'),base);
+ for(const value of ['所有付费ChatGPT Work和Codex账户','所有免费ChatGPT Work和Codex账户','ChatGPT Work和Codex Plus用户','美国ChatGPT Work和Codex账户','ChatGPT Work和Codex账户（限定范围：受影响账户）'])assert.notEqual(eligibilityKey(value),base,value);
+});
 test('historical direct deadline: give us 24 hours is a promise, not a completion',()=>{
  const p=post('2066956441173323943'),claims=extractBenefitClaims(p.text,p.publishedAt);
  assert.equal(claims[0]?.kind,'automatic_reset');assert.equal(claims[0]?.stage,'promised');assert.equal(claims[0]?.expectedAt,'2026-06-17T18:49:52.000Z');

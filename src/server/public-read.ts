@@ -201,6 +201,10 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
         if(rows.rows.length){extraEvidence.push(options.id!);rows.rows.forEach(row=>selected.add(row.id));}
       }
     }
+    // Repeated same-kind occurrences share an event, but each retained source
+    // article must be available to the client for its own record and share link.
+    const selectedEvents=new Set(facts.publications.filter(p=>selected.has(p.id)).map(p=>p.eventId));
+    for(const item of publicActions(facts))if(selectedEvents.has(item.event.id))selected.add(item.publication.id);
     let selectedFacts:Publication[]=(await client.query(`SELECT ${thinPublication} AS payload FROM radar_publications WHERE id=ANY($1::text[])`,[[...selected]])).rows.map(row=>row.payload);
     if(detailed&&selectedFacts.length){
       const events:RadarEvent[]=(await client.query('SELECT payload FROM radar_events WHERE id=ANY($1::text[])',[selectedFacts.map(p=>p.eventId)])).rows.map(row=>row.payload);

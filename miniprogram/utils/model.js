@@ -112,12 +112,13 @@ function publicActions(data) {
 }
 function publicationActions(publication) {
   const actions=publication.event.actions,primary=publication.article.evidenceIds[0],at=publication.article.sourcePublishedAt;
-  if(!at||actions.filter(a=>a.kind==='banked_reset'&&a.scope==='public').length<2)return actions;
-  const own=actions.filter(a=>a.kind==='banked_reset'&&a.scope==='public'&&a.evidenceIds.includes(primary)&&Date.parse(a.statementAt)===Date.parse(at));
-  return own.length?actions.filter(a=>a.kind!=='banked_reset'||a.scope!=='public'||own.includes(a)):actions;
+  if(!at)return actions;
+  const own=actions.filter(a=>a.scope==='public'&&a.evidenceIds.includes(primary)&&Date.parse(a.statementAt)===Date.parse(at));
+  const repeated=new Set(own.filter(a=>actions.filter(other=>other.kind===a.kind&&other.scope==='public').length>1).map(a=>a.kind));
+  return repeated.size?actions.filter(a=>a.scope!=='public'||!repeated.has(a.kind)||own.includes(a)):actions;
 }
 function actionPublication(data,event,action,current) {
-  if(action.kind!=='banked_reset'||event.actions.filter(a=>a.kind==='banked_reset'&&a.scope==='public').length<2)return current;
+  if(event.actions.filter(a=>a.kind===action.kind&&a.scope==='public').length<2)return current;
   const facts=a=>JSON.stringify([a.id,a.kind,a.scope,a.stage,a.statementAt,a.eligibility,a.expectedAt,a.timeNote,a.evidenceQuote]);
   return data.publications.filter(p=>p.eventId===event.id&&!publicationWithdrawn(data,p)&&data.articles.some(a=>a.id===p.articleId&&a.publicationId===p.id)&&data.evidence.some(e=>e.id===p.article.evidenceIds[0]&&action.evidenceIds.includes(e.id)&&Date.parse(e.publishedAt)===Date.parse(action.statementAt))&&p.event.actions.some(a=>facts(a)===facts(action)))
     .sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt))[0]||current;
@@ -310,7 +311,7 @@ function resolveDetail(data, query) {
   const targetEvent = merged && data.events.find(item => item.id === currentEvent.mergedInto);
   const targetPublication = targetEvent && currentPublication(data, targetEvent);
   const newsOnly = isNewsOnly(publication);
-  const ownedBatch=!newsOnly&&currentArticle.publicationId===publication.id&&currentEvent.actions.filter(a=>a.kind==='banked_reset'&&a.scope==='public').length>1&&currentEvent.actions.some(a=>a.kind==='banked_reset'&&actionPublication(data,currentEvent,a,{}).id===publication.id);
+  const ownedBatch=!newsOnly&&currentArticle.publicationId===publication.id&&currentEvent.actions.some(a=>a.scope==='public'&&currentEvent.actions.filter(other=>other.kind===a.kind&&other.scope==='public').length>1&&actionPublication(data,currentEvent,a,{}).id===publication.id);
   const isOld = !ownedBatch&&(newsOnly ? currentArticle.publicationId : currentEvent.publicationId) !== publication.id;
   const current = newsOnly ? data.publications.find(item => item.id === currentArticle.publicationId) : currentPublication(data, currentEvent);
   const observationKeys=p=>p&&isNewsOnly(p)?[...new Set(data.evidence.filter(e=>p.article.evidenceIds.includes(e.id)).map(e=>observedEvidence(e,data.serverTime)).filter(Boolean).map(o=>o.kind+':'+o.observedAt))].sort():[];

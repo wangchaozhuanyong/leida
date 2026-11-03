@@ -3,7 +3,7 @@ const validProbability = value => typeof value === 'number' && Number.isFinite(v
 const displayTime = value => Number.isFinite(validTime(value)) ? new Date(validTime(value) + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ') : '';
 const shortTime = value => { const full=displayTime(value); return full ? `${full.slice(5,7)}月${full.slice(8,10)}日 ${full.slice(11,16)}` : ''; };
 const cadenceSnapshotId = value => typeof value === 'string' && /^forecast_cadence_[a-f0-9]{64}$/.test(value);
-const currentModel = 'conditional-beta-reset-cadence-20261102-evidence-4';
+const currentModel = 'conditional-beta-reset-cadence-20261103-evidence-5';
 const record = value => !!value && typeof value === 'object' && !Array.isArray(value);
 const text = value => typeof value === 'string' && !!value.trim();
 const count = value => Number.isSafeInteger(value) && value >= 0;

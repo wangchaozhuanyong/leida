@@ -44,16 +44,30 @@ test('isolated worker: a completed first reset plus another promise keep separat
  await put('sources',{id:sourceId,name:'隔离回放回归',kind:'archive',url:'https://example.invalid',enabled:true,validated:true,intervalMinutes:60,version:1,status:'healthy',nextRunAt:'2100-01-01T00:00:00Z'});
  await put('settings',{id:'site',name:'本地测试',description:'本地',autoPublish:true,version:1});await put('settings',{id:'ai',enabled:false,version:1});
  const add=(id:string,text:string,time=start,parentId?:string)=>createEvidence({sourceId,messageId:id,url:'https://x.com/thsottiaux/status/'+id,text,publishedAt:time,collectedAt:time,contextComplete:true,textOrigin:'original',provenance:'archive',historical:false,parentId});
- const drain=async()=>{for(let i=0;i<30;i++){await scheduleDue({skipSources:true,allowTemplates:true,allowEnrichment:false});if(!await runOne({schedule:false,allowTemplates:true,generate:async()=>{throw Error('no AI')},enrich:async()=>undefined,enrichQuoted:async()=>[],wechat:async()=>{throw Error('no WeChat sends')}}))return;}throw Error('queue did not converge');};
+ const drain=async()=>{for(let i=0;i<30;i++){await scheduleDue({skipSources:true,allowTemplates:true,allowEnrichment:false});if(!await runOne({schedule:false,allowTemplates:true,generate:async()=>{throw Error('no AI')},enrich:async()=>undefined,enrichQuoted:async()=>[],wechat:async()=>{throw Error('no WeChat sends')}})){const due=(await list<any>('jobs')).some(j=>j.status==='queued'&&Date.parse(j.availableAt)<=Date.now()+100);if(!due)return;await new Promise(resolve=>setTimeout(resolve,25));}}throw Error('queue did not converge');};
  try{
   const text='We have reset usage limits across Codex and ChatGPT Work. And another one will come later in the day.';
   await add('200000000000000101',text);await drain();
   const event=(await list<RadarEvent>('events')).find(e=>e.actions.length===2)!;assert.ok(event);assert.equal(new Set(event.actions.map(a=>a.id)).size,2);assert.deepEqual(new Set(event.actions.map(a=>a.stage)),new Set(['claimed_complete','promised']));
   const frozen=JSON.stringify(await list('publications'));
   await add('200000000000000101',text);await drain();assert.equal(JSON.stringify(await list('publications')),frozen);
+  const rollout='Introducing... another usage limit reset for all our ChatGPT Work and Codex users. Should land over next 30 minutes.',rolloutAt=new Date(Date.parse(start)+30*60_000).toISOString();
+  await add('200000000000000103',rollout,rolloutAt);await drain();
+  await add('200000000000000103',rollout,rolloutAt,'200000000000000101');await drain();
+  const rolling=await one<RadarEvent>('events',event.id);assert.equal(rolling?.actions.length,2);assert.equal(rolling?.actions[0].stage,'claimed_complete');assert.equal(rolling?.actions[1].stage,'in_progress');
+  assert.equal(rolling?.actions[1].expectedAt,new Date(Date.parse(start)+3600_000).toISOString());
+  assert.equal((await list<RadarEvent>('events')).filter(e=>e.status==='published'&&e.actions.length).length,1,'a copy arriving before its explicit parent does not create a duplicate round');
   // Unambiguous same-kind second occurrence, with the explicit earlier original.
   await add('200000000000000102','Another usage reset has landed across Codex and ChatGPT Work.',new Date(Date.parse(start)+3600_000).toISOString(),'200000000000000101');await drain();
   const final=await one<RadarEvent>('events',event.id);assert.equal(final?.actions.length,2);assert.ok(final?.actions.every(a=>a.stage==='claimed_complete'));
+  const {getPublicRead}=await import('../src/server/public-read');
+  const {publicActions}=await import('../src/lib/public-facts');
+  for(const view of ['calendar','history'] as const){
+   const envelope=await getPublicRead({view});
+   const facts=publicActions(envelope.data).filter(item=>item.event.id===event.id);
+   assert.equal(facts.length,2,view+' retains both rounds');
+   assert.deepEqual(facts.map(item=>item.publication.article.sourcePublishedAt).sort(),[start,new Date(Date.parse(start)+3600_000).toISOString()].sort(),view+' retains each source article');
+  }
   const completion='We have reset usage limits for all paid Codex users.';
   const first=await add('200000000000000201',completion+' See you see.',start,'200000000000000190');await drain();
   const firstEvent=(await list<RadarEvent>('events')).find(e=>e.actions.some(a=>a.evidenceIds.includes(first.evidence.id)))!;assert.ok(firstEvent);

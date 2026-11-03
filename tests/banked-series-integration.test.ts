@@ -17,7 +17,7 @@ test('isolated worker restores old preview, links progress, deduplicates retries
  const source:Source={id:sourceId,name:'隔离重置卡测试',kind:'archive',url:'https://example.invalid/qa',enabled:true,validated:true,intervalMinutes:60,version:1,status:'healthy',nextRunAt:'2100-01-01T00:00:00Z'};
  await put('sources',source);await put('settings',{id:'site',name:'隔离测试',description:'本地',autoPublish:true,version:1});
  const fixture=(text:string,id:string,time=at,historical=false)=>createEvidence({sourceId,messageId:id,url:'https://x.com/thsottiaux/status/'+id,text,publishedAt:time,collectedAt:time,contextComplete:true,textOrigin:'original',provenance:'archive',historical});
- const drain=async()=>{await scheduleDue({allowTemplates:true,allowEnrichment:false,skipSources:true});for(let i=0;i<12;i++){const pending=(await list<Job>('jobs')).filter(j=>j.status==='queued'&&j.kind==='generate');if(!pending.length)break;await runOne({schedule:false,allowTemplates:true,generate:async()=>{throw Error('No AI or external calls allowed in this fixture');}});}};
+ const drain=async()=>{await scheduleDue({allowTemplates:true,allowEnrichment:false,skipSources:true});for(let i=0;i<12;i++){const pending=(await list<Job>('jobs')).filter(j=>j.status==='queued'&&j.kind==='generate');if(!pending.length)break;if(!await runOne({schedule:false,allowTemplates:true,generate:async()=>{throw Error('No AI or external calls allowed in this fixture');}}))await new Promise(resolve=>setTimeout(resolve,25));}};
  try{
   const p=await fixture('Next two days will be resets… banked… do with this what you may 👀.',tag+'-preview');
   // Reproduce the already-published old machine news shell without rewriting

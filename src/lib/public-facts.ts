@@ -18,14 +18,15 @@ export const statePublication = (data: PublicFactsData, event: RadarEvent) => {
 /** A series snapshot retains every batch; an article describes its own batch. */
 export function publicationActions(publication:Publication):BenefitAction[] {
   const actions=publication.event.actions,primary=publication.article.evidenceIds[0],at=publication.article.sourcePublishedAt;
-  if(!at||actions.filter(a=>a.kind==='banked_reset'&&a.scope==='public').length<2)return actions;
-  const own=actions.filter(a=>a.kind==='banked_reset'&&a.scope==='public'&&a.evidenceIds.includes(primary)&&Date.parse(a.statementAt)===Date.parse(at));
-  return own.length?actions.filter(a=>a.kind!=='banked_reset'||a.scope!=='public'||own.includes(a)):actions;
+  if(!at)return actions;
+  const own=actions.filter(a=>a.scope==='public'&&a.evidenceIds.includes(primary)&&Date.parse(a.statementAt)===Date.parse(at));
+  const repeated=new Set(own.filter(a=>actions.filter(other=>other.kind===a.kind&&other.scope==='public').length>1).map(a=>a.kind));
+  return repeated.size?actions.filter(a=>a.scope!=='public'||!repeated.has(a.kind)||own.includes(a)):actions;
 }
 /** Separate batches may share an event, but each record opens its own current
  * source article. A later batch does not turn an earlier batch into old news. */
 export function actionPublication(data:PublicFactsData,event:RadarEvent,action:BenefitAction,current:Publication):Publication {
-  if(action.kind!=='banked_reset'||event.actions.filter(a=>a.kind==='banked_reset'&&a.scope==='public').length<2)return current;
+  if(event.actions.filter(a=>a.kind===action.kind&&a.scope==='public').length<2)return current;
   const facts=(a:BenefitAction)=>JSON.stringify([a.id,a.kind,a.scope,a.stage,a.statementAt,a.eligibility,a.expectedAt,a.timeNote,a.evidenceQuote]);
   return data.publications.filter(p=>p.eventId===event.id&&!publicationWithdrawn(data,p)&&data.articles.some(a=>a.id===p.articleId&&a.publicationId===p.id)&&data.evidence.some(e=>e.id===p.article.evidenceIds[0]&&action.evidenceIds.includes(e.id)&&Date.parse(e.publishedAt)===Date.parse(action.statementAt))&&p.event.actions.some(a=>facts(a)===facts(action)))
     .sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt))[0]??current;

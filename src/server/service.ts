@@ -66,9 +66,12 @@ export function providerIdentity(evidence:Evidence):string {
 export function automaticNewsContextUpgrade(primary:Evidence,content:DraftContent,duplicate:RadarEvent,target:RadarEvent,evidence:Evidence[],articles:Article[]):Article|undefined {
  if(primary.provenance==='manual'||!primary.parentId&&!bankedSeriesContext(primary,evidence).length||duplicate.id===target.id||duplicate.status!=='published'||duplicate.mergedInto||target.status!=='published'||duplicate.manualFields?.length||target.manualFields?.length||content.publicationMode!=='state_change'||content.actions.length!==1||!target.actions.length)return;
  const incoming=content.actions[0],batch=incoming.kind==='banked_reset'&&bankedProgress(primary.text)&&bankedSeriesContext(primary,evidence).length;
- if(!batch&&target.actions.length!==1||batch&&target.actions.some(action=>action.kind!=='banked_reset'||action.scope!=='public'||action.stage==='cancelled'||normalizedEligibility(action.eligibility)!==normalizedEligibility(incoming.eligibility)))return;
- const previous=matchingBenefitActions(incoming,target.actions)[0]??target.actions[0];
- if(incoming.kind!==previous.kind||incoming.scope!=='public'||previous.scope!=='public'||previous.stage==='cancelled'||normalizedEligibility(incoming.eligibility)!==normalizedEligibility(previous.eligibility)||![incoming.statementAt,previous.statementAt,primary.publishedAt].every(value=>Number.isFinite(Date.parse(value)))||!batch&&Date.parse(incoming.statementAt)<Date.parse(previous.statementAt))return;
+ const matches=matchingBenefitActions(incoming,target.actions);
+ const repeated=!batch&&target.actions.length>1&&matches.length===1&&['promised','in_progress'].includes(matches[0].stage)&&target.actions.filter(action=>['promised','in_progress'].includes(action.stage)).length===1&&target.actions.every(action=>action.kind===incoming.kind&&action.scope==='public'&&action.stage!=='cancelled');
+ if(!batch&&target.actions.length!==1&&!repeated||batch&&target.actions.some(action=>action.kind!=='banked_reset'||action.scope!=='public'||action.stage==='cancelled'||normalizedEligibility(action.eligibility)!==normalizedEligibility(incoming.eligibility)))return;
+ const previous=matches[0]??target.actions[0];
+ const sameAudience=normalizedEligibility(incoming.eligibility)===normalizedEligibility(previous.eligibility);
+ if(incoming.kind!==previous.kind||incoming.scope!=='public'||previous.scope!=='public'||previous.stage==='cancelled'||!sameAudience||![incoming.statementAt,previous.statementAt,primary.publishedAt].every(value=>Number.isFinite(Date.parse(value)))||!batch&&Date.parse(incoming.statementAt)<Date.parse(previous.statementAt))return;
  const context=gatherEvidenceContext(primary,evidence),lineage=gatherExplicitEvidenceContext(primary,evidence);
  const referent=lineage.findIndex((item,index)=>index>0&&hasCompleteContext(item,context)&&directEvidenceBenefitClaims(item,context).length>0);
  // Equivalent source versions are not ancestors. A complete typed referent

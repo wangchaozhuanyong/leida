@@ -111,3 +111,13 @@ test('fractional archive timestamps of one original do not archive an equivalent
  assert.equal(partitionAutomaticActions({...draft,actions:[{...incoming,eligibility:'部分账户'}]},event,[exact,copy]).stale.length,1);
  assert.equal(partitionAutomaticActions(draft,{...event,actions:[{...old,statementAt:old.statementAt.replace('.068Z','.000Z').replace('00:43:20','00:43:22')}]},[exact,copy]).stale.length,1);
 });
+
+for(const kind of ['automatic_reset','banked_reset'] as const)test('same-kind occurrence source identity stays local to each record: '+kind,()=>{
+ const data=fixture();
+ for(const p of data.publications)for(const a of p.event.actions)a.kind=kind;
+ for(const e of data.events)for(const a of e.actions)a.kind=kind;
+ const pairs=publicActions(data).map(x=>[x.action.statementAt,x.publication.id]).sort();
+ assert.deepEqual(pairs,[[first,'pub-first'],[second,'pub-second']].sort());
+ assert.deepEqual(m.publicActions(data).map((x:any)=>[x.action.statementAt,x.publication.id]).sort(),pairs);
+ for(const id of ['pub-first','pub-second']){assert.equal(m.resolveDetail(data,{publicationId:id}).isOld,false);assert.equal(publicationActions(data.publications.find(p=>p.id===id)!).length,1);}
+});
