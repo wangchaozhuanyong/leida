@@ -1,7 +1,7 @@
 import type { PublicData } from '@/lib/types';
 import { actionLabels, fullTime, stageLabels } from '@/lib/labels';
 import { isNewsOnly } from '@/lib/public-facts';
-import { publicArticleSummary } from '@/lib/public-content';
+import { publicArticleTitle, publicArticleSummary } from '@/lib/public-content';
 import { isLocalShareUrl } from '@/lib/share';
 import { activityPublicationUrl, ActivityShareError, resolveActivityShare, type ActivityDayShare, type ActivityShareReady } from '@/lib/activity-share';
 import { qrSvg } from './share-qr';
@@ -60,7 +60,7 @@ export function activityPosterSvg(model:ResolvedActivityPoster,name:string,share
     content.push(`<path d="M60 ${y-10}H840" stroke="#3f494a"/>`);y+=26;
     text(`第${index+1}条 · 来源发布 ${fullTime(item.sourceTime)} 北京时间`,22,'#adb4b7',500,2);
     text(`${publication.article.historical?'历史收录 · ':''}${newsOnly?'来源消息':'公开公告'}`,22,newsOnly?'#adb4b7':'#f4c15c',500,2);
-    let truncated=text(publication.article.title,31,'#eceeea',600,4);
+    let truncated=text(publicArticleTitle(publication.article),31,'#eceeea',600,4);
     truncated=text(publicArticleSummary(publication.article),25,'#c4c9c8',400,4)||truncated;
     if(newsOnly)text('发放状态请查看对应重置消息。',22,'#adb4b7',400,2);
     else if(publication.event.actions.length){

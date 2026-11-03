@@ -71,12 +71,21 @@ test('23和24日的多来源合列但不能跨日合并；16天待核对、17天
  assert.equal(activity.days[15].label,'待核对');assert.equal(activity.days[16].label,'重置预告');assert.equal(activity.days[17].label,'重置');assert.equal(activity.days[18].label,'重置');
 });
 
-test('同一来源同日两条独立记录和两次明确完成不能被一天一次规则抹掉',()=>{
+test('同日多条观测合为日期摘要，原始报告、独立计时和两次明确完成仍保留',()=>{
  const data=fixture();add(data,'limits','2026-10-26T06:08:00.000Z');add(data,'limits','2026-10-26T08:08:00.000Z');
- assert.equal(observationDayGroups(data).length,2);assert.equal(recordCalendar(data).recentTotal,2);
+ assert.equal(observationDayGroups(data).length,1);assert.equal(recordCalendar(data).recentTotal,1);
+ assert.equal(observationSources(data).length,2);assert.equal(observationDayGroups(data)[0].sources.length,2);
+ assert.equal(observationDayGroups(data,undefined,{separateSourceTimes:true}).length,2);
  add(data,'archive','2026-10-26T08:08:00.000Z');
- assert.equal(observationDayGroups(data).length,2);assert.equal(recordCalendar(data).recentTotal,2);
+ const before=structuredClone(data),calendar=recordCalendar(data);
+ assert.equal(observationDayGroups(data).length,1);assert.equal(calendar.recentTotal,1);
+ assert.equal(calendar.observationEvidenceCount,3);assert.equal(calendar.observedDateCount,1);
+ assert.deepEqual(calendar.selectedItems[0].sources.map((s:any)=>s.at),['2026-10-26T06:08:00.000Z','2026-10-26T08:08:00.000Z','2026-10-26T08:08:00.000Z']);
+ assert.equal(calendar.selectedItems[0].timeLabel,'最早观测');assert.equal(calendar.selectedItems[0].timeRange,'14:08–16:08');
+ assert.equal(calendar.selectedItems[0].title,'当日额度重置观测');assert.equal(calendar.selectedItems[0].recordTitle,'额度重置观测');
  assert.equal(selectedHomeStatus(data,'automatic_reset').hero.timeLabel,'观测时间');assert.equal(selectedHomeStatus(data,'automatic_reset').clockAt,'2026-10-26T08:08:00.000Z');
+ assert.equal(homeNewsGroups(data).length,1);assert.equal(homeNewsGroups(data)[0].observation.evidenceCount,3);
+ assert.deepEqual(data,before);
  const complete=fixture();publish(complete,'first','2026-10-26T03:00:00.000Z',undefined,[action('first','2026-10-26T03:00:00.000Z')]);publish(complete,'second','2026-10-26T09:00:00.000Z',undefined,[action('second','2026-10-26T09:00:00.000Z')]);
  assert.equal(recordCalendar(complete).confirmedCount,2);assert.equal(recordCalendar(complete).recentTotal,2);
 });

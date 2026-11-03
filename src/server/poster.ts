@@ -1,4 +1,4 @@
-import { publicArticleSummary, publicEligibility } from '@/lib/public-content';
+import { publicArticleTitle, publicArticleSummary, publicEligibility } from '@/lib/public-content';
 import type { Publication } from '@/lib/types';
 import { fullTime, actionLabels, stageLabels } from '@/lib/labels';
 import { isLocalShareUrl } from '@/lib/share';
@@ -33,7 +33,7 @@ export function posterSvg(publication: Publication, name: string, shareUrl?: str
   text(`${publication.article.historical?'历史收录':'公开资料'}`, 23, '#adb4b7');
   if(publication.article.sourcePublishedAt)text(`来源发布：${fullTime(publication.article.sourcePublishedAt)} 北京时间`,23,'#adb4b7');
   y += 12;
-  text(publication.article.title, 44, '#eceeea', 650);
+  text(publicArticleTitle(publication.article), 44, '#eceeea', 650);
   y += 15;
   text(publicArticleSummary(publication.article), 27);
   for (const action of actions) {

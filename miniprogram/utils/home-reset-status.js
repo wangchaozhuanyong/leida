@@ -159,7 +159,7 @@ function homeResetStatus(data, now=data.serverTime) {
     const kind=base.kind,rounds=roundsFor(input,kind,now),assigned=assignObservations(rounds,observations.filter(o=>o.kind===kind));
     // A late report from another source must not create a second occurrence or
     // restart the clock. Unlinked evidence stays a clearly labelled date summary.
-    const summarize=rows=>observationDayGroups(input,rows).map(g=>({...g.observations[0],...(g.isObservationSummary?{displaySummary:g}:{})}));
+    const summarize=rows=>observationDayGroups(input,rows,{separateSourceTimes:true}).map(g=>({...g.observations[0],...(g.isObservationSummary?{displaySummary:g}:{})}));
     const {assignments}=assigned,independent=summarize(assigned.independent),unassigned=summarize(assigned.unassigned);
     const record=kind==='banked_reset'?states.lastCard:states.lastReset;
     const resolution=rounds.filter(r=>['claimed_complete','cancelled'].includes(r.stage))
