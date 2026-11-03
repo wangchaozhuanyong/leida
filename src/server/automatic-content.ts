@@ -42,7 +42,10 @@ export function evidenceFingerprint(evidence:Evidence[],semanticVersion?:number)
   // even when the upstream text is unchanged. Keep other fact rules untouched.
   const observation=evidence[0]&&observedEvidence(evidence[0],evidence[0].collectedAt);
   const semantic=semanticVersion!==undefined&&needsSemanticReview(buildAutomaticTemplate(evidence),evidence)?`-semantic-${semanticVersion}`:'';
-  return `${AUTOMATIC_RULES_VERSION}${semantic}${observation?'-observation-template-2':''}${evidence[0]&&attributedActivityExcerpt(evidence[0])?'-activity-attribution-1':''}${evidence[0]&&originalProductSummary(evidence[0],evidence)?'-original-product-1':''}:${inputs}`;
+  // Only affected originals need a new generation when their raw bytes did not
+  // change. Existing human, parent-conflict and source-pause gates still apply.
+  const transport=evidence.some(item=>item.textOrigin==='original'&&/&(?:amp|#0*38|#x0*26);/i.test(item.text))?'-original-amp-1':'';
+  return `${AUTOMATIC_RULES_VERSION}${semantic}${transport}${observation?'-observation-template-2':''}${evidence[0]&&attributedActivityExcerpt(evidence[0])?'-activity-attribution-1':''}${evidence[0]&&originalProductSummary(evidence[0],evidence)?'-original-product-1':''}:${inputs}`;
 }
 
 export function classifyBlockers(reasons:string[],evidence:Evidence[]):CandidateAutomation {

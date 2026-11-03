@@ -240,7 +240,7 @@ function publicationCard(data, publication) {
   const withdrawn = publicationWithdrawn(data, publication);
   const kinds = [...new Set(actions.map(action => actionLabels[action.kind]))].join('＋');
   return {
-    id: publication.id, path: sharePath(publication), title: publication.article.title, summary: publicArticleSummary(publication.article), reviewStatus: publication.article.reviewStatus || '', reviewReasons: publicReviewMessage(publication.article),
+    id: publication.id, path: sharePath(publication), title: publicArticleTitle(publication.article), summary: publicArticleSummary(publication.article), reviewStatus: publication.article.reviewStatus || '', reviewReasons: publicReviewMessage(publication.article),
     time: displayTime(publicationSourceTime(publication)), historical: isHistoricalArticle(publication.article, data.evidence),
     label: withdrawn ? '已撤回' : isNewsOnly(publication) ? '来源消息' : kinds || (publication.article.category === 'activity' ? '活动动态' : '产品更新'),
     note: withdrawn ? '已撤回，不能作为当前发放依据' : isNewsOnly(publication) ? '具体安排以发布方公告为准' : '公开公告',
@@ -265,9 +265,15 @@ function calendarModel(data, selected) {
 function noticeModel(data, preferences, read) {
   return data.notices.filter(notice => notice.status === 'active' && notice.origin === 'admin').sort((a, b) => Number(b.pinned === true) - Number(a.pinned === true) || Date.parse(b.createdAt) - Date.parse(a.createdAt) || a.id.localeCompare(b.id)).map(notice => ({ ...notice, summary:publicNoticeSummary(notice, data.publications), time: displayTime(notice.createdAt), read: read.includes(notice.id), path: data.publications.some(item => item.id === notice.publicationId) ? `/pages/detail/index?publicationId=${encodeURIComponent(notice.publicationId)}` : '', missing: notice.origin !== 'admin' && !data.publications.some(item => item.id === notice.publicationId) }));
 }
+function publicArticleTitle(article) {
+  if (article.contentOrigin !== 'template' || article.manualFields?.includes('title')) return article.title;
+  return article.title.replace(/^公开归档收录重置相关动态$/, '重置相关消息')
+    .replace(/^公开归档收录产品动态$/, '产品更新').replace(/^活动归档：/, '');
+}
 /** Public reading copy; ingestion metadata remains unchanged in the stored article. */
 function publicArticleSummary(article) {
   if (article.contentOrigin !== 'template' || article.manualFields?.includes('summary')) return article.summary;
+  let accountNoteShown = false;
   return article.summary
     .replace(/^AIPlanWatch 将对应原帖记录为公共额度重置；原帖仅为简短完成表达，福利类型采用参考项目分类，未虚构回复关系。/, 'AIPlanWatch 已收录本次额度重置完成消息。')
     .replace(/原文承诺日终前完成，预计最晚时间已换算为北京时间（UTC\+8）；(?:按原文PST字面UTC-8换算，未自行改用当地夏令时；)?这是公告预计时间，仍待实际确认。/g, '预计为最晚时间，以实际发放为准。')
@@ -282,10 +288,25 @@ function publicArticleSummary(article) {
     .replace(/个人账户是否到账尚未观测。/g, '实际到账以账户显示为准。')
     .replace(/^辅助归档将此条列为第 \d+ 天(?:产品动态|重置相关消息)。归档摘录：“([\s\S]*)”。(这是来源消息，完整细节以原帖为准。|仅记录消息，不据此认定已完成；具体福利、时间和完成情况仍需核对。)$/, (_, excerpt, note) => excerpt + (note.startsWith('仅记录') ? ' 具体发放安排待确认。' : ''))
     .replace(/^已保存公开来源消息。活动简写已收录；套餐资格和具体发放安排仍需后续声明核对。此条不计入已重置、已发卡或预测准确率；请查看原文依据。$/, '发布方提及后续活动，具体安排仍待明确。')
+    .replace(/^已保存公开来源消息。[\s\S]*?此条不计入已重置、已发卡或预测准确率；请查看原文依据。$/, '这条消息提及重置，具体安排和完成情况待确认。')
+    .replace(/^公开归档收录消息：[“「]([\s\S]*?)[”」]。此条仅作消息记录，福利类型、资格或对应轮次尚待确认。$/, '$1')
+    .replace(/^参考项目记录了公共额度重置，等待核对原文。$/, '来源提及额度重置，具体安排待确认。')
+    .replace(/^公开归档已安排用量重置，/, '来源提及额度重置，')
+    .replace(/；原帖内容待核对。/g, '；发放情况待确认。')
+    .replace(/，适用对象：适用范围未说明。/g, '。适用范围以原文为准。')
+    .replace(/（原帖未列明具体套餐(?:及到账资格)?）/g, '（具体资格以原文为准）')
     .replace('已保存发布说明；完整中文改动会在智能服务可用后自动补充。', '更新细节请查看官方发布说明。')
     .replace(/^公开归档收录(?:产品动态|消息)：[“「]([\s\S]*?)[”」]。此条仅作(?:产品)?消息记录，完整细节请查看原文。$/, '$1')
     .replace(/根据(?:公开归档保存的原帖|公开原文)，/g, '')
     .replace(/\s*原文发布时间：[^。\n]*。这是中文事实摘要，/g, ' ')
+    .replace(/原文最晚期限：北京时间(?=\s*(?:(?:个人|实际)到账|$))/g, '预计为最晚时间，以实际发放为准。')
+    .replace(/原文预计时刻：并非最晚截止；北京时间(?=\s*(?:(?:个人|实际)到账|$))/g, '预计时间仅供参考，以实际发放为准。')
+    .replace(/(^|[。\n])北京时间(?=\s*(?:(?:个人|实际)到账|$))/g, '$1')
+    .replace(/(?:个人|实际)到账以账户显示为准。/g, () => {
+      if (accountNoteShown) return '';
+      accountNoteShown = true;
+      return '实际到账以账户显示为准。';
+    })
     .trim();
 }
 
@@ -303,7 +324,8 @@ function publicSourceNotes(article, actions = []) {
   return [...new Set([reference, publicReviewMessage(article), ...timeNotes].filter(Boolean))];
 }
 function publicEligibility(action) {
-  return action.eligibility.replace(/^公开额度重置（依据 AIPlanWatch 分类，适用套餐以原公告为准）$/, '暂未明确').trim() || '暂未明确';
+  return action.eligibility.replace(/^公开额度重置（依据 AIPlanWatch 分类，适用套餐以原公告为准）$/, '暂未明确')
+    .replace(/^适用范围未说明$/, '暂未明确').replace(/（原帖未列明具体套餐(?:及到账资格)?）/g, '（具体资格以原文为准）').trim() || '暂未明确';
 }
 function publicNoticeSummary(notice, publications = []) {
   const publication = publications.find(p => p.id === notice.publicationId);
@@ -338,14 +360,14 @@ function resolveDetail(data, query) {
   const evidence = uniqueDisplayEvidence(data.evidence.filter(item => ids.has(item.id))
     .sort((a,b) => priority(b) - priority(a) || Date.parse(b.publishedAt) - Date.parse(a.publishedAt) || Number(b.provenance === 'official') - Number(a.provenance === 'official')));
   return {
-    missing: false, publicationId: publication.id, title: publication.article.title, ...publicArticleContent(publication.article), reviewStatus: publication.article.reviewStatus || '', reviewReasons: publicReviewMessage(publication.article),
+    missing: false, publicationId: publication.id, title: publicArticleTitle(publication.article), ...publicArticleContent(publication.article), reviewStatus: publication.article.reviewStatus || '', reviewReasons: publicReviewMessage(publication.article),
     time: displayTime(articleSourceTime(publication.article)),
     historical: isHistoricalArticle(publication.article, data.evidence), newsOnly, withdrawn, merged, isOld, observationSourceUpdate,
     version: newsOnly ? publication.article.version : publication.event.version, cutoff: displayTime(publication.cutoffAt), publishedAt: displayTime(publication.publishedAt),
     canShare: !withdrawn && !merged, mergePath: targetPublication ? sharePath(targetPublication) : '', latestPath: !merged && isOld && current ? sharePath(current) : '',
     actions: newsOnly ? [] : publicationActions(publication).map(action => ({ id: action.id, label: actionLabels[action.kind], stage: stageText(action, isOld || merged ? publication.cutoffAt : data.serverTime), eligibility: publicEligibility(action), scope: { public: '普发', targeted: '定向', private: '私人' }[action.scope], expectedAt: action.expectedAt ? displayTime(action.expectedAt) : '暂未明确', quote: action.evidenceQuote || '' })),
     sourceNotes: publicSourceNotes(publication.article, newsOnly ? [] : publication.event.actions),
-    updates: (publicNewsGroups(data).find(group=>group.updates.some(p=>p.id===publication.id))?.updates || []).filter(p=>p.id!==publication.id).map(p=>({id:p.id,title:p.article.title,time:displayTime(publicationSourceTime(p)),path:sharePath(p)})),
+    updates: (publicNewsGroups(data).find(group=>group.updates.some(p=>p.id===publication.id))?.updates || []).filter(p=>p.id!==publication.id).map(p=>({id:p.id,title:publicArticleTitle(p.article),time:displayTime(publicationSourceTime(p)),path:sharePath(p)})),
     evidence: evidence.map(item => {
       const observation=observedEvidence(item,item.collectedAt);
       return {id:item.id,name:observation?.sourceName||(data.sources.find(source=>source.id===item.sourceId)?.name||'原文记录').replace('（辅助来源）','').replace('（免费）',''),label:observation?'来源观测':{official:'官方原文',archive:'第三方收录',manual:'补充来源'}[item.provenance],text:item.text,origin:observation?'第三方观测，实际额度以账户显示为准。':item.textOrigin==='archive_excerpt'?'仅收录原文片段':item.textOrigin==='structured'?'来源摘要':'',complete:item.contextComplete,observed:!!observation,time:displayTime(item.publishedAt),url:observation?.sourceUrl||safeUrl(item.url)||'',referenceUrl:observation?.referenceUrl||''};
@@ -429,7 +451,7 @@ function activityModel(data, id, day) {
   }
   // A public reset need not be linked to the campaign article. Place its fact
   // on the activity-local date, using statement/observation time, not collection.
-  const resetFacts=resetRecordFacts(data,completedBenefits(data)).map(fact=>({...fact,
+  const resetFacts=resetRecordFacts(data,completedBenefits(data),{separateSourceTimes:true}).map(fact=>({...fact,
     stage:fact.evidenceType==='confirmed'?'发布者完成声明':fact.statusLabel,
     timeLabel:fact.evidenceType==='confirmed'?'声明时间':fact.isObservationSummary&&fact.summaryScope==='date'?'最早观测':'观测时间'}));
   for(const fact of resetFacts){
@@ -624,4 +646,4 @@ function forecastOutcomeModel(snapshot, data) {
   });
   return { available: true, entries, message: entries.length ? '按后续观测时间排列，最新记录在前。' : '尚无已关联的后续记录；不代表没有公告或不会发放。', note };
 }
-module.exports = { publicNewsGroups, homeNewsGroups, publicSourceNotes, publicEligibility, publicReviewMessage, publicNoticeSummary,referenceCadenceView, publicArticleSummary, publicArticleContent, sourceStatus, actionLabels, recentCompletedBenefits, preferenceDefaults, dateKey, displayTime, elapsed, completionTime, latestCompletedBenefits, completionElapsed, articleSourceTime, sortedArticles, isNewsOnly, currentPublication, statePublication, publicationSourceTime, sortedPublications, sortedStatePublications, publicActions, isHistoricalArticle, publicationActions, upcomingActions, announcementCountdown, resetOutlookModel, stageText, calendarDays, safeUrl, sharePath, publicationWithdrawn, publicationCard, calendarModel, noticeModel, resolveDetail, activityDayNumber, activityHomeVisible, activityModel, validateForecastSnapshot, validateForecastPublicData, validateResetWatch, activeResetWatch, activeResetSchedule, resetWatchWindow, probabilityText, forecastPath, forecastSnapshotModel, currentForecast, forecastReferenceModel, forecastOutcomeModel };
+module.exports = { publicNewsGroups, homeNewsGroups, publicSourceNotes, publicEligibility, publicReviewMessage, publicNoticeSummary,referenceCadenceView, publicArticleTitle, publicArticleSummary, publicArticleContent, sourceStatus, actionLabels, recentCompletedBenefits, preferenceDefaults, dateKey, displayTime, elapsed, completionTime, latestCompletedBenefits, completionElapsed, articleSourceTime, sortedArticles, isNewsOnly, currentPublication, statePublication, publicationSourceTime, sortedPublications, sortedStatePublications, publicActions, isHistoricalArticle, publicationActions, upcomingActions, announcementCountdown, resetOutlookModel, stageText, calendarDays, safeUrl, sharePath, publicationWithdrawn, publicationCard, calendarModel, noticeModel, resolveDetail, activityDayNumber, activityHomeVisible, activityModel, validateForecastSnapshot, validateForecastPublicData, validateResetWatch, activeResetWatch, activeResetSchedule, resetWatchWindow, probabilityText, forecastPath, forecastSnapshotModel, currentForecast, forecastReferenceModel, forecastOutcomeModel };

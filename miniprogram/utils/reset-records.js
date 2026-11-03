@@ -14,22 +14,23 @@ function observationSources(data) {
 /** A date summary is NOT a claim that all reports prove exactly one reset round.
  * Proven separate completion actions remain separate. No proximity heuristic is used.
  * @param {Facts} data @param {Observation[]} [observations]
+ * @param {{separateSourceTimes?:boolean}} [options] Clock selection retains separate possible occurrences.
  */
-function observationDayGroups(data, observations = observationSources(data)) {
+function observationDayGroups(data, observations = observationSources(data), options = {}) {
   /** @type {Map<string, Observation[]>} */
   const groups = new Map();
   for (const o of observations) {
     const key = o.kind + ':' + beijingDate(o.observedAt);
     groups.set(key, [...(groups.get(key)||[]), o]);
   }
-  // Multiple distinct entries from the SAME source may describe separate rounds.
-  // Do not erase them with a one-reset-per-day rule, or guess which other source
-  // belongs to which round. Only exact-time peers can share those entries.
+  // Reading lists summarize a date, without claiming one or several occurrences.
+  // Clock selection still separates possible rounds from the SAME source. All
+  // original observations and times remain available in either projection.
   /** @type {[string, Observation[]][]} */
   const partitions=[...groups].flatMap(([key,rows])=>{
     const counts=new Map();
     for(const o of rows)counts.set(o.sourceId,(counts.get(o.sourceId)||0)+1);
-    if(![...counts.values()].some(n=>n>1))return [[key,rows]];
+    if(!options.separateSourceTimes||![...counts.values()].some(n=>n>1))return [[key,rows]];
     const times=new Map();
     for(const o of rows)times.set(o.observedAt,[...(times.get(o.observedAt)||[]),o]);
     return [...times].map(([at,items])=>[key+':'+at,items]);
@@ -46,7 +47,7 @@ function observationDayGroups(data, observations = observationSources(data)) {
       publication,observations:sorted,sourceCount:sourceNames.length,evidenceCount:sorted.length,sourceName:sourceNames.join('、'),
       evidenceType:'observed',statusLabel:'来源观测',isObservationSummary:multi,summaryScope,
       timeRange:times.length>1?times[0]+'–'+times[times.length-1]:times[0],
-      title:multi?'额度已重置（观测）':publication?.article.title||'额度重置观测',
+      title:multi?'当日额度重置观测':'额度重置观测',
       summary:multi?`来源：${sourceNames.join('、')}。最早观测 ${beijingTime(first.observedAt)}（北京时间）。`:'',
       sources:sorted.map(o=>({id:o.evidenceId,title:o.sourceName,time:beijingDate(o.observedAt)+' '+beijingTime(o.observedAt),at:o.observedAt,publicationId:o.publicationId,path:'/pages/detail/index?publicationId='+encodeURIComponent(o.publicationId)}))}];
   }).sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)||a.id.localeCompare(b.id));
@@ -55,8 +56,9 @@ function observationDayGroups(data, observations = observationSources(data)) {
  * not extra completed actions. Directly cited observations attach to their completion.
  * @param {Facts} data
  * @param {{action:import('../../src/lib/types').BenefitAction,publication:import('../../src/lib/types').Publication}[]} completed
+ * @param {{separateSourceTimes?:boolean}} [options]
  */
-function resetRecordFacts(data, completed) {
+function resetRecordFacts(data, completed, options = {}) {
   const observations = observationSources(data), consumed = new Set();
   const confirmed = completed.map(({action, publication})=>{
     const cited = observations.filter(o=>o.kind===action.kind && action.evidenceIds.includes(o.evidenceId));
@@ -64,7 +66,7 @@ function resetRecordFacts(data, completed) {
     return {id:action.id,kind:action.kind,at:action.statementAt,publication,evidenceType:'confirmed',statusLabel:'完成确认',sourceName:'',isObservationSummary:false,
       observedUntil:'',sourceCount:0,evidenceCount:0,timeRange:'',summary:'',summaryScope:'',title:publication.article.title,sources:[]};
   });
-  return [...confirmed,...observationDayGroups(data,observations.filter(o=>!consumed.has(observationKey(o))))]
+  return [...confirmed,...observationDayGroups(data,observations.filter(o=>!consumed.has(observationKey(o))),options)]
     .sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)||a.id.localeCompare(b.id));
 }
 module.exports = { observationSources, observationDayGroups, resetRecordFacts };

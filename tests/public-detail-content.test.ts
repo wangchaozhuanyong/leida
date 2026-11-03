@@ -8,6 +8,7 @@ import { SearchParamsContext } from 'next/dist/shared/lib/hooks-client-context.s
 import type { Article, Evidence, PublicData, Publication } from '../src/lib/types';
 import { publicArticleContent } from '../src/components/public/model';
 import { ArticlePage, EventPage, EvidencePage } from '../src/components/public/PublicApp';
+import { publicArticleTitle, publicArticleSummary } from '../src/lib/public-content';
 
 const time = '2026-10-16T01:00:00.000Z';
 const article: Article = { id: 'a', eventId: 'e', publicationId: 'p', title: '公告标题', summary: '额度提高至 20 次。', translation: '', category: 'reset', version: 1, status: 'published', evidenceIds: ['source'], publishedAt: time, updatedAt: time, contentOrigin: 'template' };
@@ -113,4 +114,42 @@ test('网页、小程序卡片及公告海报使用相同客户摘要，内部�
   const image=posterSvg(p,'测试雷达');assert.doesNotMatch(image,/根据公开归档保存的原帖|这是中文事实摘要/);assert.match(image,/额度提高至 20 次/);
   assert.equal(JSON.stringify(data),before);
   const manual=fixture({...data.articles[0],manualFields:['summary']});assert.equal(native.publicationCard(manual,manual.publications[0]).summary,manual.articles[0].summary);
+});
+
+test('既有模板的未知范围和重复到账说明统一整理，不改事实、时间或已保存版本',()=>{
+  const native=createRequire(import.meta.url)('../miniprogram/utils/model.js');
+  const data=fixture({summary:'重置卡公告称已完成，适用对象：适用范围未说明。发布者报告第 2/2 批重置卡已发放，本系列发放已结束；个人到账以账户显示为准。 实际到账以账户显示为准。'});
+  const before=structuredClone(data),summary=publicArticleSummary(data.articles[0]);
+  assert.equal(native.publicationCard(data,data.publications[0]).summary,summary);
+  assert.doesNotMatch(summary,/适用对象：适用范围未说明|个人到账/);
+  assert.match(summary,/第 2\/2 批/);assert.match(summary,/适用范围以原文为准/);
+  assert.equal(summary.match(/实际到账以账户显示为准/g)?.length,1);
+  const archive=fixture({title:'公开归档收录重置相关动态',summary:'公开归档收录消息：“公开归档已安排用量重置，预计最晚2026/10/25 15:00:00（北京时间）；原帖内容待核对。”。此条仅作消息记录，福利类型、资格或对应轮次尚待确认。'});
+  const card=native.publicationCard(archive,archive.publications[0]);
+  assert.equal(card.title,'重置相关消息');assert.equal(card.title,publicArticleTitle(archive.articles[0]));
+  assert.equal(card.summary,publicArticleSummary(archive.articles[0]));
+  assert.match(card.summary,/预计最晚2026\/10\/25 15:00:00（北京时间）/);assert.match(card.summary,/发放情况待确认/);
+  assert.doesNotMatch(card.summary,/公开归档|原帖内容待核对|福利类型、资格或对应轮次/);
+  for(const html of [renderArticle(archive),renderEvent(archive)])assert.doesNotMatch(html,/公开归档收录重置相关动态/);
+  const poster=createRequire(import.meta.url)('../miniprogram/utils/poster.js').posterInput(archive,'p');
+  assert.equal(poster.title,card.title);assert.equal(poster.summary,card.summary);
+  assert.deepEqual(data,before);
+});
+
+test('待确认的旧消息保持待确认，手工修改的标题摘要与原文保持原样',()=>{
+  const native=createRequire(import.meta.url)('../miniprogram/utils/model.js');
+  const data=fixture({reviewStatus:'pending',summary:'已保存公开来源消息。保存的正文为摘要或存在截断，等待完整原文。此条不计入已重置、已发卡或预测准确率；请查看原文依据。'});
+  assert.equal(publicArticleSummary(data.articles[0]),'这条消息提及重置，具体安排和完成情况待确认。');
+  assert.equal(native.publicationCard(data,data.publications[0]).summary,publicArticleSummary(data.articles[0]));
+  assert.equal(data.articles[0].reviewStatus,'pending');
+  for(const [note,expected] of [['原文最晚期限：北京时间','预计为最晚时间，以实际发放为准。'],['原文预计时刻：并非最晚截止；北京时间','预计时间仅供参考，以实际发放为准。']]){
+    const item={...article,summary:`预计时间：2026/10/24 02:00:00（北京时间）。${note} 实际到账以账户显示为准。`};
+    assert.match(publicArticleSummary(item),/2026\/10\/24 02:00:00（北京时间）/);assert.ok(publicArticleSummary(item).includes(expected));
+    assert.equal(native.publicArticleSummary(item),publicArticleSummary(item));
+  }
+  for(const contentOrigin of ['generated',undefined] as const){const item={...data.articles[0],contentOrigin,title:'公开归档收录重置相关动态'};assert.equal(publicArticleSummary(item),item.summary);assert.equal(publicArticleTitle(item),item.title);}
+  const item:Article={...data.articles[0],title:'公开归档收录重置相关动态',manualFields:['summary','title']};
+  assert.equal(publicArticleSummary(item),item.summary);assert.equal(publicArticleTitle(item),item.title);
+  assert.equal(native.publicArticleSummary(item),item.summary);assert.equal(native.publicArticleTitle(item),item.title);
+  assert.equal(data.evidence[0].text,evidence.text);
 });

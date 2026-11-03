@@ -66,7 +66,7 @@ function recordCalendar(data, options = {}) {
   const present = ({ id,kind,at,publication,evidenceType,statusLabel,sourceName,isObservationSummary,sources,sourceCount,evidenceCount,timeRange,title,summaryScope }) => ({ id, kind,
     label: kind==='banked_reset'?'重置卡':'额度重置', title, time: displayTime(at).slice(11), timeRange,at,evidenceType,statusLabel,sourceName,isObservationSummary,sources,sourceCount,evidenceCount,
     date: displayTime(at).slice(0,10),
-    recordTitle:kind==='banked_reset'?'重置卡发放':isObservationSummary?'额度重置观测':'额度重置',timeLabel:evidenceType==='observed'?isObservationSummary&&summaryScope==='date'?'最早观测':'观测时间':'声明时间',
+    recordTitle:kind==='banked_reset'?'重置卡发放':evidenceType==='observed'?'额度重置观测':'额度重置',timeLabel:evidenceType==='observed'?isObservationSummary&&summaryScope==='date'?'最早观测':'观测时间':'声明时间',
     path: `/pages/detail/index?publicationId=${encodeURIComponent(publication.id)}`,
     href: `/events/${encodeURIComponent(publication.eventId)}?version=${encodeURIComponent(publication.id)}` });
   const selectedItems = (byDate.get(selected) || []).map(present);

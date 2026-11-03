@@ -4,6 +4,25 @@ import {extractBenefitClaims} from '../src/server/benefit-rules';
 import {publicHistoryEvidence,refreshHistoryOriginalContext} from '../src/lib/reset-history-candidates';
 import {evidenceBenefitClaims,gatherEvidenceContext,hasStandaloneContext,originalConflict} from '../src/server/source-context';
 import type {Evidence} from '../src/lib/types';
+import {buildAutomaticTemplate,evidenceFingerprint} from '../src/server/automatic-content';
+import {validateDraft} from '../src/server/domain';
+
+test('同一原帖的与号转义不制造冲突，原文、资格与不同期限仍受保护',()=>{
+ const text='We have reset usage limits for all paid Codex users. Plus & Pro are included.';
+ const original:Evidence={id:'amp-original',sourceId:'tibo-public',messageId:'2115273064481218829',url:'https://x.com/thsottiaux/status/2115273064481218829',text,publishedAt:'2026-10-28T02:42:53.000Z',collectedAt:'2026-11-03T15:00:00.000Z',hash:'',provenance:'archive',textOrigin:'original',contextComplete:true,historical:true};
+ for(const escape of ['&amp;','&#38;','&#x26;']){
+  const copy={...original,id:'amp-copy',sourceId:'reset-archive',text:text.replace('&',escape)},before=structuredClone([original,copy]);
+  assert.equal(originalConflict(original,[original,copy]),false);
+  assert.match(evidenceFingerprint([original,copy]),/-original-amp-1:/);
+  assert.doesNotMatch(evidenceFingerprint([original]),/-original-amp-1/);
+  assert.equal(evidenceFingerprint([original,copy]),evidenceFingerprint([original,copy]));
+  const context=gatherEvidenceContext(original,[original,copy]),draft=buildAutomaticTemplate(context)!;
+  assert.ok(draft.actions.some(a=>a.kind==='automatic_reset'&&a.stage==='claimed_complete'));
+  assert.deepEqual(validateDraft(draft,context,true),[]);assert.deepEqual([original,copy],before);
+  for(const modified of [copy.text.replace('all paid','selected paid'),copy.text+' Another reset will happen in six hours.',copy.text.replace('Pro','Business')])assert.equal(originalConflict(original,[original,{...copy,text:modified}]),true);
+  assert.equal(originalConflict({...original,parentId:'1'},[original,{...copy,parentId:'2'}]),true);
+ }
+});
 
 test('同一原帖的图片链接表现差异不构成正文冲突，事实与父帖差异仍受保护',()=>{
  const common={sourceId:'tibo-public',messageId:'2078320950488297917',url:'https://x.com/thsottiaux/status/2078320950488297917',publishedAt:'2026-07-18T03:28:22Z',collectedAt:'2026-10-17T12:18:00Z',hash:'',historical:true,provenance:'archive',textOrigin:'original',contextComplete:true} as const;
