@@ -9,6 +9,25 @@ export function publicationUrl(origin: string, publication: Pick<Publication, 'e
   return url.href;
 }
 
+/** A grouped source observation opens its date, while a single publication opens its fixed version. */
+export function statusShareUrl(origin: string, publications: Publication[], snapshot: {publicationId?: string; sharePath: string}): string {
+  const item = publications.find(publication => publication.id === snapshot.publicationId);
+  if (item) return publicationUrl(origin, item);
+  const url = new URL('/', origin);
+  const [page, params] = snapshot.sharePath.split('?');
+  if (page === '/pages/schedule/index') {
+    const query = new URLSearchParams(params);
+    const date = query.get('date');
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      url.pathname = '/history';
+      url.searchParams.set('date', date);
+      const kind = query.get('kind');
+      if (kind === 'automatic_reset' || kind === 'banked_reset') url.searchParams.set('target', kind === 'banked_reset' ? 'banked' : 'automatic');
+    }
+  }
+  return url.href;
+}
+
 export function isLocalShareUrl(value: string): boolean {
   const host = new URL(value).hostname.toLowerCase();
   return host === 'localhost' || host.endsWith('.localhost') || host === '[::1]' || host === '0.0.0.0' || /^127(?:\.\d{1,3}){3}$/.test(host);

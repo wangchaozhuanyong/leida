@@ -39,12 +39,6 @@ function homeOrbitPresentation(card, now) {
         description: card.state === 'revised' ? '公开安排已更新，按最新时间持续关注。' : '已有' + subject + '预告，正在持续关注。',
         footnote: '预计时间仅供参考，请以实际发放为准。' });
       break;
-    case 'cycle':
-      Object.assign(view,{title:'',label:'距离周期预计重置',badge:'7天周期推算',tone:'blue',parts:card.clockParts||[],metric:card.metric||'',symbol:'◷',timeLabel:'周期预计时间',description:card.clockEvidenceType==='observation'?'按最近一次来源观测时间加7天推算。':'按最近一次公开重置消息时间加7天计算。',footnote:'新预告或重置消息将及时更新，不代表个人账户保证到账时间。'});
-      break;
-    case 'cycle_due':
-      Object.assign(view,{title:'周期时间已到',label:'7天周期推算',badge:'完成情况待核对',tone:'amber',timeLabel:'周期预计时间',description:'暂未收到新的重置完成依据，持续关注。',footnote:'实际额度以账户显示为准。'});
-      break;
     case 'progress':
       Object.assign(view, { title: card.expectedAt?'':banked ? '重置卡正在发放' : '额度重置进行中', label: card.expectedAt?card.metricLabel:'收到公开进展', badge: '等待完成声明', tone: 'teal', parts:card.clockParts||[],metric:card.metric||'',
         description: '公开消息称已开始，正在持续核对完成消息。', footnote: '实际到账进度请查看个人账户。' });

@@ -99,13 +99,13 @@ test('固定海报十次切换和预览返回复用两张成品，撤回立即�
 });
 
 
-test('小程序完成满24小时切周期海报，不借历史文章制造当前扫码目标',()=>{
+test('小程序完成满24小时仍分享上次完成时长与对应记录，不生成周期预计时间',()=>{
   const data=fixture('claimed_complete');
   for(const event of [data.events[0],data.publications[0].event])event.actions[0].statementAt='2026-10-10T20:00:00Z';
   const input=native.statusPosterInput(data),snapshot=statusPosterSnapshot(data);
-  assert.equal(input.publicationId,'');assert.equal(input.codePublicationId,'');
-  assert.equal(input.value,'2天20小时0分钟');assert.equal(input.statementAt,'2026-10-17T20:00:00.000Z');assert.match(input.sourceLabel,/周期推算/);
-  assert.equal(snapshot.publicationId,'');assert.equal(snapshot.value,'等待下一次 Reset');
+  assert.equal(input.publicationId,'fixed-publication');assert.equal(input.codePublicationId,'fixed-publication');
+  assert.equal(input.value,'4天4小时0分钟');assert.equal(input.statementAt,'2026-10-10T20:00:00Z');assert.equal(input.sourceLabel,'依据：发布者公开完成声明');assert.doesNotMatch(input.title+input.label+input.sourceLabel,/周期/);
+  assert.equal(snapshot.publicationId,input.publicationId);assert.equal(snapshot.value,input.value);
   data.articles[0].status='withdrawn';assert.equal(native.statusPosterAvailable(input,data),false);
 });
 

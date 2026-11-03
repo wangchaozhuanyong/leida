@@ -1,3 +1,4 @@
+const {announcementNeedsReview}=require('./round-evidence');
 const m = require('./model');
 const { resetStateCards } = require('./reset-state-cards');
 const { observationDayGroups, observationSources } = require('./reset-records');
@@ -103,25 +104,6 @@ function completedCard(base, kind, round, observations, now) {
   }
   return card;
 }
-// The cycle is a display projection from a real reset, never a completion fact.
-function completionPhase(card, now) {
-  const at=millis(card.clockAt),current=millis(now),boundary=at+DAY;
-  if(current<boundary){card.validUntil=new Date(boundary).toISOString();return card;}
-  const previous={at:card.clockAt,publicationId:card.publicationId,evidenceType:card.evidenceType,clockEvidenceType:card.clockEvidenceType||card.evidenceType,sourceName:card.sourceName};
-  if(card.kind==='banked_reset'){
-    Object.assign(card,{state:'waiting',title:'等待下一次发卡预告',badge:'持续关注',completedDisplay:false,metric:'',clockParts:[],expectedAt:'',validUntil:'',evidenceType:'history',...dateFields(previous.at),timeLabel:'上次发卡消息时间',action:'查看历史记录'});
-    card.hero=homeOrbitPresentation(card,now);
-    Object.assign(card.hero,{title:card.title,description:'有新的发卡消息后及时更新。',timeLabel:card.timeLabel});
-  }else{
-    const due=at+7*DAY,reached=current>=due,expected=new Date(due).toISOString();
-    const parts=reached?[]:countdownParts(expected,now),units=parts.some(p=>p.unit==='天')?['天','小时','分钟']:['小时','分钟'];
-    Object.assign(card,{state:reached?'cycle_due':'cycle',title:reached?'周期时间已到':'距离周期预计重置',badge:'7天周期推算',completedDisplay:false,evidenceType:'cycle',expectedAt:expected,validUntil:reached?'':expected,
-      ...dateFields(expected),timeLabel:'周期预计时间',metric:reached?'':parts.map(p=>p.value+p.unit).join('')||'不足1分钟',clockParts:parts.length?units.map(unit=>({unit,value:String(parts.find(p=>p.unit===unit)?.value||0).padStart(2,'0')})):[],action:'查看历史记录'});
-    card.hero=homeOrbitPresentation(card,now);
-  }
-  card.previousCompletion=previous;
-  return card;
-}
 function pendingCard(base, round, now) {
   const time=millis(now),deadline=millis(round.expectedAt),timed=valid(round.expectedAt),overdue=timed&&time>=deadline;
   const expired=overdue&&time>=deadline+DAY;
@@ -161,7 +143,7 @@ function finalize(card, data) {
   card.shareTitle=(card.kind==='banked_reset'?'重置卡发放':'额度重置')+' · '+(card.hero.title||card.hero.label)+' · '+card.hero.badge;
   // Clock digits and collection time are intentionally excluded: a minute tick is not a new fact.
   card.revision=stateRevision(JSON.stringify([card.kind,card.roundKey,card.state,card.publicationId||'',card.timeAt||'',card.expectedAt||'',card.clockAt||'',card.declarationAt||'',card.hero.title,card.hero.badge,card.hero.description,card.hero.footnote,card.sourceName||'',card.sourceUrl||'',card.observationPublicationId||'',card.timeQualifier||'',card.oldTime||'']));
-  card.sharePath=(['cycle','history'].includes(card.evidenceType)?'/pages/home/index?':card.observationSummaryDate?'/pages/schedule/index?date='+card.observationSummaryDate+'&':card.publicationId?detailPath(card.publicationId)+'&':'/pages/home/index?')+'kind='+card.kind+'&revision='+card.revision;
+  card.sharePath=(card.observationSummaryDate?'/pages/schedule/index?date='+card.observationSummaryDate+'&':card.publicationId?detailPath(card.publicationId)+'&':'/pages/home/index?')+'kind='+card.kind+'&revision='+card.revision;
   return card;
 }
 function historyMessage(record) {
@@ -179,7 +161,11 @@ function homeResetStatus(data, now=data.serverTime) {
     // restart the clock. Unlinked evidence stays a clearly labelled date summary.
     const summarize=rows=>observationDayGroups(input,rows).map(g=>({...g.observations[0],...(g.isObservationSummary?{displaySummary:g}:{})}));
     const {assignments}=assigned,independent=summarize(assigned.independent),unassigned=summarize(assigned.unassigned);
-    const latest=rounds[0],record=kind==='banked_reset'?states.lastCard:states.lastReset;
+    const record=kind==='banked_reset'?states.lastCard:states.lastReset;
+    const resolution=rounds.filter(r=>['claimed_complete','cancelled'].includes(r.stage))
+      .sort((a,b)=>millis(b.statementAt)-millis(a.statementAt))[0];
+    const latest=rounds.find(r=>!['promised','in_progress'].includes(r.stage) ||
+      !announcementNeedsReview(r,resolution && {...resolution,announcedAt:resolution.hasPromise?resolution.startAt:undefined},r.eventId));
     let card;
     const bound=latest?assignments.get(keyOf(latest))||[]:[];
     if(latest?.stage==='claimed_complete'||bound.length){
@@ -193,6 +179,13 @@ function homeResetStatus(data, now=data.serverTime) {
       card=pendingCard(base,latest,now);
       const newer=independent.find(o=>millis(o.observedAt)>millis(latest.expectedAt)+DAY);
       if(card.expiredRound&&newer)card=completedCard(base,kind,null,[newer],now);
+      else if(card.expiredRound){
+        const completions=rounds.filter(r=>r.stage==='claimed_complete'||assignments.get(keyOf(r))?.length)
+          .map(r=>completedCard(base,kind,r,assignments.get(keyOf(r))||[],now));
+        for(const o of unassigned)completions.push(completedCard(base,kind,null,[o],now));
+        const last=completions.sort((a,b)=>millis(b.clockAt)-millis(a.clockAt))[0];
+        if(last)card=last;
+      }
       else if(!card.expiredRound){const other=independent.find(o=>millis(o.observedAt)>=millis(latest.startAt));if(other)Object.assign(card,{observationPublicationId:other.publicationId,observationSourceName:other.sourceName,observationTime:m.displayTime(other.observedAt),observationAt:other.observedAt});}
     }else if(latest?.stage==='cancelled'){
       const newer=independent.find(o=>millis(o.observedAt)>millis(latest.statementAt));
@@ -202,12 +195,34 @@ function homeResetStatus(data, now=data.serverTime) {
     else card={...base,completedDisplay:false,expiredRound:false};
     // A genuinely newer classified signal replaces history, never a still-active arrangement.
     if(['signal','estimated'].includes(base.state) && (!latest || millis(base.timeAt)>Math.max(millis(latest.statementAt),millis(card.clockAt))) && !['scheduled','revised','announced','progress','overdue'].includes(card.state))card={...base,completedDisplay:false,expiredRound:false};
-    if(card.completedDisplay)card=completionPhase(card,now);
     card.lastMessage=historyMessage(record);
     return finalize(card,input);
   });
   states.sourceWarning=[states.sourceWarning,m.sourceStatus(input.sources).warning?'部分来源更新延迟，新消息可能稍晚显示。':''].filter(Boolean).join(' ');
-  return states;
+  return {...states,...chooseFocus(states.cards)};
+}
+// Choose a presentation only. Comparing cards must never change either occurrence.
+function chooseFocus(cards) {
+  function rank(card) {
+    if (['scheduled','revised','progress','announced'].includes(card.state)) return 0;
+    if (card.state==='overdue') return 1;
+    if (['signal','estimated'].includes(card.state)) return 2;
+    if (card.completedDisplay || card.state==='cancelled') return 3;
+    return 4;
+  }
+  const sorted=cards.slice().sort((a,b)=>{
+    const order=rank(a)-rank(b);
+    if(order) return order;
+    if(rank(a)===0){
+      const at=valid(a.expectedAt)?millis(a.expectedAt):Infinity;
+      const bt=valid(b.expectedAt)?millis(b.expectedAt):Infinity;
+      if(at!==bt)return at-bt;
+    }
+    return millis(b.clockAt||b.timeAt)-millis(a.clockAt||a.timeAt) || a.kind.localeCompare(b.kind);
+  });
+  const [primary, other]=sorted;
+  const secondary=other && rank(other)<4 && (rank(primary)<3 || rank(other)<3) ? other : null;
+  return {primary, secondary};
 }
 function selectedHomeStatus(data, kind, now=data.serverTime) {return homeResetStatus(data,now).cards.find(c=>c.kind===validKind(kind));}
 module.exports={homeResetStatus,selectedHomeStatus,validKind};

@@ -86,7 +86,7 @@ test('内部趋势读取失败不归咎第三方信号，保留公告状态与�
 test('旧接口单状态可显示，当前两类投影可靠时优先使用，两类切换入口不混成阶段线',()=>{
  const d=fixture();projected(d);d.forecasts!.outlook={status:'scheduled',active:{actionId:'a',eventId:'e',publicationId:'p',kind:'banked_reset',stage:'promised',statementAt:'2026-10-18T10:00:00Z',expectedAt:'2026-10-18T14:00:00Z'}};
  assert.equal(card(d,'banked_reset').state,'scheduled');assert.equal(card(d).state,'waiting');
- const html=renderToStaticMarkup(createElement(ResetStateCards,{data:d,selectedKind:'banked_reset'}));assert.match(html,/role="tablist"/);assert.match(html,/重置卡/);assert.match(html,/时间已公布/);assert.match(html,/aria-label="当前状态：时间已公布"/);assert.doesNotMatch(html,/aria-label="当前事件进度"/);assert.doesNotMatch(html,/较早的安排/);
+ const html=renderToStaticMarkup(createElement(ResetStateCards,{data:d}));assert.doesNotMatch(html,/role="tablist"/);assert.match(html,/重置卡/);assert.match(html,/时间已公布/);assert.match(html,/radar-readout/);assert.doesNotMatch(html,/aria-label="当前事件进度"/);assert.doesNotMatch(html,/较早的安排/);
 });
 
 test('未验证的实验分类不能替未知信号归类，旧线索不盖过较新的完成；两个信号按发布时间选择',()=>{
@@ -134,7 +134,7 @@ test('选择发卡类别后，历史标题、计时和固定公告链接都使�
  assert.equal(resetStateCards(d,now).lastCard!.statementAt,banked.statementAt,'下一次发卡预告不重置历史计时');
  const html=renderToStaticMarkup(createElement(LastResetElapsed,{data:d,selectedKind:'banked_reset'}));
  assert.match(html,/上次重置卡发放已经过去/);assert.match(html,/上次发放时间/);assert.match(html,/10月18日 19:00/);assert.match(html,/events\/card\?version=p-card/);assert.match(html,/查看这次发卡记录/);assert.doesNotMatch(html,/上次额度重置|p-reset|p-next-card/);
- const states=renderToStaticMarkup(createElement(ResetStateCards,{data:d,selectedKind:'banked_reset'}));assert.doesNotMatch(states,/pub-reset-last-card-note/,'上方不再重复显示同一发卡时间');
+ const states=renderToStaticMarkup(createElement(ResetStateCards,{data:d}));assert.doesNotMatch(states,/pub-reset-last-card-note/,'上方不再重复显示同一发卡时间');
 });
 
 test('所选类别没有完成记录时显示空态，不借用另一类的历史',()=>{

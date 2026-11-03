@@ -1,5 +1,6 @@
 'use client';
-import {Fragment,useState} from 'react';
+import {Fragment} from 'react';
+import {homeResetStatus} from '../../../miniprogram/utils/home-reset-status';
 import Link from 'next/link';
 import type {PublicData} from '@/lib/types';
 import {resetStateCards,type ResetStateCard} from '@/lib/reset-state-cards';
@@ -38,18 +39,28 @@ export function ResetStateCardView({card}:{card:ResetStateCard}) {
     <div className="pub-reset-state-footer"><span>{card.metric?'预计安排，以实际发放为准':card.window?'不是承诺发放时间 · '+card.footer:card.footer}</span>{card.sourceName?<details className="pub-reset-state-source"><summary>{card.action} →</summary><div><p>来源：{card.sourceName}{card.sourceType==='observed'?' · 观察记录':''}</p>{card.watchNote&&<p>{card.watchNote}</p>}{card.sourceUrl&&safeUrl(card.sourceUrl)?<a href={card.sourceUrl} target="_blank" rel="noopener noreferrer">查看来源原文 ↗</a>:<p>此观察记录没有公开原文链接。</p>}</div></details>:<Link scroll={false} href={href}>{card.action} →</Link>}</div>
   </article>;
 }
-export function ResetStateCards({data,selectedKind,onKindChange}:{data:PublicData;selectedKind?:'automatic_reset'|'banked_reset';onKindChange?:(kind:'automatic_reset'|'banked_reset')=>void}) {
-  const now=usePublicClock(data.serverTime),model=resetStateCards(data,now);
-  const [localKind,setLocalKind]=useState('automatic_reset');
-  const selected=selectedKind??localKind;
-  const setSelected=(kind:'automatic_reset'|'banked_reset')=>{setLocalKind(kind);onKindChange?.(kind);};
-  const card=model.cards.find(item=>item.kind===selected)!;
-  return <section className="pub-reset-states" aria-label="额度重置和重置卡进展">
-    <div className="pub-reset-tabs" role="tablist" aria-label="重置类型">{model.cards.map(item=><button type="button" key={item.kind} id={`reset-tab-${item.kind}`} role="tab" aria-selected={item.kind===selected} tabIndex={item.kind===selected?0:-1} aria-controls="reset-state-panel" onKeyDown={event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const kind=event.key==='Home'?'automatic_reset':event.key==='End'?'banked_reset':selected==='automatic_reset'?'banked_reset':'automatic_reset';setSelected(kind);document.getElementById(`reset-tab-${kind}`)?.focus();}}} onClick={()=>setSelected(item.kind as 'automatic_reset'|'banked_reset')}><img src={`/icons/${item.kind==='banked_reset'?'card':'reset'}.svg`} width="24" height="24" alt=""/><span className="pub-reset-tab-copy"><strong>{item.kind==='banked_reset'?'重置卡发放':item.name}</strong></span></button>)}</div>
-    {model.sourceWarning&&<p className="pub-reset-source-warning" role="status">{model.sourceWarning}</p>}
-    <div id="reset-state-panel" role="tabpanel" aria-labelledby={`reset-tab-${selected}`}><ResetStateCardView card={card}/></div>
-    {model.untyped&&<div className="pub-reset-untyped"><p>类型暂未明确的公开线索</p><ResetStateCardView card={model.untyped}/></div>}
-    {model.expiredNote&&<p className="pub-reset-expired">{model.expiredNote}</p>}
+export function ResetStateCards({data}:{data:PublicData}) {
+  const now=usePublicClock(data.serverTime);
+  const {primary:card,secondary,untyped}=homeResetStatus(data,now);
+  const destination=(item:typeof card)=>{
+    if(item.observationSummaryDate)return '/history?date='+encodeURIComponent(item.observationSummaryDate);
+    if(item.publicationId&&item.eventId)return '/events/'+encodeURIComponent(item.eventId)+'?version='+encodeURIComponent(item.publicationId);
+    return safeUrl(item.sourceUrl)||'/history';
+  };
+  return <section aria-label="重置动态">
+    <article className={`radar-panel is-live kind-${card.kind}`}>
+      <header className="radar-mast"><strong className="radar-name"><i aria-hidden="true" className="radar-mark"/>{card.kind==='banked_reset'?'重置卡发放':'额度重置'}</strong><span className="radar-basis">{card.hero.badge}</span></header>
+      <div className="radar-field"><div className="radar-face"><i className="radar-pearl" aria-hidden="true"/><div className="radar-readout">
+        <div className="radar-caption">{card.hero.metric?(card.hero.title||card.hero.label):card.hero.label}</div>
+        {card.hero.parts.length?<div className={`radar-value ${card.hero.long?'long':''}`} aria-label={card.hero.metric}>{card.hero.parts.map((part:{unit:string,value:string})=><span className="radar-number" key={part.unit}>{part.value}<small className="radar-unit">{part.unit}</small></span>)}</div>:<strong className="radar-verdict">{card.hero.metric||card.hero.title}</strong>}
+      </div></div></div>
+      <div className="pub-focus-fact"><span>{card.timeAt?card.timeLabel+' · 北京时间':'当前状态'}</span><strong>{card.time||card.hero.badge}</strong></div>
+      {card.oldTime&&<div className="pub-focus-fact">{card.oldTime}</div>}
+      {card.observationPublicationId&&<Link className="pub-focus-link" href={'/events/'+encodeURIComponent(card.observationEventId||data.publications.find(p=>p.id===card.observationPublicationId)?.eventId||card.eventId)+'?version='+encodeURIComponent(card.observationPublicationId)}>查看独立观测 · {card.observationTime}</Link>}
+      <Link className="pub-focus-link" href={destination(card)}>{card.action} →</Link>
+      {secondary&&<Link className="radar-secondary" href={destination(secondary)}><span>{secondary.kind==='banked_reset'?'重置卡发放':'额度重置'} · {secondary.hero.badge} {secondary.time}</span><span>→</span></Link>}
+    </article>
+    {untyped&&<div className="pub-reset-untyped"><p>类型暂未明确的公开线索</p><ResetStateCardView card={untyped}/></div>}
   </section>;
 }
 

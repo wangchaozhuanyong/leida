@@ -510,7 +510,7 @@ test('首页海报跳过撤回、合并和关联缺失的动态；无有效记�
   }
   const empty=pageHarness();empty.data.publications=[];empty.data.events=[];empty.data.articles=[];
   const page=empty.page('home');assert.equal(page.data.posterPath,'');assert.match(page.data.posterDescription,/分享当前公开状态/);
-  page.openPoster();assert.equal(empty.navigation.length,1);assert.equal(empty.navigation[0].method,'navigateTo');assert.match(empty.navigation[0].url,/^\/packages\/poster\/index\?kind=automatic_reset&revision=/);assert.equal(empty.requests.length,0);page.onUnload();
+  page.openPoster();assert.equal(empty.navigation.length,1);assert.equal(empty.navigation[0].method,'navigateTo');assert.match(empty.navigation[0].url,/^\/packages\/poster\/index\?kind=automatic_reset&focus=auto&revision=/);assert.equal(empty.requests.length,0);page.onUnload();
 });
 
 test('首页微信提醒切换到设置标签页，不打开动态记录或自动发起微信登录授权',()=>{

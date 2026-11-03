@@ -60,8 +60,8 @@ test('月历只保留有日期的完整周，四至六周均不裁掉月底',()=
     data.serverTime=serverTime;
     const days=recordCalendar(data,{date}).days;
     assert.equal(days.length,cells);
-    assert.equal(days.filter(day=>!day.blank).at(-1)?.day,last);
-    assert.ok(days.slice(-7).some(day=>!day.blank));
+    assert.equal(days.filter(day=>!day.outsideMonth).at(-1)?.day,last);
+    assert.ok(days.slice(-7).some(day=>!day.outsideMonth));
   }
 });
 test('日历不重复计同一动作，撤回和合并从标记与计数同步撤下',()=>{
@@ -79,7 +79,7 @@ test('按类型过滤、同日双标记、月份选择与无记录月份均使�
   assert.equal(recordCalendar(data,{month:'2026-04'}).selected,'2026-04-17');
   assert.equal(recordCalendar(data,{date:'2026-04-16'}).selected,'2026-10-15');
   assert.equal(recordCalendar(data,{date:'2026-02-31'}).selected,'2026-10-15');
-  assert.ok(model.days.filter(item=>!item.blank&&item.date>'2026-10-17').every(item=>item.disabled));
+  assert.ok(model.days.filter(item=>item.date>'2026-10-17').every(item=>item.disabled));
 });
 test('记录页日期月份类型均不改变读取身份，动态重置通过服务端类型筛选完整分页',()=>{
   for(const query of ['','date=2026-10-08','date=2026-04-17&target=banked','target=automatic'])assert.equal(parsePublicRoute('/history',new URLSearchParams(query)).readPath,'/api/v1/bootstrap?view=calendar');
@@ -113,6 +113,27 @@ test('小程序连续选日切月切类型不发请求，旧日程链接定位�
     page.selectKind({currentTarget:{dataset:{value:'banked_reset'}}});page.moveToMonth(1);assert.equal(page.data.month,'2026-09');assert.equal(page.data.selectedItems.length,0);
     page.recentRecord();assert.equal(page.data.selected,'2026-10-08');assert.equal(reads,1);page.onHide();page.onShow();assert.equal(page.data.selected,'2026-10-08');assert.equal(page.data.kind,'banked_reset');
   } finally {page.onUnload();(globalThis as any).getApp=previous;(globalThis as any).wx=previousWx;}
+});
+
+test('小程序选择首周的上月日期直接显示当日记录，切月不重读、返回保留日期',()=>{
+ const data=fixture();data.serverTime='2026-11-03T08:00:00Z';
+ const at='2026-10-31T03:44:00Z',p=data.publications.find(p=>p.eventId==='oct8')!;
+ p.event.actions[0].statementAt=at;p.publishedAt=at;p.article.publishedAt=at;
+ data.events.find(e=>e.id==='oct8')!.actions[0].statementAt=at;
+ data.articles.find(a=>a.id==='a-oct8')!.publishedAt=at;
+ const definition=createRecordPage(),previous=(globalThis as any).getApp,previousWx=(globalThis as any).wx;let reads=0;
+ const client={setView(){reads++;return Promise.resolve();},getState(){return{data,receivedAt:Date.now(),loading:false};},subscribe(fn:any){fn(this.getState());return()=>{};}};
+ (globalThis as any).wx={};(globalThis as any).getApp=()=>({client});
+ const page:any={...definition,data:structuredClone(definition.data),setData(patch:any,callback?:()=>void){Object.assign(this.data,patch);callback?.();}};
+ try{
+  page.onLoad({date:'2026-11-02',kind:'banked_reset'});page.onShow();assert.equal(page.data.month,'2026-11');
+  assert.equal(page.data.days.find((d:any)=>d.date==='2026-10-31')?.disabled,false);
+  page.selectDay({currentTarget:{dataset:{date:'2026-10-31'}}});
+  assert.equal(page.data.selected,'2026-10-31');assert.equal(page.data.month,'2026-10');
+  assert.equal(page.data.selectedItems.length,1);assert.equal(page.data.selectedItems[0].kind,'banked_reset');
+  assert.equal(page.data.selectedItems[0].time,'11:44');assert.equal(reads,1);
+  page.onHide();page.onShow();assert.equal(page.data.selected,'2026-10-31');assert.equal(reads,2,'再次显示沿用既有setView缓存入口');
+ }finally{page.onUnload();(globalThis as any).getApp=previous;(globalThis as any).wx=previousWx;}
 });
 
 

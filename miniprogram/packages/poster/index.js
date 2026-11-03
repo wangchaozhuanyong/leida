@@ -13,7 +13,7 @@ function currentData(){const state=getApp().client.getState(),data=state.data;if
 function stop(page){clearTimeout(page._stateExpiryTimer);clearTimeout(page._posterTimeout);page._active=false;page._generation=(page._generation||0)+1;if(page._codeRequest)page._codeRequest.abort();page._codeFlight=null;}
 Page(createPage(data=>({available:!!data}),{
   view:()=>({view:'home'}),
-  load(query){this._selectedKind=query.kind==='banked_reset'?'banked_reset':'automatic_reset';this._expectedRevision=typeof query.revision==='string'?query.revision:'';},
+  load(query){this._selectedKind=query.focus==='auto'?undefined:query.kind==='banked_reset'?'banked_reset':'automatic_reset';this._expectedRevision=typeof query.revision==='string'?query.revision:'';},
   data:{available:false,theme:'precision',preview:'',posterReady:false,posterBusy:false,posterSaving:false,posterError:'',codeNote:'',blocked:'',privacyNeeded:false},
   show(){this._active=true;if(this._snapshot)void this.generate();},hide(){stop(this);},unload(){stop(this);this.clearPosters();this._codeData=null;},
   afterRender(){
