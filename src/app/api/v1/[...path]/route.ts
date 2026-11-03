@@ -40,7 +40,12 @@ export async function GET(request:Request,{params}:{params:Promise<{path:string[
  if(kind==='wechat'&&id==='scene'&&path.length===3)return json(await resolveWechatScene(path[2]));
  if(kind==='forecasts'&&id==='cadence'&&path.length===3){const snapshot=await getResetCadenceSnapshot(path[2]);if(!snapshot)throw Object.assign(new Error('未找到固定重置时间预测'),{status:404});return json(snapshot);}
  if(kind==='forecasts'&&path.length<=2){if(!id)return json(publicWatchForClient(await getPublicData(),acceptsObserved,true).forecasts);const snapshot=await getForecastSnapshot(id);if(!snapshot)throw Object.assign(new Error('未找到固定预测快照'),{status:404});return json(snapshot);}
- const data=await getPublicData();
+ // The browser freezes its current-state poster from the homepage read. Use that
+ // same projection for its revision and code target, including the observed contract.
+ const currentHomePoster=kind==='posters' && id==='current' && new URL(request.url).searchParams.get('round')?.startsWith('state:');
+ const data=currentHomePoster
+   ? publicWatchForClient((await getPublicRead(parsePublicRead(new URLSearchParams({view:'home'})))).data,true)
+   : await getPublicData();
  if(kind==='status'||kind==='bootstrap')return Response.json({data:publicWatchForClient(data,acceptsObserved),version:publicRevision(data)},{headers:{'Cache-Control':'no-store'}});
  if(kind==='health')return json({database:'ready',serverTime:data.serverTime,sources:data.sources});
  if(kind==='forecast-posters'&&id&&path.length===2){const snapshot=await getForecastSnapshot(id);if(!snapshot)throw Object.assign(new Error('未找到固定预测快照'),{status:404});const shareUrl=`${requestShareOrigin(request)}/methodology?snapshot=${encodeURIComponent(snapshot.id)}`;return new Response(forecastPosterSvg(snapshot,data.site.name,shareUrl),{headers:{'Content-Type':'image/svg+xml; charset=utf-8','Content-Disposition':'attachment; filename="moyao-radar-forecast.svg"','Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; sandbox"}});}

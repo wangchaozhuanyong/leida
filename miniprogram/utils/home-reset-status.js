@@ -164,8 +164,10 @@ function homeResetStatus(data, now=data.serverTime) {
     const record=kind==='banked_reset'?states.lastCard:states.lastReset;
     const resolution=rounds.filter(r=>['claimed_complete','cancelled'].includes(r.stage))
       .sort((a,b)=>millis(b.statementAt)-millis(a.statementAt))[0];
-    const latest=rounds.find(r=>!['promised','in_progress'].includes(r.stage) ||
-      !announcementNeedsReview(r,resolution && {...resolution,announcedAt:resolution.hasPromise?resolution.startAt:undefined},r.eventId));
+    // Start time orders open arrangements. Once resolved, use the resolution time:
+    // an earlier announcement for batch two must not make batch one appear newer.
+    const latest=rounds.find(r=>['promised','in_progress'].includes(r.stage) &&
+      !announcementNeedsReview(r,resolution && {...resolution,announcedAt:resolution.hasPromise?resolution.startAt:undefined},r.eventId)) || resolution;
     let card;
     const bound=latest?assignments.get(keyOf(latest))||[]:[];
     if(latest?.stage==='claimed_complete'||bound.length){
