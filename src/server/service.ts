@@ -264,8 +264,14 @@ export async function publishHistoricalDraft(content:DraftContent,c:Client,reaso
   }else if(!isHistoricalContent(cited,now()))throw new DomainError('历史补录证据范围不符');
   const primary=cited.find(row=>row.id===content.evidenceIds[0]);
   const batchUpgrade=!!(captured&&primary&&bankedProgress(primary.text)&&bankedSeriesContext(primary,evidence).length&&existingArticle?.publicationMode==='state_change'&&content.actions.length===1&&content.actions[0].kind==='banked_reset'&&content.actions[0].stage==='claimed_complete'&&existingArticle.eventId===content.eventId&&evidence.some(row=>row.id===existingArticle.evidenceIds[0]&&providerIdentity(row)===providerIdentity(primary)));
-  if(existingArticle&&(existingArticle.status!=='published'||existingArticle.publicationMode!=='news_only'&&!batchUpgrade||existingArticle.contentOrigin!=='template'||existingArticle.manualFields?.length))throw new DomainError('历史文章不符合自动补证范围');
-  if(batchUpgrade){
+  const declarationEvent=captured&&existingArticle?.publicationMode==='state_change'&&existingArticle.eventId===content.eventId?await one<RadarEvent>('events',content.eventId!,c):undefined;
+  const first=declarationEvent?.actions[0],retained=first&&content.actions.find(action=>action.id===first.id),added=content.actions.filter(action=>!declarationEvent?.actions.some(old=>old.id===action.id));
+  // An old machine version may have kept only the completed first occurrence
+  // of this very original. Restore its explicit second promise without changing
+  // the first occurrence, its qualification or any manually protected version.
+  const declarationUpgrade=!!(captured&&primary&&existingArticle&&declarationEvent?.status==='published'&&!declarationEvent.manualFields?.length&&declarationEvent.actions.length===1&&first?.stage==='claimed_complete'&&first.scope==='public'&&content.actions.length===2&&added.length===1&&added[0].stage==='promised'&&added[0].scope===first.scope&&added[0].kind===first.kind&&normalizedEligibility(added[0].eligibility)===normalizedEligibility(first.eligibility)&&/\banother\s+one\s+will\s+(?:come|land)\b/i.test(added[0].evidenceQuote??'')&&retained?.kind===first.kind&&retained.stage===first.stage&&retained.scope===first.scope&&normalizedEligibility(retained.eligibility)===normalizedEligibility(first.eligibility)&&retained.statementAt===first.statementAt&&retained.expectedAt===first.expectedAt&&retained.timeNote===first.timeNote&&evidence.some(row=>row.id===existingArticle.evidenceIds[0]&&providerIdentity(row)===providerIdentity(primary)));
+  if(existingArticle&&(existingArticle.status!=='published'||existingArticle.publicationMode!=='news_only'&&!batchUpgrade&&!declarationUpgrade||existingArticle.contentOrigin!=='template'||existingArticle.manualFields?.length))throw new DomainError('历史文章不符合自动补证范围');
+  if(batchUpgrade||declarationUpgrade){
     const event=await one<RadarEvent>('events',content.eventId!,c);
     if(!event||event.status!=='published'||event.manualFields?.length)throw new DomainError('批次记录已被人工处理或撤回，不能自动恢复');
     if(samePublishedContent(content,existingArticle!,event)){

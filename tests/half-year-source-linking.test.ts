@@ -36,8 +36,8 @@ test('manual, withdrawn, different-identity and untyped parent records stay prot
 });
 
 test('isolated worker: a completed first reset plus another promise keep separate identities through repeat and later completion',{skip:process.env.RADAR_INTEGRATION!=='1'},async()=>{
- const {pool,list,one,put}=await import('../src/db');
- const {createEvidence}=await import('../src/server/service');
+ const {pool,list,one,put,insert,transaction,lockTransaction}=await import('../src/db');
+ const {createEvidence,publishHistoricalDraft,samePublishedContent}=await import('../src/server/service');
  const {runOne,scheduleDue}=await import('../src/server/worker');
  const url=new URL(process.env.DATABASE_URL!);assert.equal(url.hostname,'127.0.0.1');assert.equal(url.port,'55489');assert.match(url.pathname,/^\/radar_qa_/);
  const sourceId='half-year-wording-qa',start=new Date(Date.now()-2*3600_000).toISOString();
@@ -76,5 +76,26 @@ test('isolated worker: a completed first reset plus another promise keep separat
   const repostEvent=await one<RadarEvent>('events',firstEvent.id);assert.equal(repostEvent?.actions.length,1);assert.equal(repostEvent?.actions[0].statementAt,start);assert.equal((await list('notices')).length,notices,'wording-only repost does not create another reminder');
   assert.equal((await list('wechat_deliveries')).length,0);
   assert.equal((await list<any>('jobs')).filter(j=>j.status==='failed').length,0);
+  // A real old state article may already contain the first completion only.
+  // Recover the omitted explicit promise through the controlled history path,
+  // rather than disguising the article as news or changing its old snapshot.
+  const legacy=await add('200000000000000301',text);
+  const recovery=buildAutomaticTemplate([legacy.evidence])!;
+  recovery.eventId='legacy-first-only';recovery.actions[0].id='legacy-first';recovery.actions[1].id='legacy-second';
+  const legacyEvent:RadarEvent={id:recovery.eventId,title:'Legacy first completion',status:'published',version:1,publicationId:'legacy-pub',actions:[recovery.actions[0]],evidenceIds:[legacy.evidence.id],updatedAt:start};
+  const legacyArticle:Article={id:'legacy-article',eventId:legacyEvent.id,title:legacyEvent.title,summary:'Legacy first completion',translation:'',category:'reset',status:'published',version:1,publicationId:'legacy-pub',evidenceIds:[legacy.evidence.id],publishedAt:start,updatedAt:start,sourcePublishedAt:start,publicationMode:'state_change',contentOrigin:'template'};
+  const legacyPub={id:'legacy-pub',eventId:legacyEvent.id,articleId:legacyArticle.id,event:legacyEvent,article:legacyArticle,publishedAt:start,cutoffAt:start,mode:'state_change',reason:'synthetic old first-only state'};
+  await put('events',legacyEvent);await put('articles',legacyArticle);await insert('publications',legacyPub);const legacyFrozen=await one('publications',legacyPub.id);
+  const capture={evidenceId:legacy.evidence.id,evidenceHash:legacy.evidence.hash,capturedBefore:new Date().toISOString()};
+  const recover=(article=legacyArticle,draft=recovery,proof=capture)=>transaction(async c=>{await lockTransaction(c,'radar_publication');return publishHistoricalDraft(draft,c,'QA omitted second promise',article,proof);});
+  await assert.rejects(recover({...legacyArticle,manualFields:['title']}),/历史文章/);
+  const foreign=await add('200000000000000302',text);
+  await assert.rejects(recover(legacyArticle,{...recovery,evidenceIds:[foreign.evidence.id],actions:recovery.actions.map(a=>({...a,evidenceIds:[foreign.evidence.id]}))},{evidenceId:foreign.evidence.id,evidenceHash:foreign.evidence.hash,capturedBefore:new Date().toISOString()}),/历史文章/);
+  const notificationCount=(await list('notices')).length;
+  const restored=await recover();assert.equal(restored.event.actions.length,2);assert.equal(restored.event.actions[0].id,'legacy-first');assert.equal(restored.event.actions[1].id,'legacy-second');assert.equal(restored.event.actions[1].stage,'promised');
+  assert.deepEqual(await one('publications',legacyPub.id),legacyFrozen,'the old state snapshot stays immutable');
+  assert.equal((await list('notices')).length,notificationCount,'controlled recovery is silent');
+  assert.equal((await list('wechat_deliveries')).length,0);
+  assert.equal(samePublishedContent(recovery,restored.article,restored.event),true,'a repeated maintenance scan reuses the restored state');
  }finally{await pool.end();}
 });
