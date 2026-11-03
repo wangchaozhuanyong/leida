@@ -1,5 +1,5 @@
 import type { ActionKind, ActionStage } from './types';
-import { pendingPublicActions, publicActions, isNewsOnly, type PublicFactsData } from './public-facts';
+import { pendingPublicActions, publicActions, isNewsOnly, publicationWithdrawn, type PublicFactsData } from './public-facts';
 import {resetObservations,type ResetObservation} from './reset-observations';
 
 export interface ResetOutlookRound {
@@ -38,27 +38,25 @@ export function publicResetOutlook(data: PublicFactsData, kind?: ActionKind): Re
   const globalCompleted=facts.find(item=>item.action.kind==='automatic_reset'&&item.action.stage==='claimed_complete');
   const latestResolutions: NonNullable<ResetOutlook['latestResolutions']> = {};
   for (const item of facts.filter(item=>['claimed_complete','cancelled'].includes(item.action.stage))) {
-    latestResolutions[item.action.kind] ??= {...round(item),resolvedAt:item.action.statementAt};
+    if(latestResolutions[item.action.kind])continue;
+    const prior = data.publications.filter(p => p.eventId === item.event.id && p.id !== item.publication.id
+      && !isNewsOnly(p) && !publicationWithdrawn(data,p) && Date.parse(p.publishedAt) <= Date.parse(item.publication.publishedAt))
+      .flatMap(p => p.event.actions.filter(a => a.id === item.action.id && a.kind === item.action.kind
+        && a.scope === 'public' && ['promised','in_progress'].includes(a.stage) && Date.parse(a.statementAt) <= Date.parse(item.action.statementAt)))
+      .sort((a,b) => Date.parse(a.statementAt) - Date.parse(b.statementAt));
+    const timed = prior.filter(a => a.expectedAt && Number.isFinite(Date.parse(a.expectedAt))).at(-1);
+    latestResolutions[item.action.kind] = { ...round(item), resolvedAt:item.action.statementAt,
+      ...(prior[0] ? { announcedAt:prior[0].statementAt } : {}),
+      ...(timed ? { announcedDeadline:timed.expectedAt, announcedDeadlineNote:timed.timeNote } : {}) };
   }
   // A later same-kind completion does not prove which older promise it fulfilled.
   // Retain that promise for review, without using it as the current countdown.
   const pendingAll=pendingPublicActions(data).filter(item=>!kind||item.action.kind===kind);
-  const needsReview=(item:typeof pendingAll[number])=>announcementNeedsReview(item.action,latestResolutions[item.action.kind]);
+  const needsReview=(item:typeof pendingAll[number])=>announcementNeedsReview(item.action,latestResolutions[item.action.kind],item.event.id);
   const pendingReview=pendingAll.filter(needsReview).map(round);
   const observedRound=(item:typeof pendingAll[number])=>observation&&Date.parse(item.action.statementAt)<=Date.parse(observation.observedAt)&&item.action.evidenceIds.some(id=>data.evidence.some(e=>e.id===id&&e.url===observation.referenceUrl));
-  const pending=pendingAll.find(item=>!needsReview(item)&&!observedRound(item)&&(!resolved||Date.parse(item.action.statementAt)>=Date.parse(resolved.action.statementAt)||Date.parse(item.action.expectedAt??'')>=Date.parse(resolved.action.statementAt)));
-  let lastResolved: ResolvedResetRound | undefined;
-  if (resolved) {
-    // Only matching immutable versions of this same action establish its preannouncement.
-    const prior = data.publications.filter(p => p.eventId === resolved.event.id && !isNewsOnly(p) && Date.parse(p.publishedAt) <= Date.parse(resolved.publication.publishedAt))
-      .flatMap(p => p.event.actions.filter(a => a.id === resolved.action.id && a.kind === resolved.action.kind && a.scope === 'public' && ['promised', 'in_progress'].includes(a.stage) && Date.parse(a.statementAt) <= Date.parse(resolved.action.statementAt)))
-      .sort((a, b) => Date.parse(a.statementAt) - Date.parse(b.statementAt));
-    const timed = prior.filter(a => a.expectedAt && Number.isFinite(Date.parse(a.expectedAt))).at(-1);
-    lastResolved = { ...round(resolved), resolvedAt: resolved.action.statementAt,
-      ...(prior[0] ? { announcedAt: prior[0].statementAt } : {}),
-      ...(timed ? { announcedDeadline: timed.expectedAt, announcedDeadlineNote: timed.timeNote } : {}),
-    };
-  }
+  const pending=pendingAll.find(item=>!needsReview(item)&&!observedRound(item)&&(!resolved || resolved.action.kind===item.action.kind || Date.parse(item.action.statementAt)>=Date.parse(resolved.action.statementAt) || Date.parse(item.action.expectedAt??'')>=Date.parse(resolved.action.statementAt)));
+  const lastResolved = resolved ? latestResolutions[resolved.action.kind] : undefined;
   const relevant = [pending, completed, resolved].filter((item): item is typeof facts[number] => !!item);
   const evidenceIds = new Set(relevant.flatMap(item => item.action.evidenceIds));
   const collected = data.evidence.filter(item => evidenceIds.has(item.id) && Number.isFinite(Date.parse(item.collectedAt)) && Date.parse(item.collectedAt) <= now).map(item => item.collectedAt).sort((a, b) => Date.parse(b) - Date.parse(a));
@@ -72,8 +70,11 @@ export function publicResetOutlook(data: PublicFactsData, kind?: ActionKind): Re
 }
 
 /** Shared by page selection and delivery checks; it never mutates the old event. */
-export function announcementNeedsReview(action: Pick<ResetOutlookRound,'kind'|'statementAt'>, resolution: Pick<ResolvedResetRound,'kind'|'statementAt'>|undefined): boolean {
-  return !!resolution && action.kind===resolution.kind && Number.isFinite(Date.parse(action.statementAt)) && Date.parse(resolution.statementAt)>Date.parse(action.statementAt);
+export function announcementNeedsReview(action: Pick<ResetOutlookRound,'kind'|'statementAt'> & {id?:string; actionId?:string}, resolution: ResolvedResetRound|undefined, eventId?:string): boolean {
+  if(!resolution || resolution.kind!==action.kind || !(Date.parse(resolution.statementAt)>Date.parse(action.statementAt)))return false;
+  const actionId = action.actionId || action.id;
+  const differentRound = eventId && resolution.eventId && (eventId !== resolution.eventId || (actionId && resolution.actionId && actionId !== resolution.actionId));
+  return !(differentRound && resolution.announcedAt && Date.parse(resolution.announcedAt) < Date.parse(action.statementAt));
 }
 
 /** Only immutable versions of the same action prove a time adjustment. */

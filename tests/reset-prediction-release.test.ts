@@ -82,7 +82,7 @@ test('两款网页/小程序海报跟随同一状态，旧完成不遮盖新预�
     if(web.round!==statusPosterSnapshot(changed).round){assert.throws(()=>assertStatusPosterRound(changed,web.round),/已变化/);assert.equal(nativePoster.statusPosterAvailable(mini,changed),mini.round===nativePoster.statusPosterInput(changed,mini.kind).round);}
   }
   const value=data(),snap=statusPosterSnapshot(value);assert.equal(snap.publicationId,'');
-  assert.throws(()=>currentStatusPosterSvg({...value,serverTime:'2026-10-17T05:00:00Z'},now,snap.round),/已变化/);
+  assert.doesNotThrow(()=>currentStatusPosterSvg({...value,serverTime:'2026-10-17T05:00:00Z'},now,snap.round),'未分类线索过期不改变已分享的分类事实');
 });
 test('原生海报在信号到期时主动清除预览和缓存，不能切换风格或继续保存旧图',()=>{
   let definition:any,clock=Date.parse(now);const timers:any[]=[];

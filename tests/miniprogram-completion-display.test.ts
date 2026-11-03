@@ -86,11 +86,11 @@ test('跨24小时主状态恢复等待，最近消息保留日期并更新相对
 });
 test('最近发卡与重置独立计时，分享原文绑定最近完成；隐藏页面停止并在显示时恢复',()=>{
  const h=nativeHome(fixture([publication('reset','automatic_reset','2026-10-13T05:45:00Z'),publication('card','banked_reset','2026-10-13T07:25:00Z')]));
- assert.equal(h.page.data.lastReset.relativeTime,'距今 2小时15分钟');assert.equal(h.page.data.timeline.title,'已确认发放重置卡');
+ assert.equal(h.page.data.lastReset.relativeTime,'距今 35分钟');assert.equal(h.page.data.timeline.title,'已确认发放重置卡');
  assert.equal(h.page.data.completions[1].time,'2026/10/13 13:45');
- assert.match(h.page.onShareAppMessage().path,/^\/pages\/detail\/index\?publicationId=reset&kind=automatic_reset&revision=home-[a-f0-9]{16}$/);
+ assert.match(h.page.onShareAppMessage().path,/^\/pages\/detail\/index\?publicationId=card&kind=banked_reset&revision=home-[a-f0-9]{16}$/);
  h.page.onHide();assert.equal(h.timers.size,0);
- h.advance(60000);h.page.onShow();assert.equal(h.page.data.lastReset.relativeTime,'距今 2小时16分钟');assert.equal(h.timers.size,1);
+ h.advance(60000);h.page.onShow();assert.equal(h.page.data.lastReset.relativeTime,'距今 36分钟');assert.equal(h.timers.size,1);
  h.page.onUnload();assert.equal(h.timers.size,0);
 });
 test('首页公告入口有预告时对应当前轮次，无预告时对应最近完成，无记录时进入历史',()=>{
@@ -122,7 +122,7 @@ test('最近消息不为秒数跨原生桥发更新，分钟变化只传主卡�
  const changes:Record<string,unknown>[]=[],original=h.page.setData.bind(h.page),before=h.page.data.completions;
  h.page.setData=(patch:Record<string,unknown>)=>{changes.push(patch);original(patch);};
  h.advance(1000);assert.equal(changes.length,0);assert.equal(h.page.data.lastReset.relativeTime,'距今 2小时15分钟');
- h.advance(59000);assert.equal(changes.length,1);assert.deepEqual(Object.keys(changes[0]),['resetCards','lastReset.relativeTime']);assert.equal(h.page.data.resetCards[0].metric,'2小时16分钟');
+ h.advance(59000);assert.equal(changes.length,1);assert.deepEqual(Object.keys(changes[0]),['resetCards','primaryCard','lastReset.relativeTime']);assert.equal(h.page.data.resetCards[0].metric,'2小时16分钟');
  assert.equal(h.page.data.completions,before);assert.equal(h.page.data.lastReset.relativeTime,'距今 2小时16分钟');h.page.onUnload();
 });
 
@@ -138,7 +138,7 @@ test('跨天相对时长进位时不更换消息日期和公告起点',()=>{
 
 test('原生首页切换类型同时切换最近消息和链接，返回与刷新保持所选类别',()=>{
  const h=nativeHome(fixture([publication('reset','automatic_reset','2026-10-11T19:14:52Z'),publication('card','banked_reset','2026-10-13T07:25:00Z')]));
- assert.equal(h.page.data.dial,undefined);assert.equal(h.page.data.lastReset.relativeTime,'距今 1天12小时');
+ assert.equal(h.page.data.primaryCard.kind,'banked_reset');assert.equal(h.page.data.lastReset.relativeTime,'距今 35分钟');
  h.page.selectResetKind({currentTarget:{dataset:{kind:'banked_reset'}}});
  assert.equal(h.page.data.selectedResetKind,'banked_reset');assert.equal(h.page.data.lastReset.relativeTime,'距今 35分钟');
  h.page.openLastReset();assert.equal(h.navigations.at(-1),'/pages/detail/index?publicationId=card');
@@ -160,7 +160,7 @@ test('原生所选类别无历史时清空旧消息，切换到有历史的类�
  h.advance(2000);h.page.selectResetKind({currentTarget:{dataset:{kind:'automatic_reset'}}});
  assert.equal(h.page.data.lastReset.relativeTime,'距今 1天12小时');assert.equal(h.timers.size,1);h.page.onUnload();
  const banked=nativeHome(fixture([publication('card','banked_reset','2026-10-08T03:44:55Z')]));
- assert.equal(banked.page.data.lastReset,null);assert.equal(banked.timers.size,0);
+ assert.equal(banked.page.data.lastReset.publicationId,'card');assert.equal(banked.timers.size,1);
  banked.page.selectResetKind({currentTarget:{dataset:{kind:'banked_reset'}}});assert.equal(banked.page.data.lastReset.relativeTime,'距今 5天4小时');assert.equal(banked.timers.size,1);
  banked.advance(1000);assert.equal(banked.page.data.lastReset.relativeTime,'距今 5天4小时');banked.page.onUnload();
 });

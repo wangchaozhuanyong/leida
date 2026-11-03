@@ -84,7 +84,7 @@ test('完成后旧外部安排不得复活，海报与首页同源，秒变化�
  assert.deepEqual(nativeTimeline.statusTimelineModel(outlook,facts.serverTime),a);
  assert.equal(a.scheduled,false);
  assert.equal(statusTimelineRevision(a),statusTimelineRevision(statusTimelineModel(outlook,'2026-10-17T22:00:01Z')));
- assert.equal(statusPosterSnapshot(facts).statementAt,sourceAt);assert.equal(statusPosterSnapshot(facts).validUntil,'2026-10-18T21:12:21.000Z');
+ assert.equal(statusPosterSnapshot(facts).statementAt,sourceAt);assert.equal(statusPosterSnapshot(facts).validUntil,'');
 });
 test('历史经验比例只条件计数、不加Beta先验；不足、冷却、未经审计不得公布数字',()=>{
  const start=Date.parse('2026-01-01T00:00:00Z'),points=Array.from({length:35},(_,i)=>({id:String(i),at:new Date(start+i*96*3600000).toISOString(),knownAt:new Date(start+i*96*3600000).toISOString()}));

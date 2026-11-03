@@ -45,27 +45,35 @@ function add(data:PublicData,id:string,kind:ActionKind,stage:ActionStage,time:st
  data.events.push(event);data.articles.push(article);data.publications.push(p);
 }
 const time=(n:number)=>new Date(Date.parse(at)+n*day).toISOString();
-test('24h boundary, seven-day boundary and reopening derive from the same real reset without emitting completion',()=>{
- const d=fixture();const current=(n:number)=>selectedHomeStatus(d,'automatic_reset',time(n));
- assert.equal(current(1-1/86400).state,'completed');assert.equal(current(0).validUntil,time(1));
- assert.equal(current(1).state,'cycle');assert.equal(current(1).expectedAt,time(7));assert.equal(current(1).clockAt,at);
- assert.equal(current(6.99).state,'cycle');assert.equal(current(7).state,'cycle_due');assert.equal(current(9).state,'cycle_due');assert.equal(current(9).expectedAt,time(7));
- assert.equal(current(7).completedDisplay,false);assert.equal(current(7).evidenceType,'cycle');assert.equal(d.events.length,1);assert.equal(d.notices.length,0);
- d.serverTime=time(1);const old=statusPosterInput(d);assert.match(old.sourceLabel,/周期推算/);assert.equal(old.codePublicationId,'');assert.match(old.sharePath,/pages\/home/);
- d.serverTime=time(7);assert.equal(statusPosterAvailable(old,d),false);assert.match(statusPosterInput(d).title,/周期时间已到/);
+test('没有新预告时，24小时、7天与重新打开均保留真实重置计时，不合成周期重置',()=>{
+ const d=fixture();const before=JSON.stringify(d);
+ for(const n of [0,1-1/86400,1,6.99,7,9,30]){
+  const c=selectedHomeStatus(d,'automatic_reset',time(n));
+  assert.equal(c.state,'completed');assert.equal(c.hero.title,'距离上次重置');
+  assert.equal(c.clockAt,at);assert.equal(c.timeAt,at);assert.equal(c.validUntil,'');assert.equal(c.expectedAt,'');
+  assert.equal(c.evidenceType,'declaration');assert.doesNotMatch(c.hero.title+c.hero.label+c.hero.badge,/周期|7天/);
+ }
+ d.serverTime=time(7);const poster=statusPosterInput(d),home=selectedHomeStatus(d);
+ assert.equal(poster.title,home.hero.title);assert.equal(poster.value,home.hero.metric);assert.equal(poster.statementAt,at);
+ assert.equal(poster.sourceLabel,'依据：发布者公开完成声明');assert.match(poster.sharePath,/publicationId=pub-first/);
+ assert.equal(statusPosterAvailable(poster,{...d,serverTime:time(9)}),true);
+ assert.equal(d.events.length,1);assert.equal(d.notices.length,0);d.serverTime=at;assert.equal(JSON.stringify(d),before);
 });
-test('new announcement replaces elapsed/cycle immediately; only new quota completion moves quota anchor',()=>{
+test('新预告立即接替经过时长；发卡不改变额度计时，只有新额度完成证据移动锚点',()=>{
  for(const n of [.1,3]){
   const d=fixture('automatic_reset',time(n));add(d,'next','automatic_reset','promised',time(n),time(n+1));
   const c=selectedHomeStatus(d,'automatic_reset');assert.equal(c.state,'scheduled');assert.equal(c.expectedAt,time(n+1));
  }
- const d=fixture('automatic_reset',time(3));add(d,'card','banked_reset','claimed_complete',time(2.5));assert.equal(selectedHomeStatus(d,'automatic_reset').expectedAt,time(7));
- add(d,'next','automatic_reset','claimed_complete',time(2));const c=selectedHomeStatus(d,'automatic_reset');assert.equal(c.state,'cycle');assert.equal(c.expectedAt,time(9));assert.equal(c.clockAt,time(2));
+ const d=fixture('automatic_reset',time(3));add(d,'card','banked_reset','claimed_complete',time(2.5));assert.equal(selectedHomeStatus(d,'automatic_reset').clockAt,at);
+ add(d,'next','automatic_reset','claimed_complete',time(2));const c=selectedHomeStatus(d,'automatic_reset');assert.equal(c.state,'completed');assert.equal(c.expectedAt,'');assert.equal(c.clockAt,time(2));
 });
-test('banked grants retain last-message date after 24h but never invent a seven-day distribution',()=>{
- const d=fixture('banked_reset',time(1));const c=selectedHomeStatus(d,'banked_reset');assert.equal(c.state,'waiting');assert.equal(c.expectedAt,'');assert.equal(c.timeAt,at);assert.equal(c.previousCompletion.publicationId,'pub-first');
- assert.equal(c.lastMessage.publicationId,'pub-first');assert.equal(statusPosterInput(d,'banked_reset').codePublicationId,'');
- add(d,'next','banked_reset','promised',time(1),time(1.25));assert.equal(selectedHomeStatus(d,'banked_reset').state,'scheduled');
+test('发卡与额度一样保留上次完成计时，24小时与7天不会自行进入新一轮',()=>{
+ for(const n of [1,7,30]){
+  const d=fixture('banked_reset',time(n)),c=selectedHomeStatus(d,'banked_reset');
+  assert.equal(c.state,'completed');assert.equal(c.hero.title,'距离上次发卡');assert.equal(c.expectedAt,'');assert.equal(c.clockAt,at);
+  assert.equal(c.lastMessage.publicationId,'pub-first');assert.equal(statusPosterInput(d,'banked_reset').statementAt,at);
+  add(d,'next','banked_reset','promised',time(n),time(n+.25));assert.equal(selectedHomeStatus(d,'banked_reset').state,'scheduled');
+ }
 });
 
 test('an in-progress statement with an explicit deadline still counts down for both benefit kinds',()=>{

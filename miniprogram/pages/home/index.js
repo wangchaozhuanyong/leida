@@ -23,11 +23,20 @@ function recentMessage(record) {
     note: record.sourceType === 'observed' ? '依据第三方观测，个人额度以账户为准。' : '依据公开完成消息，个人到账以账户为准。'
   };
 }
+function focusFor(states,entryKind) {
+  return states.cards.find(card=>card.kind===entryKind) || states.primary;
+}
+function companion(states,selected) {
+  const other=selected===states.primary?states.secondary:states.primary;
+  if(!other||other.state==='waiting')return null;
+  const kindLabel=other.kind==='banked_reset'?'重置卡发放':'额度重置';
+  return {kind:other.kind,label:kindLabel,sourceUrl:other.sourceUrl||'',sourceName:other.sourceName||'',note:[other.hero.badge,other.time].filter(Boolean).join(' · ')};
+}
 Page(createPage((data, query, page, app) => {
   if (!data) return { name: '模钥重置雷达', latest: null, completions: [], pending: null, forecast: null, recent: [], activity: null, sharePath: '', timeline: null, posterPath: '', posterDescription: '' };
   const states = homeStateCards(data);
-  const selectedResetKind=validKind(page.selectedResetKind||query.kind);
-  const selected=states.cards.find(card=>card.kind===selectedResetKind);
+  const selected=focusFor(states,page.entryKind);
+  const selectedResetKind=selected.kind;
   const outlook = m.resetOutlookModel(data), completed = m.latestCompletedBenefits(data), latestItem = completed[0], pending = outlook.active;
   const latestPublication = latestItem && latestItem.publication;
   const latestAction = latestItem && latestItem.action;
@@ -45,8 +54,8 @@ Page(createPage((data, query, page, app) => {
   const posterDescription = '选择黑金或水墨，分享当前公开状态';
   return {
     name: data.site.name || '模钥重置雷达',
-    resetCards:states.cards,untypedSignal:states.untyped,stateWarning:states.sourceWarning,signalExpiredNote:states.expiredNote,selectedResetKind,
-    bankedResetUnread:selectedResetKind!=='banked_reset'&&!!app.homeTabNotices?.unread(states.cards,data),
+    primaryCard:selected,secondaryCard:companion(states,selected),resetCards:states.cards,untypedSignal:states.untyped,stateWarning:states.sourceWarning,signalExpiredNote:states.expiredNote,selectedResetKind,
+    bankedResetUnread:!!page.entryKind&&selectedResetKind!=='banked_reset'&&!!app.homeTabNotices?.unread(states.cards,data),
     historicalProbability: m.referenceCadenceView(data.forecasts?.referenceCadence,data.serverTime),
     lastReset: recentMessage(selectedResetKind==='banked_reset'?states.lastCard:states.lastReset),
     latest: latest ? { title: latest.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', elapsed: m.elapsed(latest.statementAt, data.serverTime), time: m.completionTime(latest.statementAt), eligibility: latestAction.eligibility, path: pathFor(latest) } : null,
@@ -69,10 +78,11 @@ Page(createPage((data, query, page, app) => {
     shareLabel: '分享这条公告给朋友',
     historical: data.articles.length > 0 && data.articles.every(article => m.isHistoricalArticle(article, data.evidence))
   };
-}, { view:()=>({view:'home'}), load(query) { this.setData({selectedResetKind:validKind(query.kind)}); }, data: { name: '模钥重置雷达', freshnessOpen: false, motionActive: false, bankedResetUnread:false }, show() { this.setData({motionActive: true}); }, afterRender() { this.queuePrimaryPrefetch(); this.syncCountdown(); this.syncForecastExpiry(); this.syncHomeTabNotice(); }, hide() { this.setData({motionActive: false}); this.cancelPrimaryPrefetch(); this.stopCountdown(); this.stopForecastExpiry(); }, unload() { this.setData({motionActive: false}); this.cancelPrimaryPrefetch(); this.stopCountdown(); this.stopForecastExpiry(); }, methods: {
+}, { view:()=>({view:'home'}), load(query) { this.setData({entryKind:['automatic_reset','banked_reset'].includes(query.kind)?query.kind:''}); }, data: { name: '模钥重置雷达', freshnessOpen: false, motionActive: false, bankedResetUnread:false }, show() { this.setData({motionActive: true}); }, afterRender() { this.queuePrimaryPrefetch(); this.syncCountdown(); this.syncForecastExpiry(); this.syncHomeTabNotice(); }, hide() { this.setData({motionActive: false}); this.cancelPrimaryPrefetch(); this.stopCountdown(); this.stopForecastExpiry(); }, unload() { this.setData({motionActive: false}); this.cancelPrimaryPrefetch(); this.stopCountdown(); this.stopForecastExpiry(); }, methods: {
   syncHomeTabNotice() {
     const data=this._renderedData,notices=getApp().homeTabNotices;
-    if(!this._visible||!data||!notices)return;
+    // A direct legacy category link can still acknowledge its old tab notice.
+    if(!this.data.entryKind||!this._visible||!data||!notices)return;
     const selected=this.data.selectedResetKind==='banked_reset';
     const unread=!selected&&notices.unread(this.data.resetCards,data);
     if(unread!==this.data.bankedResetUnread)this.setData({bankedResetUnread:unread});
@@ -90,10 +100,10 @@ Page(createPage((data, query, page, app) => {
   },
   cancelPrimaryPrefetch() { if(this._primaryPrefetchTimer)clearTimeout(this._primaryPrefetchTimer);this._primaryPrefetchTimer=null; },
   toggleFreshness() { this.setData({ freshnessOpen: !this.data.freshnessOpen }); },
-  currentHomeStatus() { const state=getApp().client.getState();if(!state.data||state.snapshotPending)return null;const now=new Date(Date.parse(state.data.serverTime)+Math.max(0,Date.now()-(state.receivedAt||Date.now()))).toISOString();return selectedHomeStatus(state.data,this.data.selectedResetKind,now); },
-  openPoster() { if(this.data.snapshotPending){wx.showToast({title:'更新最新消息后可分享',icon:'none'});return;}const card=this.data.connected&&this.currentHomeStatus();if(card)wx.navigateTo({url:'/packages/poster/index?kind='+card.kind+'&revision='+encodeURIComponent(card.revision),fail(){wx.showToast({title:'海报页面加载失败，请重试。',icon:'none'});} }); },
+  currentHomeStatus() { const state=getApp().client.getState();if(!state.data||state.snapshotPending)return null;const now=new Date(Date.parse(state.data.serverTime)+Math.max(0,Date.now()-(state.receivedAt||Date.now()))).toISOString();return focusFor(homeStateCards(state.data,now),this.data.entryKind); },
+  openPoster() { if(this.data.snapshotPending){wx.showToast({title:'更新最新消息后可分享',icon:'none'});return;}const card=this.data.connected&&this.currentHomeStatus();if(card)wx.navigateTo({url:'/packages/poster/index?kind='+card.kind+(this.data.entryKind?'':'&focus=auto')+'&revision='+encodeURIComponent(card.revision),fail(){wx.showToast({title:'海报页面加载失败，请重试。',icon:'none'});} }); },
   syncCountdown() {
-    if (!this.data.lastReset && !this.data.resetCards?.some(card=>['scheduled','revised','overdue'].includes(card.state)||(card.kind===this.data.selectedResetKind&&['completed','observed'].includes(card.state))) && !(this.data.pending && this.data.pending.counting) && !(this.data.timeline && (this.data.timeline.completed || this.data.timeline.scheduled))) { this.stopCountdown(); return; }
+    if (!this.data.lastReset && !this.data.resetCards?.some(card=>['scheduled','revised','overdue'].includes(card.state)||(card.state==='progress'&&card.expectedAt)||(card.kind===this.data.selectedResetKind&&['completed','observed'].includes(card.state))) && !(this.data.pending && this.data.pending.counting) && !(this.data.timeline && (this.data.timeline.completed || this.data.timeline.scheduled))) { this.stopCountdown(); return; }
     if (!this._countdownTimer) this._countdownTimer = setInterval(() => this.tickCountdown(), 1000);
   },
   tickCountdown() {
@@ -146,14 +156,24 @@ Page(createPage((data, query, page, app) => {
   resetCardsPatch(data, now) {
     const states=homeStateCards(data,now),patch={};
     for(const [key,value] of Object.entries({resetCards:states.cards,untypedSignal:states.untyped,stateWarning:states.sourceWarning,signalExpiredNote:states.expiredNote}))if(JSON.stringify(this.data[key])!==JSON.stringify(value))patch[key]=value;
-    const selected=states.cards.find(card=>card.kind===validKind(this.data.selectedResetKind));
+    const selected=focusFor(states,this.data.entryKind);
+    for(const [key,value] of Object.entries({primaryCard:selected,selectedResetKind:selected.kind,secondaryCard:companion(states,selected)}))if(JSON.stringify(this.data[key])!==JSON.stringify(value))patch[key]=value;
     for(const [key,value] of Object.entries({shareTitle:selected.shareTitle,sharePath:selected.sharePath}))if(this.data[key]!==value)patch[key]=value;
-    const history=recentMessage(this.data.selectedResetKind==='banked_reset'?states.lastCard:states.lastReset);
+    const history=recentMessage(selected.kind==='banked_reset'?states.lastCard:states.lastReset);
     if(!history||!this.data.lastReset){if(JSON.stringify(history)!==JSON.stringify(this.data.lastReset))patch.lastReset=history;}
     else for(const [key,value] of Object.entries(history))if(value!==this.data.lastReset[key])patch['lastReset.'+key]=value;
     return patch;
   },
-  selectResetKind(event) { const kind=event.currentTarget.dataset.kind;if(['automatic_reset','banked_reset'].includes(kind)){this.setData({selectedResetKind:kind,expandedSourceKind:''});this.tickCountdown();this.syncCountdown();this.syncHomeTabNotice();} },
+  selectResetKind(event) { const kind=event.currentTarget.dataset.kind;if(['automatic_reset','banked_reset'].includes(kind)){this.setData({entryKind:kind,selectedResetKind:kind,expandedSourceKind:''});this.tickCountdown();this.syncCountdown();this.syncHomeTabNotice();} },
+  openSecondary(event) {
+    const card=this.data.resetCards.find(item=>item.kind===event.currentTarget.dataset.kind);
+    if(!card)return;
+    if(card.observationSummaryDate || card.publicationId){
+      if(card.observationSummaryDate)wx.navigateTo({url:card.sharePath});
+      else wx.navigateTo({url:'/pages/detail/index?publicationId='+encodeURIComponent(card.publicationId)});
+    }else if(card.sourceUrl) this.setData({expandedSourceKind:this.data.expandedSourceKind===card.kind?'':card.kind});
+    else wx.switchTab({url:'/pages/news/index'});
+  },
   openStatusEvidence(event) {
     const kind=event.currentTarget.dataset.kind,card=kind==='untyped'?this.data.untypedSignal:this.data.resetCards.find(item=>item.kind===kind);
     if(!card)return;

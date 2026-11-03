@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
+import {publicResetOutlook,announcementNeedsReview} from '../src/lib/reset-outlook';
+import {reminderContentCurrent} from '../src/lib/reminder-lifecycle';
+import {statusShareUrl} from '../src/lib/share';
 import {readFileSync} from 'node:fs';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -93,7 +96,28 @@ test('提前完成结束倒计时；同轮补采更早的完成声明只升级�
  const observed=card(d);assert.equal(observed.state,'observed');assert.equal(observed.early,true);assert.equal(observed.hero.title,'距离上次重置（观测）');assert.equal(observed.hero.badge,'第三方报告');assert.equal(observed.clockAt,'2026-10-24T01:40:00Z');assert.match(observed.hero.description,/预计时间前.*观测/);assert.match(observed.hero.footnote,/来源：.*账户为准/);assert.equal(observed.evidenceType,'observation');
  action(d,'declared','claimed_complete','2026-10-24T01:30:00Z',undefined,'automatic_reset','promise',NOW);
  const declared=card(d);assert.equal(declared.state,'completed');assert.equal(declared.hero.badge,'发布者已确认');assert.equal(declared.clockAt,observed.clockAt);assert.equal(declared.hero.metric,observed.hero.metric);assert.equal(declared.publicationId,'pub-declared');assert.match(declared.declarationTime,/09:30/);assert.notEqual(declared.revision,observed.revision);
- const later=card(d,'2026-10-25T03:00:00Z');assert.equal(later.state,'cycle');assert.equal(later.clockAt,observed.clockAt);assert.match(later.hero.description,/来源观测时间/);assert.match(statusPosterInput({...d,serverTime:'2026-10-25T03:00:00Z'}).sourceLabel,/来源观测时间/);
+ const later=card(d,'2026-10-25T03:00:00Z');assert.equal(later.state,'completed');assert.equal(later.clockAt,observed.clockAt);assert.equal(later.hero.badge,'发布者已确认');assert.equal(statusPosterInput({...d,serverTime:'2026-10-25T03:00:00Z'}).sourceLabel,'依据：发布者公开完成声明');
+ const afterCycle=card(d,'2026-10-31T02:00:00Z');
+ assert.equal(afterCycle.hero.title,'距离上次重置','完成声明的确认等级不能因为沿用观测计时而降级');
+ assert.equal(afterCycle.clockAt,observed.clockAt);assert.equal(afterCycle.timeAt,observed.clockAt);
+ assert.equal(afterCycle.hero.timeLabel,'来源观测时间');
+ assert.equal(statusPosterInput({...d,serverTime:'2026-10-31T02:00:00Z'}).sourceLabel,'依据：发布者公开完成声明');
+});
+
+test('纯观测超过7天仍保留经过时长及来源，两款海报与首页同步',()=>{
+ const d=fixture();observation(d,'last-observation','2026-10-24T01:40:00Z');d.serverTime='2026-10-31T02:00:00Z';
+ const c=card(d),input=statusPosterInput(d);
+ assert.equal(c.state,'observed');assert.equal(c.hero.title,'距离上次重置（观测）');assert.equal(c.hero.badge,'第三方报告');
+ assert.equal(c.clockAt,'2026-10-24T01:40:00Z');assert.equal(c.timeAt,c.clockAt);assert.equal(c.hero.metric,'7天0小时20分钟');
+ assert.equal(input.value,c.hero.metric);assert.equal(input.statementAt,c.clockAt);assert.match(input.sourceLabel,/第三方观测/);
+ for(const theme of ['precision','editorial']){
+  const layout=createStatusPosterLayout(input,(text:string,size:number)=>text.length*size*.55,theme,false);
+  const copy=layout.commands.filter((c:any)=>c.type==='text').map((c:any)=>c.value).join(' ');
+  assert.match(copy,/距离上次重置（观测）/);assert.doesNotMatch(copy,/周期时间已到|7天周期推算/);
+ }
+ const previousRevision=c.revision;
+ action(d,'new-arrangement','promised','2026-10-31T01:50:00Z','2026-10-31T04:00:00Z');
+ assert.equal(card(d).state,'scheduled');assert.notEqual(card(d).revision,previousRevision);assert.equal(statusPosterAvailable(input,d),false);
 });
 test('同轮两个来源采用最早有效观测计时，较晚采集和刷新不把计时推迟',()=>{
  const d=fixture();action(d,'promise');observation(d,'later','2026-10-24T01:40:00Z','2113492502355562875');observation(d,'earlier','2026-10-24T01:00:00Z');
@@ -170,16 +194,16 @@ test('进行中跨截止时间统一转超时，24小时边界退出且刷新不
  const d=fixture();action(d,'older','claimed_complete','2026-10-22T04:00:00Z',undefined);action(d,'promise');action(d,'started','in_progress','2026-10-24T00:00:00Z',T,'automatic_reset','promise');
  assert.equal(card(d,'2026-10-24T01:59:59Z').state,'progress');const overdue=card(d,T);assert.equal(overdue.state,'overdue');assert.match(overdue.hero.description,/已宣布开始/);assert.equal(overdue.validUntil,'2026-10-25T02:00:00.000Z');
  assert.equal(card(d,'2026-10-25T01:59:59Z').state,'overdue');
- for(const at of ['2026-10-25T02:00:00Z','2026-10-26T03:00:00Z']){const expired=card(d,at);assert.equal(expired.state,'waiting');assert.equal(expired.hero.title,'暂无新消息');assert.equal(expired.publicationId,'');assert.equal(expired.clockAt,'');assert.equal(expired.hero.metric,'');assert.equal(expired.expiredRound,true);assert.match(expired.sharePath,/home\/index/);}
+ for(const at of ['2026-10-25T02:00:00Z','2026-10-26T03:00:00Z']){const expired=card(d,at);assert.equal(expired.state,'completed');assert.equal(expired.hero.title,'距离上次重置');assert.equal(expired.publicationId,'pub-older');assert.equal(expired.clockAt,'2026-10-22T04:00:00Z');assert.match(expired.sharePath,/publicationId=pub-older/);}
 });
 test('24小时内新安排、调整、取消与完成取代旧状态；无关动态不覆盖',()=>{
  for(const stage of ['promised','cancelled','claimed_complete'] as const){const d=fixture();action(d,'old');const p=action(d,'new',stage,'2026-10-24T02:30:00Z',stage==='promised'?'2026-10-25T02:00:00Z':undefined);const v=card(d);assert.equal(v.state,stage==='promised'?'scheduled':stage==='cancelled'?'cancelled':'completed');assert.equal(v.publicationId,p.id);}
  const d=fixture();action(d,'v1');action(d,'v2','promised','2026-10-24T02:30:00Z','2026-10-24T06:00:00Z','automatic_reset','v1');assert.equal(card(d).state,'revised');assert.match(card(d).oldTime,/10:00/);
  const unrelated=action(d,'product','promised','2026-10-24T02:50:00Z');unrelated.mode='news_only';unrelated.article.category='product';assert.equal(card(d).publicationId,'pub-v2');
 });
-test('来源故障不改完成事实、不延长窗口；完成24小时后只切换周期展示',()=>{
+test('来源故障不改完成事实或预告窗口；完成24小时后持续显示真实计时',()=>{
  const d=fixture();action(d,'promise');const before=card(d);d.sources[0].status='failed';const after=card(d);assert.equal(after.state,before.state);assert.equal(after.validUntil,before.validUntil);assert.match(homeResetStatus(d).sourceWarning,/来源更新延迟/);assert.equal(card(d,'2026-10-25T02:00:00Z').state,'waiting');
- const c=fixture();action(c,'completed','claimed_complete','2026-10-20T00:00:00Z',undefined);assert.equal(card(c).state,'cycle');assert.equal(card(c).clockAt,'2026-10-20T00:00:00Z');assert.equal(card(c).expectedAt,'2026-10-27T00:00:00.000Z');assert.equal(card(c).validUntil,card(c).expectedAt);
+ const c=fixture();action(c,'completed','claimed_complete','2026-10-20T00:00:00Z',undefined);assert.equal(card(c).state,'completed');assert.equal(card(c).clockAt,'2026-10-20T00:00:00Z');assert.equal(card(c).expectedAt,T);assert.equal(card(c).validUntil,'');
 });
 test('首页精简数据只保留服务端outlook时，同样执行进行中超时和24小时退出',()=>{
  const d=fixture(),active={actionId:'projected',eventId:'projected-event',publicationId:'projected-publication',kind:'automatic_reset',stage:'in_progress',statementAt:START,expectedAt:T,timeNote:'最晚之前'};
@@ -293,15 +317,73 @@ test('已读只存公共消息身份并按环境隔离，不包含登录、次�
  const other=createHomeTabNotices(store.api,{...newsConfig,cloudEnv:'another-isolated-env'});assert.equal(other.unread(homeResetStatus(d).cards,d),true);
 });
 
-// Native timers, not a mocked presentation helper: background crossing and reopening
-// must use the same recorded reset anchor rather than restart a seven-day window.
-test('原生首页在完成24小时与周期7天边界重算，后台恢复不重启周期',()=>{
+// Native lifecycle must retain the recorded reset anchor across long absences.
+test('原生首页跨过24小时和7天、后台恢复及重新进入仍保持原始计时',()=>{
  const start=Date.parse(START),d=fixture();d.serverTime=START;action(d,'done','claimed_complete',START,undefined);
  const h=nativeHome(d,start);try{
   assert.equal(h.page.data.resetCards[0].state,'completed');
-  h.advanceTo(start+86400000+100);assert.equal(h.page.data.resetCards[0].state,'cycle');
+  h.advanceTo(start+86400000+100);h.page.onHide();h.page.onShow();assert.equal(h.page.data.resetCards[0].state,'completed');
   h.page.onHide();h.advanceTo(start+7*86400000+100);h.page.onShow();
-  assert.equal(h.page.data.resetCards[0].state,'cycle_due');assert.equal(h.page.data.resetCards[0].clockAt,START);
-  assert.equal(h.page.data.resetCards[0].expectedAt,new Date(start+7*86400000).toISOString());
+  assert.equal(h.page.data.resetCards[0].state,'completed');assert.equal(h.page.data.resetCards[0].clockAt,START);
+  assert.equal(h.page.data.resetCards[0].expectedAt,T);
+  assert.equal(h.page.data.resetCards[0].hero.title,'距离上次重置');assert.equal(h.page.data.resetCards[0].timeAt,START);
+  h.page.openStatusEvidence({currentTarget:{dataset:{kind:'automatic_reset'}}});
+  assert.equal(h.navigations.at(-1),'/pages/detail/index?publicationId=pub-done');
  }finally{h.page.onUnload();}
+});
+
+
+test('两类预告并存取最近期限，换主卡后旧海报失效，另一类预告保留',()=>{
+ const data=fixture();
+ action(data,'automatic','promised',START,'2026-10-26T10:00:00Z');
+ const saved=statusPosterInput(data);
+ assert.equal(saved.kind,'automatic_reset');
+ const other=action(data,'banked','promised','2026-10-24T02:10:00Z','2026-10-25T02:00:00Z','banked_reset');
+ const {primary,secondary}=homeResetStatus(data),current=statusPosterInput(data);
+ assert.equal(primary.publicationId,other.id);
+ assert.equal(secondary.publicationId,'pub-automatic');
+ assert.equal(statusPosterAvailable(saved,data),false);
+ assert.equal(current.round,primary.revision);
+ assert.equal(current.sharePath,primary.sharePath);
+ assert.equal(statusShareUrl('https://example.test',data.publications,current),'https://example.test/events/event-banked?version=pub-banked');
+});
+
+test('完成旧轮不能撤下已识别的另一轮预告，也不能拦截对应提醒',()=>{
+ const data=fixture();
+ action(data,'old-promise','promised','2026-10-21T02:00:00Z',T,'automatic_reset','old');
+ const next=action(data,'next','promised','2026-10-22T02:00:00Z','2026-10-25T02:00:00Z');
+ next.article.evidenceIds=['proof-next'];
+ next.event.actions[0].evidenceIds=['proof-next'];
+ data.events.find(e=>e.id===next.eventId)!.actions[0].evidenceIds=['proof-next'];
+ action(data,'old-done','claimed_complete',T,undefined,'automatic_reset','old');
+ const outlook=publicResetOutlook(data,'automatic_reset');
+ const native=require('../miniprogram/utils/model').resetOutlookModel;
+ assert.equal(native(data,'automatic_reset').active?.publicationId,next.id);
+ assert.equal(outlook.active?.publicationId,next.id);
+ assert.equal(homeResetStatus(data).primary.publicationId,next.id);
+ const notice={status:'active',categories:['announcement']} as Parameters<typeof reminderContentCurrent>[0];
+ assert.equal(reminderContentCurrent(notice,next,next.event,NOW,outlook.latestResolutions),true);
+ // Removing the earlier promise removes proof of an independent previous round.
+ data.publications=data.publications.filter(p=>p.id!=='pub-old-promise');
+ const ambiguous=publicResetOutlook(data,'automatic_reset');
+ assert.equal(ambiguous.active,undefined);
+ assert.equal(native(data,'automatic_reset').active,null);
+ assert.equal(reminderContentCurrent(notice,next,next.event,NOW,ambiguous.latestResolutions),false);
+});
+
+test('观测汇总分享保留实际日期和类别，空状态回首页',()=>{
+ const url=(sharePath:string)=>statusShareUrl('https://example.test',[],{sharePath});
+ assert.equal(url('/pages/schedule/index?date=2026-10-24&kind=automatic_reset&revision=one'),'https://example.test/history?date=2026-10-24&target=automatic');
+ assert.equal(url('/pages/home/index?kind=banked_reset'),'https://example.test/');
+});
+
+test('同一事件内有独立动作身份也要核对旧批次的原预告',()=>{
+ const native=require('../miniprogram/utils/round-evidence').announcementNeedsReview;
+ const prior={actionId:'batch-1',eventId:'event-series',publicationId:'pub-complete',kind:'banked_reset',stage:'claimed_complete',statementAt:T,resolvedAt:T,announcedAt:'2026-10-21T02:00:00Z'} as const;
+ for(const guard of [announcementNeedsReview,native]){
+  const next={id:'batch-2',kind:'banked_reset',statementAt:START} as const;
+  assert.equal(guard(next,prior,prior.eventId),false);
+  assert.equal(guard({...next,id:'batch-1'},prior,prior.eventId),true);
+  assert.equal(guard(next,{...prior,announcedAt:undefined},prior.eventId),true);
+ }
 });

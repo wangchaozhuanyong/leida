@@ -54,7 +54,7 @@ test('真实01:00观测进入公共状态和共享首页计时，不伪造成原
  assert.equal(data.publications[0].mode,'news_only');assert.equal(data.publications[0].event.actions.length,0);
  assert.match(data.articles[0].summary,/观测时间/);assert.equal(view.lastCard,null);
  assert.deepEqual(require('../miniprogram/utils/status-timeline.js').statusTimelineModel(outlook,now),statusTimelineModel(outlook,now));
- assert.equal(statusPosterSnapshot(data).title,'来源观测：用量已重置');assert.equal(statusPosterSnapshot(data).statementAt,observedAt);
+ assert.equal(statusPosterSnapshot(data).title,'距离上次重置（观测）');assert.equal(statusPosterSnapshot(data).statementAt,observedAt);
 });
 test('重复采集只呈现一条观测；撤回、未来、其他来源及不明确消息均不能推动计时',()=>{
  const data=fixture();data.evidence.push({...data.evidence[0],id:'new-version',collectedAt:'2026-10-23T04:00:00Z'});data.publications[0].article.evidenceIds.push('new-version');
@@ -81,7 +81,7 @@ test('历史事件指向其他普通动态时仍找到观测；已有完成观�
  assert.equal(require('../miniprogram/utils/model.js').sortedStatePublications(data)[0].id,'observed-publication');
  data.forecasts={outlook:publicResetOutlook(data),referenceSignal:{sourceUrl:observation().url,publishedAt:'2026-10-22T06:55:54Z',recordedAt:now,sourceName:'AIPlanWatch'}} as any;
  assert.equal(resetStateCards(data).untyped,null);assert.equal(statusTimelineModel(data.forecasts!.outlook!,now,undefined,data.forecasts).watching,false);
- assert.equal(statusPosterSnapshot(data).statementLabel,'观测时间');
+ assert.equal(statusPosterSnapshot(data).statementLabel,'来源观测时间');
 });
 function campaign(){
  const rule=original('2106845241357824205','Over the next 28 days, each day we’ll either ship one thing that is a clear improvement and relevant for most codex/work users or ship a full reset. Let the improvements begin.','2026-10-04T20:33:43Z');

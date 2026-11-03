@@ -28,7 +28,7 @@ export function reminderContentCurrent(notice:Notice, publication:Publication, e
   if(!stage)return false;
   return actions.some(action=>{
     if(stage==='claimed_complete')return action.stage==='claimed_complete'&&event.actions.some(current=>current.id===action.id&&current.kind===action.kind&&current.stage==='claimed_complete');
-    if(!['promised','in_progress'].includes(action.stage)||announcementNeedsReview(action,resolutions?.[action.kind]))return false;
+    if(!['promised','in_progress'].includes(action.stage)||announcementNeedsReview(action,resolutions?.[action.kind],event.id))return false;
     if(action.expectedAt&&Date.parse(action.expectedAt)<=Date.parse(now))return false;
     return event.actions.some(current=>current.id===action.id&&current.kind===action.kind&&['promised','in_progress'].includes(current.stage)&&current.expectedAt===action.expectedAt&&Date.parse(current.statementAt)===Date.parse(action.statementAt));
   });

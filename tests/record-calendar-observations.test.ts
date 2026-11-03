@@ -28,6 +28,52 @@ function addObservation(data:PublicData,e=limits(),id=`p-${e.id}`){return addPub
 function addCompletion(data:PublicData,id='confirmed',at='2026-10-23T18:10:00.000Z',kind:BenefitAction['kind']='automatic_reset',evidence:Evidence[]=[],actionEvidenceIds=evidence.map(e=>e.id),eventId=`event-${id}`){return addPublication(data,id,at,[{id:`action-${id}`,kind,stage:'claimed_complete',scope:'public',statementAt:at,eligibility:'公开',evidenceIds:actionEvidenceIds}],evidence,eventId);}
 function fixture(){const data=empty();addObservation(data,archive());addObservation(data);return data;}
 
+test('11月首周显示10月26至31日，跨月标记保留完成、发卡和来源观测，统计只算本月',()=>{
+ const data=empty();data.serverTime='2026-11-03T08:00:00.000Z';
+ addCompletion(data,'oct-quota','2026-10-26T06:08:00.000Z');
+ addCompletion(data,'oct-card','2026-10-31T03:44:00.000Z','banked_reset');
+ addCompletion(data,'nov-card','2026-11-02T03:44:00.000Z','banked_reset');
+ const observation=archive('2026-10-27T17:00:00.000Z','oct-observation');observation.collectedAt=data.serverTime;addObservation(data,observation);
+ const before=structuredClone(data),view=recordCalendar(data,{month:'2026-11'});
+ assert.deepEqual(view.days.slice(0,7).map(d=>[d.date,d.day]),[
+  ['2026-10-26','26'],['2026-10-27','27'],['2026-10-28','28'],['2026-10-29','29'],['2026-10-30','30'],['2026-10-31','31'],['2026-11-01','1']
+ ]);
+ assert.equal(view.days.length,42);assert.equal(view.days.at(-1)!.date,'2026-12-06');
+ assert.equal(new Set(view.days.map(d=>d.date)).size,42);
+ assert.ok(view.days.slice(0,6).every(d=>d.outsideMonth&&!d.disabled));
+ assert.equal(view.days[6].outsideMonth,false);
+ assert.equal(view.days.find(d=>d.date==='2026-10-26')!.confirmedAutomatic,true);
+ assert.equal(view.days.find(d=>d.date==='2026-10-31')!.confirmedBanked,true);
+ assert.equal(view.days.find(d=>d.date==='2026-10-28')!.observedCount,1);
+ assert.ok(view.days.filter(d=>d.date>'2026-11-03').every(d=>d.disabled&&d.count===0));
+ assert.deepEqual([view.automaticCount,view.bankedCount,view.confirmedCount,view.observedCount],[0,1,1,0]);
+ const selected=recordCalendar(data,{date:'2026-10-31'});
+ assert.equal(selected.selectedItems[0].kind,'banked_reset');assert.equal(selected.selectedItems[0].path,'/pages/detail/index?publicationId=oct-card');
+ const banked=recordCalendar(data,{month:'2026-11',kind:'banked_reset'});
+ assert.equal(banked.days.find(d=>d.date==='2026-10-26')!.count,0);
+ assert.equal(banked.days.find(d=>d.date==='2026-10-28')!.count,0);
+ assert.equal(banked.days.find(d=>d.date==='2026-10-31')!.count,1);
+ assert.deepEqual(data,before);
+});
+
+test('跨年和闰年相邻日期连续；半年范围之外仍显示日期但不能选择或借入旧记录',()=>{
+ const data=empty();data.serverTime='2027-01-15T08:00:00.000Z';
+ addCompletion(data,'dec-card','2026-12-30T03:44:00.000Z','banked_reset');
+ const january=recordCalendar(data,{month:'2027-01'});
+ assert.deepEqual(january.days.slice(0,5).map(d=>d.date),['2026-12-28','2026-12-29','2026-12-30','2026-12-31','2027-01-01']);
+ assert.equal(january.days[2].confirmedBanked,true);
+ data.serverTime='2024-03-05T08:00:00.000Z';
+ const march=recordCalendar(data,{month:'2024-03'});
+ assert.deepEqual(march.days.slice(0,5).map(d=>d.date),['2024-02-26','2024-02-27','2024-02-28','2024-02-29','2024-03-01']);
+ data.serverTime='2026-11-03T08:00:00.000Z';
+ addCompletion(data,'before-window','2026-04-30T03:44:00.000Z');
+ const earliest=recordCalendar(data,{month:'2026-05'});
+ assert.equal(earliest.days[0].date,'2026-04-27');
+ assert.ok(earliest.days.filter(d=>d.date<'2026-05-03').every(d=>d.disabled&&d.count===0));
+ assert.equal(earliest.days.find(d=>d.date==='2026-05-03')!.disabled,false);
+ assert.ok(data.events.some(e=>e.id==='event-before-window'),'范围外原始记录没有被删除');
+});
+
 test('三条来源观测汇总为两个日期项，所有来源依据保留在明细',()=>{
  const data=fixture();addObservation(data,limits('2026-10-22T17:10:00.000Z','old-limits'));
  const view=recordCalendar(data);

@@ -21,10 +21,10 @@ import { useFixedSnapshot } from './useFixedSnapshot';
 import type {ForecastSnapshot} from '@/lib/forecast';
 import {ForecastPanel} from './ForecastPanel';
 import {statusPosterSnapshot} from '@/lib/status-timeline';
-import {ResetStateCards,ResetStatePending,LastResetElapsed} from './ResetStateCards';
+import {ResetStateCards,ResetStatePending} from './ResetStateCards';
 import { actionLabels } from '@/lib/labels';
 import { activityDayNumber, activityHomeVisible } from '@/lib/activity-display';
-import { publicationUrl, isLocalShareUrl } from '@/lib/share';
+import { publicationUrl, statusShareUrl, isLocalShareUrl } from '@/lib/share';
 import { createPosterFromEndpoint, savePosterImage, type PosterImage } from './poster-image';
 import { statusPosterStyles, statusPosterVariant, type StatusPosterStyle } from '@/lib/status-poster-style';
 import { activityPublicationUrl, activityShareQuery, buildActivityShare, parseActivityShare, resolveActivityShare, type ActivityDayShare } from '@/lib/activity-share';
@@ -200,7 +200,10 @@ export default function PublicApp() {
     </main>
     <footer className={`pub-footer ${subpage ? 'subpage' : ''}`}>{navigationLoading ? null : route==='methodology'&&query.get('snapshot') ? <p>预测资料截至时间见历史记录</p> : cutoff && !['home', 'events', 'articles', 'sources'].includes(route) ? <p>{historical ? '历史资料' : '资料截至'} · {displayTime(cutoff)}</p> : null}<p>所有时间均为北京时间</p><Link scroll={false} href="/more#privacy">隐私说明</Link></footer>
     <nav className="pub-bottom-nav" aria-label="手机主导航">{navigation}</nav>
-    {statusPoster && <PosterModal statusDesign codeAvailable={posterCodeAvailable} target={{ validUntil:data?statusPosterSnapshot(data,statusPoster.generatedAt).validUntil:undefined,id: `${statusPoster.publication?.id??'current'}:${statusPoster.actionId}`, cutoffAt: statusPoster.publication?.cutoffAt??statusPoster.generatedAt, title: '公开重置状态', endpoint: `/api/v1/posters/${encodeURIComponent(statusPoster.publication?.id??'current')}?${new URLSearchParams({ layout: 'status', action: statusPoster.actionId,round:statusPoster.round,at:statusPoster.generatedAt })}`, filename: `模钥重置雷达-重置状态-${dateKey(data?.serverTime || new Date().toISOString())}.png` }} name={data?.site.name || '模钥重置雷达'} blocked={data && statusPoster.round!==statusPosterSnapshot(data,currentTime()||data.serverTime).round ? '公开状态已变化，请关闭后重新生成海报。' : ''} onClose={() => setStatusPoster(null)} onShare={() => share(statusPoster.publication)} />}
+    {statusPoster && data && <PosterModal statusDesign codeAvailable={posterCodeAvailable} target={{ validUntil:data?statusPosterSnapshot(data,statusPoster.generatedAt).validUntil:undefined,id: `${statusPoster.publication?.id??'current'}:${statusPoster.actionId}`, cutoffAt: statusPoster.publication?.cutoffAt??statusPoster.generatedAt, title: '公开重置状态', endpoint: `/api/v1/posters/${encodeURIComponent(statusPoster.publication?.id??'current')}?${new URLSearchParams({ layout: 'status', action: statusPoster.actionId,round:statusPoster.round,at:statusPoster.generatedAt })}`, filename: `模钥重置雷达-重置状态-${dateKey(data?.serverTime || new Date().toISOString())}.png` }} name={data?.site.name || '模钥重置雷达'} blocked={data && statusPoster.round!==statusPosterSnapshot(data,currentTime()||data.serverTime).round ? '公开状态已变化，请关闭后重新生成海报。' : ''} onClose={() => setStatusPoster(null)} onShare={() => {
+      const snapshot = statusPosterSnapshot(data, statusPoster.generatedAt);
+      return shareUrl(statusShareUrl(location.origin, data.publications, snapshot), snapshot.shareTitle);
+    }} />}
     {poster && <PosterModal target={{ id: poster.id, cutoffAt: poster.cutoffAt, title: poster.article.title, endpoint: `/api/v1/posters/${encodeURIComponent(poster.id)}`, filename: `模钥重置雷达-${dateKey(poster.cutoffAt)}-${poster.id}.png` }} name={data?.site.name || '模钥重置雷达'} blocked={posterWithdrawn ? '此内容已撤回，已停止生成海报。' : ''} onClose={() => setPoster(null)} onShare={() => share(poster)} />}
     {!poster && dayPoster && <PosterModal target={{ id: `${dayPoster.activityId}:${dayPoster.day}:${dayPoster.publicationIds.join(',')}`, cutoffAt: dayPosterCutoff, title: `活动第${dayPoster.day}天整合海报`, endpoint: `/api/v1/activity-posters/${encodeURIComponent(dayPoster.activityId)}?${activityShareQuery(dayPoster)}`, filename: `模钥重置雷达-活动第${dayPoster.day}天.png` }} name={data?.site.name || '模钥重置雷达'} blocked={dayPosterError} onClose={() => setDayPoster(null)} onShare={() => shareUrl(activityPublicationUrl(location.origin, dayPoster), `活动第${dayPoster.day}天进展`)} />}
     {!poster && !dayPoster && forecastPoster && <PosterModal target={{id:forecastPoster.id,cutoffAt:forecastPoster.evidenceCutoffAt,title:'重置实验预测记录',endpoint:`/api/v1/forecast-posters/${encodeURIComponent(forecastPoster.id)}`,filename:`模钥重置雷达-实验预测-${forecastPoster.id}.png`}} name={data?.site.name||'模钥重置雷达'} blocked={forecastPosterState.unavailable ? '此固定预测记录已不可用，已停止生成与分享海报。' : ''} onClose={()=>setForecastPoster(null)} onShare={()=>shareUrl(`${location.origin}/methodology?snapshot=${encodeURIComponent(forecastPoster.id)}`,'重置实验预测记录')} />}
@@ -211,7 +214,6 @@ export default function PublicApp() {
 }
 
 export function Home({ data, onWechatReminders, onPoster, onShare, historical, wechatEntry = 'checking' }: { data: PublicData; onWechatReminders: () => void; onPoster: (p?: Publication, actionId?: string) => void; onShare: (p?: Publication) => Promise<void>; historical: boolean; wechatEntry?: WechatEntryState }) {
-  const [resetKind,setResetKind]=useState<'automatic_reset'|'banked_reset'>('automatic_reset');
   const completions = recentCompletedBenefits(data), latest = latestCompletedBenefits(data)[0];
   const recent = homeNewsGroups(data).map(group => group.latest);
   const activity = data.activities.find(item => activityHomeVisible(item, data.serverTime));
@@ -227,8 +229,7 @@ export function Home({ data, onWechatReminders, onPoster, onShare, historical, w
   return <>
     {historical && <p className="pub-warning">当前展示历史收录资料。</p>}
     <div className="pub-home-dashboard">
-      <div className="pub-home-current"><ResetStateCards data={data} selectedKind={resetKind} onKindChange={setResetKind}/></div>
-      <LastResetElapsed data={data} selectedKind={resetKind}/>
+      <div className="pub-home-current"><ResetStateCards data={data}/></div>
       <div className="pub-home-card-actions">
         <button onClick={onWechatReminders} className="pub-button pub-home-reminder"><Icon name="bell"/><span>微信提醒</span>{wechatEntry === 'unavailable' && <small>待开放</small>}</button>
         <button className="pub-button secondary" onClick={()=>onPoster(latest?.publication,latest?.action.id)}>分享重置动态</button>

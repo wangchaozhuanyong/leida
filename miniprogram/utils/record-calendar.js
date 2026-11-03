@@ -54,10 +54,11 @@ function recordCalendar(data, options = {}) {
   const first = new Date(`${month}-01T12:00:00Z`), offset = (first.getUTCDay()+6)%7;
   const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth()+1, 0)).getUTCDate();
   const days = Array.from({ length: Math.ceil((offset + last) / 7) * 7 }, (_,index) => {
-    const day = index-offset+1, blank = day<1 || day>last, date = blank ? `blank-${index}` : `${month}-${String(day).padStart(2,'0')}`;
+    const cell = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), index-offset+1, 12));
+    const date = cell.toISOString().slice(0,10), outsideMonth = !date.startsWith(month);
     const items = byDate.get(date) || [];
     const confirmed = items.filter(item=>item.evidenceType==='confirmed'), observedCount=items.length-confirmed.length;
-    return { date, day: blank ? '' : String(day), blank, disabled: blank || date<start || date>end, selected: date===selected, today: date===end,
+    return { date, day: String(cell.getUTCDate()), outsideMonth, disabled: date<start || date>end, selected: date===selected, today: date===end,
       count: items.length, automatic: items.some(item=>item.kind==='automatic_reset'), banked: items.some(item=>item.kind==='banked_reset'),
       confirmedCount:confirmed.length,observedCount,observed:observedCount>0,
       confirmedAutomatic:confirmed.some(item=>item.kind==='automatic_reset'),confirmedBanked:confirmed.some(item=>item.kind==='banked_reset') };
