@@ -18,7 +18,8 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
   let prefetchTask, prefetchEpoch = 0;
   const warmQueue=[],snapshots=new Map();
   const primaryViews=[{view:'calendar'},{view:'news',filter:'all'},{view:'notices'}];
-  const newsViews=[{view:'news',filter:'all'},{view:'news',filter:'activity'},{view:'news',filter:'product'},{view:'history',filter:'all'}];
+  const newsViews=[{view:'news',filter:'all'},{view:'news',filter:'activity'},{view:'news',filter:'product'},{view:'calendar'}];
+  // Keep legacy snapshot hydration compatible; new reset filters need no reads.
   const resetViews=[{view:'history',filter:'automatic_reset'},{view:'history',filter:'banked_reset'}];
   function snapshotFor(target){
     const filter=target.filter||'all';
@@ -174,12 +175,10 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
       for(const next of primaryViews)if(query(next)!==query(view)&&!warmQueue.some(item=>query(item)===query(next))&&prefetchTask?.key!==query(next))warmQueue.push(next);
       pumpPrefetch();
     },
-    // Warm only bounded, exact category responses while public content is ready.
-    // Pagination and counts remain those returned for that category, never a
-    // filtered fragment of the default feed's first page.
+    // Reset filters share the already-warmed complete calendar snapshot, so a
+    // source group cannot be split by message cursors or repeated filter reads.
     prefetchNewsViews(){
-      const targets=view.view==='history'?[...newsViews,...resetViews]:newsViews;
-      const queued=targets.filter(next=>query(next)!==query(view)&&!warmQueue.some(item=>query(item)===query(next))&&prefetchTask?.key!==query(next));
+      const queued=newsViews.filter(next=>query(next)!==query(view)&&!warmQueue.some(item=>query(item)===query(next))&&prefetchTask?.key!==query(next));
       warmQueue.unshift(...queued);pumpPrefetch();
     },
     setView(next) {

@@ -1,5 +1,6 @@
 'use client';
-import {resetObservations,observedEvidence} from '@/lib/reset-observations';
+import {observedEvidence} from '@/lib/reset-observations';
+import {publicationActions} from '@/lib/public-facts';
 
 import Link from 'next/link';
 import { useSearchParams, usePathname } from 'next/navigation';
@@ -15,6 +16,7 @@ import { customerNotice, compareNotices } from '@/lib/notice-display';
 import type { Activity, Article, BenefitAction, Evidence, Notice, PublicData, Publication } from '@/lib/types';
 import { usePublicClock, usePublicQuery, useWechatAvailability } from './PublicSession';
 import { RecordCalendar, RecordKindFilter } from './RecordCalendar';
+import {resetNewsRecords} from '../../../miniprogram/utils/record-calendar';
 import { parsePublicRoute } from './public-navigation';
 import { usePublicNavigation } from './usePublicNavigation';
 import { useFixedSnapshot } from './useFixedSnapshot';
@@ -28,7 +30,7 @@ import { publicationUrl, statusShareUrl, isLocalShareUrl } from '@/lib/share';
 import { createPosterFromEndpoint, savePosterImage, type PosterImage } from './poster-image';
 import { statusPosterStyles, statusPosterVariant, type StatusPosterStyle } from '@/lib/status-poster-style';
 import { activityPublicationUrl, activityShareQuery, buildActivityShare, parseActivityShare, resolveActivityShare, type ActivityDayShare } from '@/lib/activity-share';
-import { briefTime, articleSourceTime, publicationSourceTime, publicationWithdrawn, sortedArticles, sortedStatePublications, currentPublication, dateKey, displayTime, elapsed, publicActions, safeUrl, statePublication, isNewsOnly, stageText } from './model';
+import { briefTime, articleSourceTime, publicationSourceTime, publicationWithdrawn, sortedArticles, currentPublication, dateKey, displayTime, elapsed, publicActions, safeUrl, statePublication, isNewsOnly, stageText } from './model';
 import { latestSourceSuccess, publicArticleTitle, publicArticleSummary, publicArticleContent, publicNavSection, latestCompletedBenefits, recentCompletedBenefits, completionTime } from './model';
 
 type IconName = 'radar' | 'home' | 'settings' | 'arrow' | 'back' | 'bell' | 'link' | 'share' | 'card' | 'clock' | 'check' | 'close' | 'external' | 'info' | 'refresh' | 'calendar' | 'news' | 'more';
@@ -100,6 +102,7 @@ export default function PublicApp() {
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [wechatReminders, setWechatReminders] = useState(false);
   const [toast, setToast] = useState('');
+  const [resetLimits,setResetLimits]=useState<Record<string,number>>({});
   const endpoint = queryReady ? readPath : null;
   const { data, page, initialLoading, refreshing, navigationLoading, loadingMore, error, moreError, refresh, more, applyUpdates, updateAvailable, currentTime } = usePublicQuery(endpoint, `${pathname}?${queryString}:${queryReady}`);
   const loading = initialLoading || refreshing;
@@ -158,14 +161,15 @@ export default function PublicApp() {
     catch (cause) { dayPosterError = cause instanceof Error ? cause.message : '这条消息暂时无法分享。'; }
   }
   const newsArticles = route === 'news' && data ? sortedArticles(data.articles.filter(article => newsCategory === 'all' || article.category === newsCategory)) : [];
-  const historyPublications = route === 'news' && newsCategory === 'reset' && data ? sortedStatePublications(data).filter(p => (p.event.actions.length>0 && (historyFilter === 'all' || p.event.actions.some(action => action.kind === historyFilter)) || ['all','automatic_reset'].includes(historyFilter) && resetObservations(data).some(o=>o.publicationId===p.id))) : [];
+  const historyRecords = route === 'news' && newsCategory === 'reset' && data ? resetNewsRecords(data,historyFilter) : [];
+  const resetLimit=resetLimits[historyFilter]||20;
   const pageTitle = ({ history: '重置记录', news: '动态', settings: '提醒', more: '关于与隐私', notices: '站内信', methodology: '观察记录', events: '事件详情', articles: '动态详情', sources: '原文来源', activities: '活动动态' } as Record<string, string>)[route] ?? '重置雷达';
   const failure = <div className="pub-empty" role="alert"><Icon name="info" /><h2>资料暂时无法加载</h2><p>{error || '请稍后重试。'}</p><button className="pub-button primary" onClick={() => void refresh()} disabled={loading}>{loading ? '正在重试…' : '重新加载'}</button></div>;
   const pending = error ? failure : <LoadingContent variant={route==='history'?'calendar':['events','articles','sources','methodology'].includes(route)?'detail':'list'}/>;
   let content: React.ReactNode;
   if (route === 'settings') content = <Settings notices={visibleNotices} read={read} markRead={markRead} storageError={storageError} data={data} codeAvailable={posterCodeAvailable} pending={!data ? error ? <div className="pub-inbox-empty" role="alert"><p>消息暂时无法加载，请稍后重试。</p><button className="pub-text-button" onClick={() => void refresh()} disabled={loading}>重新加载</button></div> : pending : undefined}/>;
   else if (route === 'more') content = <MorePage />;
-  else if (route === 'news') content = <News resetContent={newsCategory === 'reset' ? <History publications={historyPublications} filter={historyFilter} onFilter={setHistoryFilter} data={data} hasMore={!!page?.nextCursor} onMore={() => void more()} loading={loadingMore} pending={!data ? pending : undefined} /> : undefined} groups={data ? publicNewsGroups(data).filter(group => newsCategory === 'all' || group.category === newsCategory) : []} category={newsCategory} onCategoryChange={setNewsCategory} hasMore={!!page?.nextCursor} onMore={() => void more()} loading={loadingMore} pending={!data ? pending : undefined} />;
+  else if (route === 'news') content = <News resetContent={newsCategory === 'reset' ? <History records={historyRecords.slice(0,resetLimit)} filter={historyFilter} onFilter={setHistoryFilter} data={data} hasMore={resetLimit<historyRecords.length} onMore={()=>setResetLimits(old=>({...old,[historyFilter]:(old[historyFilter]||20)+20}))} loading={false} pending={!data ? pending : undefined} /> : undefined} groups={data ? publicNewsGroups(data).filter(group => newsCategory === 'all' || group.category === newsCategory) : []} category={newsCategory} onCategoryChange={setNewsCategory} hasMore={!!page?.nextCursor} onMore={() => void more()} loading={loadingMore} pending={!data ? pending : undefined} />;
   else if (route === 'history') content = data ? <RecordCalendar data={data} date={query.get('date') || ''} kind={historyFilter} onDate={value=>changeFilter('date',value)} onKind={setHistoryFilter}/> : pending;
   else if (route === 'activities' && path[1]) content = <ActivityPage data={data} activity={data ? currentActivity : activityCache.current.get(path[1])} id={path[1]} query={query} onDay={value => changeFilter('day', value === null ? null : String(value))} pending={!data ? pending : undefined} onPoster={setPoster} onDayPoster={value => { setPoster(null); setDayPoster(value); }} />;
   else if (!readPath) content = <><Empty title="暂时没有这条记录" detail="链接可能已变化，请返回首页查看公开动态。" /><TextLink href="/">返回首页</TextLink></>;
@@ -181,7 +185,7 @@ export default function PublicApp() {
     <Suspense fallback={null}><PublicRouteReader onChange={onLocation} /></Suspense>
     <a className="pub-skip" href="#public-main">跳到主要内容</a>
     <header className="pub-topbar">
-      <div className="pub-topbar-identity">{route === 'home' ? <Link scroll={false} href="/" className="pub-brand-home" aria-label="模钥重置雷达首页"><Brand name={data?.site.name} /></Link> : <div className="pub-topbar-heading">{subpage && <Link scroll={false} className="pub-header-back" href={backHref} aria-label="返回上级"><Icon name="back" /></Link>}<PageSymbol route={route}/>{['news', 'history', 'settings', 'more', 'notices'].includes(route) ? <h1 className="pub-topbar-title">{pageTitle}</h1> : <span className="pub-topbar-title">{pageTitle}</span>}{!navigationLoading && data && ['news', 'history'].includes(route) && <span className="pub-context-count" role="status" aria-live="polite" aria-atomic="true">{route === 'history' ? '近半年' : newsCategory === 'reset' ? `共${page?.total ?? historyPublications.length}个事件` : `共${page?.total ?? newsArticles.length}篇`}</span>}</div>}</div>
+      <div className="pub-topbar-identity">{route === 'home' ? <Link scroll={false} href="/" className="pub-brand-home" aria-label="模钥重置雷达首页"><Brand name={data?.site.name} /></Link> : <div className="pub-topbar-heading">{subpage && <Link scroll={false} className="pub-header-back" href={backHref} aria-label="返回上级"><Icon name="back" /></Link>}<PageSymbol route={route}/>{['news', 'history', 'settings', 'more', 'notices'].includes(route) ? <h1 className="pub-topbar-title">{pageTitle}</h1> : <span className="pub-topbar-title">{pageTitle}</span>}{!navigationLoading && data && ['news', 'history'].includes(route) && <span className="pub-context-count" role="status" aria-live="polite" aria-atomic="true">{route === 'history' ? '近半年' : newsCategory === 'reset' ? `共${historyRecords.length}条动态` : `共${page?.total ?? newsArticles.length}篇`}</span>}</div>}</div>
       <nav className="pub-desktop-nav" aria-label="主导航">{navigation}</nav><div className="pub-sidebar-note"><span className="pub-status-dot" /> 公开消息追踪<small>所有时间 · 北京时间</small></div><Link scroll={false} className="pub-icon-button pub-more-button" href="/more" aria-label="关于与隐私"><Icon name="more" /></Link>
     </header>
     <div className={`pub-refresh-track${refreshing ? " is-active" : ""}`} role={refreshing ? "status" : undefined} aria-label={refreshing ? "正在更新" : undefined}><span/></div>
@@ -247,13 +251,29 @@ function Announcement({ publication, withdrawn }: { publication: Publication; wi
   const kinds = [...new Set(actions.map(a => actionLabels[a.kind]))];
   return <article className="pub-card pub-announcement" data-reading-id={article.id}><div className="pub-card-top"><Badge tone={actions.some(a => a.kind === 'banked_reset') ? 'purple' : 'cyan'}>{article.historical ? '历史收录 · ' : ''}{isNewsOnly(publication) ? '来源消息' : kinds.join('＋') || (article.category === 'activity' ? '活动动态' : '产品更新')}</Badge><time dateTime={publicationSourceTime(publication)} title={`${displayTime(publicationSourceTime(publication))} · 北京时间`}>{briefTime(publicationSourceTime(publication))}</time></div><h3><Link scroll={false} href={isNewsOnly(publication) ? `/articles/${encodeURIComponent(article.id)}` : `/events/${encodeURIComponent(event.id)}`}>{publicArticleTitle(article)}</Link></h3><p>{publicArticleSummary(article)}</p><div className="pub-card-top"><span className="pub-muted">{withdrawn ? '已撤回' : isNewsOnly(publication) ? '来源消息' : actions.some(a => a.stage === 'in_progress') ? '含进行中动作' : '公开公告'}</span><TextLink href={isNewsOnly(publication) ? `/articles/${encodeURIComponent(article.id)}` : `/events/${encodeURIComponent(event.id)}`}>查看详情</TextLink></div></article>;
 }
-function History({ publications, filter, onFilter, data, hasMore, onMore, loading, pending }: { publications: Publication[]; filter: string; onFilter: (value: string) => void; data: PublicData | null; hasMore:boolean; onMore:()=>void; loading:boolean; pending?: React.ReactNode }) {
-  const months = new Map<string, Publication[]>();
-  for (const publication of publications) {
-    const month = dateKey(publicationSourceTime(publication)).slice(0, 7);
-    months.set(month, [...(months.get(month) ?? []), publication]);
+type ResetNewsRecord=ReturnType<typeof resetNewsRecords>[number];
+function History({ records, filter, onFilter, data, hasMore, onMore, loading, pending }: { records: ResetNewsRecord[]; filter: string; onFilter: (value: string) => void; data: PublicData | null; hasMore:boolean; onMore:()=>void; loading:boolean; pending?: React.ReactNode }) {
+  const months = new Map<string, ResetNewsRecord[]>();
+  for (const record of records) {
+    const month = dateKey(record.at).slice(0, 7);
+    months.set(month, [...(months.get(month) ?? []), record]);
   }
-  return <><RecordKindFilter value={filter as import('./public-navigation').HistoryFilter} onChange={onFilter}/>{pending ?? (publications.length ? [...months].map(([month, rows]) => <section className="pub-history-month" key={month}><h2>{month.replace('-', '年')}月</h2><div className="pub-history-list">{rows.map(publication => <article className={`pub-history-item${publicationWithdrawn(data!, publication) ? ' is-withdrawn' : ''}`} key={publication.id} data-reading-id={publication.eventId}><time dateTime={publicationSourceTime(publication)}>{briefTime(publicationSourceTime(publication))}</time><div><h3><Link scroll={false} href={`/events/${encodeURIComponent(publication.eventId)}`}>{publicArticleTitle(publication.article)}</Link></h3><div className="pub-history-status">{resetObservations(data!).some(o=>o.publicationId===publication.id)&&<Badge tone="cyan">重置观测</Badge>}{publication.event.actions.map(action => <Badge key={action.id} tone={action.stage === 'claimed_complete' ? 'cyan' : 'amber'}>{actionLabels[action.kind]} · {stageText(action, data!.serverTime)}</Badge>)}{publicationWithdrawn(data!, publication) && <Badge>已撤回</Badge>}{publication.article.historical && <span>历史收录</span>}</div><p>{publicArticleSummary(publication.article)}</p><TextLink href={`/events/${encodeURIComponent(publication.eventId)}`}>查看依据与进展</TextLink></div></article>)}</div></section>) : <Empty title="暂无相关公告" detail="这个分类还没有已发布的事件。" />)}{hasMore && <button className="pub-button full" disabled={loading} onClick={onMore}>{loading ? '正在加载…' : '加载更多'}</button>}</>;
+  return <><RecordKindFilter value={filter as import('./public-navigation').HistoryFilter} onChange={onFilter}/>{pending ?? (records.length ? [...months].map(([month, rows]) => <section className="pub-history-month" key={month}>
+    <h2>{month.replace('-', '年')}月</h2><div className="pub-history-list">{rows.map(({id,at,publication,fact})=>{
+      const observed=fact?.evidenceType==='observed';
+      const href=`/events/${encodeURIComponent(publication.eventId)}?version=${encodeURIComponent(publication.id)}`;
+      const title=observed?fact.title:publicArticleTitle(publication.article);
+      return <article className={`pub-history-item${publicationWithdrawn(data!,publication)?' is-withdrawn':''}`} key={id} data-reading-id={id}>
+        <time dateTime={at}>{briefTime(at)}</time><div><h3><Link scroll={false} href={href}>{title}</Link></h3>
+        <div className="pub-history-status">{fact?<Badge tone="cyan">{observed?'来源观测':`${actionLabels[fact.kind]} · 完成确认`}</Badge>:publicationActions(publication).filter(action=>action.scope==='public'&&(filter==='all'||action.kind===filter)).map(action=><Badge key={action.id} tone={action.stage==='claimed_complete'?'cyan':'amber'}>{actionLabels[action.kind]} · {stageText(action,data!.serverTime)}</Badge>)}{publicationWithdrawn(data!,publication)&&<Badge>已撤回</Badge>}</div>
+        <p>{observed?fact.summary||'已观测到额度重置，实际额度以账户显示为准。':publicArticleSummary(publication.article)}</p>
+        <TextLink href={href}>查看依据与进展</TextLink>
+        {observed&&<details className="pub-news-progress"><summary>查看来源依据 · {fact.evidenceCount}条</summary><ol>{fact.sources.map(source=>{
+          const target=data!.publications.find(p=>p.id===source.publicationId);
+          return <li key={source.id}><time dateTime={source.at}>{source.time}</time>{target?<Link scroll={false} href={`/events/${encodeURIComponent(target.eventId)}?version=${encodeURIComponent(source.publicationId)}`}>{source.title}</Link>:<span>{source.title}</span>}</li>;
+        })}</ol></details>}
+        </div></article>;
+    })}</div></section>) : <Empty title="暂无相关公告" detail="这个分类还没有已发布的消息。" />)}{hasMore&&<button className="pub-button full" disabled={loading} onClick={onMore}>加载更多</button>}</>;
 }
 
 function NewsProgress({ updates, currentId }: { updates: Publication[]; currentId: string }) {
@@ -309,7 +329,7 @@ export function EventPage({ data, id, onPoster, onShare }: { data: PublicData; i
   const withdrawn = publicationWithdrawn(data, publication);
   const currentArticle = data.articles.find(article => article.id === publication.articleId);
   const currentReason = publication.event.status === 'withdrawn' || publication.article.status === 'withdrawn' ? publication.reason : currentArticle?.status === 'withdrawn' ? data.publications.find(p => p.id === currentArticle.publicationId)?.reason : current ? currentPublication(data, current)?.reason : publication.reason;
-  const actions = isNewsOnly(publication) ? [] : publication.event.actions;
+  const actions = isNewsOnly(publication) ? [] : publicationActions(publication);
   const evidenceIds = new Set([...(isNewsOnly(publication) ? publication.article.evidenceIds : publication.event.evidenceIds), ...actions.flatMap(action => action.evidenceIds)]);
   return <>
     {historicalVersion && <div className="pub-warning">此消息已有更新，以下为原内容。<TextLink href={`/events/${encodeURIComponent(id)}`}>查看最新消息</TextLink></div>}

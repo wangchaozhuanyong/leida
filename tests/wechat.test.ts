@@ -37,7 +37,7 @@ function memory() {
     }
   };return store;
 }
-async function fixture(overrides:{apiLimit?:number;send?:'ok'|'reject'|'timeout';qr?:'png'|'error'|'truncated';token?:'ok'|'fail';beforeToken?:()=>Promise<void>;beforeCode?:()=>Promise<void>;beforeSend?:()=>Promise<void>;preparePublicPage?:(id:string)=>Promise<void>}={}) {
+async function fixture(overrides:{apiLimit?:number;send?:'ok'|'reject'|'timeout';sendCode?:number;qr?:'png'|'error'|'truncated';token?:'ok'|'fail';beforeToken?:()=>Promise<void>;beforeCode?:()=>Promise<void>;beforeSend?:()=>Promise<void>;preparePublicPage?:(id:string)=>Promise<void>}={}) {
   const store=memory();let time=Date.parse('2026-10-10T02:00:00Z');const calls:{url:string;body?:Record<string,unknown>}[]=[];
   const fetcher=(async(input:RequestInfo|URL,init?:RequestInit)=>{
     const url=String(input);assert.equal(new URL(url).origin,'https://api.weixin.qq.com');assert.equal(init?.redirect,'error');const body=init?.body?JSON.parse(String(init.body)):undefined;calls.push({url,body});
@@ -47,6 +47,7 @@ async function fixture(overrides:{apiLimit?:number;send?:'ok'|'reject'|'timeout'
     if(url.includes('subscribe/send')) {
       await overrides.beforeSend?.();
       if(overrides.send==='timeout')throw new Error('socket unknown with confidential content');
+      if(overrides.sendCode!==undefined)return Response.json({errcode:overrides.sendCode,errmsg:'fixture explicit provider response'});
       return Response.json(overrides.send==='reject'?{errcode:43101,errmsg:'user not subscribed'}:{errcode:0,errmsg:'ok'});
     }
     throw new Error('unexpected fixture endpoint');
@@ -909,4 +910,158 @@ test('登录期间AppID变化时摘要沿用读者身份校验，不返回旧身
  }) as typeof fetch});
  await assert.rejects(service.wechatLogin('identity-changed-during-login','summary-race-client',{includeLastResult:false}),e=>e instanceof Error&&'status'in e&&e.status===401);
  assert.equal((await f.store.list<WechatReader>('wechat_readers'))[0].sessions.length,before);
+});
+
+test('模板参数被明确拒绝时保留所有次数和同一发送任务',async()=>{
+ const f=await fixture(),session=await f.login();
+ await f.accept(session.sessionToken);await f.accept(session.sessionToken);await f.accept(session.sessionToken);
+ const service=createWechatService({store:f.store,clock:f.now,encryptionKey:()=>Buffer.alloc(32,7),preparePublicPage:async()=>{},fetcher:(async(input,init)=>String(input).includes('/message/subscribe/send')?Response.json({errcode:47003,errmsg:'fixture invalid template field'}):f.fetcher(input,init)) as typeof fetch});
+ await f.notice();const jobs=await f.queued();assert.equal(jobs.length,1);
+ const result=await service.processWechatJob({...jobs[0],attempts:1});
+ const state=await f.service.wechatSubscriptionState(session.sessionToken);
+ assert.equal(result.state,'deferred');assert.equal(state.remainingCount,3);assert.equal(state.pendingCount,1);
+ const delivery=(await f.store.list<WechatDelivery>('wechat_deliveries'))[0];assert.equal(delivery.status,'queued');assert.equal(delivery.errorCode,47003);assert.equal(delivery.attempts,1);
+});
+
+test('同轮有效观测取消已排队旧预告，并保留未发送次数',async()=>{
+ const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);f.advance(1000);
+ const messageId=(((BigInt(f.now()-86400000)-1288834974657n)<<22n)+1n).toString();
+ const url=`https://x.com/thsottiaux/status/${messageId}`;
+ f.evidence.url=url;f.evidence.messageId=messageId;await f.store.put('evidence',f.evidence);
+ f.publication.event.actions=[{id:'promised-round',kind:'automatic_reset',stage:'promised',scope:'public',eligibility:'公开用户',evidenceIds:['ev'],statementAt:new Date(f.now()).toISOString(),expectedAt:new Date(f.now()+3600000).toISOString()}];
+ await f.store.put('publications',f.publication);await f.store.put('events',f.publication.event);
+ await f.notice({categories:['announcement']});const jobs=await f.queued();assert.equal(jobs.length,1);
+ f.advance(60000);const at=new Date(f.now()).toISOString();
+ const e:Evidence={id:'same-round-observation',sourceId:'reset-archive',messageId:`observed-${messageId}`,url,text:'Codex usage limits have been reset. Check your limits.',publishedAt:at,collectedAt:at,hash:'fixture-observation',contextComplete:false,historical:false,provenance:'archive',textOrigin:'archive_excerpt',metadata:{sourceGroup:'codex-resets',category:'reset'}};
+ const draft=buildAutomaticTemplate([e]);assert.ok(draft);assert.equal(draft.publicationMode,'news_only');
+ const event:RadarEvent={...f.event,id:'same-round-observed-event',title:draft.title,actions:[],evidenceIds:[e.id],publicationId:'same-round-observed-pub',updatedAt:at};
+ const article:Article={...f.article,...draft,id:'same-round-observed-article',eventId:event.id,publicationId:event.publicationId,publishedAt:at,updatedAt:at,historical:false};
+ const publication:Publication={...f.publication,id:event.publicationId,eventId:event.id,articleId:article.id,event,article,mode:'news_only',publishedAt:at,cutoffAt:at};
+ await f.store.put('evidence',e);await f.store.put('events',event);await f.store.put('articles',article);await f.store.insert('publications',publication);
+ await f.notice({eventId:event.id,publicationId:publication.id,categories:['result']});
+ const result=await f.service.processWechatJob({...jobs[0],attempts:1});
+ assert.equal(result.state,'cancelled','已有同轮重置观测后，旧倒计时预告应取消');
+ assert.equal(f.calls.filter(c=>c.url.includes('/message/subscribe/send')).length,0);
+ assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,1);
+});
+
+test('正常发布的完成消息积压三天后不入队、不占用次数',async()=>{
+ const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);f.advance(1000);
+ const at=new Date(f.now()).toISOString();
+ f.publication.event.actions=[{id:'completed-round',kind:'automatic_reset',stage:'claimed_complete',scope:'public',eligibility:'公开用户',evidenceIds:['ev'],statementAt:at}];
+ await f.store.put('publications',f.publication);await f.store.put('events',f.publication.event);await f.notice();
+ f.advance(3*86400000);const jobs=await f.queued();
+ assert.equal(jobs.length,0,'三天前的完成消息不应在任务恢复后补发');
+ const state=await f.service.wechatSubscriptionState(session.sessionToken);assert.equal(state.remainingCount,1);assert.equal(state.pendingCount,0);
+});
+
+test('配置错误和明确服务拒绝可安全重试，未知网络结果仍不自动重发',async()=>{
+ for(const code of [47003,40037,41030,-1,45009,45011,43101]){
+  const mode={sendCode:code},f=await fixture(mode),session=await f.login();await f.accept(session.sessionToken);await f.accept(session.sessionToken);
+  await f.notice();const job=(await f.queued())[0];assert.ok(job);const first=await f.service.processWechatJob({...job,attempts:1});
+  if(code===43101){assert.equal(first.state,'rejected');assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,0);continue;}
+  assert.equal(first.state,'deferred');assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,2);
+  assert.equal(Date.parse(first.resumeAt!)-f.now(),code<0||code>=45009&&code<=45011?60000:15*60000);
+  mode.sendCode=0;f.advance(Date.parse(first.resumeAt!)-f.now());
+  assert.equal((await f.service.processWechatJob({...job,attempts:2})).state,'sent');
+  assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,1);
+  assert.equal((await f.service.processWechatJob({...job,attempts:3})).state,'sent');
+  assert.equal(f.calls.filter(c=>c.url.includes('/message/subscribe/send')).length,2,'一次明确失败和一次成功；重复任务不能第三次发送');
+ }
+});
+
+test('明确凭据失效会刷新当前缓存，成功前不丢授权次数',async()=>{
+ const mode={sendCode:40001},f=await fixture(mode),session=await f.login();await f.accept(session.sessionToken);await f.notice();
+ const job=(await f.queued())[0];assert.equal((await f.service.processWechatJob({...job,attempts:1})).state,'deferred');
+ assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,1);
+ mode.sendCode=0;f.advance(15*60000);assert.equal((await f.service.processWechatJob({...job,attempts:2})).state,'sent');
+ assert.equal(f.calls.filter(c=>c.url.includes('/stable_token')).length,2);
+ assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,0);
+});
+
+async function pendingReminder(f:Awaited<ReturnType<typeof fixture>>,kind:'automatic_reset'|'banked_reset'='automatic_reset'){
+ f.advance(1000);const messageId=(((BigInt(f.now()-86400000)-1288834974657n)<<22n)+1n).toString();
+ f.evidence.url=`https://x.com/thsottiaux/status/${messageId}`;f.evidence.messageId=messageId;await f.store.put('evidence',f.evidence);
+ f.publication.event.actions=[{id:'pending-fixture',kind,stage:'promised',scope:'public',eligibility:'公开用户',evidenceIds:['ev'],statementAt:new Date(f.now()).toISOString(),expectedAt:new Date(f.now()+3600000).toISOString()}];
+ await f.store.put('publications',f.publication);await f.store.put('events',f.publication.event);
+ return f.notice({categories:['announcement']});
+}
+
+async function referencedObservation(f:Awaited<ReturnType<typeof fixture>>,at=new Date(f.now()).toISOString(),reference=f.evidence){
+ const collectedAt=new Date(f.now()).toISOString();
+ const evidence:Evidence={...reference,id:'referenced-observation',sourceId:'reset-archive',messageId:`observed-${reference.messageId}`,text:'Codex usage limits have been reset. Check your limits.',publishedAt:at,collectedAt,contextComplete:false,historical:false,provenance:'archive',textOrigin:'archive_excerpt',metadata:{sourceGroup:'codex-resets',category:'reset'}};
+ const draft=buildAutomaticTemplate([evidence]);assert.ok(draft);assert.equal(draft.publicationMode,'news_only');
+ const event:RadarEvent={...f.event,id:'reference-event',title:draft.title,actions:[],evidenceIds:[evidence.id],publicationId:'reference-pub',updatedAt:collectedAt};
+ const article:Article={...f.article,...draft,id:'reference-article',eventId:event.id,publicationId:event.publicationId,publishedAt:collectedAt,updatedAt:collectedAt,historical:false};
+ const publication:Publication={...f.publication,id:event.publicationId,eventId:event.id,articleId:article.id,event,article,mode:'news_only',publishedAt:collectedAt,cutoffAt:collectedAt};
+ await f.store.put('evidence',evidence);await f.store.put('events',event);await f.store.put('articles',article);await f.store.insert('publications',publication);
+ await f.notice({eventId:event.id,publicationId:publication.id,categories:['result']});return {event,publication,evidence};
+}
+
+test('同轮观测在入队前或令牌准备期间到达，都阻止旧预告发送',async()=>{
+ for(const arrival of ['before-queue','before-claim']){
+  let arrive=async()=>{};
+  const f=await fixture({beforeToken:async()=>{if(arrival==='before-claim')await arrive();}}),session=await f.login();await f.accept(session.sessionToken);
+  const old=await pendingReminder(f);
+  arrive=async()=>{f.advance(60000);await referencedObservation(f);};
+  if(arrival==='before-queue')await arrive();
+  const jobs=await f.queued();
+  if(arrival==='before-queue'){
+   assert.ok(jobs.length===1);const delivery=(await f.store.list<WechatDelivery>('wechat_deliveries'))[0];assert.notEqual(delivery.noticeId,old.id,'只排入新的结果通知');
+  }else{
+   assert.equal(jobs.length,1);assert.equal((await f.service.processWechatJob(jobs[0])).state,'cancelled');
+   assert.equal(f.calls.filter(c=>c.url.includes('/message/subscribe/send')).length,0);
+   assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,1);
+  }
+ }
+});
+
+test('不同类别、其他原帖、预告之前的观测及竞争轮次，不误取消预告',async()=>{
+ for(const scenario of ['other-kind','other-post','older','ambiguous','source-index','withdrawn']){
+  const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);
+  await pendingReminder(f,scenario==='other-kind'?'banked_reset':'automatic_reset');
+  const job=(await f.queued())[0];assert.ok(job);
+  f.advance(60000);
+  if(scenario==='source-index'){
+   f.evidence.url='https://codexlimits.com/reset-history';await f.store.put('evidence',f.evidence);await observedFixture(f);
+  }else{
+   const reference=scenario==='other-post'?{...f.evidence,messageId:(BigInt(f.evidence.messageId)+1n).toString(),url:`https://x.com/thsottiaux/status/${BigInt(f.evidence.messageId)+1n}`} :f.evidence;
+   const at=scenario==='older'?new Date(Date.parse(f.publication.event.actions[0].statementAt)-1000).toISOString():new Date(f.now()).toISOString();
+   const observed=await referencedObservation(f,at,reference);
+   if(scenario==='withdrawn')await f.store.put('events',{...observed.event,status:'withdrawn'});
+  }
+  if(scenario==='ambiguous'){
+   const event:RadarEvent={...f.publication.event,id:'competing-event',publicationId:'competing-pub',actions:f.publication.event.actions.map(a=>({...a,id:'competing-action'}))};
+   await f.store.put('events',event);await f.store.insert('publications',{...f.publication,id:event.publicationId,eventId:event.id,event});
+  }
+  assert.equal((await f.service.processWechatJob(job)).state,'sent',scenario+' 不应凭不相关或歧义观测取消预告');
+ }
+});
+
+test('结果提醒在24小时边界失效，未来完成不入队，排队后过期返还次数',async()=>{
+ for(const age of [-60000,24*3600000-1,24*3600000,3*86400000]){
+  const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);f.advance(1000);const at=new Date(f.now()).toISOString();
+  f.publication.event.actions=[{id:'timed-result',kind:'automatic_reset',stage:'claimed_complete',scope:'public',eligibility:'公开用户',evidenceIds:['ev'],statementAt:at}];
+  await f.store.put('publications',f.publication);await f.store.put('events',f.publication.event);await f.notice();
+  f.advance(Date.parse(at)+age-f.now());assert.equal((await f.queued()).length,age>=0&&age<24*3600000?1:0);
+ }
+ const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);await f.notice();
+ const job=(await f.queued())[0];f.advance(24*3600000);assert.equal((await f.service.processWechatJob(job)).state,'cancelled');
+ assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,1);
+});
+
+test('已明确拒绝的请求之后过期取消可返还；用户关闭后不能重新启用',async()=>{
+ for(const revoke of [false,true]){
+  const f=await fixture({sendCode:47003}),session=await f.login();await f.accept(session.sessionToken);await f.notice();
+  const job=(await f.queued())[0];assert.equal((await f.service.processWechatJob({...job,attempts:1})).state,'deferred');
+  if(revoke)await f.service.revokeWechatSubscription(session.sessionToken);else f.advance(24*3600000);
+  assert.equal((await f.service.processWechatJob({...job,attempts:2})).state,'cancelled');
+  assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,revoke?0:1);
+ }
+});
+
+test('旧结果的最新重要更正仍可以发送，不套用原结果的过期时间',async()=>{
+ const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);f.advance(3*86400000);
+ await f.notice({categories:['correction']});const job=(await f.queued())[0];assert.ok(job);
+ assert.equal((await f.service.processWechatJob(job)).state,'sent');
 });

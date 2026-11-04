@@ -81,10 +81,10 @@ test('按类型过滤、同日双标记、月份选择与无记录月份均使�
   assert.equal(recordCalendar(data,{date:'2026-02-31'}).selected,'2026-10-15');
   assert.ok(model.days.filter(item=>item.date>'2026-10-17').every(item=>item.disabled));
 });
-test('记录页日期月份类型均不改变读取身份，动态重置通过服务端类型筛选完整分页',()=>{
+test('记录页与动态重置共用完整日历，日期月份和福利类型不改变读取身份',()=>{
   for(const query of ['','date=2026-10-08','date=2026-04-17&target=banked','target=automatic'])assert.equal(parsePublicRoute('/history',new URLSearchParams(query)).readPath,'/api/v1/bootstrap?view=calendar');
-  assert.equal(parsePublicRoute('/news',new URLSearchParams('category=reset&target=banked')).readPath,'/api/v1/bootstrap?view=history&filter=banked_reset');
-  assert.equal(parsePublicRoute('/news',new URLSearchParams('category=reset')).readPath,'/api/v1/bootstrap?view=history&filter=all');
+  assert.equal(parsePublicRoute('/news',new URLSearchParams('category=reset&target=banked')).readPath,'/api/v1/bootstrap?view=calendar');
+  assert.equal(parsePublicRoute('/news',new URLSearchParams('category=reset')).readPath,'/api/v1/bootstrap?view=calendar');
 });
 test('小程序预取只写日历缓存；进入时共享在途请求、返回页面无需再次读取',async()=>{
   const n=network(),client=createClient({wxApi:n.wx,config,now:()=>1000});

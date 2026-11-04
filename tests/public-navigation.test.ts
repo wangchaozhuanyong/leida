@@ -17,6 +17,13 @@ test('网站筛选直接从 URL 解析且只把正文所需参数传给读取接
   assert.equal(parsePublicRoute('/methodology', new URLSearchParams('snapshot=one&cadence=two')).readPath, parsePublicRoute('/methodology', new URLSearchParams()).readPath);
 });
 
+test('动态重置与记录复用完整日历，福利筛选不改变网络读取身份',()=>{
+ const reads=['all','automatic','banked'].map(target=>parsePublicRoute('/news',new URLSearchParams(`category=reset&target=${target}`)).readPath);
+ assert.deepEqual(reads,Array(3).fill('/api/v1/bootstrap?view=calendar'));
+ assert.equal(reads[0],parsePublicRoute('/history',new URLSearchParams()).readPath);
+ assert.equal(parsePublicRoute('/news',new URLSearchParams('category=reset&target=banked')).historyFilter,'banked_reset');
+});
+
 test('固定事件版本与活动发布清单保持独立读取身份', () => {
   assert.equal(parsePublicRoute('/events/evt-1', new URLSearchParams('version=pub-1')).readPath, '/api/v1/bootstrap?view=detail&id=evt-1&entity=events&version=pub-1');
   const fixed = parsePublicRoute('/activities/activity-1', new URLSearchParams('day=2&publication=old-1&publication=old-2'));

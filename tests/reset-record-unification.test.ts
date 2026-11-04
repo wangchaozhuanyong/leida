@@ -5,7 +5,7 @@ import type {BenefitAction,Evidence,Publication,PublicData} from '../src/lib/typ
 import {resetObservationSources as serverObservationSources} from '../src/lib/reset-observations';
 const require=createRequire(import.meta.url);
 const {observationDayGroups,observationSources}=require('../miniprogram/utils/reset-records.js');
-const {recordCalendar}=require('../miniprogram/utils/record-calendar.js');
+const {recordCalendar,resetNewsRecords}=require('../miniprogram/utils/record-calendar.js');
 const {activityModel,homeNewsGroups,publicActions}=require('../miniprogram/utils/model.js');
 const {resetObservations}=require('../miniprogram/utils/reset-observations.js');
 const {selectedHomeStatus}=require('../miniprogram/utils/home-reset-status.js');
@@ -102,4 +102,39 @@ test('相同分钟的两个来源依据仍完整保留，重复采集不增加�
 test('夏令时切换日对应北京时间范围为23小时，不使用固定时差挪动日期',()=>{
  const data=fixture();data.activities[0].startsOn='2026-03-07';
  assert.equal(activityModel(data,'challenge',2).selectedBeijingRange,'2026-03-08 16:00 — 2026-03-09 15:00（不含）');
+});
+
+
+test('动态重置与日历复用同一天的完整来源汇总，不以消息条数冒充重置次数',()=>{
+ const data=fixture();add(data,'limits','2026-10-26T06:08:00.000Z');add(data,'limits','2026-10-26T07:00:00.000Z');add(data,'reference','2026-10-26T07:00:00.000Z');add(data,'archive','2026-10-26T07:00:00.000Z');
+ const before=structuredClone(data),calendar=recordCalendar(data),news=resetNewsRecords(data);
+ assert.equal(news.length,1);assert.equal(news[0].id,calendar.selectedItems[0].id);
+ assert.equal(news[0].at,'2026-10-26T06:08:00.000Z');assert.equal(news[0].fact.evidenceCount,4);
+ assert.deepEqual(news[0].fact.sources,calendar.selectedItems[0].sources);
+ assert.equal(resetNewsRecords(data,'banked_reset').length,0);assert.deepEqual(data,before);
+});
+
+test('动态重置保留独立完成和新预告；两次同日发卡不被观测日期合并规则吞掉',()=>{
+ const data=fixture();
+ publish(data,'first-card','2026-10-26T01:00:00.000Z',undefined,[action('first-card','2026-10-26T01:00:00.000Z','banked_reset')]);
+ publish(data,'second-card','2026-10-26T03:00:00.000Z',undefined,[action('second-card','2026-10-26T03:00:00.000Z','banked_reset')]);
+ publish(data,'next','2026-10-26T04:00:00.000Z',undefined,[{...action('next','2026-10-26T04:00:00.000Z','automatic_reset','promised'),expectedAt:'2026-10-27T00:00:00.000Z'}]);
+ const all=resetNewsRecords(data);assert.equal(all.length,3);assert.equal(all[0].id,'next');assert.equal(all[0].fact,null);
+ const cards=resetNewsRecords(data,'banked_reset');assert.deepEqual(cards.map((r:any)=>r.id),['second-card','first-card']);
+ assert.equal(resetNewsRecords(data,'automatic_reset').length,1);assert.equal(recordCalendar(data).recentTotal,2);
+});
+
+test('纯资讯、私人安排和未来记录不进入动态重置待发列表',()=>{
+ const data=fixture();publish(data,'private','2026-10-26T03:00:00.000Z',undefined,[{...action('private','2026-10-26T03:00:00.000Z','banked_reset','promised'),scope:'private'}]);
+ publish(data,'tomorrow','2026-10-27T03:00:00.000Z',undefined,[action('tomorrow','2026-10-27T03:00:00.000Z','banked_reset','promised')]);
+ const news=publish(data,'news','2026-10-26T03:00:00.000Z',undefined,[action('news','2026-10-26T03:00:00.000Z','banked_reset','promised')]);news.mode='news_only';news.article.publicationMode='news_only';
+ assert.deepEqual(resetNewsRecords(data),[]);
+});
+
+test('同日尚未发生的声明、发布版本以及无效声明时间也不能提前出现',()=>{
+ const data=fixture(),future='2026-10-26T14:30:00.000Z';
+ publish(data,'later-action',future,undefined,[action('later-action',future,'banked_reset','promised')]);
+ const laterPublication=publish(data,'later-publication','2026-10-26T10:00:00.000Z',undefined,[action('later-publication','2026-10-26T10:00:00.000Z','automatic_reset','promised')]);laterPublication.publishedAt=future;
+ publish(data,'invalid-action','2026-10-26T10:00:00.000Z',undefined,[action('invalid-action','invalid','automatic_reset','promised')]);
+ assert.deepEqual(resetNewsRecords(data),[]);
 });
