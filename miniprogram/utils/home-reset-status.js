@@ -57,13 +57,26 @@ function roundsFor(data, kind, now) {
 }
 function assignObservations(rounds, observations) {
   const assignments = new Map(), independent = [], unassigned = [];
-  for(const observation of observations){
+  // Establish earlier evidence first. A full history must not let an old,
+  // already observed arrangement compete with the next announced round.
+  for(const observation of observations.slice().sort((a,b)=>millis(a.observedAt)-millis(b.observedAt))){
     // A shared source/index URL is provenance, not an occurrence identity.
     // Only a distinct referenced post can explicitly bind different records.
     const postReference=observation.referenceUrl&&observation.referenceUrl!==observation.sourceUrl;
     const explicit = rounds.filter(r=>r.stage!=='cancelled' && (!r.hasPromise||millis(observation.observedAt)>=millis(r.startAt)) && (r.eventId===observation.eventId || postReference&&r.urls.includes(observation.referenceUrl)));
-    const candidates = explicit.length ? explicit : rounds.filter(r=>r.stage!=='cancelled' && r.hasPromise && millis(observation.observedAt)>=millis(r.startAt) &&
+    const resolution=rounds.filter(r=>['claimed_complete','cancelled'].includes(r.stage)&&millis(r.statementAt)<=millis(observation.observedAt))
+      .sort((a,b)=>millis(b.statementAt)-millis(a.statementAt))[0];
+    const possible=rounds.filter(r=>r.stage!=='cancelled' && r.hasPromise && millis(observation.observedAt)>=millis(r.startAt) &&
+      !announcementNeedsReview(r,resolution&&{...resolution,announcedAt:resolution.hasPromise?resolution.startAt:undefined},r.eventId) &&
       (valid(r.expectedAt) ? millis(observation.observedAt)<=millis(r.expectedAt)+DAY : ['promised','in_progress'].includes(r.stage)));
+    const candidates = explicit.length ? explicit : possible.filter(r=>{
+      const prior=assignments.get(keyOf(r));
+      if(!prior?.length)return true;
+      const observedAt=Math.min(...prior.map(o=>millis(o.observedAt)));
+      // Only an established observation followed by a new arrangement closes
+      // this fallback window. Two unresolved arrangements remain ambiguous.
+      return !possible.some(other=>keyOf(other)!==keyOf(r)&&millis(other.startAt)>observedAt);
+    });
     if(candidates.length===1){const key=keyOf(candidates[0]);assignments.set(key,[...(assignments.get(key)||[]),observation]);}
     else {
       independent.push(observation);
@@ -72,7 +85,8 @@ function assignObservations(rounds, observations) {
       if(!candidates.length)unassigned.push(observation);
     }
   }
-  return {assignments,independent,unassigned};
+  const newestFirst=(a,b)=>millis(b.observedAt)-millis(a.observedAt);
+  return {assignments,independent:independent.sort(newestFirst),unassigned:unassigned.sort(newestFirst)};
 }
 function completedCard(base, kind, round, observations, now) {
   // Source-observation time stays the clock anchor when a later declaration upgrades evidence.
