@@ -34,6 +34,40 @@ function limitsObservation(data:PublicData,id:string,at:string){
  return o;
 }
 const card=(data:PublicData,at=data.serverTime,kind='automatic_reset')=>selectedHomeStatus(data,kind,at);
+function untimedAction(data:PublicData,id:string,stage:ActionStage,at:string,kind:ActionKind='automatic_reset'){
+ const p=action(data,id,stage,at,undefined,kind);
+ for(const event of [p.event,data.events.find(e=>e.id===p.eventId)!])delete event.actions[0].expectedAt;
+ return p;
+}
+
+test('完整历史的旧进展与已经观测的旧预告不争抢下一轮观测，首页和海报选择一致',()=>{
+ const data=fixture();data.serverTime='2026-11-04T04:00:00Z';
+ untimedAction(data,'old-progress','in_progress','2026-07-14T19:34:00Z');
+ untimedAction(data,'known-completion','claimed_complete','2026-10-20T06:33:00Z');
+ untimedAction(data,'previous-promise','promised','2026-10-26T05:21:00Z');
+ limitsObservation(data,'previous-observation','2026-10-26T06:08:00Z');
+ untimedAction(data,'next-promise','promised','2026-10-28T02:42:00Z');
+ limitsObservation(data,'next-observation','2026-10-28T06:35:00Z');
+ untimedAction(data,'latest-card','claimed_complete','2026-11-01T23:27:00Z','banked_reset');
+ const projection=structuredClone(data),keep=new Set(['pub-next-promise','pub-next-observation','pub-latest-card']);
+ projection.publications=projection.publications.filter(p=>keep.has(p.id));
+ projection.articles=projection.articles.filter(a=>keep.has(a.publicationId));
+ projection.events=projection.events.filter(e=>keep.has(e.publicationId));
+ const before=structuredClone(data),full=homeResetStatus(data),home=homeResetStatus(projection);
+ assert.equal(full.primary.kind,'banked_reset');assert.equal(full.primary.revision,home.primary.revision);
+ assert.equal(card(data).state,'observed');assert.equal(card(data).clockAt,'2026-10-28T06:35:00.000Z');
+ assert.equal(statusPosterInput(data).round,statusPosterInput(projection).round);
+ assert.deepEqual(data,before,'展示不能改写历史事实');
+});
+
+test('两个都尚无完成依据的重叠预告仍保持待核对，不能仅按先后顺序认定后一轮完成',()=>{
+ const data=fixture();data.serverTime='2026-11-04T04:00:00Z';
+ untimedAction(data,'first-open','promised','2026-10-26T05:00:00Z');
+ untimedAction(data,'second-open','promised','2026-10-28T02:00:00Z');
+ limitsObservation(data,'ambiguous-proof','2026-10-28T06:35:00Z');
+ const result=card(data);assert.equal(result.state,'announced');assert.equal(result.completedDisplay,false);
+ assert.equal(result.observationPublicationId,'pub-ambiguous-proof');
+});
 
 test('额度和重置卡共用预告、倒计时、进展、超时及完成计时，数字批次不覆盖首页状态',()=>{
  const cases:[ActionStage,string,boolean,string][]=[
