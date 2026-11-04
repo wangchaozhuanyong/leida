@@ -355,7 +355,9 @@ function resolveDetail(data, query) {
   const oldObservations=observationKeys(publication),newObservations=observationKeys(current);
   const observationSourceUpdate=!!(isOld&&!withdrawn&&!merged&&current&&current.articleId===publication.articleId&&current.eventId===publication.eventId&&oldObservations.length&&JSON.stringify(oldObservations)===JSON.stringify(newObservations));
   const ids = new Set([...(isNewsOnly(publication) ? publication.article.evidenceIds : publication.event.evidenceIds), ...(publication.article.contextEvidenceIds || [])]);
-  const actions = newsOnly ? [] : publication.event.actions;
+  // A series snapshot may include later batches. Source priority must follow
+  // the same batch-specific actions displayed by this article.
+  const actions = newsOnly ? [] : publicationActions(publication);
   const priority = item => actions.some(action => action.stage === 'claimed_complete' && action.evidenceIds.includes(item.id) && Date.parse(action.statementAt) === Date.parse(item.publishedAt)) ? 1 : 0;
   const evidence = uniqueDisplayEvidence(data.evidence.filter(item => ids.has(item.id))
     .sort((a,b) => priority(b) - priority(a) || Date.parse(b.publishedAt) - Date.parse(a.publishedAt) || Number(b.provenance === 'official') - Number(a.provenance === 'official')));
@@ -365,8 +367,8 @@ function resolveDetail(data, query) {
     historical: isHistoricalArticle(publication.article, data.evidence), newsOnly, withdrawn, merged, isOld, observationSourceUpdate,
     version: newsOnly ? publication.article.version : publication.event.version, cutoff: displayTime(publication.cutoffAt), publishedAt: displayTime(publication.publishedAt),
     canShare: !withdrawn && !merged, mergePath: targetPublication ? sharePath(targetPublication) : '', latestPath: !merged && isOld && current ? sharePath(current) : '',
-    actions: newsOnly ? [] : publicationActions(publication).map(action => ({ id: action.id, label: actionLabels[action.kind], stage: stageText(action, isOld || merged ? publication.cutoffAt : data.serverTime), eligibility: publicEligibility(action), scope: { public: '普发', targeted: '定向', private: '私人' }[action.scope], expectedAt: action.expectedAt ? displayTime(action.expectedAt) : '暂未明确', quote: action.evidenceQuote || '' })),
-    sourceNotes: publicSourceNotes(publication.article, newsOnly ? [] : publication.event.actions),
+    actions: actions.map(action => ({ id: action.id, label: actionLabels[action.kind], stage: stageText(action, isOld || merged ? publication.cutoffAt : data.serverTime), eligibility: publicEligibility(action), scope: { public: '普发', targeted: '定向', private: '私人' }[action.scope], expectedAt: action.expectedAt ? displayTime(action.expectedAt) : '暂未明确', quote: action.evidenceQuote || '' })),
+    sourceNotes: publicSourceNotes(publication.article, actions),
     updates: (publicNewsGroups(data).find(group=>group.updates.some(p=>p.id===publication.id))?.updates || []).filter(p=>p.id!==publication.id).map(p=>({id:p.id,title:publicArticleTitle(p.article),time:displayTime(publicationSourceTime(p)),path:sharePath(p)})),
     evidence: evidence.map(item => {
       const observation=observedEvidence(item,item.collectedAt);

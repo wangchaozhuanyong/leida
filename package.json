@@ -1,6 +1,6 @@
 {
   "name": "moyao-reset-radar",
-  "version": "1.0.88",
+  "version": "1.0.89",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@9.15.9",
@@ -35,7 +35,6 @@
     "@types/qrcode": "1.5.6",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
-    "drizzle-kit": "^0.31.6",
     "jsqr": "1.4.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"

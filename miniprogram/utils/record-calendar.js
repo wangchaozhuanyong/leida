@@ -1,4 +1,4 @@
-const { publicActions, dateKey, displayTime } = require('./model');
+const { publicActions, dateKey, displayTime, sortedStatePublications, publicationActions, publicationSourceTime, isNewsOnly } = require('./model');
 const { resetRecordFacts } = require('./reset-records');
 /** @typedef {'all'|'automatic_reset'|'banked_reset'} RecordKind */
 /** @typedef {ReturnType<typeof resetRecordFacts>[number]} CalendarRecord */
@@ -28,6 +28,24 @@ function completedRecords(data) {
 function calendarRecords(data) {
   const completed = completedRecords(data), { start, end } = recordRange(data.serverTime);
   return resetRecordFacts(data,completed).filter(r=>dateKey(r.at)>=start&&dateKey(r.at)<=end);
+}
+/** Reset news uses the same complete date summaries as the calendar. Pending
+ * announcements stay separate messages; source reports never become extra resets.
+ * @param {import('../../src/lib/types').PublicData} data @param {RecordKind} [kind]
+ */
+function resetNewsRecords(data, kind = 'all') {
+  const now=Date.parse(data.serverTime);
+  if(!Number.isFinite(now))return [];
+  const { start, end } = recordRange(data.serverTime);
+  const records = calendarRecords(data).filter(item => kind === 'all' || item.kind === kind);
+  const pending = sortedStatePublications(data).filter(publication => {
+    const at=publicationSourceTime(publication),date=dateKey(at);
+    return !isNewsOnly(publication) && Date.parse(publication.publishedAt)<=now && Date.parse(at)<=now && date >= start && date <= end && publicationActions(publication).some(action =>
+      action.scope === 'public' && Date.parse(action.statementAt)<=now && action.stage !== 'claimed_complete' && (kind === 'all' || action.kind === kind));
+  });
+  return [...records.map(fact => ({ id: fact.id, at: fact.at, publication: fact.publication, fact })),
+    ...pending.map(publication => ({ id: publication.id, at: publicationSourceTime(publication), publication, fact: null }))]
+    .sort((a,b) => Date.parse(b.at) - Date.parse(a.at) || a.id.localeCompare(b.id));
 }
 /** @param {import('../../src/lib/types').PublicData} data @param {{date?:string,kind?:RecordKind,month?:string,recentLimit?:number}} [options] */
 function recordCalendar(data, options = {}) {
@@ -81,4 +99,4 @@ function recordCalendar(data, options = {}) {
     selectedLabel: `${Number(selected.slice(5,7))}月${Number(selected.slice(8))}日`,
     periodLabel: `${start.replace(/-/g,'.')}—${end.replace(/-/g,'.')}` };
 }
-module.exports = { recordRange, completedRecords, recordCalendar };
+module.exports = { recordRange, completedRecords, recordCalendar, resetNewsRecords };

@@ -237,23 +237,26 @@ test('动态分类按精确请求串行预读；点击在途分类复用，预�
   client.prefetchNewsViews();client.prefetchNewsViews();assert.equal(n.calls.length,2);assert.match(n.calls[1].url,/filter=activity&view=news/);
   const enter=client.setView({view:'news',filter:'activity'});assert.equal(n.calls.length,2,'同一分类共享正在预读的请求');n.reply(1,categoryResponse('activity'));await enter;await flush();
   assert.equal(n.calls.length,3);assert.match(n.calls[2].url,/filter=product&view=news/);n.reply(2,categoryResponse('product'));await flush();
-  assert.equal(n.calls.length,4);assert.match(n.calls[3].url,/filter=all&view=history/);n.reply(3,categoryResponse('reset'));await flush();
-  for(const [target,name] of [[{view:'news',filter:'product'},'product'],[{view:'history',filter:'all'},'reset'],[{view:'news',filter:'all'},'all'],[{view:'news',filter:'activity'},'activity']] as const){
+  assert.equal(n.calls.length,4);assert.match(n.calls[3].url,/view=calendar/);n.reply(3,categoryResponse('reset'));await flush();
+  for(const [target,name] of [[{view:'news',filter:'product'},'product'],[{view:'calendar'},'reset'],[{view:'news',filter:'all'},'all'],[{view:'news',filter:'activity'},'activity']] as const){
    const before=frames.length,work=client.setView(target);assert.equal(client.getState().data.site.name,name);assert.equal(client.getState().page.total,23);assert.equal(frames.slice(before).some(s=>!s.data),false);await work;
   }
   assert.equal(n.calls.length,4);client.prefetchNewsViews();await flush();assert.equal(n.calls.length,4,'有效分类重复调度不增加请求');
  }finally{client.stop();}
 });
-test('打开重置分类后才预读两种福利筛选，发卡与额度总数和游标各自保留',async()=>{
+test('重置分类复用完整日历预读，不再为两种福利分别发送历史分页请求',async()=>{
  const n=network(),client=n.client();
  try{
-  const first=client.setView({view:'history',filter:'all'});n.reply(0,categoryResponse('reset'));await first;client.prefetchNewsViews();
-  const expected=[['filter=all&view=news','all'],['filter=activity&view=news','activity'],['filter=product&view=news','product'],['filter=automatic_reset&view=history','automatic'],['filter=banked_reset&view=history','banked']];
-  for(let i=0;i<expected.length;i++){assert.ok(n.calls[i+1].url.endsWith(expected[i][0]));const value=categoryResponse(expected[i][1]);value.page.total=i+30;value.page.nextCursor='cursor-'+i;n.reply(i+1,value);await flush();}
-  const count=n.calls.length;await client.setView({view:'history',filter:'banked_reset'});assert.equal(client.getState().data.site.name,'banked');assert.equal(client.getState().page.total,34);assert.equal(client.getState().page.nextCursor,'cursor-4');
-  await client.setView({view:'history',filter:'automatic_reset'});assert.equal(client.getState().data.site.name,'automatic');assert.equal(client.getState().page.total,33);assert.equal(n.calls.length,count);
+  const first=client.setView({view:'calendar'});const calendar=categoryResponse('reset');delete (calendar as any).page;n.reply(0,calendar);await first;client.prefetchNewsViews();
+  const expected=[['filter=all&view=news','all'],['filter=activity&view=news','activity'],['filter=product&view=news','product']];
+  for(let i=0;i<expected.length;i++){assert.ok(n.calls[i+1].url.endsWith(expected[i][0]));n.reply(i+1,categoryResponse(expected[i][1]));await flush();}
+  const count=n.calls.length;
+  for(let i=0;i<10;i++)await client.setView({view:'calendar'});
+  assert.equal(client.getState().data.site.name,'reset');assert.equal(client.getState().page,null);assert.equal(n.calls.length,count);
+  assert.equal(n.calls.some((call:any)=>call.url.includes('view=history')),false);
  }finally{client.stop();}
 });
+
 test('重开后分类缓存同步恢复；旧分类迟到响应不能覆盖新分类，失败保留本分类内容',async()=>{
  const store=multiStorage();
  for(const target of categoryViews){const value=categoryResponse(target.view+':'+target.filter);createPublicSnapshot(store.api,config,{now:()=>baseTime,...target}).save({...value,receivedAt:baseTime});}await flush();
@@ -280,12 +283,12 @@ test('动态页重复点击当前分类不重载，分类就绪才调度一次�
   Page(value:any){definition=value;},getApp:()=>({client:{prefetchNewsViews(){warm++;}}}),
   require:(name:string)=>name.includes('/page')?{createPage:(_build:any,extra:any)=>extra}:{}
  });
- const page={...definition.methods,_visible:true,data:{...definition.data,connected:true,snapshotPending:false,loading:false,error:''},setData(patch:any){Object.assign(this.data,patch);},reloadView(){reloads++;}};
+ const page={...definition.methods,_visible:true,data:{...definition.data,connected:true,snapshotPending:false,loading:false,error:''},setData(patch:any){Object.assign(this.data,patch);},reloadView(){reloads++;},redraw(){}};
  const tap=(value:string)=>({currentTarget:{dataset:{value}}});
  page.selectCategory(tap('all'));page.selectKind(tap('all'));page.selectCategory(tap('invalid'));assert.equal(reloads,0);
  definition.afterRender.call(page);definition.afterRender.call(page);assert.equal(warm,1);
  page.selectCategory(tap('product'));assert.equal(page.data.category,'product');assert.equal(reloads,1);definition.afterRender.call(page);assert.equal(warm,2);
  page.data.loading=true;page.selectCategory(tap('reset'));definition.afterRender.call(page);assert.equal(warm,2);page.data.loading=false;definition.afterRender.call(page);assert.equal(warm,3);
- page.selectKind(tap('banked_reset'));assert.equal(page.data.kind,'banked_reset');assert.equal(reloads,3);definition.afterRender.call(page);assert.equal(warm,4);
+ page.selectKind(tap('banked_reset'));assert.equal(page.data.kind,'banked_reset');assert.equal(reloads,2);definition.afterRender.call(page);assert.equal(warm,4);
  definition.hide.call(page);page._visible=false;definition.afterRender.call(page);assert.equal(warm,4);
 });

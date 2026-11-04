@@ -86,7 +86,13 @@ export function createWechatProvider(fetcher:typeof fetch=fetch) {
         if(data.errcode!==0)throw new WechatServiceError('微信发送结果无法确认','unknown');
         return {errorCode:0};
       } catch(error) {
-        if(error instanceof WechatServiceError&&error.errorCode!==undefined)throw new WechatServiceError(error.message,'rejected',error.errorCode);
+        if(error instanceof WechatServiceError&&error.errorCode!==undefined){
+          // Only the recipient's subscription rejection invalidates consent.
+          // Explicit provider errors prove this request was not accepted, so a
+          // repaired template or a recovered provider can retry the same credit.
+          const failure=error.errorCode===43101?'rejected':[-1,45009,45011].includes(error.errorCode)?'transient':'configuration';
+          throw new WechatServiceError(error.message,failure,error.errorCode);
+        }
         // No provider idempotency key: retrying an ambiguous send may consume another grant.
         throw new WechatServiceError('微信发送结果未知，已停止自动重发','unknown');
       }
