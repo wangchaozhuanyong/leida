@@ -114,6 +114,35 @@ test('动态重置与日历复用同一天的完整来源汇总，不以消息�
  assert.equal(resetNewsRecords(data,'banked_reset').length,0);assert.deepEqual(data,before);
 });
 
+test('Cloudbase 日历保留公开观测和完成引用的去重证据，排除撤回及未发布观测',async()=>{
+ const {CloudbaseRpc}=await import('../src/server/cloudbase/rpc');
+ const {createCloudbasePublicReader}=await import('../src/server/cloudbase/public-read');
+ const data=fixture(),at='2026-10-26T06:08:00.000Z';
+ const current=add(data,'limits',at);
+ const cited=evidence('limits',at);
+ cited.id='older-cited-observation';
+ cited.collectedAt='2026-10-26T10:30:00.000Z';
+ cited.metadata!.referenceReset!.snapshotAt=cited.collectedAt;
+ const linked=publish(data,'linked-observation',at,cited);
+ const completedAt='2026-10-26T06:09:00.000Z';
+ const completion=publish(data,'completion',completedAt,undefined,[{...action('done',completedAt),evidenceIds:[cited.id]}]);
+ const independent=add(data,'archive','2026-10-26T08:00:00.000Z');
+ const withdrawn=add(data,'reference','2026-10-26T09:00:00.000Z');
+ data.events.find(event=>event.id===withdrawn.eventId)!.status='withdrawn';
+ const unpublished=evidence('archive','2026-10-26T10:00:00.000Z');
+ data.evidence.push(unpublished);
+ const bundle={...data,page:null,versionData:{digests:Array(5).fill('0'.repeat(32)),sources:[],settings:[],deadlines:[],cases:[],snapshots:[],outcomeDigest:'0'.repeat(32)},forecastRecords:{cases:[],snapshots:[],outcomes:[]}};
+ const rpc=new CloudbaseRpc('local-calendar-qa','synthetic-only',async(_input,init)=>{
+  assert.equal(JSON.parse(String(init?.body)).p_options.view,'calendar');
+  return Response.json(bundle);
+ });
+ const result=await createCloudbasePublicReader(rpc,()=>now).read({view:'calendar'});
+ assert.deepEqual(result.data.publications.map(item=>item.id).sort(),[current.id,linked.id,completion.id,independent.id].sort());
+ assert.ok(result.data.evidence.some(item=>item.id===cited.id));
+ assert.ok(!result.data.evidence.some(item=>item.id===unpublished.id));
+ assert.deepEqual(resetNewsRecords(result.data).map((item:any)=>item.id),resetNewsRecords(data).map((item:any)=>item.id));
+});
+
 test('动态重置保留独立完成和新预告；两次同日发卡不被观测日期合并规则吞掉',()=>{
  const data=fixture();
  publish(data,'first-card','2026-10-26T01:00:00.000Z',undefined,[action('first-card','2026-10-26T01:00:00.000Z','banked_reset')]);

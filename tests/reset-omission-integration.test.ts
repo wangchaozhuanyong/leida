@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {pool,list,one,put} from '../src/db';
 import {createEvidence,defaultSite,publishCandidate} from '../src/server/service';
 import {runOne,scheduleDue} from '../src/server/worker';
-import type {Evidence,Candidate,Source,Publication,Article,Job,Notice} from '../src/lib/types';
+import type {Evidence,Candidate,Source,Publication,Article,Job,Notice,Activity} from '../src/lib/types';
 
 test('隔离库：漏报补录保留旧快照、完整闭环、幂等且不发历史通知',{skip:process.env.RADAR_OMISSION_INTEGRATION!=='1'},async()=>{
  assert.match(new URL(process.env.DATABASE_URL!).pathname,/^\/radar_qa_/);
@@ -17,6 +17,9 @@ test('隔离库：漏报补录保留旧快照、完整闭环、幂等且不发�
  try {
   for(const s of await list<Source>('sources'))await put('sources',{...s,enabled:false});
   await put('sources',source);await put('settings',{id:'site',...defaultSite,autoPublish:true});await put('settings',{id:'ai',enabled:false,version:1});
+  const activity=inputs.find(row=>row.sourceId==='activity-archive')?.metadata?.activity;
+  assert.ok(activity,'归档夹具应包含活动定义');
+  if(!await one<Activity>('activities',activity.id))await put('activities',{...activity,version:1,items:[]} satisfies Activity);
   const byMessage=new Map<string,string>();
   const add=async(r:Evidence)=>{
    const {id:_id,hash:_hash,...input}=r;

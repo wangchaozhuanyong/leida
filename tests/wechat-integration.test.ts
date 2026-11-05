@@ -28,7 +28,7 @@ test('真实隔离库：微信身份、一次性授权、任务派发和安全�
   assert.equal(actual.rows[0].name, expectedName, '实际数据库必须与 QA 配置一致');
   const { createWechatService, defaultWechat } = await import('../src/server/wechat');
   const { WechatServiceError } = await import('../src/server/wechat-provider');
-  const { runOne } = await import('../src/server/worker');
+  const { claimJob, runOne } = await import('../src/server/worker');
   const { getPublicData, getAdminData } = await import('../src/server/service');
 
   const require = createRequire(import.meta.url);
@@ -84,7 +84,11 @@ test('真实隔离库：微信身份、一次性授权、任务派发和安全�
     }
     assert.fail('未预期的微信接口；禁止真实网络调用');
   }) as typeof fetch;
-  const service = createWechatService({ fetcher, clock: () => clock, encryptionKey: () => Buffer.alloc(32, 19), preparePublicPage: async () => {} });
+  let preparePage: (() => Promise<void>) | undefined;
+  const service = createWechatService({
+    fetcher, clock: () => clock, encryptionKey: () => Buffer.alloc(32, 19),
+    preparePublicPage: async () => { await preparePage?.(); }
+  });
   const originalSettings = await one<WechatRecord>('settings', 'wechat');
   const suspendedJobs = (await list<Job>('jobs')).filter(job => ['queued','running'].includes(job.status));
   const configure = async (patch: Record<string, unknown> = {}) => {
@@ -93,7 +97,8 @@ test('真实隔离库：微信身份、一次性授权、任务派发和安全�
   };
   async function identity() {
     clock = Math.max(Date.now(), clock + 1);
-    const session = await service.wechatLogin(`synthetic-login-${tag}-${++sequence}`);
+    const identityKey=`synthetic-login-${tag}-${++sequence}`;
+    const session = await service.wechatLogin(identityKey,identityKey);
     rawSessions.add(session.sessionToken);
     const record = (await list<WechatReader>('wechat_readers')).find(reader => reader.appId === `wx${tag}` && !ownedReaders.has(reader.id));
     assert.ok(record, '测试登录必须持久化独立身份');
@@ -298,6 +303,64 @@ test('真实隔离库：微信身份、一次性授权、任务派发和安全�
       assert.equal((await one<WechatDelivery>('wechat_deliveries',delivery.id))?.status,'sent');
       assert.equal((await one<WechatDelivery>('wechat_deliveries',queued.delivery.id))?.status,'unknown');
       assert.equal(sendCount(),before+2);
+    });
+    await t.test('任务刚过期且尚无人接管时，旧执行不能把可领任务延后', async () => {
+      const reader=await identity();
+      await accept(reader.session.sessionToken);
+      const {job,delivery}=await queueNotice(reader.reader.id);
+      const wait=Math.max(0,Date.parse(job.availableAt)-Date.now()+2);
+      if(wait)await new Promise(resolve=>setTimeout(resolve,wait));
+      const realNow=Date.now;
+      let claimed:Job|undefined;
+      try {
+        assert.equal(await runOne({schedule:false,wechat:async current=>{
+          claimed=current;
+          Date.now=()=>Date.parse(current.leaseUntil!)+1;
+          return {state:'deferred'};
+        }}),true);
+      } finally {Date.now=realNow;}
+      assert.equal(claimed?.id,job.id);
+      assert.deepEqual(await one<Job>('jobs',job.id),claimed);
+      assert.equal((await one<WechatDelivery>('wechat_deliveries',delivery.id))?.status,'queued');
+      await service.revokeWechatSubscription(reader.session.sessionToken);
+      await put('jobs',{...claimed!,status:'succeeded',leaseUntil:undefined,finishedAt:at()});
+    });
+    await t.test('实际任务行被接管后，旧执行不能发送或结束新租约', {timeout:10_000}, async () => {
+      const reader = await identity();
+      await accept(reader.session.sessionToken);
+      const {job,delivery} = await queueNotice(reader.reader.id);
+      const before = sendCount();
+      const entered = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      preparePage = async () => {
+        preparePage = undefined;
+        entered.resolve();
+        await release.promise;
+      };
+      const wait = Math.max(0, Date.parse(job.availableAt) - Date.now() + 2);
+      if (wait) await new Promise(resolve => setTimeout(resolve, wait));
+      const original = runOne({schedule:false,wechat:service.processWechatJob});
+      try {
+        await Promise.race([entered.promise, original.then(() => assert.fail('旧任务应停在页面准备阶段'))]);
+        const oldJob = await one<Job>('jobs', job.id);
+        assert.equal(oldJob?.status, 'running');
+        await put('jobs',{...oldJob!,leaseUntil:new Date(Date.now()-1000).toISOString()});
+        const replacement = await claimJob();
+        assert.equal(replacement?.id, job.id);
+        assert.equal(replacement?.attempts, oldJob!.attempts+1);
+        release.resolve();
+        assert.equal(await original, true);
+        assert.equal(sendCount(), before);
+        assert.deepEqual(await one<Job>('jobs', job.id), replacement, '旧任务不能写回新执行的任务行');
+        assert.equal((await one<WechatDelivery>('wechat_deliveries', delivery.id))?.status,'queued');
+        assert.equal((await service.processWechatJob(replacement!)).state,'sent');
+        assert.equal(sendCount(), before+1);
+        assert.equal((await one<WechatDelivery>('wechat_deliveries', delivery.id))?.status,'sent');
+      } finally {
+        preparePage = undefined;
+        release.resolve();
+        await original;
+      }
     });
     await t.test('公开和管理员资料只包含公开内容或聚合结果，不包含私有对象', async () => {
       const publicData = await getPublicData(), adminData = await getAdminData();

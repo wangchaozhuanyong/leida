@@ -17,6 +17,7 @@ import type { Activity, Article, BenefitAction, Evidence, Notice, PublicData, Pu
 import { usePublicClock, usePublicQuery, useWechatAvailability } from './PublicSession';
 import { RecordCalendar, RecordKindFilter } from './RecordCalendar';
 import {resetNewsRecords} from '../../../miniprogram/utils/record-calendar';
+import {activityModel} from '../../../miniprogram/utils/model';
 import { parsePublicRoute } from './public-navigation';
 import { usePublicNavigation } from './usePublicNavigation';
 import { useFixedSnapshot } from './useFixedSnapshot';
@@ -29,7 +30,7 @@ import { activityDayNumber, activityHomeVisible } from '@/lib/activity-display';
 import { publicationUrl, statusShareUrl, isLocalShareUrl } from '@/lib/share';
 import { createPosterFromEndpoint, savePosterImage, type PosterImage } from './poster-image';
 import { statusPosterStyles, statusPosterVariant, type StatusPosterStyle } from '@/lib/status-poster-style';
-import { activityPublicationUrl, activityShareQuery, buildActivityShare, parseActivityShare, resolveActivityShare, type ActivityDayShare } from '@/lib/activity-share';
+import { activityPublicationUrl, activityShareQuery, buildActivityShare, parseActivityShare, resolveActivityShare, type ActivityDayShare, type ActivityShareItem } from '@/lib/activity-share';
 import { briefTime, articleSourceTime, publicationSourceTime, publicationWithdrawn, sortedArticles, currentPublication, dateKey, displayTime, elapsed, publicActions, safeUrl, statePublication, isNewsOnly, stageText } from './model';
 import { latestSourceSuccess, publicArticleTitle, publicArticleSummary, publicArticleContent, publicNavSection, latestCompletedBenefits, recentCompletedBenefits, completionTime } from './model';
 
@@ -63,7 +64,7 @@ function PageSymbol({route}:{route:string}) {
   const icon:Record<string,string>={news:'news',history:'history',settings:'reminder',more:'more',notices:'inbox',activities:'activity',methodology:'methodology'};
   return <img className="pub-page-symbol" src={`/icons/${icon[route]||'document'}.svg`} alt="" width="34" height="34"/>;
 }
-function Brand({ name = '模钥重置雷达', subtitle }: { name?: string; subtitle?: string }) { return <div className="pub-brand"><span className="pub-brand-mark" aria-hidden="true"><img src="/brand/MOYAO_AI_Icon_Transparent.svg" alt="" width="40" height="40" /></span><div className="pub-brand-copy"><strong>{name}</strong>{subtitle && <p>{subtitle}</p>}</div></div>; }
+function Brand({ name = '模钥重置雷达', subtitle }: { name?: string; subtitle?: string }) { return <div className="pub-brand"><span className="pub-brand-mark" aria-hidden="true"><img src="/brand/moyao-icon-384.png" alt="" width="40" height="40" /></span><div className="pub-brand-copy"><strong>{name}</strong>{subtitle && <p>{subtitle}</p>}</div></div>; }
 function TextLink({ href, children }: { href: string; children: React.ReactNode }) { return <Link scroll={false} className="pub-text-link" href={href}>{children}<Icon name="arrow" /></Link>; }
 function ExternalLink({ url, children }: { url: string; children: React.ReactNode }) {
   const href = safeUrl(url);
@@ -111,9 +112,12 @@ export default function PublicApp() {
   const { navHref, backHref, changeFilter, onNavigateCapture } = usePublicNavigation(pathname, queryString, data, queryReady && !navigationLoading);
   const setNewsCategory = (value: NewsCategory) => changeFilter('category', value === 'all' ? null : value);
   const setHistoryFilter = (value: string) => changeFilter('target', value === 'banked_reset' ? 'banked' : value === 'automatic_reset' ? 'automatic' : null);
-  const activityCache = useRef(new Map<string, Activity>());
-  const currentActivity = data?.activities.find(item => item.id === path[1]);
-  useEffect(() => { if (currentActivity) activityCache.current.set(currentActivity.id, currentActivity); }, [currentActivity]);
+  const activityCache = useRef(new Map<string, PublicData>());
+  const liveActivity = route === 'activities' && !query.has('publication');
+  const activityId = path[1];
+  useEffect(() => {
+    if (liveActivity && data?.activities.some(item => item.id === activityId)) activityCache.current.set(activityId, data);
+  }, [activityId, data, liveActivity]);
   useEffect(() => {
     setPoster(null); setStatusPoster(null); setForecastPoster(null); setDayPoster(null);
     setShareLink(null); setWechatReminders(false); setToast('');
@@ -171,7 +175,12 @@ export default function PublicApp() {
   else if (route === 'more') content = <MorePage />;
   else if (route === 'news') content = <News resetContent={newsCategory === 'reset' ? <History records={historyRecords.slice(0,resetLimit)} filter={historyFilter} onFilter={setHistoryFilter} data={data} hasMore={resetLimit<historyRecords.length} onMore={()=>setResetLimits(old=>({...old,[historyFilter]:(old[historyFilter]||20)+20}))} loading={false} pending={!data ? pending : undefined} /> : undefined} groups={data ? publicNewsGroups(data).filter(group => newsCategory === 'all' || group.category === newsCategory) : []} category={newsCategory} onCategoryChange={setNewsCategory} hasMore={!!page?.nextCursor} onMore={() => void more()} loading={loadingMore} pending={!data ? pending : undefined} />;
   else if (route === 'history') content = data ? <RecordCalendar data={data} date={query.get('date') || ''} kind={historyFilter} onDate={value=>changeFilter('date',value)} onKind={setHistoryFilter}/> : pending;
-  else if (route === 'activities' && path[1]) content = <ActivityPage data={data} activity={data ? currentActivity : activityCache.current.get(path[1])} id={path[1]} query={query} onDay={value => changeFilter('day', value === null ? null : String(value))} pending={!data ? pending : undefined} onPoster={setPoster} onDayPoster={value => { setPoster(null); setDayPoster(value); }} />;
+  else if (route === 'activities' && activityId) {
+    // A new day read may still be in flight. Keep its calendar and badges in
+    // place from the latest live read; fixed shares always wait for their data.
+    const activityData = data ?? (liveActivity ? activityCache.current.get(activityId) ?? null : null);
+    content = <ActivityPage data={activityData} activity={activityData?.activities.find(item => item.id === activityId)} id={activityId} query={query} onDay={value => changeFilter('day', value === null ? null : String(value))} pending={!data ? pending : undefined} onPoster={setPoster} onDayPoster={value => { setPoster(null); setDayPoster(value); }} />;
+  }
   else if (!readPath) content = <><Empty title="暂时没有这条记录" detail="链接可能已变化，请返回首页查看公开动态。" /><TextLink href="/">返回首页</TextLink></>;
   else if (!data) content = route==='home'?(error?<ResetStatePending failed busy={loading} onRetry={()=>void refresh()}/>:<LoadingContent variant="home"/>):pending;
   else if (route === 'home') content = <Home data={data} onWechatReminders={() => setWechatReminders(true)} onPoster={() => {const at=currentTime()||data.serverTime;setStatusPoster({actionId:'',round:statusPosterSnapshot(data,at).round,generatedAt:at});}} onShare={share} historical={historical} wechatEntry={wechatEntry} />;
@@ -225,7 +234,7 @@ export function Home({ data, onWechatReminders, onPoster, onShare, historical, w
   const activityPhase = activityDay === undefined ? '活动动态' : activityDay < 1 ? '尚未开始' : activity && activityDay > activity.days ? '活动已结束' : `第${activityDay}天 / 共${activity?.days}天`;
   const latestRecord = completions.length ? <section className="pub-home-completions" aria-label="最近五条公开完成公告">
     <div className="pub-home-completions-heading"><h2>最近完成公告</h2><Link scroll={false} href="/history">全部记录 →</Link></div>
-    {completions.map(item => <Link scroll={false} className="pub-home-completion" key={item.action.id} href={`/events/${encodeURIComponent(item.event.id)}`} aria-label={`公告称已${item.action.kind === 'banked_reset' ? '发放重置卡' : '重置用量'}，${completionTime(item.action.statementAt)}，查看公开依据`}>
+    {completions.map(item => <Link scroll={false} className="pub-home-completion" key={item.action.id} href={fixedPublicationHref(item.publication)} aria-label={`公告称已${item.action.kind === 'banked_reset' ? '发放重置卡' : '重置用量'}，${completionTime(item.action.statementAt)}，查看公开依据`}>
       <Icon name="check"/><span className="pub-home-completion-name">{item.action.kind === 'banked_reset' ? '重置卡发放' : '用量重置'}</span>
       <time dateTime={item.action.statementAt} title={`${displayTime(item.action.statementAt)} · 北京时间`}>{completionTime(item.action.statementAt).replace(/^(\d{4})\/(\d{2})\/(\d{2}) /, (_, year: string, month: string, day: string) => `${year === dateKey(data.serverTime).slice(0, 4) ? '' : `${year}年`}${Number(month)}月${Number(day)}日 `)}</time>
     </Link>)}
@@ -374,6 +383,10 @@ export function EvidencePage({ data, id }: { data: PublicData; id: string }) {
   const articles = data.articles.filter(a => a.evidenceIds.includes(id));
   return <><div className="pub-page-heading"><h1>原文与来源</h1><p>{displayTime(evidence.publishedAt)} · 北京时间</p></div><section className="pub-card"><div className="pub-card-top"><h2>{evidenceSourceName(evidence, data.sources)}</h2><Badge tone={evidence.provenance === 'official' ? 'cyan' : ''}>{evidenceKind(evidence)}</Badge></div>{evidence.provenance === 'archive' && <p className="pub-muted">由第三方收录，可打开原文核对。</p>}<ExternalLink url={evidence.url}>打开原文</ExternalLink></section>{(!evidence.contextComplete || evidence.textOrigin === 'archive_excerpt') && <p className="pub-warning">这里只收录了部分原文，请打开来源查看完整内容。</p>}<section className="pub-card"><h2>{evidence.provenance === 'official' && evidence.textOrigin !== 'structured' && evidence.textOrigin !== 'archive_excerpt' ? '原文内容' : '收录内容'}</h2><blockquote className="pub-original" dir="auto">{evidence.text}</blockquote></section>{parent && <section className="pub-card"><h2>相关上文</h2><p className="pub-prose">{parent.text}</p><TextLink href={`/sources/${encodeURIComponent(parent.id)}`}>查看上文来源</TextLink></section>}{articles.length > 0 && <section className="pub-card"><h2>对应中文内容</h2>{articles.map(article => <TextLink key={article.id} href={`/articles/${encodeURIComponent(article.id)}`}>{publicArticleTitle(article)}</TextLink>)}</section>}</>;
 }
+function fixedPublicationHref(publication: Publication) {
+  return `/events/${encodeURIComponent(publication.eventId)}?version=${encodeURIComponent(publication.id)}`;
+}
+
 function ActivityPage({ data, activity, id, query, onDay: setDay, pending, onPoster, onDayPoster }: { data: PublicData | null; activity?: Activity; id: string; query: URLSearchParams; onDay: (value: number | null) => void; pending?: React.ReactNode; onPoster: (p: Publication) => void; onDayPoster: (selection: ActivityDayShare) => void }) {
   const requestedDay = query.get('day');
   const day = requestedDay && /^[1-9]\d{0,2}$/.test(requestedDay) ? Number(requestedDay) : null;
@@ -386,36 +399,70 @@ function ActivityPage({ data, activity, id, query, onDay: setDay, pending, onPos
     catch (cause) { return <><Empty title="分享链接无效" detail={cause instanceof Error ? cause.message : '无法打开分享内容。'} /><TextLink href={`/activities/${encodeURIComponent(id)}`}>查看当前每日进展</TextLink></>; }
     const fixed = resolveActivityShare(data, selection);
     if (!fixed.available) return <><Empty title="分享内容暂不可用" detail={fixed.blockedReason} /><TextLink href={`/activities/${encodeURIComponent(id)}`}>查看当前每日进展</TextLink></>;
-    return <><div className="pub-page-heading"><p className="pub-eyebrow">分享时的活动进展 · 第{fixed.manifest.day}天</p><h1>{fixed.activity.title}</h1><p>{fixed.date} · {fixed.items.length}条进展</p></div><p className="pub-warning">{fixed.rulesNotice}以下为分享时的内容，可查看最新进展。</p><div className="pub-share-row"><button className="pub-button" onClick={() => onDayPoster(fixed.manifest)}>生成整日海报<Icon name="share" /></button><Link scroll={false} className="pub-button" href={`/activities/${encodeURIComponent(id)}?day=${fixed.manifest.day}`}>查看当前进展<Icon name="arrow" /></Link></div>{fixed.items.map(({ publication, sourceTime }) => <article className="pub-card" key={publication.id} data-reading-id={publication.id}><div className="pub-card-top"><Badge tone="purple">分享记录</Badge><time>{briefTime(sourceTime)}</time></div><h2>{publicArticleTitle(publication.article)}</h2><ArticleContent article={publication.article} /><p className="pub-muted">此条资料截至 {displayTime(publication.cutoffAt)}</p><TextLink href={`/events/${encodeURIComponent(publication.eventId)}?version=${encodeURIComponent(publication.id)}`}>查看消息与来源</TextLink></article>)}</>;
+    return <><div className="pub-page-heading"><p className="pub-eyebrow">分享时的活动进展 · 第{fixed.manifest.day}天</p><h1>{fixed.activity.title}</h1><p>{fixed.date} · {fixed.items.length}条进展</p></div><p className="pub-warning">{fixed.rulesNotice}以下为分享时的内容，可查看最新进展。</p><div className="pub-share-row"><button className="pub-button" onClick={() => onDayPoster(fixed.manifest)}>生成整日海报<Icon name="share" /></button><Link scroll={false} className="pub-button" href={`/activities/${encodeURIComponent(id)}?day=${fixed.manifest.day}`}>查看当前进展<Icon name="arrow" /></Link></div>{fixed.items.map(item => <FixedActivityEntry key={item.publication.id} item={item}/>)}</>;
   }
   if (day !== null && (day < 1 || day > activity.days)) return <><Empty title="活动日期超出范围" detail="请选择这项活动内的日期。" /><button className="pub-button" onClick={() => setDay(null)}>查看当前日期</button></>;
   return <ActivityContent activity={activity} data={data} pending={pending} day={day} onDay={setDay} onPoster={onPoster} onDayPoster={onDayPoster} />;
 }
+function FixedActivityEntry({item}: {item: ActivityShareItem}) {
+  const {publication, sourceTime, fact, observationReports} = item;
+  return <article className="pub-card" data-reading-id={publication.id}>
+    <div className="pub-card-top"><Badge tone={fact?.evidenceType==='observed'?'cyan':'purple'}>{fact?.evidenceType==='observed'?'来源观测':fact?.evidenceType==='confirmed'?'完成确认':'分享记录'}</Badge><time dateTime={sourceTime}>{briefTime(sourceTime)}</time></div>
+    {observationReports ? <><h2>当日额度重置观测</h2><p>最早观测 {briefTime(sourceTime)}（北京时间）。</p>
+      <details className="pub-news-progress"><summary>查看来源依据 · {observationReports.length}条</summary><ol>{observationReports.map(({publication: source, report}) => (
+        <li key={report.evidenceId}><time dateTime={report.observedAt}>{briefTime(report.observedAt)}</time><Link scroll={false} href={fixedPublicationHref(source)}>{report.sourceName}</Link></li>
+      ))}</ol></details>
+    </> : <><h2>{publicArticleTitle(publication.article)}</h2><ArticleContent article={publication.article} /></>}
+    <p className="pub-muted">此条资料截至 {displayTime(item.cutoffAt)}</p>
+    {!observationReports && <TextLink href={fixedPublicationHref(publication)}>查看消息与来源</TextLink>}
+  </article>;
+}
+type ActivityEvidenceLink = { id:string; title:string; at:string; time:string; publicationId:string };
+type ActivityEntry = { id:string; stage:string; sourceTime:number; time:string; title:string; summary:string; withdrawn:boolean; sources?:ActivityEvidenceLink[] };
+
 function ActivityContent({ activity, data, pending, day, onDay, onPoster, onDayPoster }: { activity: Activity; data: PublicData | null; pending?: React.ReactNode; day: number | null; onDay: (n: number) => void; onPoster: (p: Publication) => void; onDayPoster: (selection: ActivityDayShare) => void }) {
   const [shareError, setShareError] = useState('');
-  const now = usePublicClock(data?.serverTime ?? '');
+  const now = usePublicClock(data?.serverTime ?? '') || data?.serverTime || '';
   const actualDay = activityDayNumber(activity, now) ?? 1;
   const selected = day ?? Math.max(1, Math.min(activity.days, actualDay));
-  const entries = activity.items.filter(item => item.day === selected).map(item => data?.articles.find(a => a.id === item.articleId)).filter(a => !!a);
-  const publishedDays = new Set(activity.items.map(item => item.day));
-  const timezoneName = activity.timezone === 'Asia/Shanghai' ? '北京时间' : activity.timezone === 'America/Los_Angeles' ? '美国西部时间' : '活动指定时区';
+  const projection = useMemo(() => data ? activityModel({ ...data, serverTime: now }, activity.id, selected) : null,
+    // Rebuild when the selected day or campaign-local date changes, not each clock tick.
+    [data, activity.id, selected, actualDay]);
+  const model = projection && !projection.missing ? projection : null;
+  const entries: ActivityEntry[] = model?.entries ?? [];
+  const days = model?.days ?? [];
+  const timezoneName = model?.timezone ?? (activity.timezone === 'Asia/Shanghai' ? '北京时间' : activity.timezone === 'America/Los_Angeles' ? '美国西部时间' : '活动指定时区');
   const selectedDate = new Date(Date.parse(`${activity.startsOn}T00:00:00Z`) + (selected - 1) * 86400000).toISOString().slice(0, 10);
-  const latestDay = [...publishedDays].filter(n => n <= actualDay).sort((a, b) => b - a)[0];
+  const latestDay = days.filter(entry => entry.recorded && entry.state !== 'future').at(-1)?.value;
+  const selectDay = (value: number) => { setShareError(''); onDay(value); };
+  const visiblePublicationIds = entries.filter(entry=>!entry.withdrawn).flatMap(entry => [entry.id,...(entry.sources ?? []).map(source => source.publicationId)]);
   return <div className="pub-activity-content">
     <div className="pub-page-heading"><div className="pub-activity-heading"><h1>{activity.title}</h1><span className="pub-activity-phase">{actualDay < 1 ? '尚未开始' : actualDay > activity.days ? '活动已结束' : `第${actualDay}天 / 共${activity.days}天`}</span></div><p>{activity.rules}</p></div>
-    <section className="pub-card pub-activity-calendar"><div className="pub-card-top"><h2>每日进展</h2><Badge tone="purple">已收录{publishedDays.size}天</Badge></div>
-      <div className="pub-activity-days" role="group" aria-label="选择活动日期">{Array.from({ length: activity.days }, (_, index) => index + 1).map(n => <button key={n} className={`${selected === n ? 'active' : ''} ${publishedDays.has(n) ? 'has-entry' : ''} ${n === actualDay ? 'is-today' : ''} ${n > actualDay ? 'is-future' : ''}`} aria-label={`第${n}天${publishedDays.has(n) ? '，有已收录进展' : n > actualDay ? '，尚未到来' : '，暂无记录'}`} title={n === actualDay ? '今天' : n > actualDay ? '未来日期' : publishedDays.has(n) ? '已有进展' : '待收录'} aria-pressed={selected === n} onClick={() => onDay(n)}>{n}{publishedDays.has(n) && <i />}</button>)}</div>
-      <div className="pub-activity-legend"><span className="today">今天</span><span className="recorded">已收录</span><span>待收录</span><span className="future">未来</span></div>
+    <section className="pub-card pub-activity-calendar"><div className="pub-card-top"><h2>每日进展</h2><Badge tone="purple">已收录{model?.recordedDays ?? 0}天</Badge></div>
+      <div className="pub-activity-days" role="group" aria-label="选择活动日期">{days.map(entry => <button key={entry.value} className={`${entry.selected ? 'active' : ''} ${entry.recorded ? 'has-entry' : ''} ${entry.today ? 'is-today' : ''} ${entry.state === 'future' ? 'is-future' : ''}`} aria-label={entry.accessibility} title={entry.label} aria-pressed={entry.selected} onClick={() => selectDay(entry.value)}>{entry.value}{entry.recorded && <i />}</button>)}</div>
+      <div className="pub-activity-legend"><span className="today">今天</span><span className="recorded">已收录</span><span>待收录</span><span>未来</span></div>
       <p className="pub-muted">活动日期按{timezoneName}划分，记录时间显示为北京时间。</p>
     </section>
     <div className="pub-section-heading pub-activity-day-heading"><div><h2>第{selected}天</h2><p>{selectedDate} · {timezoneName}</p></div><span className="pub-muted">{entries.length}条进展</span></div>
-    {pending ?? <>{!entries.length && <div className="pub-empty pub-activity-empty"><Icon name="calendar" /><h2>{selected > actualDay ? '这一天尚未开始' : '暂无已收录进展'}</h2><p>{selected > actualDay ? '有公开进展后，会在对应日期更新。' : '尚未收录这一天的公开进展，不代表活动没有发生。'}</p>{latestDay && latestDay !== selected && <button className="pub-button" onClick={() => onDay(latestDay)}>查看最近有进展的第{latestDay}天<Icon name="arrow" /></button>}</div>}
-    <button className="pub-button full pub-day-poster" disabled={!entries.length} onClick={() => { try { const selection = buildActivityShare(data!, activity.id, selected); activityPublicationUrl(location.origin, selection); setShareError(''); onDayPoster(selection); } catch (cause) { setShareError(cause instanceof Error ? cause.message : '这一天暂时不能生成整合海报。'); } }}>生成整日海报<Icon name="share" /></button>
+    {pending ?? <>{!entries.length && <div className="pub-empty pub-activity-empty"><Icon name="calendar" /><h2>{model?.emptyTitle ?? '暂无已收录进展'}</h2><p>{model?.emptyText}</p>{latestDay && latestDay !== selected && <button className="pub-button" onClick={() => selectDay(latestDay)}>查看最近有进展的第{latestDay}天<Icon name="arrow" /></button>}</div>}
+    <button className="pub-button full pub-day-poster" disabled={!entries.some(entry=>!entry.withdrawn)} onClick={() => { try { const selection = buildActivityShare(data!, activity.id, selected, visiblePublicationIds); activityPublicationUrl(location.origin, selection); setShareError(''); onDayPoster(selection); } catch (cause) { setShareError(cause instanceof Error ? cause.message : '这一天暂时不能生成整合海报。'); } }}>生成整日海报<Icon name="share" /></button>
     {shareError && <p className="pub-warning" role="alert">{shareError}</p>}
-    {entries.map(article => { const publication = data!.publications.find(p => p.id === article.publicationId); return <article className="pub-card" key={article.id} data-reading-id={article.id}><div className="pub-card-top"><Badge tone="purple">{article.historical ? '历史收录 · ' : ''}活动动态</Badge><time dateTime={articleSourceTime(article)} title={`${displayTime(articleSourceTime(article))} · 北京时间`}>{briefTime(articleSourceTime(article))}</time></div><h2>{publicArticleTitle(article)}</h2><ArticleContent article={article} /><div className="pub-card-top"><TextLink href={`/articles/${encodeURIComponent(article.id)}`}>查看详情与来源</TextLink>{publication && <button className="pub-text-button" disabled={article.status === 'withdrawn' || data!.events.find(event => event.id === article.eventId)?.status === 'withdrawn'} onClick={() => onPoster(publication)}>分享海报<Icon name="share" /></button>}</div></article>; })}
+    {entries.map(entry => {
+      const sources = entry.sources ?? [];
+      const publication = data?.publications.find(p => p.id === (sources[0]?.publicationId ?? entry.id));
+      if (!publication) return null;
+      return <article className="pub-card" key={entry.id} data-reading-id={entry.id}>
+        <div className="pub-card-top"><Badge tone={entry.withdrawn ? '' : entry.stage === '来源观测' ? 'cyan' : 'purple'}>{entry.stage}</Badge><time dateTime={new Date(entry.sourceTime).toISOString()}>{entry.time} · 北京时间</time></div>
+        <h2>{entry.title}</h2>{sources.length ? <p>{entry.summary}</p> : <ArticleContent article={publication.article} />}
+        {sources.length > 1 && <details className="pub-news-progress"><summary>查看来源依据 · {sources.length}条</summary><ol>{sources.map(source => {
+          const target = data?.publications.find(item => item.id === source.publicationId);
+          return <li key={source.id}><time dateTime={source.at}>{source.time}</time>{target ? <Link scroll={false} href={fixedPublicationHref(target)}>{source.title}</Link> : <span>{source.title}</span>}</li>;
+        })}</ol></details>}
+        <div className="pub-card-top"><TextLink href={fixedPublicationHref(publication)}>查看详情与来源</TextLink>{sources.length <= 1 && <button className="pub-text-button" disabled={entry.withdrawn} onClick={() => onPoster(publication)}>分享海报<Icon name="share" /></button>}</div>
+      </article>;
+    })}
     </>}
   </div>;
-
 }
 export function Settings({notices,read,markRead,storageError,pending,data,codeAvailable=false}:{notices:Notice[];read:string[];markRead:(ids:string[])=>void;storageError:string;pending?:React.ReactNode;data?:PublicData|null;codeAvailable?:boolean}) {
   const unread=notices.filter(n=>!read.includes(n.id)).length;

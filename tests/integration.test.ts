@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
+import {request as httpRequest} from 'node:http';
 const base=process.env.RADAR_TEST_URL||'http://127.0.0.1:5191';
 test('真实数据库、登录隔离、版本发布、去重与公共接口', {skip:process.env.RADAR_INTEGRATION!=='1'},async()=>{
  let cookie='';
@@ -16,6 +17,17 @@ test('真实数据库、登录隔离、版本发布、去重与公共接口', {s
  assert.equal((await request('/api/setup')).status,200);
  assert.equal((await fetch(base+'/api/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,403);
  const password=randomBytes(24).toString('base64url');const email='qa-owner@example.invalid';
+ const setup={email,password,name:'集成测试站长'};
+ const untrustedHeaders: Record<string,string>[]=[{Host:'external.example'},{'X-Forwarded-For':'127.0.0.1'},{Forwarded:'for=127.0.0.1'}];
+ const payload=JSON.stringify(setup);
+ for(const headers of untrustedHeaders){
+  const status=await new Promise<number|undefined>((resolve,reject)=>{
+   const attempt=httpRequest(base+'/api/setup',{method:'POST',headers:{Origin:base,'Content-Type':'application/json','Content-Length':Buffer.byteLength(payload),...headers}},response=>{response.resume();resolve(response.statusCode);});
+   attempt.once('error',reject);
+   attempt.end(payload);
+  });
+  assert.equal(status,403,Object.keys(headers).join(','));
+ }
  assert.equal((await request('/api/setup',{email,password,name:'集成测试站长'})).status,200);
  assert.equal((await request('/api/setup',{email:'other@example.invalid',password,name:'测试'})).status,409);
  assert.notEqual((await request('/api/auth/sign-up/email',{email:'registration@example.invalid',password,name:'不应注册'})).status,200);
@@ -43,7 +55,7 @@ test('真实数据库、登录隔离、版本发布、去重与公共接口', {s
  assert.equal((await request('/api/v1/articles/'+p.article.id,undefined,false)).status,200);const poster=await request('/api/v1/posters/'+p.id,undefined,false);assert.equal(poster.status,200);assert.match(await poster.text(),/资料截至/);
  const privateText='unpublished private QA marker '+randomBytes(4).toString('hex');await command('candidate.create',{url:'https://example.org/pending',text:privateText,publishedAt,contextComplete:false});assert.ok(!JSON.stringify((await (await request('/api/v1/status')).json()).data).includes(privateText));
  const current=data.events.find((v:{id:string})=>v.id===p.eventId);await command('event.withdraw',{id:current.id,version:current.version,reason:'撤回集成测试事件'});assert.equal((await request('/api/v1/posters/'+p.id)).status,410);
- const out=(await (await request('/api/v1/status')).json()).data;assert.equal(out.events.find((v:{id:string})=>v.id===p.eventId).status,'withdrawn');const eventNotices=out.notices.filter((v:{eventId:string})=>v.eventId===p.eventId);const activeCorrections=eventNotices.filter((v:{status:string;categories:string[]})=>v.status==='active'&&v.categories.includes('correction'));assert.equal(activeCorrections.length,1);assert.match(activeCorrections[0].title,/已撤回/);assert.match(activeCorrections[0].summary,/撤回集成测试事件/);assert.ok(eventNotices.filter((v:{id:string})=>v.id!==activeCorrections[0].id).every((v:{status:string})=>v.status==='withdrawn'));
+ const out=(await (await request('/api/v1/status')).json()).data;assert.equal(out.events.find((v:{id:string})=>v.id===p.eventId).status,'withdrawn');assert.ok(!out.notices.some((v:{eventId:string})=>v.eventId===p.eventId),'自动事件提醒不进入公开站内信');const owner=(await (await request('/api/admin/data')).json()).data;const eventNotices=owner.notices.filter((v:{eventId:string})=>v.eventId===p.eventId);const activeCorrections=eventNotices.filter((v:{status:string;categories:string[]})=>v.status==='active'&&v.categories.includes('correction'));assert.equal(activeCorrections.length,1);assert.match(activeCorrections[0].title,/已撤回/);assert.match(activeCorrections[0].summary,/撤回集成测试事件/);assert.ok(eventNotices.filter((v:{id:string})=>v.id!==activeCorrections[0].id).every((v:{status:string})=>v.status==='withdrawn'));
  // Only the isolated QA owner is changed; user credentials never enter this test.
  const nextPassword=randomBytes(24).toString('base64url');
  assert.equal((await request('/api/auth/change-password',{currentPassword:password,newPassword:nextPassword,revokeOtherSessions:true},false)).status,401);

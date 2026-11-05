@@ -16,9 +16,9 @@
 
 - 每天北京时间03:15执行，开机后也会检查；离线错过的日历任务由 `Persistent=true` 补一次。失败后30分钟重试，单次超时30分钟。定时行为依据 [systemd.timer 官方说明](https://www.freedesktop.org/software/systemd/man/latest/systemd.timer.html)。
 - 数据库通过 `docker exec` 调用本地 `pg_dump`，不读取或打印数据库密码，不开放数据库端口。
-- 新备份使用独立文件名，权限受限；先保留`.partial`，通过非空与`pg_restore --list`检查后才改为`.dump`，不覆盖已有备份、不自动删除历史文件。
+- 新备份使用独立文件名，权限受限；先保留`.partial`，通过非空与 `pg_restore --exit-on-error --file=/dev/null` 完整读取检查后才改为 `.dump`，不覆盖已有备份、不自动删除历史文件。
 - 检查：`systemctl list-timers reset-radar-backup.timer`、`systemctl show reset-radar-backup.service -p Result -p ExecMainStatus -p ExecMainExitTimestamp`、`journalctl -u reset-radar-backup.service -n 30 --no-pager`。
-- 目录检查只能证明归档结构可读；还需在独立恢复库验证表及记录，不能对生产库执行清空或覆盖恢复。
+- 完整读取可识别截断或不可读的数据段。还原操作仅在独立恢复库执行，并核对表及记录。
 - 本机备份不能覆盖整机或磁盘损失。不要把修复测试生成的`outputs/.../backup-fixture/`归档当作业务备份。
 
 本轮已经在无外部网络、无开放端口的本地隔离 PostgreSQL 中验证备份和恢复，恢复后的发布记录为27条测试记录。这不代表服务器定时任务已安装或生产业务备份已经恢复验证。

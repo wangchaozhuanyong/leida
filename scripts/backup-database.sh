@@ -30,8 +30,8 @@ if ! "${database_exec[@]}" pg_dump --username=radar --dbname=radar --format=cust
   echo '数据库备份失败，未完成的文件保留为 .partial；现有备份未覆盖。' >&2
   exit 1
 fi
-if ! test -s "$partial_file" || ! "${database_exec[@]}" pg_restore --list < "$partial_file" >/dev/null 2>&1; then
-  echo '备份文件为空或未通过目录校验，已保留 .partial；不得用于恢复。' >&2
+if ! test -s "$partial_file" || ! "${database_exec[@]}" pg_restore --exit-on-error --file=/dev/null < "$partial_file" >/dev/null 2>&1; then
+  echo '备份文件为空或未通过完整读取校验，已保留 .partial；不得用于恢复。' >&2
   exit 1
 fi
 if test -e "$backup_file"; then

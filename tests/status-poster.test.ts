@@ -186,6 +186,7 @@ for (const { id: style } of statusPosterStyles) {
   test(`${style} 动态模板使用真实状态和北京时间，缺少小程序码时不生成网站替代码`, async () => {
     const selected = publication();
     const svg = statusPosterSvg(input({ style, publication: selected }));
+    assert.ok(Buffer.byteLength(svg) < 600_000, '无圆码海报应使用压缩资源，避免重复传输全尺寸原图');
     assert.match(svg, new RegExp(`data-poster-style="${style}"`));
     assert.match(svg, /公告称已发放重置卡/);
     assert.match(svg, /距该公告 2 天/);

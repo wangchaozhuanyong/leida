@@ -368,8 +368,8 @@
 .pub-poster-style.is-selected { border-color: var(--pub-cyan); color: var(--pub-text); background: #29251a; }
 .pub-poster-style > .pub-icon { width: 16px; height: 16px; margin-left: auto; color: var(--pub-cyan); flex-shrink: 0; }
 .pub-poster-swatch { display: block; width: 27px; height: 38px; border-radius: 3px; flex-shrink: 0; background-position: center; background-size: cover; }
-.pub-poster-swatch.precision { background-image: url('/posters/precision-background.png'); }
-.pub-poster-swatch.editorial { background-image: url('/posters/editorial-background.png'); }
+.pub-poster-swatch.precision { background-image: url('/posters/precision-swatch.jpg'); }
+.pub-poster-swatch.editorial { background-image: url('/posters/editorial-swatch.jpg'); }
 .pub-poster-code-option { display: flex; align-items: center; gap: 7px; margin-top: 10px; font-size: 12px; line-height: 1.6; color: var(--pub-muted); }
 .pub-poster-code-option input { margin: 0; accent-color: var(--pub-cyan); }
 .pub-poster-code-option small { margin-left: auto; font-size: 10px; }
@@ -458,8 +458,8 @@
 .pub-share-entry:hover{background:transparent}.pub-share-entry:focus-visible{outline:2px solid var(--pub-cyan);outline-offset:3px}
 .pub-share-entry-posters{position:relative;display:block;flex:none;width:50px;height:62px}
 .pub-share-entry-poster{position:absolute;display:block;width:34px;height:53px;border-radius:3px;background-size:cover;background-position:center;box-shadow:0 3px 8px #0005}
-.pub-share-entry-poster.precision{left:0;top:6px;transform:rotate(-9deg);border:1px solid #6f6448;background-image:url('/posters/precision-background.png')}
-.pub-share-entry-poster.editorial{left:17px;top:0;transform:rotate(8deg);border:1px solid #d5d0bd;background-image:url('/posters/editorial-background.png')}
+.pub-share-entry-poster.precision{left:0;top:6px;transform:rotate(-9deg);border:1px solid #6f6448;background-image:url('/posters/precision-swatch.jpg')}
+.pub-share-entry-poster.editorial{left:17px;top:0;transform:rotate(8deg);border:1px solid #d5d0bd;background-image:url('/posters/editorial-swatch.jpg')}
 .pub-share-entry-copy{display:block;flex:1;min-width:0}.pub-share-entry-title{display:block;font-size:16px;line-height:24px;font-weight:600;letter-spacing:.3px;color:#e7ebe3}
 .pub-share-entry-description{display:block;margin-top:4px;font-size:11px;line-height:18px;color:#9eaaa3}
 .pub-share-entry-arrow{position:relative;display:block;flex:none;width:44px;height:44px;color:var(--pub-cyan);transition:transform 160ms ease}

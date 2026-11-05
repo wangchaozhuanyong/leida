@@ -67,7 +67,9 @@ test('隔离库：受控来源注册、首次静默、重复去重、后续新�
   const data=await getPublicData();assert.equal(publicResetOutlook(data).latestObservation?.observedAt,new Date(newer).toISOString());
   assert.equal(publicResetOutlook(data).latestGlobalCompletionAt,undefined);assert.deepEqual(publicActions(data),[]);
   assert.deepEqual(extractCadenceObservations(evidence,await list<Source>('sources'),new Date().toISOString()),[],'不成为正式完成/进度预测训练样本');
-  assert.equal((await list<Notice>('notices')).length,0);assert.equal((await list('wechat_deliveries')).length,0);
+  const notices=await list<Notice>('notices');
+  assert.equal(notices.length,1);assert.deepEqual(notices[0].categories,['result']);assert.equal(data.notices.length,0);
+  assert.equal((await list('wechat_deliveries')).length,0);
   saved=(await one<Source>('sources',source.id))!;await put('sources',{...saved,enabled:false,status:'paused'});await scheduleDue({skipGeneration:true});
   assert.equal((await one<Source>('sources',source.id))!.enabled,false);assert.equal(sourceCollectionDue({...saved,enabled:false}),false);
   assert.ok(requests.length>=3);assert.ok(requests.every(url=>url===source.url));

@@ -145,13 +145,16 @@ test('真实 PostgreSQL 公开读取：23/24日观测证明、日历、类型历
       const full=await transaction(client=>readPublicFacts(client,new Date().toISOString()));
       const compact=(await getPublicRead({view:'calendar',filter:'all'})).data;
       const fullCalendar=recordCalendar(full,{date:'2026-10-24'}),compactCalendar=recordCalendar(compact,{date:'2026-10-24'});
-      assert.equal(fullCalendar.confirmedCount,4);assert.equal(fullCalendar.observedCount,2);
+      assert.equal(fullCalendar.confirmedCount,4);assert.equal(fullCalendar.observedCount,1);
       assert.equal(compactCalendar.confirmedCount,fullCalendar.confirmedCount);assert.equal(compactCalendar.observedCount,fullCalendar.observedCount);
       assert.deepEqual(compactCalendar.selectedItems.map(item=>[item.id,item.evidenceType,item.at]),fullCalendar.selectedItems.map(item=>[item.id,item.evidenceType,item.at]));
       assert.ok(linkedPublications.every(id=>ids(compact).includes(id)),'B已公开但跨源去重后仍需保留引用证明');
       assert.ok(!ids(compact).includes('qa-p-b-unpublished'));assert.ok(!ids(compact).includes('qa-p-b-withdrawn'));
-      assert.ok(!compactCalendar.selectedItems.some(item=>item.evidenceType==='observed'&&item.at==='2026-10-23T17:50:00.000Z'));
-      for(const hour of [18,19])assert.ok(compactCalendar.selectedItems.some(item=>item.evidenceType==='observed'&&item.at===`2026-10-23T${hour}:50:00.000Z`),'未公开或已撤回B不构成有效完成引用关系');
+      const sources=(calendar:ReturnType<typeof recordCalendar>)=>calendar.selectedItems
+        .filter(item=>item.evidenceType==='observed').flatMap(item=>item.sources.map((source:{at:string})=>source.at)).sort();
+      assert.deepEqual(sources(fullCalendar),['2026-10-23T18:50:00.000Z','2026-10-23T19:50:00.000Z'],
+        '同日观测归一项；已公开的B可归入完成记录，未公开或已撤回的B不能吞掉A观测');
+      assert.deepEqual(sources(compactCalendar),sources(fullCalendar),'精简读取须保留汇总展开的全部来源');
     });
     await t.test('实际SQL裁剪保留相同分钟的全部来源，首页、日历与活动只展示一项汇总',async()=>{
       const at='2026-10-25T06:08:00.000Z',clock=new Date().toISOString(),url='https://codexlimits.com/reset-history';

@@ -3,8 +3,8 @@ import { randomBytes } from 'node:crypto';
 import type pg from 'pg';
 import { readFile } from 'node:fs/promises';
 import { CloudbaseRpc,CloudbaseRpcError } from '../src/server/cloudbase/rpc';
-import { createCloudbasePublicReader } from '../src/server/cloudbase/public-read';
-import { readPublicVersion,getPublicRead } from '../src/server/public-read';
+import { cloudbasePublicVersion,createCloudbasePublicReader } from '../src/server/cloudbase/public-read';
+import { getPublicRead } from '../src/server/public-read';
 import { publicRevision } from '../src/server/public-version';
 import { getPublicData } from '../src/server/service';
 import type { Evidence,Article,RadarEvent,Publication,Source,PublicData } from '../src/lib/types';
@@ -38,7 +38,7 @@ export async function testCloudbasePublic(pool:pg.Pool,rpc:CloudbaseRpc,pass:(na
       if(i===8){const news={...publication,id:'public-qa-newer-news',mode:'news_only' as const,publishedAt:at,article:{...article,id:'public-qa-newer-article',publicationId:'public-qa-newer-news',publishedAt:at,category:'product' as const},articleId:'public-qa-newer-article'};await put('publications',news);await put('articles',news.article);await seed.query("UPDATE public.radar_events SET payload=jsonb_set(payload,'{publicationId}',to_jsonb($2::text)) WHERE id=$1",[event.id,news.id]);}
     }
     const unpublished:Evidence={id:'public-qa-unpublished',sourceId:source.id,messageId:'unpublished',text:privateCanary,url:'https://example.org/private',publishedAt:at,collectedAt:at,hash:'private-canary',contextComplete:true,historical:false,provenance:'official'};await put('evidence',unpublished);
-    await put('activities',{id:'public-qa-activity',title:'28 天测试',timezone:'America/Los_Angeles',startsOn:'2026-10-05',days:28,rules:'公开进度',version:1,items:[{day:1,articleId:'public-qa-article-002',eventId:'public-qa-event-002'}]} as {id:string});
+    await put('activities',{id:'public-qa-activity',title:'28 天测试',timezone:'UTC',startsOn:new Date(Date.parse(at)-48*3600_000).toISOString().slice(0,10),days:28,rules:'公开进度',version:1,items:[{day:1,articleId:'public-qa-article-002',eventId:'public-qa-event-002'}]} as {id:string});
     await put('notices',{id:'public-qa-notice',eventId:'public-qa-event-001',publicationId:'public-qa-publication-001',semanticKey:'public-qa-notice',title:'公开结果',summary:'公开状态',categories:['result'],status:'active',createdAt:at} as {id:string});
     const snapshotId='forecast_snapshot_'+'a'.repeat(64),caseId='public-qa-case';
     const forecastCase:ForecastCase={id:caseId,identity:'public-qa-signal',sourceId:source.id,title:'公开测试信号',url:'https://status.openai.com',target:'automatic_reset',signalEvidenceIds:['public-qa-evidence-000'],signalAt:at,collectedAt:at,windows:{24:new Date(Date.parse(at)+86400_000).toISOString(),48:new Date(Date.parse(at)+172800_000).toISOString()},status:'watching',coverage:{status:'unverified',sourceIds:[source.id],reason:'测试'},late:false,snapshotId,createdAt:at,updatedAt:at};
@@ -62,20 +62,30 @@ export async function testCloudbasePublic(pool:pg.Pool,rpc:CloudbaseRpc,pass:(na
   };
   const views:PublicReadOptions[]=[{view:'home'},{view:'methodology'},{view:'calendar'},{view:'state'},{view:'history',filter:'all'},{view:'history',filter:'banked_reset'},{view:'news',filter:'all'},{view:'news',filter:'product'},{view:'detail',entity:'events',id:'public-qa-event-006'},{view:'detail',entity:'articles',id:'public-qa-article-001'},{view:'detail',entity:'sources',id:'public-qa-evidence-001'},{view:'detail',entity:'publications',id:'public-qa-publication-008'},{view:'activity',id:'public-qa-activity',day:1,publications:['public-qa-publication-002']},{view:'notices'}];
   const differences=(a:unknown,b:unknown,prefix='root'):string[]=>{if(JSON.stringify(a)===JSON.stringify(b))return [];if(a&&b&&typeof a==='object'&&typeof b==='object')return [...new Set([...Object.keys(a),...Object.keys(b)])].flatMap(key=>differences((a as Record<string,unknown>)[key],(b as Record<string,unknown>)[key],prefix+'.'+key)).slice(0,12);return [prefix];};
-  const nativeModule=await import('../src/db');
   for(const view of views){
     console.log('PUBLIC_SCOPE',view.view,view.entity??view.filter??'');
     const native=await getPublicRead(view),clock=()=>native.data.forecasts?.generatedAt??native.data.serverTime;
     const reader=createCloudbasePublicReader(rpc,clock),cloud=await reader.read(view);
-    const paths=differences(canonical(cloud),canonical(native));if(paths.length)console.error('PARITY_FIELDS',view.view,view.entity??'',paths.join(','));
-    assert.deepEqual(canonical(cloud),canonical(native),`public scope parity: ${view.view}/${view.entity??''}/${view.filter??''}`);
+    const cloudScope={data:cloud.data,page:cloud.page},nativeScope={data:native.data,page:native.page};
+    const paths=differences(canonical(cloudScope),canonical(nativeScope));if(paths.length)console.error('PARITY_FIELDS',view.view,view.entity??'',paths.join(','));
+    assert.deepEqual(canonical(cloudScope),canonical(nativeScope),`public scope parity: ${view.view}/${view.entity??''}/${view.filter??''}`);
     assert.ok(!JSON.stringify(cloud).includes(privateCanary),'private config or unreferenced evidence must never cross public response');
     if(view.view==='home')assert.ok(Buffer.byteLength(JSON.stringify(cloud))<100*1024,'home public response must stay below 100 KiB');
     if(view.view==='history'||view.view==='news'){assert.deepEqual(cloud.page?.ids,native.page?.ids);assert.deepEqual(cloud.data.publications.map(p=>p.id),native.data.publications.map(p=>p.id));}
   }
   pass('fourteen_native_cloud_scope_parities','home/forecast/calendar/state/history/news/details/merge/activity/notices match current native API; home under 100 KiB; private canaries absent');
-  const now=new Date().toISOString(),version=await readPublicVersion(nativeModule.pool,now);
-  const cloudVersion=await createCloudbasePublicReader(rpc,()=>now).version();assert.deepEqual(cloudVersion,{version:version.version,contentVersion:version.contentVersion});
+  const now=new Date().toISOString();
+  const reader=createCloudbasePublicReader(rpc,()=>now),cloudVersion=await reader.version();
+  const rawVersion=await rpc.call<Record<string,unknown>>('radar_cb_public_version');
+  const {projectionRevision,...legacy}=rawVersion;
+  assert.equal(projectionRevision,'calendar-activity-proof-1');
+  const oldProjection=cloudbasePublicVersion(legacy,now);
+  assert.notEqual(cloudVersion.contentVersion,oldProjection.contentVersion);
+  assert.notEqual(cloudVersion.version,oldProjection.version);
+  const activity=await reader.read({view:'activity',id:'public-qa-activity',day:1});
+  assert.equal(activity.version,cloudVersion.version);assert.equal(activity.contentVersion,cloudVersion.contentVersion);
+  assert.ok(activity.data.publications.some(p=>p.id==='public-qa-publication-003'),'campaign retains public reset fact without an explicit link');
+  pass('public_projection_revision','same rows produce new version and contentVersion after projection revision; light and activity views agree');
   const nativeData=await getPublicData(),cloudData=await createCloudbasePublicReader(rpc,()=>nativeData.forecasts?.generatedAt??nativeData.serverTime).legacy();assert.deepEqual(canonical(cloudData),canonical(nativeData));
   assert.ok(Buffer.byteLength(JSON.stringify(cloudData))<1024*1024);assert.equal((await pool.query("SELECT count(*)::int AS n FROM radar_forecast_snapshots WHERE payload->>'recordType'='historical_replay_step'")).rows[0].n,120);
   pass('legacy_replay_rows_are_separate','more than 3 MB of immutable replay steps remain stored while legacy/bootstrap returns only the current forecast records');

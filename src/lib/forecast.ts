@@ -1,6 +1,6 @@
 import type {ActionKind,ActionStage,Evidence,Source} from './types';
 
-export const FORECAST_RULE_VERSION='codex-usage-signal-20261010-1';
+export const FORECAST_RULE_VERSION='codex-usage-signal-20261105-2';
 export const FORECAST_MODEL_VERSION='dirichlet-reference-20261010-1';
 export const FORECAST_PRIOR:[number,number,number]=[0.5,0.5,1];
 export interface ForecastCoverage {status:'unverified'|'gap'|'verified';sourceIds:string[];reason:string;}

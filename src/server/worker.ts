@@ -1,7 +1,7 @@
 import {validSemanticProof,type SemanticBenefitProof} from './semantic-benefit-review';
 import {analyzeBenefitEvidence} from './benefit-analysis';
 import { bankedProgress, bankedSeriesContext, matchingBenefitActions, equivalentCompletionOriginal } from './benefit-signal';
-import {REFERENCE_RESET_SOURCE,REFERENCE_SOURCES,needsReferenceHistoryRecovery} from './reference-reset-source';
+import {REFERENCE_RESET_SOURCE,REFERENCE_SOURCES,needsReferenceHistoryRecovery,referenceCollectionHealth} from './reference-reset-source';
 import { lockTransaction } from '../db';
 import { configuredStorageRpc } from './cloudbase/storage-config';
 import { cloudbaseTasks } from './cloudbase/tasks';
@@ -506,7 +506,7 @@ export async function runOne(dependencies:WorkerDependencies={}):Promise<boolean
       phase('job_result');
       await transaction(async c=>{
         const current=await one<Job>('jobs',job.id,c,true);
-        if(current?.status!=='running'||current.leaseUntil!==job.leaseUntil)return;
+        if(current?.status!=='running'||current.attempts!==job.attempts||current.leaseUntil!==job.leaseUntil||Date.parse(job.leaseUntil??'')<=Date.now())return;
         const waiting=result.state==='deferred'||result.state==='sending'||result.state==='queued';
         const resumeAt=result.resumeAt??new Date(Date.now()+120_000).toISOString();
         await put('jobs',{...current,status:waiting?'queued':'succeeded',leaseUntil:undefined,finishedAt:waiting?undefined:now(),availableAt:waiting?resumeAt:current.availableAt,error:result.reason,payload:{...current.payload,wechatState:result.state,...(waiting?{resumeAfter:resumeAt}:{})}},c);
@@ -524,7 +524,13 @@ export async function runOne(dependencies:WorkerDependencies={}):Promise<boolean
       if(collected.created>0||collected.healthChanged){forecastInputsChanged=true;cadence.nudge('generation','forecast');}
       await transaction(async c=>{
         const source=await one<Source>('sources',job.sourceId!,c,true);
-        if(source&&(source.status!==(source.enabled?'healthy':'paused')||!source.validated||source.publicationPaused||source.error)){forecastInputsChanged=true;await put('sources',{...source,validated:true,publicationPaused:false,pauseReason:undefined,consecutiveFailures:0,status:source.enabled?'healthy':'paused',error:undefined,...sourceCollectionSchedule(source),nextRunAt:sourceNextCollectionAt(source)},c);}
+        if(!source)return;
+        const health=referenceCollectionHealth(source,now());
+        if(source.status!==health.status||source.error!==health.error||!source.validated||source.publicationPaused){
+          forecastInputsChanged=true;
+          const recovered:Source={...source,validated:true,publicationPaused:false,pauseReason:undefined,consecutiveFailures:0,...health,...sourceCollectionSchedule(source)};
+          await put('sources',{...recovered,nextRunAt:sourceNextCollectionAt(recovered)},c);
+        }
       });
     }
     phase('job_result');
@@ -544,6 +550,7 @@ export async function runOne(dependencies:WorkerDependencies={}):Promise<boolean
     await transaction(async c=>{
       const current=await one<Job>('jobs',job.id,c,true);
       if(!current||current.leaseUntil!==job.leaseUntil)return;
+      if(job.kind==='wechat_send'&&(current.status!=='running'||current.attempts!==job.attempts||Date.parse(job.leaseUntil??'')<=Date.now()))return;
       const retryMs=Math.max(error instanceof AIServiceError?error.retryAfterMs??0:0,job.attempts===1?30_000:120_000);
       const cooldownCycle=Number(current.payload.cooldownCycle??0)+1;
       const cooldown=job.kind==='generate'&&recoverableModelFailure&&!retry;

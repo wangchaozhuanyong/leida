@@ -2,11 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {forecastSourceAvailable} from '../src/lib/forecast';
 import {parseReferenceSignals,parseReferenceHistory,parseReferenceLatest,referenceCollectionHealth,REFERENCE_SIGNAL_SOURCE,REFERENCE_HISTORY_SOURCE} from '../src/server/reference-reset-source';
-import {fetchRecords,sourceReadCheckpoint,validateSource,collectSource} from '../src/server/ingestion';
+import {fetchRecords,sourceReadCheckpoint,validateSource} from '../src/server/ingestion';
 import {sourceForecastConfiguration} from '../src/server/source-collection-policy';
-import {sourceCollectionDue} from '../src/server/worker';
-import {pool,one,put,list} from '../src/db';
-import type {Source,Evidence} from '../src/lib/types';
+import {runOne,sourceCollectionDue} from '../src/server/worker';
+import {queueJob} from '../src/server/service';
+import {pool,one,put,list,transaction} from '../src/db';
+import type {Source,Evidence,Job} from '../src/lib/types';
 
 const checkedAt='2026-10-22T13:20:00.000Z',generatedAt='2026-10-20T06:41:53.619Z';
 const messageId='2110951585983631505',source={url:`https://x.com/thsottiaux/status/${messageId}`};
@@ -21,6 +22,18 @@ test('两天前的公开归档仍可发现原帖；保持原始时间且不生�
   assert.equal(row.metadata?.referenceReset,undefined);
  }
  assert.equal(referenceCollectionHealth({...REFERENCE_HISTORY_SOURCE,enabled:true},checkedAt).status,'healthy');
+});
+
+test('半年历史截止时间在短月末截住，保留当日边界并排除更早记录',()=>{
+ for(const [collectedAt,cutoff] of [['2027-08-31T12:00:00Z','2027-02-28T12:00:00Z'],['2028-08-31T20:00:00+08:00','2028-02-29T12:00:00Z']]){
+  const events=[-1,0,86400_000].map(offset=>{
+   const occurredAt=Date.parse(cutoff)+offset;
+   const messageId=((BigInt(occurredAt)-1288834974657n)<<22n).toString();
+   return {event_id:String(offset),reset_type:'global',record_status:'recorded',occurred_at:new Date(occurredAt).toISOString(),source:{url:`https://x.com/thsottiaux/status/${messageId}`}};
+  });
+  const rows=parseReferenceHistory({schema_version:1,generated_at:collectedAt,events},collectedAt);
+  assert.deepEqual(rows.map(row=>row.url),events.slice(1).map(event=>event.source.url));
+ }
 });
 
 test('读取成功和实时信号可用分开：过期显示延迟，重新检查及304不能洗新',async()=>{
@@ -78,21 +91,29 @@ test('隔离库：验证保留关闭状态，恢复采集可读历史，304保�
  let unchanged=false;
  globalThis.fetch=async()=>unchanged?new Response(null,{status:304}):Response.json(body,{headers:{etag:'"reference-integration"'}});
  try{
+  const collect=async()=>{
+   const job=await transaction(c=>queueJob('collect',{sourceId:source.id},c));
+   await put('jobs',{...job,availableAt:'2020-01-01T00:00:00Z'});
+   assert.equal(await runOne({schedule:false}),true);
+   assert.equal((await one<Job>('jobs',job.id))?.status,'succeeded');
+   return (await one<Source>('sources',source.id))!;
+  };
   await put('sources',source);
   await validateSource(source.id,'isolated-qa');
   const validated=(await one<Source>('sources',source.id))!;
   assert.equal(validated.enabled,false);assert.equal(validated.validated,true);assert.equal(validated.status,'paused');
   assert.equal((await list<Evidence>('evidence')).length,0,'验证不入业务证据');
   await put('sources',{...validated,enabled:true});
-  const initial=await collectSource(source.id);assert.equal(initial.created,1);
-  let saved=(await one<Source>('sources',source.id))!;
+  let saved=await collect();
   assert.equal(saved.status,'delayed');assert.equal(saved.referenceSnapshotAt,old);assert.equal(saved.pauseReason,undefined);
+  assert.match(saved.error??'',/快照尚未更新/);
   assert.equal(forecastSourceAvailable(saved),false);assert.equal((await list<Evidence>('evidence'))[0].historical,true);
-  unchanged=true;await collectSource(source.id);saved=(await one<Source>('sources',source.id))!;
+  unchanged=true;saved=await collect();
   assert.equal(saved.referenceSnapshotAt,old);assert.equal(saved.status,'delayed');
+  assert.match(saved.error??'',/快照尚未更新/);
   unchanged=false;body.generated_at=at;
-  const refreshed=await collectSource(source.id);saved=(await one<Source>('sources',source.id))!;
-  assert.equal(refreshed.created,0);assert.equal(refreshed.healthChanged,true);assert.equal(saved.status,'healthy');
+  saved=await collect();
+  assert.equal((await list<Evidence>('evidence')).length,1);assert.equal(saved.status,'healthy');assert.equal(saved.error,undefined);
   assert.equal(saved.referenceSnapshotAt,at);assert.equal(forecastSourceAvailable(saved),true);
   assert.equal((await list('publications')).length,0);assert.equal((await list('wechat_deliveries')).length,0);
  }finally{globalThis.fetch=fetchBefore;await pool.end();}

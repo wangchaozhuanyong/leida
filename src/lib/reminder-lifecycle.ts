@@ -29,6 +29,13 @@ export function reminderObservation(publication:Publication,evidence:Evidence[],
   return resetObservations({events:[publication.event],articles:[publication.article],publications:[publication],evidence,serverTime:now})[0];
 }
 
+/** Match the record view's observation-only date summary for reminder delivery.
+ * This bucket does not identify an actual reset round or include confirmed actions. */
+export function reminderObservationBucket(publication:Publication,evidence:Evidence[],now:string) {
+  const observation=reminderObservation(publication,evidence,now);
+  if(observation)return `${observation.kind}:${new Date(Date.parse(observation.observedAt)+8*3600_000).toISOString().slice(0,10)}`;
+}
+
 /** Content validity, independent of delivery credit and reader authorization. */
 export function reminderContentCurrent(notice:Notice, publication:Publication, event:RadarEvent|undefined, now:string,resolutions?:ResetOutlook['latestResolutions'],evidence:Evidence[]=[],data?:PublicFactsData):boolean {
   if(notice.status!=='active'||!event||event.status!=='published')return false;

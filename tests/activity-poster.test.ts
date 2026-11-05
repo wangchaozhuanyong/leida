@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import jsQR from 'jsqr';
 import type { Activity, PublicData, Publication } from '../src/lib/types';
-import { ACTIVITY_RULES_NOTICE, ActivityShareError, MAX_ACTIVITY_PUBLICATIONS, MAX_ACTIVITY_SHARE_URL, activityDate, activityPublicationUrl, activityShareQuery, buildActivityShare, normalizeActivityShare, parseActivityShare, resolveActivityShare, type ActivityDayShare } from '../src/lib/activity-share';
+import { ACTIVITY_RULES_NOTICE, ActivityShareError, MAX_ACTIVITY_PUBLICATIONS, MAX_ACTIVITY_SHARE_URL, activityDate, activityPublicationIds, activityPublicationUrl, activityShareQuery, buildActivityShare, normalizeActivityShare, parseActivityShare, resolveActivityShare, type ActivityDayShare } from '../src/lib/activity-share';
 import { activityPosterSvg, resolveActivityPoster } from '../src/server/activity-poster';
 
 const at='2026-10-10T08:00:00Z';
@@ -71,7 +71,9 @@ test('当前及历史快照撤回或合并时全部拒绝，不生成部分海�
 test('同一文章多个版本、重复活动跨日期与来源缺口不能合并',()=>{
   const data=fixture(),p=add(data,'p'),newer=structuredClone(p);newer.id='p-new';newer.article.publicationId=newer.id;data.publications.push(newer);
   assert.match(blocked(data,manifest(['p','p-new'])).blockedReason,/同一条消息请勿重复选择/);
-  const ambiguous=structuredClone(data);ambiguous.activities[0].items.push({...ambiguous.activities[0].items[0],day:1});assert.match(blocked(ambiguous,manifest(['p'])).blockedReason,/所选活动日期不一致/);
+  const ambiguous=fixture();add(ambiguous,'news',undefined,2,'news_only');
+  ambiguous.activities[0].items.push({...ambiguous.activities[0].items[0],day:1});
+  assert.match(blocked(ambiguous,manifest(['news'])).blockedReason,/所选活动日期不一致/);
   const absent=structuredClone(data);absent.evidence=[];assert.match(blocked(absent,manifest(['p'])).blockedReason,/部分来源暂不可用/);
 });
 test('自动选当日已发布文章形成显式集合，空日及超过8条不静默截断',()=>{
@@ -81,6 +83,110 @@ test('自动选当日已发布文章形成显式集合，空日及超过8条不�
   const many=fixture();for(let i=0;i<MAX_ACTIVITY_PUBLICATIONS+1;i++)add(many,`p-${i}`);
   assert.throws(()=>buildActivityShare(many,'activity',2),/最多包含8条/);assert.match(blocked(many,manifest(many.publications.map(item=>item.id))).blockedReason,/单条公告/);
   assert.deepEqual(normalizeActivityShare(manifest(Array(12).fill('same'))).publicationIds,['same']);
+});
+test('整日海报收录当前页面内未挂接的两类事实，按活动时区而非北京时间冻结',()=>{
+  const data=fixture(),completion=add(data,'independent-completion','2026-03-09T06:59:00.000Z');
+  const observation=add(data,'independent-observation','2026-03-09T06:58:00.000Z',2,'news_only');
+  const nextDay=add(data,'next-day','2026-03-09T07:00:00.000Z');
+  data.activities[0].items=[];
+  const evidence=data.evidence.find(item=>item.id===observation.article.evidenceIds[0])!;
+  const summary='Third-party observation on Mar 9, 06:58 UTC.';
+  Object.assign(evidence,{sourceId:'codexlimits-observations',messageId:`observed-codexlimits-${Date.parse(evidence.publishedAt)}`,
+    url:'https://codexlimits.com/reset-history',text:`Usage reset landed\n${summary}`,contextComplete:false,provenance:'archive',textOrigin:'archive_excerpt',
+    metadata:{sourceGroup:'codexlimits',category:'reset',benefitKind:'automatic_reset',referenceReset:{referenceUrl:'https://codexlimits.com/reset-history',eventId:`codexlimits:automatic_reset:${evidence.publishedAt}`,occurredAt:evidence.publishedAt,snapshotAt:evidence.collectedAt,summary}}});
+  const ids=[completion.id,observation.id,nextDay.id];
+  const selected=buildActivityShare(data,'activity',2,ids),result=resolveActivityPoster(data,selected);
+  assert.deepEqual(selected.publicationIds,[completion.id,observation.id]);
+  assert.deepEqual(result.items.map(item=>[item.publication.id,item.sourceTime,item.fact?.evidenceType]),[
+    [observation.id,evidence.publishedAt,'observed'],[completion.id,'2026-03-09T06:59:00.000Z','confirmed'],
+  ]);
+  assert.match(blocked(data,manifest([nextDay.id])).blockedReason,/活动日期不一致/);
+  const url=activityPublicationUrl('https://radar.example.org',selected),svg=activityPosterSvg(result,data.site.name,url);
+  assert.match(svg,/来源观测/);assert.match(svg,/声明时间/);
+  const updated=structuredClone(completion);updated.id='new-wording';updated.article.publicationId=updated.id;
+  data.publications.push(updated);data.articles.find(article=>article.id===completion.articleId)!.publicationId=updated.id;
+  data.events.find(event=>event.id===completion.eventId)!.publicationId=updated.id;
+  assert.equal(resolveActivityPoster(data,selected).items[1].publication.id,completion.id,'固定分享保留原始快照');
+  data.articles.find(article=>article.id===completion.articleId)!.status='withdrawn';
+  assert.match(blocked(data,selected).blockedReason,/已撤回/);
+});
+test('活动快照保留同一文章的不同观测来源，并按来源组计进展',()=>{
+  const data=fixture();
+  const first=add(data,'ai-plan-watch','2026-03-08T11:00:00.000Z',2,'news_only');
+  const second=add(data,'codex-resets','2026-03-08T11:00:00.000Z',2,'news_only');
+  const third=add(data,'codex-limits','2026-03-08T11:10:00.000Z',2,'news_only');
+  const originalSecondArticle=second.articleId,originalSecondEvent=second.eventId;
+  Object.assign(second,{articleId:first.articleId,eventId:first.eventId});
+  Object.assign(second.article,{id:first.articleId,eventId:first.eventId});
+  second.event.id=first.eventId;
+  data.articles=data.articles.filter(article=>article.id!==originalSecondArticle);
+  data.events=data.events.filter(event=>event.id!==originalSecondEvent);
+  data.activities[0].items=[];
+  const [a,b,c]=data.evidence;
+  const messageId=((BigInt(Date.parse(a.publishedAt)-1288834974657)<<22n)).toString();
+  const summary='Codex usage limits have been reset.';
+  for(const evidence of [a,b])Object.assign(evidence,{messageId:`observed-${messageId}`,url:`https://x.com/thsottiaux/status/${messageId}`,
+    text:summary,contextComplete:false,provenance:'archive',textOrigin:'archive_excerpt'});
+  Object.assign(a,{sourceId:'aiplanwatch-reference',metadata:{sourceGroup:'aiplanwatch',benefitKind:'automatic_reset',referenceReset:{
+    referenceUrl:'https://raw.githubusercontent.com/gdutxiaoxu/codex-reset-radar/master/data/latest.json',occurredAt:a.publishedAt,snapshotAt:a.collectedAt,summary,
+  }}});
+  Object.assign(b,{sourceId:'reset-archive',metadata:{sourceGroup:'codex-resets',category:'reset'}});
+  const url='https://codexlimits.com/reset-history',snippet='Third-party observation on Mar 8, 11:10 UTC.';
+  Object.assign(c,{sourceId:'codexlimits-observations',messageId:`observed-codexlimits-${Date.parse(c.publishedAt)}`,url,
+    text:`Usage reset landed
+${snippet}`,contextComplete:false,provenance:'archive',textOrigin:'archive_excerpt',
+    metadata:{sourceGroup:'codexlimits',category:'reset',benefitKind:'automatic_reset',referenceReset:{referenceUrl:url,eventId:`codexlimits:automatic_reset:${c.publishedAt}`,occurredAt:c.publishedAt,snapshotAt:c.collectedAt,summary:snippet}}});
+  const visible=[first.id,second.id,third.id],selected=buildActivityShare(data,'activity',2,visible);
+  assert.deepEqual(selected.publicationIds,visible.slice().sort());
+  const poster=resolveActivityPoster(data,selected);
+  assert.equal(poster.publications.length,3);
+  assert.equal(poster.items.length,1);
+  assert.deepEqual(poster.items[0].observationReports?.map(({publication,report})=>[publication.id,report.evidenceId]),
+    [[first.id,a.id],[second.id,b.id],[third.id,c.id]]);
+  const svg=activityPosterSvg(poster,data.site.name,activityPublicationUrl('https://example.invalid',selected));
+  assert.match(svg,/当天1条进展/);
+  for(const source of ['AIPlanWatch','Codex Resets','Codex Limits'])assert.ok(svg.includes(source));
+  const duplicate=structuredClone(first);duplicate.id='same-report-new-version';duplicate.article.publicationId=duplicate.id;
+  data.publications.push(duplicate);
+  assert.match(blocked(data,manifest([...visible,duplicate.id])).blockedReason,/同一条消息请勿重复选择/);
+
+  const later=add(data,'codex-limits-again','2026-03-08T11:15:00.000Z',2,'news_only');
+  const laterEvidence=data.evidence.at(-1)!,laterSnippet='Third-party observation on Mar 8, 11:15 UTC.';
+  Object.assign(laterEvidence,{...c,id:laterEvidence.id,publishedAt:laterEvidence.publishedAt,
+    messageId:`observed-codexlimits-${Date.parse(laterEvidence.publishedAt)}`,text:`Usage reset landed
+${laterSnippet}`,
+    metadata:{...c.metadata,referenceReset:{...c.metadata!.referenceReset!,eventId:`codexlimits:automatic_reset:${laterEvidence.publishedAt}`,occurredAt:laterEvidence.publishedAt,summary:laterSnippet}}});
+  const split=resolveActivityPoster(data,manifest([...visible,later.id]));
+  assert.deepEqual(split.items.map(item=>item.sourceTime),[a.publishedAt,c.publishedAt,laterEvidence.publishedAt]);
+  assert.equal(split.items[0].observationReports?.length,2);
+});
+
+test('有效固定完成快照在重新挂接后仍按事实日期读取，跨活动、无证明及撤回仍被拒绝',()=>{
+  const data=fixture(),completion=add(data,'frozen-completion'),chosen=manifest([completion.id]);
+  assert.equal(resolveActivityShare(data,chosen).available,true);
+  const activity=data.activities[0],first=activity.items[0];
+  activity.items.push({...first,day:3});
+  assert.equal(resolveActivityShare(data,chosen).available,true);
+  activity.items=activity.items.slice(1);
+  assert.equal(resolveActivityShare(data,chosen).available,true);
+  const current=structuredClone(completion);
+  current.id='current-activity-update';
+  current.article.publicationId=current.id;
+  current.event.publicationId=current.id;
+  current.event.actions=[];
+  data.publications.push(current);data.articles[0]=current.article;data.events[0]=current.event;
+  assert.equal(activityPublicationIds(data,activity,2).has(completion.id),false);
+  assert.equal(activityPublicationIds(data,activity,2,chosen.publicationIds).has(completion.id),true);
+  assert.equal(resolveActivityShare(data,chosen).available,true);
+  assert.match(blocked(data,{...chosen,day:3}).blockedReason,/所选活动日期不一致/);
+  const invalidProof=structuredClone(data);
+  invalidProof.publications[0].event.actions[0].evidenceIds=[];
+  assert.match(blocked(invalidProof,chosen).blockedReason,/所选活动日期不一致/);
+  const wrongActivity=structuredClone(data);
+  wrongActivity.activities.push({...activity,id:'other',items:[first]});
+  assert.match(blocked(wrongActivity,chosen).blockedReason,/所选活动日期不一致/);
+  data.articles[0].status='withdrawn';
+  assert.match(blocked(data,chosen).blockedReason,/已撤回/);
 });
 test('URL有明确长度上限，超长版本集合在二维码生成前拒绝',()=>{
   const selected=manifest(['汉'.repeat(180),'字'.repeat(180)]);
