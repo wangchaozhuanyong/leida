@@ -30,8 +30,7 @@ const fittedSize = (value: string, preferred: number, width: number) => Math.min
 const beijingTime = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value));
 let brandImage: string | undefined;
 function brandMarkup(x = 66, y = 62, width = 78, height = 70) {
-  brandImage ??= readFileSync(join(process.cwd(), 'public/brand/MOYAO_AI_Icon_Transparent.svg'), 'utf8').match(/href="(data:image\/png;base64,[A-Za-z0-9+/=]+)"/)?.[1];
-  if (!brandImage) throw new Error('海报品牌图标不可用');
+  brandImage ??= 'data:image/png;base64,' + readFileSync(join(process.cwd(), 'public/brand/moyao-icon-384.png')).toString('base64');
   return `<svg x="${x}" y="${y}" width="${width}" height="${height}" viewBox="110 520 1850 1010"><image width="2048" height="2048" href="${brandImage}"/></svg>`;
 }
 

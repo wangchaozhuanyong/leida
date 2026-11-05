@@ -333,12 +333,16 @@ export async function queueJob(kind:Job['kind'],payload:{sourceId?:string;candid
   const job:Job={id:id('job'),kind,sourceId:payload.sourceId,candidateId:payload.candidateId,status:'queued',attempts:0,availableAt:now(),createdAt:now(),payload}; await insert('jobs',job,c); return finish(job,false);
 }
 export interface CandidatePreview { canPublish:boolean; reasons:string[]; changes:string[]; pages:string[]; willNotify:boolean; noticeReason:string; expectedEventVersion?:number; }
+function withPrimaryEvidence(content:DraftContent,primaryId:string):DraftContent {
+  if(content.evidenceIds[0]===primaryId||!content.evidenceIds.includes(primaryId))return content;
+  return {...content,evidenceIds:[primaryId,...content.evidenceIds.filter(id=>id!==primaryId)]};
+}
 export async function previewCandidate(candidateId:string,version:number):Promise<CandidatePreview> {return transaction(async c=>{
   await repeatableRead(c);
   const candidate=await one<Candidate>('candidates',candidateId,c);assertVersion(candidate,version);
   const evidence=await list<Evidence>('evidence',c),events=await list<RadarEvent>('events',c),articles=await list<Article>('articles',c);const parsed=draftSchema.safeParse(candidate!.content);
   if(!parsed.success)return {canPublish:false,reasons:['候选内容结构不完整，请先保存必要字段'],changes:[],pages:[],willNotify:false,noticeReason:'内容未通过校验，不会发布提醒'};
-  const content=parsed.data,existing=events.find(e=>e.id===content.eventId);const reasons=validateDraft(content,evidence),changes:string[]=[];
+  const content=withPrimaryEvidence(parsed.data,candidate!.evidenceId),existing=events.find(e=>e.id===content.eventId);const reasons=validateDraft(content,evidence),changes:string[]=[];
   if(candidate!.status==='published'||candidate!.status==='ignored')reasons.push('候选已经处理，不能重复发布');
   if(content.eventId&&!existing)reasons.push('关联事件不存在');
   if(existing&&existing.status!=='published')reasons.push('关联事件已撤回或合并，请使用人工更正或目标事件');
@@ -372,13 +376,12 @@ export async function publishCandidate(candidateId:string,version:number,actor:s
     const candidate=await locked<Candidate>('candidates',candidateId,version,c);
     const enrichment=automatic&&candidate.status==='published'&&candidate.automation?.templatePublished;
     if((candidate.status==='published'&&!enrichment)||candidate.status==='ignored')throw new DomainError('候选已处理');
-    let content=draftSchema.parse(candidate.content);
+    let content=withPrimaryEvidence(draftSchema.parse(candidate.content),candidate.evidenceId);
     const evidence=await list<Evidence>('evidence',c),events=await list<RadarEvent>('events',c),articles=await list<Article>('articles',c);
     const primary=evidence.find(item=>item.id===candidate.evidenceId);
     const incomplete=primary&&analyzeBenefitEvidence(primary,gatherEvidenceContext(primary,evidence)).unresolved.length>0;
     let processingState={state:incomplete?'deferred' as const:'ready' as const,reasonCodes:incomplete?['unparsed_benefit_clause']:[]};
     let newsUpgrade:{event:RadarEvent;article:Article}|undefined;
-    if(primary&&content.evidenceIds.includes(primary.id))content={...content,evidenceIds:[primary.id,...content.evidenceIds.filter(id=>id!==primary.id)]};
     if(automatic){
       const source=primary?await one<Source>('sources',primary.sourceId,c):undefined;
       if(!source?.enabled||!source.validated||source.publicationPaused)throw new DomainError('来源已暂停或未验证，暂不自动发布');
@@ -535,7 +538,7 @@ export async function executeCommand(action:string,input:Record<string,unknown>,
     if(action==='candidate.save'||action==='candidate.ignore'||action==='candidate.generate') {
       const old=await locked<Candidate>('candidates',input.id,input.version,c);if(old.status==='published'||old.status==='ignored')throw new DomainError('候选已处理，不能修改');
       if(action==='candidate.generate') return queueJob('generate',{candidateId:old.id,force:true,expectedVersion:old.version},c,{actor,action,objectId:old.id});
-      const content=action==='candidate.save'?draftSchema.parse(input.content):old.content;
+      const content=action==='candidate.save'?withPrimaryEvidence(draftSchema.parse(input.content),old.evidenceId):old.content;
       const updated:Candidate={...old,content,status:action==='candidate.ignore'?'ignored':'draft',humanEdited:true,version:old.version+1,updatedAt:now(),reasons:action==='candidate.ignore'?[requireReason(input.reason)]:validateDraft(content,await list<Evidence>('evidence',c))};
       await put('candidates',updated,c);await audit(actor,action,old.id,typeof input.reason==='string'?input.reason:'人工编辑候选',old,updated,c);return updated;
     }

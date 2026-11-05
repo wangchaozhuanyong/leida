@@ -1,4 +1,4 @@
--- Candidate upgrade only. This file has NOT been applied by local verification.
+-- Candidate upgrade. Production application requires release authorization.
 -- Changes exactly two existing backend-only, STABLE, SECURITY INVOKER read functions.
 -- No table/column/index/policy/role/permission/data changes are included.
 --
@@ -37,6 +37,7 @@ BEGIN
   END LOOP;
   RETURN jsonb_build_object(
     'digests',digests,
+    'projectionRevision','calendar-activity-proof-1',
     'sources',(SELECT coalesce(jsonb_agg(payload ORDER BY id),'[]') FROM public.radar_sources),
     'settings',(SELECT coalesce(jsonb_agg(CASE WHEN id='site' THEN payload ELSE jsonb_build_object('id',payload->'id','status',payload->'status','cadenceSnapshotId',payload->'cadenceSnapshotId','cadenceSnapshotIds',payload->'cadenceSnapshotIds','cadenceEvaluationByKind',payload->'cadenceEvaluationByKind') END ORDER BY id),'[]') FROM public.radar_settings WHERE id IN ('site','forecast_runtime')),
     'deadlines',(SELECT coalesce(jsonb_agg(jsonb_build_object('id',payload->>'id','action',a->>'id','deadline',a->>'expectedAt') ORDER BY payload->>'id',a->>'id'),'[]') FROM public.radar_events CROSS JOIN LATERAL jsonb_array_elements(payload->'actions') a WHERE a->>'expectedAt' IS NOT NULL),
@@ -56,7 +57,7 @@ DECLARE view_name text:=p_options->>'view'; filter_name text:=coalesce(p_options
   clock_time timestamptz:=p_now::timestamptz; detailed boolean;
   selected text[]:='{}'; all_facts boolean; record_page jsonb; total integer; page_rows jsonb;
   article_ids text[]; event_ids text[]; evidence_ids text[]; parent_ids text[];
-  activity jsonb; day_number integer; version_data jsonb; events jsonb; articles jsonb; publications jsonb; evidence jsonb;
+  activity jsonb; activity_start timestamptz; activity_end timestamptz; day_number integer; version_data jsonb; events jsonb; articles jsonb; publications jsonb; evidence jsonb;
   cases jsonb; case_ids text[]; snapshots jsonb; outcomes jsonb;
 BEGIN
   IF (nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'role') IS DISTINCT FROM 'service_role' THEN RAISE EXCEPTION 'backend role required' USING ERRCODE='42501'; END IF;
@@ -94,10 +95,31 @@ BEGIN
   ELSIF view_name='activity' THEN
     activity:=(SELECT payload FROM public.radar_activities WHERE id=object_id);
     day_number:=coalesce((p_options->>'day')::integer,CASE WHEN activity IS NULL THEN 1 ELSE greatest(1,least((activity->>'days')::integer,((clock_time AT TIME ZONE (activity->>'timezone'))::date-(activity->>'startsOn')::date)+1)) END);
-    article_ids:=ARRAY(SELECT item->>'articleId' FROM jsonb_array_elements(activity->'items') item WHERE (item->>'day')::integer=day_number);
+    article_ids:=ARRAY(SELECT item->>'articleId' FROM jsonb_array_elements(activity->'items') item);
     selected:=ARRAY(SELECT payload->>'publicationId' FROM public.radar_articles WHERE id=ANY(article_ids));
+    article_ids:=ARRAY(SELECT item->>'articleId' FROM jsonb_array_elements(activity->'items') item WHERE (item->>'day')::integer=day_number);
     selected:=selected||ARRAY(SELECT id FROM public.radar_publications WHERE id IN (SELECT jsonb_array_elements_text(p_options->'publications')) AND payload->>'articleId'=ANY(article_ids));
-  ELSIF view_name='notices' THEN selected:=ARRAY(SELECT payload->>'publicationId' FROM public.radar_notices);
+    IF activity IS NOT NULL THEN
+      -- The reader verifies evidence and groups facts; this selects bounded
+      -- published candidates for the full activity calendar, including unlinked facts.
+      activity_start:=((activity->>'startsOn')::date::timestamp AT TIME ZONE (activity->>'timezone'));
+      activity_end:=(((activity->>'startsOn')::date+(activity->>'days')::integer)::timestamp AT TIME ZONE (activity->>'timezone'));
+      selected:=selected||ARRAY(
+        SELECT p.id FROM public.radar_publications p
+        WHERE p.payload->'article'->>'status'='published' AND p.payload->'event'->>'status'='published'
+        AND (
+          EXISTS(SELECT 1 FROM jsonb_array_elements(p.payload->'event'->'actions') action
+            WHERE coalesce(p.payload->>'mode',p.payload->'article'->>'publicationMode','state_change')<>'news_only'
+              AND action->>'scope'='public' AND action->>'stage' IN ('claimed_complete','in_progress')
+              AND (action->>'statementAt')::timestamptz>=activity_start AND (action->>'statementAt')::timestamptz<activity_end)
+          OR EXISTS(SELECT 1 FROM public.radar_evidence e WHERE p.payload->'article'->'evidenceIds' @> jsonb_build_array(e.id)
+            AND e.payload->>'sourceId' IN ('reset-archive','aiplanwatch-reference','codexlimits-observations')
+            AND e.payload->>'messageId' LIKE 'observed-%'
+            AND (e.payload->>'publishedAt')::timestamptz>=activity_start AND (e.payload->>'publishedAt')::timestamptz<activity_end)
+        )
+      );
+    END IF;
+  ELSIF view_name='notices' THEN selected:=ARRAY(SELECT payload->>'publicationId' FROM public.radar_notices WHERE payload->>'origin'='admin' AND payload->>'status'='active');
   ELSIF view_name='detail' THEN
     IF entity_name='events' THEN selected:=ARRAY(SELECT id FROM public.radar_publications WHERE payload->>'eventId'=object_id);
     ELSIF entity_name='articles' THEN selected:=ARRAY(SELECT id FROM public.radar_publications WHERE payload->>'articleId'=object_id);
@@ -128,7 +150,13 @@ BEGIN
     parent_ids:=ARRAY(SELECT payload->>'parentId' FROM public.radar_evidence WHERE id=ANY(evidence_ids));
     evidence_ids:=evidence_ids||ARRAY(SELECT id FROM public.radar_evidence WHERE id=ANY(parent_ids) OR payload->>'messageId'=ANY(parent_ids));
   END IF;
-  evidence:=(SELECT coalesce(jsonb_agg(CASE WHEN detailed THEN payload ELSE (payload-'text'-'metadata')||jsonb_build_object('text','') END ORDER BY created_at DESC,id),'[]') FROM public.radar_evidence WHERE id=ANY(evidence_ids));
+  -- Calendar observation candidates need their proof text and metadata for the
+  -- same strict validation used by the native reader. Ordinary evidence stays thin.
+  evidence:=(SELECT coalesce(jsonb_agg(CASE WHEN detailed OR (view_name='calendar'
+    AND payload->>'sourceId' IN ('reset-archive','aiplanwatch-reference','codexlimits-observations')
+    AND payload->>'messageId' LIKE 'observed-%') THEN payload
+    ELSE (payload-'text'-'metadata')||jsonb_build_object('text','') END ORDER BY created_at DESC,id),'[]')
+    FROM public.radar_evidence WHERE id=ANY(evidence_ids));
   cases:='[]'; snapshots:='[]'; outcomes:='[]';
   IF view_name IN ('home','methodology','legacy') THEN
     cases:=(SELECT coalesce(jsonb_agg(payload ORDER BY created_at DESC,id),'[]') FROM public.radar_forecast_cases WHERE view_name<>'home' OR (payload->'windows'->>'48')::timestamptz>clock_time);

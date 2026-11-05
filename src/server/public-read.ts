@@ -3,6 +3,7 @@ import { transaction, type Client } from '../db';
 import type { Activity, Article, Evidence, PublicData, Publication, RadarEvent, Source } from '../lib/types';
 import type { PublicReadEnvelope, PublicReadOptions, PublicView } from '../lib/public-read';
 import { projectPublicHistory } from '../lib/history';
+import { activityPublicationIds } from '../lib/activity-share';
 import { publicActions, completedPublicActions, publicationSourceTime, recentCompletedBenefits } from '../lib/public-facts';
 import { publicNewsGroups, homeNewsGroups } from '../lib/public-feed';
 import { publicResetOutlook } from '../lib/reset-outlook';
@@ -176,18 +177,10 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
       }
     } else if (options.view === 'activity') {
       const activity = activities.find(item => item.id === options.id);
-      const day = options.day || (activity ? Math.max(1, Math.min(activity.days, activityDayNumber(activity, now) || 1)) : 1);
-      // Keep the small activity calendar in one coherent read. Selecting a day
-      // is a local filter; fixed daily shares still validate against that day.
-      const items=activity?.items || [];
-      const dayItems=items.filter(item=>item.day===day);
-      const rows=await client.query("SELECT payload->>'publicationId' AS publication FROM radar_articles WHERE id=ANY($1::text[])",[items.map(item=>item.articleId)]);
-      rows.rows.forEach(row=>selected.add(row.publication));
-      // Include public reset facts independently of campaign links. The client
-      // groups them by the activity timezone and retains their evidence grade.
-      const resetFacts=[...completedPublicActions(facts).map(({action,publication})=>({at:action.statementAt,id:publication.id})),...resetObservationSources(facts).map(item=>({at:item.observedAt,id:item.publicationId}))];
-      if(activity)for(const fact of resetFacts){const value=activityDayNumber(activity,fact.at);if(value!==undefined&&value>=1&&value<=activity.days)selected.add(fact.id);}
-      if(options.publications?.length){const fixed=await client.query("SELECT id FROM radar_publications WHERE id=ANY($1::text[]) AND payload->>'articleId'=ANY($2::text[])",[options.publications,dayItems.map(item=>item.articleId)]);fixed.rows.forEach(row=>selected.add(row.id));}
+      if(activity){
+        const day=options.day||Math.max(1,Math.min(activity.days,activityDayNumber(activity,now)||1));
+        activityPublicationIds({...facts,activities},activity,day,options.publications).forEach(id=>selected.add(id));
+      }
     } else if (options.view === 'notices') {
       empty.notices = (await client.query("SELECT payload FROM radar_notices WHERE payload->>'origin'='admin' AND payload->>'status'='active'")).rows.map(row => row.payload);
       empty.notices.forEach(notice => selected.add(notice.publicationId));

@@ -4,9 +4,9 @@ import {randomUUID} from 'node:crypto';
 import {pool,put,insert,list,one,transaction} from '../src/db';
 import {applyForecastMigration} from '../scripts/migrations/forecast';
 import {runForecastCycle,getPublicForecast,getForecastSnapshot,forecastTablesAvailable} from '../src/server/forecast';
-import {getPublicData} from '../src/server/service';
+import {createEvidence,executeCommand,getPublicData} from '../src/server/service';
 import type {Source,Evidence,Publication,RadarEvent,Article,Notice} from '../src/lib/types';
-import {effectiveForecastOutcome,type ForecastCase,type ForecastSnapshot,type ForecastOutcome} from '../src/lib/forecast';
+import {effectiveForecastOutcome,selectTrainingSamples,type ForecastCase,type ForecastSnapshot,type ForecastOutcome} from '../src/lib/forecast';
 
 test('真实隔离库：预测独立闭环、固定快照、公告关联和未知守卫',{skip:process.env.RADAR_INTEGRATION!=='1'},async t=>{
  assert.match(new URL(process.env.DATABASE_URL!).pathname,/^\/radar_qa_/);
@@ -29,9 +29,9 @@ test('真实隔离库：预测独立闭环、固定快照、公告关联和未�
    const concurrent=await Promise.all([runForecastCycle('2026-10-10T00:04:00Z'),runForecastCycle('2026-10-10T00:04:00Z')]);assert.equal(concurrent.reduce((n,r)=>n+r.discovered+r.snapshots,0),0);
    assert.deepEqual(await getForecastSnapshot(usage.snapshotId),firstSnapshot);assert.deepEqual([(await list('events')).length,(await list('articles')).length,(await list<Notice>('notices')).length],before);
   });
-  const publishFixture=async(stage:'promised'|'in_progress'|'claimed_complete'|'cancelled',time:string,text:string)=>{
+  const publishFixture=async(stage:'promised'|'in_progress'|'claimed_complete'|'cancelled',time:string,text:string,proofSourceId=announcementSource)=>{
    const id=randomUUID(),eid=`announcement-${id}`,pid=`pub-${id}`,eventId=`event-${id}`,articleId=`article-${id}`;
-   const e:Evidence={...signal,id:eid,sourceId:announcementSource,messageId:id,parentId:undefined,url:`https://x.com/forecast_fixture/status/${BigInt('0x'+id.replaceAll('-','').slice(0,14))}`,text,textOrigin:'original',provenance:'archive',metadata:undefined,publishedAt:time,collectedAt:time,hash:id};
+   const e:Evidence={...signal,id:eid,sourceId:proofSourceId,messageId:id,parentId:undefined,url:`https://x.com/forecast_fixture/status/${BigInt('0x'+id.replaceAll('-','').slice(0,14))}`,text,textOrigin:'original',provenance:'archive',metadata:undefined,publishedAt:time,collectedAt:time,hash:id};
    const event:RadarEvent={id:eventId,title:'隔离公告',version:1,status:'published',publicationId:pid,updatedAt:time,evidenceIds:[eid],actions:[{id:`action-${id}`,kind:'automatic_reset',stage,scope:'public',eligibility:'所有账户',statementAt:time,evidenceIds:[eid],evidenceQuote:text}]};
    const article:Article={id:articleId,eventId,title:'隔离公告',summary:'明确关联的公开公告。',translation:'',category:'reset',version:1,status:'published',publicationId:pid,evidenceIds:[eid],publishedAt:time,updatedAt:time,publicationMode:'state_change'};
    const publication:Publication={id:pid,eventId,articleId,event,article,publishedAt:time,cutoffAt:time,reason:'synthetic QA publication fixture'};
@@ -71,6 +71,47 @@ test('真实隔离库：预测独立闭环、固定快照、公告关联和未�
    await assert.rejects(put('forecast_snapshots',{...firstSnapshot!,p48:1}),/不可变/);
    await assert.rejects(pool.query('UPDATE radar_forecast_snapshots SET payload=payload WHERE id=$1',[firstSnapshot!.id]),/immutable forecast/);
    assert.deepEqual(await getForecastSnapshot(firstSnapshot!.id),firstSnapshot);
+  });
+  await t.test('原动作合并后继续有效，人工更正移除后追加一次失效且训练排除',async()=>{
+   const start=Date.now()-60*3600_000;
+   const startAt=new Date(start).toISOString(),completionAt=new Date(start+2*3600_000).toISOString();
+   const statusId=`corrected-status-${tag}`,proofId=`corrected-proof-${tag}`;
+   const correctedSignal={...signal,id:`corrected-signal-${tag}`,sourceId:statusId,messageId:`corrected-update-${tag}`,url:`https://status.openai.com/incidents/corrected${tag.replaceAll('-','')}`,publishedAt:startAt,collectedAt:startAt,hash:`corrected-${tag}`};
+   await put('sources',{...source,id:statusId,lastSuccessAt:startAt});
+   await put('sources',{...source,id:proofId,kind:'archive',lastSuccessAt:startAt});
+   await insert('evidence',correctedSignal);
+   await runForecastCycle(new Date(start+60_000).toISOString(),{force:true});
+   const observation=(await list<ForecastCase>('forecast_cases')).find(c=>c.sourceId===statusId&&c.target==='automatic_reset')!;
+   assert.ok(observation);
+   const sample={...observation,coverage:{...observation.coverage,status:'verified' as const}};
+   const frozen=await getForecastSnapshot(sample.snapshotId);
+   const completed=await publishFixture('claimed_complete',completionAt,`We have reset all usage limits for all accounts.\n${correctedSignal.url}`,proofId);
+   const target=await publishFixture('promised',completionAt,'We will reset usage for all accounts.',proofId);
+   await runForecastCycle(completionAt,{force:true});
+   const related=async()=>(await list<ForecastOutcome>('forecast_outcomes')).filter(o=>o.caseId===sample.id);
+   const initial=await related();
+   assert.equal(initial.length,1);
+   assert.equal(initial[0].stage,'claimed_complete');
+   const merged=await executeCommand('event.merge',{id:completed.event.id,version:completed.event.version,targetId:target.event.id,targetVersion:target.event.version,reason:'合并相同活动的公开动作'},'qa') as Publication;
+   const afterMove=new Date().toISOString();
+   await runForecastCycle(afterMove,{force:true});
+   assert.deepEqual(await related(),initial,'同一动作移动到仍公开的事件不使结果失效');
+   assert.deepEqual(selectTrainingSamples([sample],await related(),afterMove),initial);
+
+   const correction=await createEvidence({sourceId:'manual',messageId:`correction-${tag}`,url:'https://example.invalid/correction',text:'Correction: this update concerns an editor layout improvement only.',publishedAt:afterMove,collectedAt:afterMove,contextComplete:true,historical:false,provenance:'manual'});
+   await executeCommand('event.correct',{id:merged.event.id,version:merged.event.version,reason:'核实这条公告仅涉及产品改进',content:{title:'产品消息更正',summary:'此公告仅涉及编辑器的布局调整。',translation:'',category:'product',actions:[],evidenceIds:[correction.evidence.id]}},'qa');
+   await runForecastCycle(afterMove,{force:true});
+   assert.deepEqual(await related(),initial,'更正尚不可知的回放时间不能提前使旧结局失效');
+   const afterCorrection=new Date().toISOString();
+   await runForecastCycle(afterCorrection,{force:true});
+   const invalidated=await related();
+   assert.deepEqual(invalidated.filter(o=>!o.invalidated),initial,'旧结果快照保持原样');
+   assert.equal(invalidated.filter(o=>o.invalidated).length,1);
+   assert.equal(effectiveForecastOutcome(invalidated,sample.id,sample.target,afterCorrection).positive,undefined);
+   assert.deepEqual(selectTrainingSamples([sample],invalidated,afterCorrection),[]);
+   await runForecastCycle(new Date().toISOString(),{force:true});
+   assert.deepEqual(await related(),invalidated,'重新运行不会重复写入失效结局');
+   assert.deepEqual(await getForecastSnapshot(sample.snapshotId),frozen);
   });
  }finally{await pool.end();}
 });

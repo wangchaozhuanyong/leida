@@ -13,6 +13,7 @@ import type {PublicFactsData} from '../lib/public-facts';
 
 const key=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const iso=()=>new Date().toISOString();
+const actionStageRank={promised:1,in_progress:2,claimed_complete:3,cancelled:4};
 export async function forecastTablesAvailable(client:Client=pool):Promise<boolean> {
  if(isCloudbaseClient(client)){await list('forecast_cases',client);await list('forecast_snapshots',client);await list('forecast_outcomes',client);return true;}
  const result=await client.query("SELECT to_regclass('radar_forecast_cases') AS cases,to_regclass('radar_forecast_snapshots') AS snapshots,to_regclass('radar_forecast_outcomes') AS outcomes");
@@ -69,10 +70,10 @@ export async function runForecastCycle(timestamp=iso(),options:{force?:boolean;i
  try{return await transaction(async c=>{
   const result:ForecastCycleResult={status:'ready',discovered:0,snapshots:0,outcomes:0};
   await lockTransaction(c,'radar_forecast_cycle');
-  const runtime=await one<CadenceRuntime>('settings','forecast_runtime',c);
+  const runtime=await one<CadenceRuntime&{ruleVersion?:string}>('settings','forecast_runtime',c);
   const inputs=await one<{id:string;revision?:string}>('settings','forecast_inputs',c);
   // A no-change worker tick reads only these two tiny settings rows. No history scan.
-  if(!options.force&&!forecastCycleDue(runtime,inputs?.revision,timestamp,options.inputsChanged))return result;
+  if(!options.force&&runtime?.ruleVersion===FORECAST_RULE_VERSION&&!forecastCycleDue(runtime,inputs?.revision,timestamp,options.inputsChanged))return result;
   if(!await forecastTablesAvailable(c))return {...result,status:'unavailable'};
   const sources=await list<Source>('sources',c),all=await list<Evidence>('evidence',c),cases=await list<ForecastCase>('forecast_cases',c),outcomes=await list<ForecastOutcome>('forecast_outcomes',c),publications=await list<Publication>('publications',c),events=await list<RadarEvent>('events',c),articles=await list<Article>('articles',c);
   // Existing evidence versions retain their own public/collection times; older updates cannot reset a case window.
@@ -108,16 +109,30 @@ export async function runForecastCycle(timestamp=iso(),options:{force?:boolean;i
     }
    }
   }
+  // Follow action identity across splits and merges. A historical observation
+  // must use the last event state it could know, before any later correction.
+  const asOf=Date.parse(timestamp);
+  const futureEvents=new Set(events.filter(event=>Date.parse(event.updatedAt)>asOf).map(event=>event.id));
+  const knownEventById=new Map(events.filter(event=>!futureEvents.has(event.id)).map(event=>[event.id,event]));
+  if(futureEvents.size)for(const publication of publications){
+   if(Date.parse(publication.publishedAt)>asOf)break;
+   if(futureEvents.has(publication.eventId)&&publication.event.publicationId===publication.id)knownEventById.set(publication.eventId,publication.event);
+  }
+  const activeActions=new Map([...knownEventById.values()].filter(e=>e.status==='published').flatMap(event=>event.actions.map(action=>[action.id,action] as const)));
   for(let current of cases){
    const available=forecastSourceAvailable(sources.find(s=>s.id===current.sourceId),timestamp),related=outcomes.filter(o=>o.caseId===current.id);
    // Withdrawal/correction is appended; it never edits a previous outcome or initial probability snapshot.
-   for(const previous of related.filter(o=>o.publicationId&&o.stage!=='unknown'&&!o.invalidated)){
-    const event=events.find(e=>e.id===previous.eventId),publication=publications.find(p=>p.id===previous.publicationId),article=articles.find(a=>a.id===publication?.articleId);
-    const previousAction=publication?.event.actions.find(a=>a.kind===previous.target&&a.evidenceIds.some(id=>previous.evidenceIds.includes(id))),latest=event?.actions.find(a=>a.id===previousAction?.id);
-    const changed=!!latest&&!!previousAction&&(latest.scope!==previousAction.scope||latest.eligibility!==previousAction.eligibility||latest.kind!==previousAction.kind||latest.stage==='cancelled'&&previousAction.stage!=='cancelled');
-    if(event?.status!=='withdrawn'&&article?.status!=='withdrawn'&&!changed)continue;
+   for(const previous of related.filter(o=>o.publicationId&&o.stage!=='unknown'&&!o.invalidated&&Date.parse(o.observedAt)<=asOf)){
+    const event=previous.eventId?knownEventById.get(previous.eventId):undefined,publication=publications.find(p=>p.id===previous.publicationId),article=articles.find(a=>a.id===publication?.articleId);
+    const previousAction=publication?.event.actions.find(a=>a.kind===previous.target&&a.stage===previous.stage&&(!previous.announcementAt||a.statementAt===previous.announcementAt)&&a.evidenceIds.some(id=>previous.evidenceIds.includes(id)));
+    const latest=previousAction&&activeActions.get(previousAction.id);
+    const changed=!!previousAction&&!!event&&(!latest||
+     latest.scope!==previousAction.scope||latest.eligibility!==previousAction.eligibility||latest.kind!==previousAction.kind||
+     actionStageRank[latest.stage]<actionStageRank[previousAction.stage]||latest.stage==='cancelled'&&previousAction.stage!=='cancelled');
+    const articleWithdrawn=article?.status==='withdrawn'&&Date.parse(article.updatedAt)<=asOf;
+    if(event?.status!=='withdrawn'&&!articleWithdrawn&&!changed)continue;
     const signature=key([current.id,'invalidated',previous.id]);
-    const invalidated:ForecastOutcome={id:`forecast_outcome_${signature}`,signature,caseId:current.id,target:current.target,stage:'unknown',evidenceIds:previous.evidenceIds,publicationId:previous.publicationId,eventId:previous.eventId,observedAt:timestamp,relation:'unmatched',relationVerified:false,actualDelivery:'unobserved',invalidated:true,reason:'关联公告已撤回、取消或资格订正，保留旧结局并标为不可训练'};
+    const invalidated:ForecastOutcome={id:`forecast_outcome_${signature}`,signature,caseId:current.id,target:current.target,stage:'unknown',evidenceIds:previous.evidenceIds,publicationId:previous.publicationId,eventId:previous.eventId,observedAt:timestamp,relation:'unmatched',relationVerified:false,actualDelivery:'unobserved',invalidated:true,reason:'关联公告已撤回、取消或对应福利动作已更正，保留旧结局并标为不可训练'};
     if(await insert('forecast_outcomes',invalidated,c)){outcomes.push(invalidated);result.outcomes++;}
    }
    if(!await one<ForecastSnapshot>('forecast_snapshots',current.snapshotId,c)){

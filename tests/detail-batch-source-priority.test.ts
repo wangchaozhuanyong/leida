@@ -5,7 +5,7 @@ import {createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {SearchParamsContext} from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import type {BenefitAction,Evidence,PublicData,Publication} from '../src/lib/types';
-import {EventPage} from '../src/components/public/PublicApp';
+import {EventPage,Home} from '../src/components/public/PublicApp';
 import {briefTime} from '../src/components/public/model';
 
 const require=createRequire(import.meta.url),native=require('../miniprogram/utils/model.js');
@@ -61,4 +61,12 @@ test('仅新闻详情不借用整个系列完成动作，仍保留原文依据',
  const detail=native.resolveDetail(data,{publicationId:publication.id});
  assert.equal(detail.newsOnly,true);assert.deepEqual(detail.actions,[]);
  assert.equal(detail.evidence[0].id,'first-source');assert.equal(detail.evidence.length,1);
+});
+
+
+test('网页首页每一批完成记录的链接固定到对应发布快照',()=>{
+ const data=fixture();
+ const html=renderToStaticMarkup(createElement(Home,{data,historical:false,onWechatReminders(){},onPoster(){},onShare:async()=>{}}));
+ const rows=[...html.matchAll(/<a class="pub-home-completion"[^>]*href="([^"]+)"[^>]*>/g)].map(match=>match[1]);
+ assert.deepEqual(rows,['/events/series?version=pub-2','/events/series?version=pub-1']);
 });

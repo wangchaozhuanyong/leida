@@ -33,7 +33,14 @@ export async function GET(request:Request,{params}:{params:Promise<{path:string[
  keepWatchAlive=true;
  if(kind==='replays'&&path.length<=2){const query=new URL(request.url).searchParams;if([...query.keys()].some(key=>key!=='step')||query.getAll('step').length>1||!id&&query.has('step'))throw Object.assign(new Error('回放查询无效'),{status:400});return json(id?await publicReplayStep(id,query.get('step')??undefined):await publicReplayRuns());}
  if(kind==='version'&&new URL(request.url).searchParams.get('light')==='1'){const state=await getLightPublicVersion(),etag=`"${state.version}"`;if(request.headers.get('if-none-match')===etag)return new Response(null,{status:304,headers:{ETag:etag,'Cache-Control':'no-store'}});return Response.json({data:state},{headers:{ETag:etag,'Cache-Control':'no-store'}});}
- if((kind==='bootstrap'||kind==='status')&&new URL(request.url).searchParams.has('view')){const options=parsePublicRead(new URL(request.url).searchParams),result=await getPublicRead(options);return Response.json({...result,data:publicWatchForClient(result.data,acceptsObserved,options.view==='methodology')},{headers:{'Cache-Control':'no-store'}});}
+ if((kind==='bootstrap'||kind==='status')&&new URL(request.url).searchParams.has('view')){
+  const options=parsePublicRead(new URL(request.url).searchParams);
+  const start=performance.now();
+  const result=await getPublicRead(options);
+  const data=publicWatchForClient(result.data,acceptsObserved,options.view==='methodology');
+  const duration=(performance.now()-start).toFixed(1);
+  return Response.json({...result,data},{headers:{'Cache-Control':'no-store','Server-Timing':`radar-read;dur=${duration}`}});
+ }
  if(kind==='version'){const version=await getPublicVersion();const etag=`"${version}"`;if(request.headers.get('if-none-match')===etag)return new Response(null,{status:304,headers:{ETag:etag,'Cache-Control':'no-store'}});return Response.json({data:{version}},{headers:{ETag:etag,'Cache-Control':'no-store'}});}
  if(kind==='wechat'&&id==='availability'&&path.length===2)return json(await publicWechatAvailability());
  if(kind==='wechat'&&id==='code'&&path.length===3){const code=await generateWechatCode(path[2]);return json({...code,image:undefined,imageBase64:code.image.toString('base64')});}
@@ -77,10 +84,10 @@ export async function GET(request:Request,{params}:{params:Promise<{path:string[
    let code:StatusPosterCode|undefined;
    let options:ReturnType<typeof parseStatusPosterOptions>;
    try{options=parseStatusPosterOptions(url.searchParams);}catch{throw Object.assign(new Error('海报样式或圆码选项无效'),{status:400});}
-   if(options.includeCode){try{code=await generateWechatCode(p.id);}catch(error){if(!(error instanceof WechatServiceError))throw error;}}
-   if(options.style)posterCodeState=code?'included':options.includeCode?'unavailable':'omitted';
    const generatedAt=url.searchParams.get('at')??new Date().toISOString();
    if(!Number.isFinite(Date.parse(generatedAt))||Math.abs(Date.parse(generatedAt)-Date.now())>86400000)throw Object.assign(new Error('海报时间已失效，请重新生成'),{status:400});
+   if(options.includeCode){try{code=await generateWechatCode(p.id);}catch(error){if(!(error instanceof WechatServiceError))throw error;}}
+   if(options.style)posterCodeState=code?'included':options.includeCode?'unavailable':'omitted';
    const active=publicResetOutlook(data).active;
    const nextAction=active?publicActions(data).find(item=>item.publication.id===active.publicationId&&item.action.id===active.actionId)?.action:undefined;
    svg=statusPosterSvg({publication:p,actionId,name:data.site.name,generatedAt,shareUrl,nextAction,code,style:options.style,evidence:data.evidence});

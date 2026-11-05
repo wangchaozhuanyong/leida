@@ -105,7 +105,7 @@ function createPage(build, extra = {}) {
     onLoad(params) { setWindowBackground(); this._params = params || {}; if (extra.load) extra.load.call(this, params || {}); },
     // Keep native appearance setup on initial load. Retained tabs only need to
     // resume their subscriptions; their background is also declared in page-meta.
-    onShow() { if(enterPage(this,()=>this.onShow()))return;const app=getApp();this._visible=true;this._viewKey=JSON.stringify(this.readView());this._entryRetainedKey=this.data.connected&&(!extra.presentable||extra.presentable.call(this,this.data))&&this._presentedViews?.has(this._viewKey)?this._viewKey:null;if(lastShownPage!==this){const previous=lastShownPage;if(previous&&!previous._visible&&!previous._unloaded&&previous.data.connected)previous.setData({contentMotion:'content-primed'});this._presentedViews?.delete(this._viewKey);}lastShownPage=this;const work=app.client.setView&&app.client.setView(this.readView());this._unsubscribe = app.client.subscribe(state => render(this, state));if(extra.show)extra.show.call(this);foreground(this,work); },
+    onShow() { if(enterPage(this,()=>this.onShow()))return;const app=getApp();this._visible=true;this._viewKey=JSON.stringify(this.readView());this._entryRetainedKey=this.data.connected&&(!extra.presentable||extra.presentable.call(this,this.data))&&this._presentedViews?.has(this._viewKey)?this._viewKey:null;if(lastShownPage!==this){const previous=lastShownPage;if(previous&&!previous._visible&&!previous._unloaded&&previous.data.connected)previous.setData({contentMotion:'content-primed'});this._presentedViews?.delete(this._viewKey);}lastShownPage=this;const work=app.client.setView?.(this.readView(), {deferAdditions:extra.deferAdditions});this._unsubscribe = app.client.subscribe(state => render(this, state));if(extra.show)extra.show.call(this);foreground(this,work); },
     nativeReturnTouched(){getApp().entryNavigation?.touched();},
     onPageScroll(event) { if(this._viewKey){this._positions=this._positions||{};this._positions[this._viewKey]=event.scrollTop;} },
     onHide() { endPull(this);this._pullRefreshWork=null;stopEntrance(this);suspendEntry(this);this._visible=false;this._renderGeneration=(this._renderGeneration||0)+1;this._navigationGeneration=(this._navigationGeneration||0)+1;if (this._unsubscribe) this._unsubscribe(); this._unsubscribe = null; if(extra.hide)extra.hide.call(this); },
@@ -138,7 +138,7 @@ function createPage(build, extra = {}) {
       return settled;
     },
     readView() { return extra.view ? extra.view(this._params||{},this.data) : {view:'home'}; },
-    reloadView() { this._viewKey=JSON.stringify(this.readView());this._restoreScroll=this._positions?.[this._viewKey]||0;const client=getApp().client; if(client.setView)return foreground(this,()=>client.setView(this.readView()));this.redraw(); },
+    reloadView() { this._viewKey=JSON.stringify(this.readView());this._restoreScroll=this._positions?.[this._viewKey]||0;const client=getApp().client; if(client.setView)return foreground(this,()=>client.setView(this.readView(), {deferAdditions:extra.deferAdditions}));this.redraw(); },
     applyUpdates() { const client=getApp().client;if(client.applyUpdates)client.applyUpdates(); },
     retry() { return foreground(this,()=>getApp().client.refresh(false)); },
     redraw() { render(this, getApp().client.getState()); },

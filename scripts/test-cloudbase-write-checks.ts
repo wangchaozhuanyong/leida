@@ -118,25 +118,46 @@ export async function testCloudbaseWrite(pool: pg.Pool, rpc: CloudbaseRpc, anony
     pass('persistent_collect_failure_audit', 'actual worker persisted failed collection job, source health and immutable failure audit');
 
     // Fresh synthetic identity and explicit consent; every WeChat endpoint is mocked.
-    let time=Date.now();let sends = 0; let failSend = false; const encryptionKey = randomBytes(32);
-    const fetcher: typeof fetch = async input => { const url = new URL(String(input)); assert.equal(url.origin, 'https://api.weixin.qq.com'); if (url.pathname.includes('jscode2session')) return Response.json({ openid: 'cloudbase_qa_openid_123456789', session_key: 'fixture-not-persisted' }); if (url.pathname.includes('stable_token')) return Response.json({ access_token: 'cloudbase_qa_access_token_123456789', expires_in: 7200 }); if (url.pathname.includes('subscribe/send')) { sends++; if (failSend) throw new Error('synthetic unknown send'); return Response.json({ errcode: 0 }); } throw new Error('unexpected mocked endpoint'); };
-    const wechat = createWechatService({ fetcher, clock:()=>time,encryptionKey: () => encryptionKey, preparePublicPage: async () => {} });
+    let sends = 0; let failSend = false; let reader = 1; const encryptionKey = randomBytes(32);
+    const fetcher: typeof fetch = async input => { const url = new URL(String(input)); assert.equal(url.origin, 'https://api.weixin.qq.com'); if (url.pathname.includes('jscode2session')) return Response.json({ openid: 'cloudbase_qa_openid_123456789_'+reader, session_key: 'fixture-not-persisted' }); if (url.pathname.includes('stable_token')) return Response.json({ access_token: 'cloudbase_qa_access_token_123456789', expires_in: 7200 }); if (url.pathname.includes('subscribe/send')) { sends++; if (failSend) throw new Error('synthetic unknown send'); return Response.json({ errcode: 0 }); } throw new Error('unexpected mocked endpoint'); };
+    const wechat = createWechatService({ fetcher, encryptionKey: () => encryptionKey, preparePublicPage: async () => {} });
     const config = await wechat.adminWechat(); await wechat.saveWechatSettings({ ...config, appId: 'wx0123456789abcdef', subscriptionsEnabled: true, envVersion: 'trial', templateId: 'cloudbase-qa-template', templateFields: { title: 'thing1', status: 'phrase2', time: 'time3' }, dailyApiLimit: 100, dailySendLimit: 20, secret: 'fixture-not-real' }, 'qa');
-    const login = await wechat.wechatLogin('synthetic-code'); const consent = await wechat.wechatSubscriptionChallenge(login.sessionToken); await wechat.confirmWechatSubscription(login.sessionToken, { nonce: consent.nonce!, templateId: consent.templateId!, result: 'accept' });
-    const notice = (await list<Notice>('notices')).find(row => row.publicationId === publication.id); assert.ok(notice);
-    await wechat.scheduleWechatDeliveries();assert.equal((await list<Job>('jobs')).filter(job=>job.kind==='wechat_send').length,0,'consent must not deliver old notices');
-    time+=1000;await insert('notices',{...notice,id:'write-new-consented-notice',semanticKey:randomUUID(),createdAt:new Date(time).toISOString()});
+    const consent = async () => {
+      const login = await wechat.wechatLogin('synthetic-code-'+reader);
+      const challenge = await wechat.wechatSubscriptionChallenge(login.sessionToken);
+      await wechat.confirmWechatSubscription(login.sessionToken, { nonce: challenge.nonce!, templateId: challenge.templateId!, result: 'accept' });
+    };
+    const publishAfterConsent = async (index: number) => {
+      const at = new Date(Date.now()+1).toISOString();
+      while (Date.now() <= Date.parse(at)) await new Promise(resolve => setTimeout(resolve, 2));
+      const added = await createEvidence({...input,messageId:'write-new-completion-'+index,url:'https://x.com/write_fixture/status/179000000000000000'+index,publishedAt:at,collectedAt:at});
+      assert.ok(added.candidate);
+      await transaction(client => queueJob('generate', {candidateId:added.candidate!.id,expectedVersion:added.candidate!.version}, client));
+      assert.equal(await work({schedule:false,allowTemplates:true,enrich:async()=>undefined,enrichQuoted:async()=>[]}),true);
+      const result = (await list<Publication>('publications')).find(item => item.article.evidenceIds.includes(added.evidence.id));
+      assert.ok(result);assert.ok((await list<Notice>('notices')).some(item => item.publicationId === result.id));
+    };
+    await consent();
+    assert.ok((await list<Notice>('notices')).some(row => row.publicationId === publication.id));
+    await wechat.scheduleWechatDeliveries();
+    assert.equal((await list<Job>('jobs')).filter(job=>job.kind==='wechat_send').length,0,'consent must not deliver old notices');
+    await publishAfterConsent(2);
     await wechat.scheduleWechatDeliveries(); await wechat.scheduleWechatDeliveries();
     const jobs = (await list<Job>('jobs')).filter(job => job.kind === 'wechat_send'); assert.equal(jobs.length, 1);
-    const sent = await Promise.allSettled([wechat.processWechatJob(jobs[0]), wechat.processWechatJob(jobs[0])]);
-    assert.ok(sent.some(result => result.status === 'fulfilled' && result.value.state === 'sent')); assert.equal(sends, 1);
+    const dispatch = () => runOne({schedule:false,wechat:job=>wechat.processWechatJob(job)});
+    const sent = await Promise.all([dispatch(),dispatch()]);
+    assert.equal(sent.filter(Boolean).length,1); assert.equal(sends,1);
+    assert.equal((await one<Job>('jobs',jobs[0].id))?.payload.wechatState,'sent');
     assert.equal((await wechat.processWechatJob(jobs[0])).state, 'sent'); assert.equal(sends, 1);
-    pass('actual_wechat_consent_queue_and_once_send', 'real service logic with mocked provider: login/consent, repeated scheduling and competing dispatch produced one grant, one task and one mock send');
-    time+=31000;const challenge = await wechat.wechatSubscriptionChallenge(login.sessionToken); await wechat.confirmWechatSubscription(login.sessionToken, { nonce: challenge.nonce!, templateId: challenge.templateId!, result: 'accept' });
-    time+=1000;await insert('notices', { ...notice, id: 'write-unknown-notice', semanticKey: randomUUID(), createdAt: new Date(time).toISOString() });
-    await wechat.scheduleWechatDeliveries(); const unknownJob = (await list<Job>('jobs')).find(job => job.kind === 'wechat_send' && job.id !== jobs[0].id); assert.ok(unknownJob);
-    failSend = true; assert.equal((await wechat.processWechatJob(unknownJob)).state, 'unknown'); const count = sends;
-    assert.equal((await createWechatService({ fetcher, clock:()=>time,encryptionKey: () => encryptionKey, preparePublicPage: async () => {} }).processWechatJob(unknownJob)).state, 'unknown'); assert.equal(sends, count);
+    pass('actual_wechat_consent_queue_and_once_send', 'real service logic with mocked provider: post-consent publication, repeated scheduling and competing worker claims produced one grant, one task and one mock send');
+    reader=2;await consent();await publishAfterConsent(3);
+    await wechat.scheduleWechatDeliveries();
+    const unknownJob = (await list<Job>('jobs')).find(job => job.kind === 'wechat_send' && job.id !== jobs[0].id); assert.ok(unknownJob);
+    failSend = true;
+    assert.equal(await work({schedule:false,wechat:job=>wechat.processWechatJob(job)}),true);
+    assert.equal((await one<Job>('jobs',unknownJob.id))?.payload.wechatState,'unknown');
+    const count = sends;
+    assert.equal((await createWechatService({fetcher,encryptionKey:()=>encryptionKey,preparePublicPage:async()=>{}}).processWechatJob(unknownJob)).state, 'unknown'); assert.equal(sends, count);
     assert.equal((await list<WechatDelivery>('wechat_deliveries')).filter(row => row.status === 'unknown').length, 1);
     pass('wechat_unknown_send_no_replay', 'mock transport loss persists unknown result; restarted service does not resend or invent delivery');
 

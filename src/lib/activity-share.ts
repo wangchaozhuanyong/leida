@@ -1,5 +1,7 @@
 import type { Activity, Publication, PublicData } from './types';
-import { publicationSourceTime, publicationWithdrawn } from './public-facts';
+import { activityDayNumber } from './activity-display';
+import { completedPublicActions, isNewsOnly, publicationActions, publicationSourceTime, publicationWithdrawn } from './public-facts';
+import { observedEvidence, resetObservationSources } from './reset-observations';
 
 export const MAX_ACTIVITY_PUBLICATIONS = 8;
 export const MAX_ACTIVITY_SHARE_URL = 1800;
@@ -8,7 +10,13 @@ export interface ActivityShareManifest { activityId:string; day:number; publicat
 export type ActivityDayShare = ActivityShareManifest;
 export class ActivityShareError extends Error { constructor(message:string,public status:400|404|409=400){super(message);} }
 export interface ActivityShareSource { id:string; name:string; label:string; url:string; publishedAt:string; }
-export interface ActivityShareItem { publication:Publication; sourceTime:string; sources:ActivityShareSource[]; }
+type ActivityObservation = NonNullable<ReturnType<typeof observedEvidence>> & { messageId:string };
+type ActivitySnapshotFact = { at:string; evidenceType:'confirmed' } | { at:string; evidenceType:'observed'; report:ActivityObservation };
+type ActivityObservationLink = { publication:Publication; report:ActivityObservation };
+export interface ActivityShareItem {
+  publication:Publication; sourceTime:string; cutoffAt:string; sources:ActivityShareSource[];
+  fact?:ActivitySnapshotFact; observationReports?:ActivityObservationLink[];
+}
 export interface ActivityShareReady {
   available:true; manifest:ActivityShareManifest; activity:Activity; date:string; timezone:string;
   publications:Publication[]; items:ActivityShareItem[]; cutoffAt:string; rulesNotice:string; excludedCount:number;
@@ -64,6 +72,86 @@ export function activityDate(activity:Activity,day:number):string {
   return new Date(start+(day-1)*86400000).toISOString().slice(0,10);
 }
 
+/** A snapshot can support its own announcement or observation. */
+function snapshotFact(data:Pick<PublicData,'evidence'|'serverTime'>,publication:Publication):ActivitySnapshotFact|undefined {
+  const now=Date.parse(data.serverTime);
+  if(!Number.isFinite(now)||!validTime(publication.publishedAt)||Date.parse(publication.publishedAt)>now)return;
+  const primary=data.evidence.find(evidence=>evidence.id===publication.article.evidenceIds[0]);
+  if(!primary)return;
+  const observation=observedEvidence(primary,data.serverTime);
+  if(observation)return {at:observation.observedAt,evidenceType:'observed',report:{...observation,messageId:primary.messageId}};
+  if(isNewsOnly(publication))return;
+  const action=publicationActions(publication).find(action=>action.scope==='public'&&action.stage==='claimed_complete'
+    &&action.evidenceIds.includes(primary.id)&&Date.parse(action.statementAt)===Date.parse(primary.publishedAt)
+    &&Date.parse(action.statementAt)<=now);
+  if(action)return {at:action.statementAt,evidenceType:'confirmed'};
+}
+
+function activitySnapshotFact(data:Pick<PublicData,'evidence'|'serverTime'>,publication:Publication,activity:Activity,day:number):ActivitySnapshotFact|undefined {
+  const fact=snapshotFact(data,publication);
+  if(fact&&activityDayNumber(activity,fact.at)===day)return fact;
+}
+
+/** An independently dated fact survives changes to this activity's links. */
+export function activityPublicationMatchesDay(data:Pick<PublicData,'activities'|'evidence'|'serverTime'>,publication:Publication,activity:Activity,day:number):boolean {
+  const links=activity.items.filter(item=>item.articleId===publication.articleId);
+  if(links.some(item=>item.eventId!==publication.eventId))return false;
+  const fact=snapshotFact(data,publication);
+  if(fact&&activityDayNumber(activity,fact.at)!==day)return false;
+  if(links.length&&links.every(item=>item.day===day))return true;
+  return !!fact&&!data.activities.some(other=>other.id!==activity.id&&other.items.some(item=>item.articleId===publication.articleId));
+}
+
+/** Read the whole campaign calendar together, plus validated fixed versions. */
+export function activityPublicationIds(data:PublicData,activity:Activity,day:number,requestedIds:readonly string[]=[]):Set<string> {
+  const linked=new Set(activity.items.map(item=>item.articleId));
+  const ids=new Set(data.articles.filter(article=>linked.has(article.id)).map(article=>article.publicationId));
+  const addFact=(at:string,id:string)=>{
+    const value=activityDayNumber(activity,at);
+    if(value!==undefined&&value>=1&&value<=activity.days)ids.add(id);
+  };
+  for(const {action,publication} of completedPublicActions(data))addFact(action.statementAt,publication.id);
+  for(const report of resetObservationSources(data))addFact(report.observedAt,report.publicationId);
+  const requested=new Set(requestedIds);
+  for(const publication of data.publications){
+    if(requested.has(publication.id)&&activityPublicationMatchesDay(data,publication,activity,day))ids.add(publication.id);
+  }
+  return ids;
+}
+
+const reportKey=(report:ActivityObservation)=>report.sourceId+':'+report.messageId;
+const compareItems=(a:ActivityShareItem,b:ActivityShareItem)=>Date.parse(a.sourceTime)-Date.parse(b.sourceTime)||a.publication.id.localeCompare(b.publication.id);
+
+/** Match activity record grouping over the selected reports, while retaining every fixed snapshot. */
+function groupObservationItems(snapshots:ActivityShareItem[]):ActivityShareItem[] {
+  type ObservedItem = ActivityShareItem & { fact:Extract<ActivitySnapshotFact,{evidenceType:'observed'}> };
+  const dates=new Map<string,ObservedItem[]>(),items:ActivityShareItem[]=[];
+  for(const item of snapshots){
+    if(item.fact?.evidenceType!=='observed'){items.push(item);continue;}
+    const date=new Date(Date.parse(item.sourceTime)+8*3600000).toISOString().slice(0,10);
+    dates.set(date,[...(dates.get(date)??[]),{...item,fact:item.fact}]);
+  }
+  for(const reports of dates.values()){
+    const sourceIds=reports.map(item=>item.fact.report.sourceId);
+    const partitions=new Map<string,ObservedItem[]>();
+    const separateTimes=new Set(sourceIds).size!==reports.length;
+    for(const item of reports){
+      const key=separateTimes?item.sourceTime:'date';
+      partitions.set(key,[...(partitions.get(key)??[]),item]);
+    }
+    for(const group of partitions.values()){
+      group.sort((a,b)=>Date.parse(a.sourceTime)-Date.parse(b.sourceTime)
+        ||a.fact.report.sourceId.localeCompare(b.fact.report.sourceId)||a.fact.report.evidenceId.localeCompare(b.fact.report.evidenceId));
+      const [first]=group;
+      if(group.length===1){items.push(first);continue;}
+      const sources=[...new Map(group.flatMap(item=>item.sources).map(source=>[source.id,source])).values()];
+      const cutoffAt=group.map(item=>item.cutoffAt).reduce((a,b)=>Date.parse(a)>=Date.parse(b)?a:b);
+      items.push({...first,cutoffAt,sources,observationReports:group.map(item=>({publication:item.publication,report:item.fact.report}))});
+    }
+  }
+  return items.sort(compareItems);
+}
+
 /** Read a fully explicit publication set; current articles are used only to detect withdrawal. */
 export function resolveActivityShare(data:PublicData,input:ActivityShareManifest):ActivityShareResult {
   let manifest:ActivityShareManifest;
@@ -72,7 +160,7 @@ export function resolveActivityShare(data:PublicData,input:ActivityShareManifest
   if(!activity)return blocked('未找到这项已公开的活动。',404);
   let date:string;
   try{date=activityDate(activity,manifest.day);}catch(error){return blocked(error instanceof Error?error.message:'活动日期无效。');}
-  const seenArticles=new Set<string>(),items:ActivityShareItem[]=[];
+  const seenArticles=new Map<string,boolean>(),seenReports=new Set<string>(),snapshots:ActivityShareItem[]=[];
   for(const id of manifest.publicationIds){
     const publication=data.publications.find(item=>item.id===id);
     if(!publication)return blocked('部分分享内容已不可用，请查看活动最新进展。',404);
@@ -82,11 +170,17 @@ export function resolveActivityShare(data:PublicData,input:ActivityShareManifest
     if(publicationWithdrawn(data,publication))return blocked('所选记录包含已撤回内容，请分别查看仍有效的公告。',409);
     if(event.status==='merged'||publication.event.status==='merged')return blocked('部分进展已并入其他消息，请返回活动页查看。',409);
     if(event.status!=='published'||article.status!=='published'||publication.event.status!=='published'||publication.article.status!=='published')return blocked('所选记录尚未公开，不能生成海报。',409);
-    const links=activity.items.filter(item=>item.articleId===publication.articleId);
-    if(!links.length||links.some(item=>item.day!==manifest.day||item.eventId!==publication.eventId)||article.eventId!==publication.eventId)return blocked('分享内容与所选活动日期不一致，请重新选择。',409);
-    if(seenArticles.has(publication.articleId))return blocked('同一条消息请勿重复选择。',409);
-    seenArticles.add(publication.articleId);
-    const sourceTime=publicationSourceTime(publication);
+    const fact=activitySnapshotFact(data,publication,activity,manifest.day);
+    if(article.eventId!==publication.eventId||!activityPublicationMatchesDay(data,publication,activity,manifest.day))return blocked('分享内容与所选活动日期不一致，请重新选择。',409);
+    const observed=fact?.evidenceType==='observed';
+    if(seenArticles.has(publication.articleId)&&!(seenArticles.get(publication.articleId)&&observed))return blocked('同一条消息请勿重复选择。',409);
+    if(observed){
+      const key=reportKey(fact.report);
+      if(seenReports.has(key))return blocked('同一条消息请勿重复选择。',409);
+      seenReports.add(key);
+    }
+    seenArticles.set(publication.articleId,observed);
+    const sourceTime=fact?.at??publicationSourceTime(publication);
     if(!validTime(sourceTime)||!validTime(publication.cutoffAt)||!validTime(publication.publishedAt))return blocked('消息时间暂不可用，请稍后再生成海报。',409);
     const evidenceIds=[...new Set(publication.article.evidenceIds)],sources:ActivityShareSource[]=[];
     if(!evidenceIds.length)return blocked('消息来源暂不可用，请稍后再生成海报。',409);
@@ -94,28 +188,35 @@ export function resolveActivityShare(data:PublicData,input:ActivityShareManifest
       const evidence=data.evidence.find(item=>item.id===id);
       if(!evidence||!validTime(evidence.publishedAt))return blocked('部分来源暂不可用，请稍后再生成海报。',409);
       const labels={official:'官方资料',archive:'第三方收录',manual:'补充来源'};
-      sources.push({id:evidence.id,name:data.sources.find(item=>item.id===evidence.sourceId)?.name??labels[evidence.provenance],label:labels[evidence.provenance],url:evidence.url,publishedAt:evidence.publishedAt});
+      const observation=observed&&fact.report.evidenceId===id?fact.report:undefined;
+      sources.push({id:evidence.id,name:observation?.sourceName??data.sources.find(item=>item.id===evidence.sourceId)?.name??labels[evidence.provenance],label:labels[evidence.provenance],url:observation?.sourceUrl??evidence.url,publishedAt:evidence.publishedAt});
     }
-    items.push({publication,sourceTime,sources});
+    snapshots.push({publication,sourceTime,cutoffAt:publication.cutoffAt,sources,...(fact?{fact}:{})});
   }
-  items.sort((a,b)=>Date.parse(a.sourceTime)-Date.parse(b.sourceTime)||a.publication.id.localeCompare(b.publication.id));
-  const cutoffAt=items.map(item=>item.publication.cutoffAt).sort((a,b)=>Date.parse(b)-Date.parse(a))[0];
-  return {available:true,manifest,activity,date,timezone:activity.timezone,publications:items.map(item=>item.publication),items,cutoffAt,rulesNotice:ACTIVITY_RULES_NOTICE,excludedCount:0};
+  snapshots.sort(compareItems);
+  const cutoffAt=snapshots.map(item=>item.cutoffAt).reduce((a,b)=>Date.parse(a)>=Date.parse(b)?a:b);
+  return {available:true,manifest,activity,date,timezone:activity.timezone,publications:snapshots.map(item=>item.publication),items:groupObservationItems(snapshots),cutoffAt,rulesNotice:ACTIVITY_RULES_NOTICE,excludedCount:0};
 }
 
 /** Called only when the reader selects a day; freeze its currently published article versions. */
-export function buildActivityShare(data:PublicData,activityId:string,day:number):ActivityDayShare {
+export function buildActivityShare(data:PublicData,activityId:string,day:number,visiblePublicationIds?:readonly string[]):ActivityDayShare {
   if(!validId(activityId)||!Number.isInteger(day))throw new ActivityShareError('活动分享链接无效，请返回后重试。');
   const activity=data.activities.find(item=>item.id===activityId);
   if(!activity)throw new ActivityShareError('未找到这项已公开的活动。',404);
   activityDate(activity,day);
-  const ids:string[]=[],seen=new Set<string>();
-  for(const item of activity.items.filter(item=>item.day===day)){
-    if(seen.has(item.articleId))continue;seen.add(item.articleId);
-    const article=data.articles.find(article=>article.id===item.articleId),event=data.events.find(event=>event.id===item.eventId);
-    if(!article||!event||article.eventId!==item.eventId)throw new ActivityShareError('这一天的活动内容暂不可用，请稍后再生成海报。',409);
-    if(article.status!=='published'||event.status!=='published')continue;
-    ids.push(article.publicationId);
+  const ids:string[]=[];
+  if(visiblePublicationIds){
+    // The daily model can show independent observations from different versions of one article.
+    for(const id of new Set(visiblePublicationIds)){
+      const publication=data.publications.find(item=>item.id===id);
+      if(publication&&activityPublicationMatchesDay(data,publication,activity,day))ids.push(id);
+    }
+  }else{
+    for(const item of activity.items.filter(item=>item.day===day)){
+      const article=data.articles.find(article=>article.id===item.articleId),event=data.events.find(event=>event.id===item.eventId);
+      if(!article||!event||article.eventId!==item.eventId)throw new ActivityShareError('这一天的活动内容暂不可用，请稍后再生成海报。',409);
+      if(article.status==='published'&&event.status==='published')ids.push(article.publicationId);
+    }
   }
   if(!ids.length)throw new ActivityShareError('这一天暂无可整合的已发布内容，可在有公开记录后再试。');
   const result=resolveActivityShare(data,{activityId,day,publicationIds:ids});

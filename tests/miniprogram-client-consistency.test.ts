@@ -13,7 +13,7 @@ function page(start:number,version:string,offset=0,total=75) {
 }
 function harness(responses:unknown[]) {
   const paths:string[]=[], snapshots:any[]=[];
-  const client=createClient({wxApi:{request(o:any){paths.push(o.url);const response=responses.shift();queueMicrotask(()=>response?o.success({statusCode:200,data:response}):o.fail());return{abort(){}};}},config:{mode:'https',baseUrl:'https://fixture.example.org',pollMs:300000},now:()=>1000});
+  const client=createClient({wxApi:{request(o:any){paths.push(o.url);const response=responses.shift();queueMicrotask(()=>typeof response==='function'?response(o):response?o.success({statusCode:200,data:response}):o.fail());return{abort(){}};}},config:{mode:'https',baseUrl:'https://fixture.example.org',pollMs:300000},now:()=>1000});
   client.subscribe((s:any)=>snapshots.push(s));
   return {client,paths,snapshots};
 }
@@ -57,6 +57,80 @@ test('新增提示保持旧正文和游标同一版本，确认后应用，撤�
   await h.client.refresh(true);assert.equal(h.paths.length,4);
   h.client.applyUpdates();assert.equal(h.client.getState().contentVersion,'v2');assert.equal(h.client.getState().updateAvailable,false);
   await h.client.refresh(true);assert.equal(h.client.getState().contentVersion,'v3');assert.equal(h.client.getState().updateAvailable,false);
+});
+
+test('重置动态提示新增，记录页切换复用同一个日历快照并立即显示最新内容',async()=>{
+  const calendar={view:'calendar'};
+  const calendarPage=(version:string,offset:number,total:number)=>{
+    const {page:_,...response}=page(0,version,offset,total);
+    return response;
+  };
+  const version=(value:string)=>({data:{version:value,contentVersion:value}});
+  const initial=calendarPage('v1',2,10), added=calendarPage('v2',1,11), more=calendarPage('v3',0,12);
+  const withdrawn=calendarPage('v4',1,11);
+  const h=harness([initial,version('v2'),added,version('v3'),more,version('v4'),withdrawn]);
+
+  await h.client.setView(calendar,{deferAdditions:true});
+  await h.client.refresh(true);
+  assert.equal(h.client.getState().updateAvailable,true);
+  assert.deepEqual(h.client.getState().data.publications,initial.data.publications);
+  h.client.applyUpdates();
+  assert.equal(h.client.getState().contentVersion,'v2');
+
+  await h.client.refresh(true);
+  assert.equal(h.client.getState().contentVersion,'v2');
+  assert.equal(h.client.getState().updateAvailable,true);
+  await h.client.setView(calendar);
+  assert.equal(h.client.getState().contentVersion,'v3');
+  assert.equal(h.client.getState().updateAvailable,false);
+  assert.equal(h.paths.length,5,'记录页直接使用共享快照，无额外请求');
+
+  await h.client.setView(calendar,{deferAdditions:true});
+  await h.client.refresh(true);
+  assert.equal(h.client.getState().contentVersion,'v4');
+  assert.equal(h.client.getState().updateAvailable,false);
+  assert.deepEqual(h.client.getState().data.publications,withdrawn.data.publications);
+  assert.equal(h.paths.filter(path=>path.includes('view=calendar')).length,4);
+  assert.ok(h.paths.every(path=>!path.includes('deferAdditions')));
+});
+
+test('刷新期间切去记录应用暂存版，返回动态时撤回按实际可见版本判定',async()=>{
+  const calendar={view:'calendar'},reading={deferAdditions:true};
+  const version=(value:string)=>({data:{version:value,contentVersion:value}});
+  const v1=page(0,'v1',2,5),v2=page(0,'v2',1,6);
+  const v3={...page(0,'v3',2,6)};
+  const delivered=Promise.withResolvers<void>();let send!:()=>void;
+  const h=harness([v1,version('v2'),v2,version('v3'),(request:any)=>{
+    send=()=>request.success({statusCode:200,data:v3});delivered.resolve();
+  }]);
+  await h.client.setView(calendar,reading);await h.client.refresh(true);
+  assert.equal(h.client.getState().updateAvailable,true);
+  const withdrawn=v2.data.publications[0].id;
+  const poll=h.client.refresh(true);await delivered.promise;
+  const records=h.client.setView(calendar);
+  assert.equal(h.client.getState().data.publications[0].id,withdrawn);
+  const news=h.client.setView(calendar,reading);
+  send();await Promise.all([poll,records,news]);
+  const state=h.client.getState();
+  assert.equal(state.version,'v3');assert.equal(state.updateAvailable,false);
+  assert.equal(state.data.publications.some((p:any)=>p.id===withdrawn),false);
+});
+
+test('切去记录或手动应用暂存版不会清除较新的失败，随后可以重新校验',async()=>{
+  const calendar={view:'calendar'},reading={deferAdditions:true};
+  const version=(value:string)=>({data:{version:value,contentVersion:value}});
+  for(const manual of [false,true]){
+    const v1=page(0,'v1',2,5),v2=page(0,'v2',1,6),v3=page(0,'v3',2,6);
+    const h=harness([v1,version('v2'),v2,version('v3'),null,version('v3'),v3]);
+    await h.client.setView(calendar,reading);await h.client.refresh(true);await h.client.refresh(true);
+    const error=h.client.getState().error;assert.ok(error);
+    if(manual)h.client.applyUpdates();
+    const retry=manual?undefined:h.client.setView(calendar);
+    assert.equal(h.client.getState().version,'v2');assert.equal(h.client.getState().error,error);
+    await (retry??h.client.refresh(true));
+    assert.equal(h.client.getState().version,'v3');assert.equal(h.client.getState().error,'');
+    assert.equal(h.paths.length,7);
+  }
 });
 
 test('二十项缓存上限淘汰旧详情而保留首页',async()=>{

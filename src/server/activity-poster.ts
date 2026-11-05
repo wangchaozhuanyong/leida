@@ -1,6 +1,6 @@
 import type { PublicData } from '@/lib/types';
 import { actionLabels, fullTime, stageLabels } from '@/lib/labels';
-import { isNewsOnly } from '@/lib/public-facts';
+import { isNewsOnly, publicationActions } from '@/lib/public-facts';
 import { publicArticleTitle, publicArticleSummary } from '@/lib/public-content';
 import { isLocalShareUrl } from '@/lib/share';
 import { activityPublicationUrl, ActivityShareError, resolveActivityShare, type ActivityDayShare, type ActivityShareReady } from '@/lib/activity-share';
@@ -37,7 +37,7 @@ export function activityPosterSvg(model:ResolvedActivityPoster,name:string,share
   let canonical:string;
   try{canonical=activityPublicationUrl(new URL(shareUrl).origin,model.manifest);}catch{throw new ActivityShareError('每日整合海报的分享地址无效。');}
   if(shareUrl!==canonical)throw new ActivityShareError('分享链接与所选内容不一致，请重新生成。');
-  if(!model.publications.length||model.publications.length!==model.items.length)throw new ActivityShareError('没有可整合的指定发布内容。');
+  if(!model.items.length||model.publications.length!==model.manifest.publicationIds.length)throw new ActivityShareError('没有可整合的指定发布内容。');
   const content:string[]=[];let y=84;
   const text=(value:string,size=26,color='#c4c9c8',weight=400,maxRows=5,x=60,width=780)=>{
     const result=clipped(value,width/size,maxRows);
@@ -58,13 +58,17 @@ export function activityPosterSvg(model:ResolvedActivityPoster,name:string,share
   for(const [index,item]of model.items.entries()){
     const publication=item.publication,newsOnly=isNewsOnly(publication);
     content.push(`<path d="M60 ${y-10}H840" stroke="#3f494a"/>`);y+=26;
-    text(`第${index+1}条 · 来源发布 ${fullTime(item.sourceTime)} 北京时间`,22,'#adb4b7',500,2);
-    text(`${publication.article.historical?'历史收录 · ':''}${newsOnly?'来源消息':'公开公告'}`,22,newsOnly?'#adb4b7':'#f4c15c',500,2);
-    let truncated=text(publicArticleTitle(publication.article),31,'#eceeea',600,4);
-    truncated=text(publicArticleSummary(publication.article),25,'#c4c9c8',400,4)||truncated;
-    if(newsOnly)text('发放状态请查看对应重置消息。',22,'#adb4b7',400,2);
+    const timeLabel=item.observationReports?'最早观测':item.fact?.evidenceType==='observed'?'观测时间':item.fact?.evidenceType==='confirmed'?'声明时间':'来源发布';
+    text(`第${index+1}条 · ${timeLabel} ${fullTime(item.sourceTime)} 北京时间`,22,'#adb4b7',500,2);
+    text(`${publication.article.historical?'历史收录 · ':''}${item.fact?.evidenceType==='observed'?'来源观测':newsOnly?'来源消息':'公开公告'}`,22,newsOnly?'#adb4b7':'#f4c15c',500,2);
+    let truncated=text(item.observationReports?'当日额度重置观测':publicArticleTitle(publication.article),31,'#eceeea',600,4);
+    if(item.observationReports){
+      for(const {report} of item.observationReports)text(`${report.sourceName} · ${fullTime(report.observedAt)}`,24,'#c4c9c8',400,2);
+    }else truncated=text(publicArticleSummary(publication.article),25,'#c4c9c8',400,4)||truncated;
+    if(item.fact?.evidenceType==='observed')text('实际额度以账户显示为准。',22,'#adb4b7',400,2);
+    else if(newsOnly)text('发放状态请查看对应重置消息。',22,'#adb4b7',400,2);
     else if(publication.event.actions.length){
-      const actions=publication.event.actions.map(action=>{
+      const actions=publicationActions(publication).map(action=>{
         const stage=action.stage==='promised'&&action.expectedAt&&Date.parse(action.expectedAt)<Date.parse(publication.cutoffAt)?'已过预计时间 · 等待确认':stageLabels[action.stage];
         return `${actionLabels[action.kind]}：${stage}（${{public:'公开发放',targeted:'定向补偿',private:'个人记录'}[action.scope]}）`;
       }).join('；');

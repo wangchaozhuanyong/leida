@@ -46,7 +46,11 @@ export function parseReferenceSignals(value:unknown,collectedAt:string):Incoming
 }
 export function parseReferenceHistory(value:unknown,collectedAt:string):Incoming[] {
  const data=historySchema.parse(value);archiveSnapshot(data.generated_at,collectedAt);
- const start=new Date(collectedAt);start.setUTCMonth(start.getUTCMonth()-6);
+ const start=new Date(collectedAt),day=start.getUTCDate();
+ start.setUTCMonth(start.getUTCMonth()-6,1);
+ const endOfMonth=new Date(start);
+ endOfMonth.setUTCMonth(endOfMonth.getUTCMonth()+1,0);
+ start.setUTCDate(Math.min(day,endOfMonth.getUTCDate()));
  return data.events.filter(row=>Date.parse(row.occurred_at)>=start.getTime()&&Date.parse(row.occurred_at)<=Date.parse(data.generated_at)).map(row=>{
   const messageId=row.source.url.split('/').at(-1)!;
   // Generic recorded rows are discovery leads. No completion, audience or parent

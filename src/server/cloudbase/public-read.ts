@@ -5,9 +5,12 @@ import type { ForecastCase, ForecastOutcome, ForecastSnapshot } from '../../lib/
 import type { StoredCadenceForecast, CadenceRuntime } from '../reset-cadence-runtime';
 import { projectPublicHistory } from '../../lib/history';
 import { homeNewsGroups } from '../../lib/public-feed';
+import {customerNotice} from '../../lib/notice-display';
+import {activityPublicationIds} from '../../lib/activity-share';
+import {activityDayNumber} from '../../lib/activity-display';
 import { publicResetOutlook } from '../../lib/reset-outlook';
-import {resetObservationSources} from '../../lib/reset-observations';
-import { publicActions, recentCompletedBenefits } from '../../lib/public-facts';
+import {resetObservations,resetObservationSources} from '../../lib/reset-observations';
+import { completedPublicActions, publicActions, recentCompletedBenefits } from '../../lib/public-facts';
 import { parsePublicRead, decodeCursor, encodePublicCursor, finishPublicVersion, paginatePublicNews } from '../public-read';
 import { projectPublicForecastRecords } from '../forecast';
 import { createPublicCache } from '../public-cache';
@@ -19,6 +22,7 @@ import {RESET_CADENCE_MODEL_VERSION} from '../../lib/reset-cadence';
 
 interface VersionData {
   digests: string[]; sources: Source[]; settings: Record<string,unknown>[];
+  projectionRevision?: string;
   deadlines: {id:string;action:string;deadline:string}[];
   cases: {id:string;digest:string;w24:string;w48:string}[];
   snapshots: {id:string;until:string;generated:string}[]; outcomeDigest:string;
@@ -38,6 +42,10 @@ export function cloudbasePublicVersion(value:unknown,timestamp:string) {
   const expired=(time:string)=>Date.parse(time)<=Date.parse(timestamp);
   const settings=value.settings.map(p=>p.id==='site'?p:{id:p.id??undefined,status:p.status??undefined,cadenceSnapshotId:p.cadenceSnapshotId??undefined,cadenceSnapshotIds:p.cadenceSnapshotIds??undefined,cadenceEvaluationByKind:p.cadenceEvaluationByKind??undefined,cadenceProjectionDigest:p.cadenceProjectionDigest??undefined,...(p.referenceSignal?{referenceSignal:p.referenceSignal}:{}),...(p.referenceCadencePublic?{referenceCadencePublic:p.referenceCadencePublic,referenceExpired:expired(String((p.referenceCadencePublic as {validUntil?:unknown}).validUntil??''))}:{})});
   const parts:unknown[]=[...value.digests,settings,value.deadlines.map(row=>[row.id,row.action,expired(row.deadline)]),value.cases.map(row=>[row.id,row.digest,expired(row.w24),expired(row.w48)]),value.snapshots.map(row=>[row.id,expired(row.until),Date.parse(row.generated)>Date.parse(timestamp)]),value.outcomeDigest];
+  if (value.projectionRevision !== undefined) {
+    if (typeof value.projectionRevision !== 'string' || !/^[a-z0-9-]{1,64}$/.test(value.projectionRevision)) throw new CloudbaseRpcError('response');
+    parts.push(value.projectionRevision);
+  }
   return finishPublicVersion(parts,value.sources,timestamp);
 }
 function optionsForRpc(options:PublicReadOptions) {
@@ -58,7 +66,7 @@ function pageFrom(bundle:Bundle,options:PublicReadOptions):PublicPage|undefined 
 function response(bundle:Bundle,options:PublicReadOptions|{view:'legacy'},timestamp:string):PublicReadEnvelope {
   if(!bundle||!['events','articles','publications','evidence','activities','notices'].every(field=>Array.isArray((bundle as unknown as Record<string,unknown>)[field]))||!bundle.forecastRecords)throw new CloudbaseRpcError('response');
   const state=cloudbasePublicVersion(bundle.versionData,timestamp);
-  const facts=projectPublicHistory({events:bundle.events,articles:bundle.articles,publications:bundle.publications,evidence:bundle.evidence,activities:bundle.activities,notices:bundle.notices,site:bundle.site??{name:'模钥重置雷达',description:options.view==='legacy'?'跟踪公开重置公告与重置卡动态':'',autoPublish:options.view==='legacy',version:1},sources:state.sources,serverTime:timestamp});
+  const facts=projectPublicHistory({events:bundle.events,articles:bundle.articles,publications:bundle.publications,evidence:bundle.evidence,activities:bundle.activities,notices:bundle.notices.filter(customerNotice),site:bundle.site??{name:'模钥重置雷达',description:options.view==='legacy'?'跟踪公开重置公告与重置卡动态':'',autoPublish:options.view==='legacy',version:1},sources:state.sources,serverTime:timestamp});
   const selected=new Set<string>();
   let data:PublicData={...facts};
   const news=options.view==='news'?paginatePublicNews(facts,options):undefined;
@@ -73,13 +81,40 @@ function response(bundle:Bundle,options:PublicReadOptions|{view:'legacy'},timest
     homeNewsGroups(facts).forEach(group=>{selected.add(group.latest.id);if(group.observation)group.observation.sources.forEach(source=>selected.add(source.publicationId));});
     resetObservationSources(facts).slice(0,10).forEach(item=>selected.add(item.publicationId));
   }else if(news)news.selected.forEach(id=>selected.add(id));
-  else if(options.view==='calendar')publicActions(facts).forEach(item=>selected.add(item.publication.id));
+  else if(options.view==='calendar'){
+    publicActions(facts).forEach(item=>selected.add(item.publication.id));
+    resetObservationSources(facts).forEach(item=>selected.add(item.publicationId));
+    // Keep the published proof of a completion's direct citation even when the
+    // ordinary observation projection selected a different source record.
+    const cited = new Set(completedPublicActions(facts).flatMap(item=>item.action.evidenceIds));
+    for(const evidence of facts.evidence.filter(item=>cited.has(item.id))){
+      resetObservations({...facts,evidence:[evidence]}).forEach(item=>selected.add(item.publicationId));
+    }
+  }
+  else if(options.view==='activity'){
+    const activity=facts.activities.find(item=>item.id===options.id);
+    if(activity){
+      const day=options.day||Math.max(1,Math.min(activity.days,activityDayNumber(activity,timestamp)||1));
+      activityPublicationIds(facts,activity,day,options.publications).forEach(id=>selected.add(id));
+    }
+    const base=facts.publications.filter(publication=>selected.has(publication.id));
+    const events=new Set(base.map(publication=>publication.eventId));
+    const articles=new Set(base.map(publication=>publication.articleId));
+    for(const item of publicActions(facts))if(events.has(item.event.id))selected.add(item.publication.id);
+    for(const event of facts.events.filter(item=>events.has(item.id))){
+      selected.add(event.publicationId);
+      const merged=event.mergedInto&&facts.events.find(item=>item.id===event.mergedInto);
+      if(merged)selected.add(merged.publicationId);
+    }
+    for(const article of facts.articles)if(articles.has(article.id))selected.add(article.publicationId);
+  }
   else facts.publications.forEach(p=>selected.add(p.id));
-  if(options.view==='home'||options.view==='methodology'||options.view==='calendar'||options.view==='news'){
+  if(options.view==='home'||options.view==='methodology'||options.view==='calendar'||options.view==='news'||options.view==='activity'){
     const publications=facts.publications.filter(p=>selected.has(p.id));
     const eventIds=new Set(publications.map(p=>p.eventId)),articleIds=new Set(publications.map(p=>p.articleId));
     const evidenceIds=new Set(publications.flatMap(p=>[...p.article.evidenceIds,...p.event.evidenceIds,...p.event.actions.flatMap(a=>a.evidenceIds),...(p.article.contextEvidenceIds??[])]));
-    data={...facts,publications,events:facts.events.filter(e=>eventIds.has(e.id)),articles:facts.articles.filter(a=>articleIds.has(a.id)),evidence:facts.evidence.filter(e=>evidenceIds.has(e.id))};
+    const parents=options.view==='activity'?new Set(facts.evidence.filter(e=>evidenceIds.has(e.id)).flatMap(e=>e.parentId?[e.parentId]:[])):new Set<string>();
+    data={...facts,publications,events:facts.events.filter(e=>eventIds.has(e.id)),articles:facts.articles.filter(a=>articleIds.has(a.id)),evidence:facts.evidence.filter(e=>evidenceIds.has(e.id)||parents.has(e.id)||parents.has(e.messageId))};
   }
   if(options.view==='state')data={...data,events:[],articles:[],publications:[],evidence:[],activities:[],notices:[]};
   if(page){const positions=new Map(page.ids.map((id,index)=>[id,index]));data.publications.sort((a,b)=>(positions.get(a.id)??0)-(positions.get(b.id)??0));data.articles.sort((a,b)=>(positions.get(a.publicationId)??0)-(positions.get(b.publicationId)??0));}

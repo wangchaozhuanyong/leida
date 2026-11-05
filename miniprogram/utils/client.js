@@ -12,6 +12,8 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
   const empty = () => ({ data: null, version: '', contentVersion:'', page:null, pagesLoaded:0, loading: false, loadingMore:false, moreError:'', updateAvailable:false, candidate:null, snapshotPending:false, error: configurationError(config), unconfigured: !!configurationError(config), receivedAt: 0, validatedAt: -Infinity });
   let state = empty();
   let active = false, suspended=false, timer, pending, epoch = 0, task, failures = 0, view = {view:'home'};
+  // News and Records share calendar data but have different refresh behavior.
+  let deferAdditions = false;
   const pollMs = Math.max(5000, Number(config.pollMs)||300000);
   let latestVersion = '', latestContentVersion = '', lastCheckAt = -Infinity;
   const pinnedKeys = new Set();
@@ -95,7 +97,6 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
   }
   async function run(checkOnly, cursor) {
     const generation = epoch;
-    const previous = state;
     let invalidated = false;
     const pathFor = next => `/api/v1/bootstrap?${query({...view,...(next?{cursor:next}:{})})}`;
     const read = async (path, version) => {
@@ -139,6 +140,7 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
         }
         if (stateOnly) result=await read(path);
       }
+      const previous = state;
       let pagesLoaded=1;
       if(cursor && previous.data && sameContent(previous,result)) {
         result=append(previous,result);pagesLoaded=(previous.pagesLoaded||1)+1;
@@ -149,7 +151,7 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
       }
       failures=0; networkRevision++; latestVersion=result.version;latestContentVersion=result.contentVersion||latestContentVersion;
       const next={ data:result.data, page:result.page||null, pagesLoaded, version:result.version, contentVersion:result.contentVersion||'', receivedAt:now(), validatedAt:now(), snapshotPending:false, error:'', moreError:'' };
-      if(checkOnly && previous.data && ['news','history'].includes(view.view) && isAddition(previous.data,result.data))emit({candidate:next,updateAvailable:true,validatedAt:now(),error:''});
+      if(checkOnly && state.data && !state.snapshotPending && deferAdditions && isAddition(state.data,result.data))emit({candidate:next,updateAvailable:true,validatedAt:now(),error:''});
       else emit({...next,candidate:null,updateAvailable:false});
       snapshotFor(view)?.save(next);
     } catch (error) { if (generation === epoch) { failures=Math.min(4,failures+1); emit({ [cursor?'moreError':'error']: error.message || '资料暂时无法加载',...(invalidated?{page:state.page?{...state.page,nextCursor:null}:null,validatedAt:-Infinity}:{}) }); } }
@@ -167,6 +169,13 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
   }
   function cancel() { epoch++; if(task)task.abort(); task=undefined;pending=undefined; }
   const current = () => state.data && !state.snapshotPending && !state.error && (state.candidate?.version||state.version)===latestVersion && now()-state.validatedAt>=0 && now()-state.validatedAt<pollMs;
+  function promoteCandidate(value) {
+    if (!value.candidate) return value;
+    const {data, page, pagesLoaded, version, contentVersion, receivedAt, snapshotPending}=value.candidate;
+    // Promoting the staged data must retain the latest request outcome.
+    return {...value,data,page,pagesLoaded,version,contentVersion,receivedAt,snapshotPending,candidate:null,updateAvailable:false};
+  }
+  const presentationState = value => deferAdditions ? value : promoteCandidate(value);
   return {
     subscribe(fn) { listeners.add(fn); fn(state); return () => listeners.delete(fn); },
     getState() { return state; }, refresh,
@@ -181,14 +190,26 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
       const queued=newsViews.filter(next=>query(next)!==query(view)&&!warmQueue.some(item=>query(item)===query(next))&&prefetchTask?.key!==query(next));
       warmQueue.unshift(...queued);pumpPrefetch();
     },
-    setView(next) {
-      if (query(next)===query(view)) {restoreSnapshot();return current() ? pending||Promise.resolve() : refresh(true);}
+    setView(next, options = {}) {
+      deferAdditions = options.deferAdditions ?? ['news','history'].includes(next.view);
+      if (query(next)===query(view)) {
+        const presentation = presentationState(state);
+        if (presentation !== state) emit(presentation);
+        restoreSnapshot();
+        return current() ? pending||Promise.resolve() : refresh(true);
+      }
       cancel(); view={...next};
       // Each page/filter restores only its own validated snapshot. Known version
       // changes and expiry revalidate it; a cold page never shows another view.
-      const restore=()=>{const cached=views.get(query(view));state={...empty(),...cached};emit({});restoreSnapshot();return current()?Promise.resolve():refresh(!!cached?.data);};
+      const restore=()=>{
+        const cached=views.get(query(view));
+        state=presentationState({...empty(),...cached});
+        emit({});restoreSnapshot();
+        return current()?Promise.resolve():refresh(!!cached?.data);
+      };
       if(prefetchTask?.key===query(next)){
-        const generation=epoch,flight=prefetchTask;state={...empty(),...views.get(query(next))};emit({loading:true});restoreSnapshot();
+        const generation=epoch,flight=prefetchTask;
+        state=presentationState({...empty(),...views.get(query(next))});emit({loading:true});restoreSnapshot();
         const work=flight.promise.then(result=>{
           if(generation!==epoch)return;
           if(result?.error){emit({loading:false,error:result.error});return;}
@@ -201,8 +222,8 @@ function createClient({ wxApi, config, timers = { setTimeout, clearTimeout }, no
       }
       return restore();
     },
-    applyUpdates() { if(state.candidate)emit({...state.candidate,candidate:null,updateAvailable:false}); },
-    more() { if(state.snapshotPending||state.moreError&&!state.page?.nextCursor)return refresh(false);if(state.candidate)emit({...state.candidate,candidate:null,updateAvailable:false}); return state.page?.nextCursor ? refresh(false,state.page.nextCursor) : Promise.resolve(); },
+    applyUpdates() { if(state.candidate)emit(promoteCandidate(state)); },
+    more() { if(state.snapshotPending||state.moreError&&!state.page?.nextCursor)return refresh(false);if(state.candidate)emit(promoteCandidate(state)); return state.page?.nextCursor ? refresh(false,state.page.nextCursor) : Promise.resolve(); },
     start() { if(active)return pending||Promise.resolve(); active=true;suspended=false;restoreSnapshot();const first=state.data&&!state.snapshotPending&&now()-lastCheckAt>=0&&now()-lastCheckAt<60000?Promise.resolve():refresh(!!state.data);primePublicSnapshots();first.finally(schedule);return first; },
     stop() { active=false;suspended=true;prefetchEpoch++;warmQueue.length=0;if(prefetchTask)prefetchTask.task.abort();prefetchTask=undefined;cancel();if(timer!==undefined)timers.clearTimeout(timer);timer=undefined;emit({loading:false,loadingMore:false}); }
   };

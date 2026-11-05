@@ -28,7 +28,7 @@ function wrap(value: string, width: number): string[] {
 /** Backgrounds contain no text or codes. Every factual field is drawn from the selected record. */
 export function designedStatusPoster(input: DesignedPoster): string {
   const dark = input.style === 'precision';
-  const asset = dark ? 'precision-background.png' : 'editorial-background.png';
+  const asset = dark ? 'precision-background.jpg' : 'editorial-background.jpg';
   if (!backgrounds.has(input.style)) backgrounds.set(input.style, readFileSync(join(process.cwd(), 'public/posters', asset)).toString('base64'));
   const ink = dark ? '#f3e5c8' : '#101719', muted = dark ? '#c4b79d' : '#435056';
   const text = (value: string, x: number, y: number, size: number, color = ink, weight = 400, anchor = 'start', extra = '') => `<text x="${x}" y="${y}" font-size="${size}" fill="${color}" font-weight="${weight}" text-anchor="${anchor}" ${extra}>${escape(value)}</text>`;
@@ -82,5 +82,5 @@ export function designedStatusPoster(input: DesignedPoster): string {
     ${text(qualifier, 64, 1516, 29, muted)}
 
   `;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920" role="img" aria-label="${escape(`${input.name}：${input.title}，距该公告 ${input.interval}`)}" data-poster-style="${input.style}"><defs><linearGradient id="elapsed-gold" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#fff1cc"/><stop offset=".45" stop-color="#e3bb71"/><stop offset=".74" stop-color="#f5d99b"/><stop offset="1" stop-color="#ad7835"/></linearGradient></defs><image width="1080" height="1920" preserveAspectRatio="none" href="data:image/png;base64,${backgrounds.get(input.style)}"/><g font-family="Songti SC,STSong,SimSun,serif">${content}${footer}</g></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920" role="img" aria-label="${escape(`${input.name}：${input.title}，距该公告 ${input.interval}`)}" data-poster-style="${input.style}"><defs><linearGradient id="elapsed-gold" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#fff1cc"/><stop offset=".45" stop-color="#e3bb71"/><stop offset=".74" stop-color="#f5d99b"/><stop offset="1" stop-color="#ad7835"/></linearGradient></defs><image width="1080" height="1920" preserveAspectRatio="none" href="data:image/jpeg;base64,${backgrounds.get(input.style)}"/><g font-family="Songti SC,STSong,SimSun,serif">${content}${footer}</g></svg>`;
 }

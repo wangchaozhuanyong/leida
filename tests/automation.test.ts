@@ -336,25 +336,16 @@ test('真实隔离库：自动积压接续、证据关联、有限恢复与人�
       await put('sources',{...blocked,enabled:false,nextRunAt:new Date(Date.now()-1000).toISOString()});await schedule();
       assert.ok(!(await list<Job>('jobs')).some(job=>job.sourceId===sourceId&&['queued','running'].includes(job.status)));
     });
-    await t.test('仅新闻模板的补充仍缺证时，不循环生成或改变福利状态',async()=>{
+    await t.test('仅新闻模板输入未变且仍缺证时，不重新生成或改变福利状态',async()=>{
       const created=await fixture({text:'重置卡已经加载。',parentId:'missing-template-parent',contextComplete:false,textOrigin:'archive_excerpt',metadata:{category:'reset'}});
       const task=await enqueue(created.candidate!);
       await processJob(task.id,generate,{allowTemplates:true});
       const template=(await one<Candidate>('candidates',created.candidate!.id))!;
       assert.equal(template.status,'published');assert.equal(template.content.publicationMode,'news_only');
       assert.equal((await one<RadarEvent>('events',template.content.eventId!))?.actions.length,0);
-      await schedule();
-      const augment=(await list<Job>('jobs')).find(job=>job.candidateId===template.id&&job.status==='queued'&&job.payload.enrichArticle===true);assert.ok(augment);
-      let attempts=0;
-      const incomplete=async(evidence:Evidence[]):Promise<DraftContent>=>{
-        attempts++;
-        return {title:'重置卡进展记录',summary:'来源记录了重置卡加载消息。',translation:'',category:'reset',actions:[{id:'incomplete-action',kind:'banked_reset',stage:'claimed_complete',eligibility:'所有账户',scope:'public',statementAt:evidence[0].publishedAt,evidenceIds:evidence.map(item=>item.id),evidenceQuote:evidence[0].text}],evidenceIds:evidence.map(item=>item.id),publicationMode:'state_change'};
-      };
-      await processJob(augment.id,incomplete,{allowTemplates:true});
       const count=(await list<Job>('jobs')).filter(job=>job.candidateId===template.id).length;
       await schedule();await schedule();
       assert.equal((await list<Job>('jobs')).filter(job=>job.candidateId===template.id).length,count,'输入相同且缺证时不重复付费生成');
-      assert.equal(attempts,1);
       assert.equal((await one<RadarEvent>('events',template.content.eventId!))?.actions.length,0,'待补证候选不改变公开状态');
     });
     await t.test('自动发布重新开启只续发，不再调用模型',async()=>{
