@@ -269,6 +269,31 @@ test('原生首页无预测数据也能前台到点和24小时退出，每个边
  } finally {h.page.onUnload();}
  assert.equal(h.timeouts.size,0);assert.equal(h.intervals.size,0);
 });
+test('仅有推测信号时也开启原生倒计时，新发卡完成消息接替海报和首页',()=>{
+ const start=Date.parse(NOW),d=fixture();
+ d.forecasts={status:'ready',ruleVersion:'test',modelVersion:'test',generatedAt:NOW,cases:[],reference:{} as any,
+  referenceSignal:{id:'fixture',sourceUrl:'https://x.com/thsottiaux/status/2120410480204525936',text:'Maybe a banked reset Saturday.',sourceName:'AIPlanWatch',publishedAt:START,recordedAt:START,
+   hint:{kind:'banked_reset',dayLabel:'周六',expiresAt:'2026-10-25T07:00:00Z'}}};
+ const h=nativeHome(d,start,'');
+ try {
+  assert.equal(h.page.data.lastReset,null);
+  assert.equal(h.page.data.primaryCard.state,'estimated');
+  assert.equal(h.page.data.primaryCard.hero.metric,'1天4小时0分钟');
+  const poster=statusPosterInput(d);
+  assert.equal(poster.value,h.page.data.primaryCard.hero.metric);
+  assert.equal(poster.statementLabel,'推测窗口结束');
+  assert.equal(h.intervals.size,1);
+  h.advanceTo(start+60_000);
+  for(const tick of h.intervals.values())tick();
+  assert.equal(h.page.data.primaryCard.hero.metric,'1天3小时59分钟');
+  action(d,'actual-banked','claimed_complete',new Date(start+30_000).toISOString(),undefined,'banked_reset');
+  h.page.redraw();
+  assert.equal(h.page.data.primaryCard.state,'completed');
+  assert.match(h.page.data.primaryCard.hero.badge,/已发放/);
+  assert.equal(statusPosterAvailable(poster,{...d,serverTime:new Date(start+60_000).toISOString()}),false);
+ }finally{h.page.onUnload();}
+ assert.equal(h.intervals.size,0);
+});
 test('后台跨越24小时、重新进入和无数据首次加载不会恢复旧预告或泄漏计时器',()=>{
  const start=Date.parse(T)+100,d=fixture();d.serverTime=new Date(start).toISOString();action(d,'promise');
  const h=nativeHome(d,start);

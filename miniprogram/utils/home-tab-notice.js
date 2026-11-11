@@ -12,7 +12,7 @@ function bankedMessage(cards, data) {
   const action=publication?.event.actions.find(item=>item.kind==='banked_reset'&&item.scope==='public'&&publication.eventId+':'+item.id===card.roundKey)
     ||publication?.event.actions.find(item=>item.kind==='banked_reset'&&item.scope==='public');
   const stage=action?.stage||(card.state==='completed'?'claimed_complete':card.state==='observed'?'observed':card.state==='cancelled'?'cancelled':'promised');
-  const at=action?.statementAt||publication?.article.sourcePublishedAt||publication?.publishedAt||card.timeAt;
+  const at=action?.statementAt||publication?.article.sourcePublishedAt||publication?.publishedAt||card.signalAt||card.timeAt;
   if(!card.roundKey||!Number.isFinite(now)||!Number.isFinite(Date.parse(at))||Date.parse(at)>now||!publication&&!card.sourceUrl)return null;
   const key=JSON.stringify([card.roundKey,stage,at,action?.expectedAt||card.expectedAt||'',action?.eligibility||'',card.declarationAt||'']);
   return {key,round:card.roundKey,at,rank:stages[stage],active:['signal','estimated','announced','scheduled','revised','progress'].includes(card.state)};

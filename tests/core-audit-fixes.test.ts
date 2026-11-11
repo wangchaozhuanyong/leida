@@ -1,14 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
-import type {Publication,PublicData,Notice} from '../src/lib/types';
+import type {Publication,PublicData,Notice,Evidence,DraftContent} from '../src/lib/types';
 import {publicResetOutlook} from '../src/lib/reset-outlook';
 import {reminderContentCurrent} from '../src/lib/reminder-lifecycle';
 import {statusTimelineModel,statusPosterSnapshot} from '../src/lib/status-timeline';
 import {projectPublicForecastRecords} from '../src/server/forecast';
 import {REFERENCE_CADENCE_VERSION,referencePointsAt,buildReferenceCadence} from '../src/lib/reference-cadence';
-import {parseReferenceSignals,parseReferenceHistory,referencePublicSignal,REFERENCE_SIGNAL_SOURCE} from '../src/server/reference-reset-source';
+import {parseReferenceSignals,parseReferenceHistory,referencePublicSignal,projectReferenceSignal,REFERENCE_SIGNAL_SOURCE} from '../src/server/reference-reset-source';
 import {extractBenefitClaims} from '../src/server/benefit-rules';
+import {interpretResetHint} from '../src/server/reset-hint';
+import {needsSemanticReview} from '../src/server/automatic-content';
+import {semanticReviewClaims} from '../src/server/semantic-benefit-review';
+import {UNKNOWN_BENEFIT_AUDIENCE} from '../src/server/benefit-signal';
+import {TIBO_PUBLIC_SOURCE} from '../src/server/tibo-public';
+import {evidenceBenefitClaims} from '../src/server/source-context';
+import {homeResetStatus} from '../miniprogram/utils/home-reset-status';
 const require=createRequire(import.meta.url),native=require('../miniprogram/utils/model.js'),timeline=require('../miniprogram/utils/status-timeline.js');
 const now='2026-10-18T03:00:00.000Z',doneAt='2026-10-17T21:12:21.000Z';
 function published(stage:'promised'|'claimed_complete',id:string):Publication {
@@ -101,4 +108,168 @@ test('历史回放使用当时版本，撤回与未来补录不改写先前训�
  const points=Array.from({length:120},(_,i)=>({id:String(i),at:new Date(Date.UTC(2025,0,1)+i*96*3600000).toISOString(),knownAt:new Date(Date.UTC(2025,0,1)+i*96*3600000).toISOString()}));
  const cutoff=new Date(Date.parse(points.at(-1)!.at)+72*3600000).toISOString(),candidate=buildReferenceCadence(points,cutoff);
  assert.notEqual(buildReferenceCadence(points,cutoff,{modelVersion:REFERENCE_CADENCE_VERSION,inputFingerprint:candidate.inputFingerprint,reviewedAt:cutoff,reviewedBy:'fixture',asOfRevisionsAudited:true,continuousCoverageVerified:true}).status,'ready','勾选审核不能替代修订回放');
+});
+
+
+test('核验原文中的发卡暗示进入首页主卡并保留周四和来源，到期不再显示',()=>{
+ const publishedAt='2026-11-11T06:57:08.459Z';
+ const checkedAt='2026-11-11T12:00:00.000Z';
+ const id='2120410480204525936';
+ const url='https://x.com/thsottiaux/status/'+id;
+ const text='Thursday is feeling codexy to me. Perhaps also a good time for a banked reset.';
+ const source={...REFERENCE_SIGNAL_SOURCE,enabled:true,validated:true,status:'healthy' as const,lastSuccessAt:checkedAt,referenceSnapshotAt:checkedAt};
+ const [archive]=parseReferenceSignals({schema_version:1,generated_at:checkedAt,signals:[{signal_id:id,signal_type:'forecast_source',recorded_at:publishedAt,summary:text,source:{url}}]},checkedAt);
+ const evidence={...archive,id:'hint-proof',hash:'fixture',historical:false,textOrigin:'original' as const};
+ assert.equal(referencePublicSignal([{...evidence,textOrigin:'archive_excerpt'}],[source],checkedAt),undefined);
+ assert.equal(referencePublicSignal([{...evidence,text:'We went for a walk.'}],[source],checkedAt)?.hint,undefined);
+ const older=previousCardCompletion();
+ const quota=published('claimed_complete','quota');
+ const quotaAt='2026-11-11T10:47:00.000Z';
+ quota.event.actions[0].statementAt=quotaAt;
+ quota.cutoffAt=quota.publishedAt=quota.article.publishedAt=quota.event.updatedAt=quotaAt;
+ const d=facts(older,quota);
+ d.serverTime=checkedAt;d.sources=[source];
+ const signal=referencePublicSignal([evidence],[source],checkedAt,quotaAt);
+ assert.deepEqual(signal?.hint,{kind:'banked_reset',dayLabel:'周四',expiresAt:'2026-11-13T08:00:00.000Z'});
+ d.forecasts=projectPublicForecastRecords({cases:[],outcomes:[],sources:[source],snapshots:[],runtime:{referenceSignal:signal}},checkedAt,d,'home');
+ const home=homeResetStatus(d);
+ assert.equal(home.primary.kind,'banked_reset');
+ assert.equal(home.primary.state,'estimated');
+ assert.equal(home.primary.hero.title,'周四可能发放');
+ assert.equal(home.primary.hero.metric,'1天20小时0分钟');
+ assert.equal(home.primary.hero.label,'距推测窗口结束');
+ assert.equal(home.primary.timeLabel,'推测窗口结束');
+ assert.equal(home.primary.time,'2026-11-13 16:00');
+ assert.equal(home.primary.validUntil,'2026-11-13T08:00:00.000Z');
+ const oneMinuteLater=homeResetStatus(d,'2026-11-11T12:01:00.000Z').primary;
+ assert.equal(oneMinuteLater.hero.metric,'1天19小时59分钟');
+ assert.equal(oneMinuteLater.revision,home.primary.revision);
+ assert.equal(home.primary.sourceUrl,url);
+ assert.equal(home.untyped,null);
+ assert.equal(home.lastCard?.publicationId,older.id);
+ assert.equal(home.cards.find(card=>card.kind==='automatic_reset')?.state,'completed');
+ const end='2026-11-13T08:00:00.000Z';
+ const lastMoment=homeResetStatus(d,'2026-11-13T07:59:59.999Z').primary;
+ assert.equal(lastMoment.state,'estimated');
+ assert.equal(lastMoment.hero.metric,'不足1分钟');
+
+ const delivered=previousCardCompletion('2026-11-12T17:00:00.000Z','new-banked');
+ const afterDelivery=facts(older,quota,delivered);
+ afterDelivery.forecasts=d.forecasts;
+ afterDelivery.serverTime='2026-11-12T17:20:00.000Z';
+ const switched=homeResetStatus(afterDelivery).primary;
+ assert.equal(switched.state,'completed');
+ assert.equal(switched.kind,'banked_reset');
+ assert.match(switched.hero.badge,/已发放/);
+ assert.equal(switched.hero.title,'距离上次发卡');
+ assert.equal(switched.hero.metric,'20分钟');
+ assert.equal(switched.publicationId,delivered.id);
+ assert.notEqual(switched.revision,home.primary.revision);
+ assert.equal(homeResetStatus(d,end).cards.find(card=>card.kind==='banked_reset')?.state,'completed');
+ assert.equal(projectReferenceSignal(signal,[{...source,lastSuccessAt:end,referenceSnapshotAt:end}],end),undefined);
+});
+
+function previousCardCompletion(at=doneAt,id='banked') {
+ const record=published('claimed_complete',id);
+ Object.assign(record.event.actions[0],{kind:'banked_reset',statementAt:at});
+ record.publishedAt=record.cutoffAt=record.article.publishedAt=record.event.updatedAt=at;
+ return record;
+}
+
+test('换说法保留类别，否定、转述、玩笑、混合类别和无关日期不会造出预告',()=>{
+ const at='2026-11-11T06:57:08.459Z';
+ for(const text of ['We are considering issuing a reset card on Thursday.','We might grant a reserve reset Thursday.','周四可能发放备用重置。']){
+  assert.equal(interpretResetHint(text,at)?.kind,'banked_reset',text);
+  assert.equal(interpretResetHint(text,at)?.dayLabel,'周四',text);
+  assert.deepEqual(extractBenefitClaims(text,at),[],text);
+ }
+ assert.equal(interpretResetHint('We might restore full Codex quota tomorrow.',at)?.kind,'automatic_reset');
+ assert.equal(interpretResetHint('Thursday is the product demo. We might grant a banked reset.',at)?.dayLabel,undefined);
+ assert.equal(interpretResetHint('We may issue a banked reset Thursday or Friday.',at)?.dayLabel,undefined);
+ assert.equal(interpretResetHint('Tomorrow we might grant a banked reset.',at)?.dayLabel,'周三');
+ assert.equal(interpretResetHint('Maybe a banked reset Saturday.','2026-03-07T20:00:00.000Z')?.expiresAt,'2026-03-08T08:00:00.000Z');
+ for(const text of ['We may not issue a banked reset Thursday.','We might have granted a banked reset yesterday.','Someone said we might grant a banked reset Thursday.','“Maybe a banked reset on Thursday.”','Maybe a banked reset Thursday. Just kidding.','Could we get a banked reset Thursday?','You might use a banked reset Thursday.','We might issue a banked reset and reset Codex usage limits.','We will grant a banked reset Thursday.','We have already granted a banked reset to all paid Codex users.']){
+  assert.equal(interpretResetHint(text,at),undefined,text);
+ }
+});
+
+
+function contextualFixture(){
+ const checkedAt='2026-11-11T20:00:00.000Z';
+ const source={...TIBO_PUBLIC_SOURCE,enabled:true,validated:true,status:'healthy' as const,lastSuccessAt:checkedAt};
+ const post=(id:string,text:string,publishedAt:string):Evidence=>({
+   id,sourceId:source.id,messageId:id,url:'https://x.com/thsottiaux/status/'+id,text,
+   publishedAt,collectedAt:checkedAt,hash:id,textOrigin:'original',contextComplete:true,
+   provenance:'archive',historical:false,metadata:{sourceGroup:'fxembed:thsottiaux',category:'reset'},
+ });
+ const parent=post('2120400000000000000','We will grant a banked reset to all paid Codex users.','2026-11-11T17:00:00.000Z');
+ const child={...post('2120410000000000000','We should be able to get it done tomorrow.','2026-11-11T18:00:00.000Z'),parentId:parent.messageId,contextComplete:false};
+ return {checkedAt,source,parent,child};
+}
+
+test('不等第三方标注：已核验的父帖给短回复提供类别，回复给推测倒计时提供日期',()=>{
+ const {checkedAt,source,parent,child}=contextualFixture();
+ const ref=referencePublicSignal([child,parent],[source],checkedAt);
+ assert.equal(ref?.sourceName,'Tibo 公开动态');
+ assert.equal(ref?.sourceUrl,child.url);
+ assert.deepEqual(ref?.hint,{kind:'banked_reset',dayLabel:'周四',expiresAt:'2026-11-13T08:00:00.000Z',parentSourceUrl:parent.url});
+ assert.deepEqual(evidenceBenefitClaims(child,[child,parent]),[]);
+ assert.equal(needsSemanticReview(undefined,[child,parent]),false);
+ const guessedAction={...published('promised','guess').event.actions[0],kind:'banked_reset' as const,
+   statementAt:child.publishedAt,evidenceIds:[child.id],evidenceQuote:child.text,expectedAt:undefined,
+   timeNote:undefined,eligibility:UNKNOWN_BENEFIT_AUDIENCE};
+ assert.equal(semanticReviewClaims([child,parent],{actions:[guessedAction]} as DraftContent),undefined);
+ const announced=published('promised','parent');
+ announced.event.actions[0].kind='banked_reset';
+ announced.event.actions[0].statementAt=parent.publishedAt;
+ announced.event.actions[0].expectedAt=undefined;
+ announced.event.actions[0].evidenceIds=announced.event.evidenceIds=announced.article.evidenceIds=[parent.id];
+ announced.publishedAt=announced.cutoffAt=announced.article.publishedAt=announced.event.updatedAt=parent.publishedAt;
+ const d=facts(announced);
+ d.serverTime=checkedAt;d.evidence=[parent,child];
+ d.forecasts=projectPublicForecastRecords({cases:[],outcomes:[],sources:[source],snapshots:[],runtime:{referenceSignal:ref}},checkedAt,d,'home');
+ const main=homeResetStatus(d).primary;
+ assert.equal(main.state,'estimated');
+ assert.equal(main.parentSourceUrl,parent.url);
+ assert.equal(main.hero.title,'周四可能发放');
+ assert.equal(main.hero.metric,'1天12小时0分钟');
+ assert.equal(announced.event.actions[0].stage,'promised');
+ announced.event.actions[0].expectedAt='2026-11-12T23:00:00.000Z';
+ d.forecasts.outlook=publicResetOutlook(d);
+ assert.equal(homeResetStatus(d).primary.state,'scheduled');
+ const delivered=previousCardCompletion('2026-11-11T17:45:00.000Z','resolved-parent');
+ delivered.eventId=delivered.event.id=delivered.article.eventId=announced.eventId;
+ delivered.event.version=2;
+ delivered.event.actions[0].id=announced.event.actions[0].id;
+ const resolved=facts(announced,delivered);
+ resolved.events=[delivered.event];
+ resolved.serverTime=checkedAt;resolved.evidence=[parent,child];
+ resolved.forecasts={...d.forecasts,outlook:publicResetOutlook(resolved)};
+ assert.equal(homeResetStatus(resolved).primary.state,'completed');
+});
+
+test('缺父帖、迟到补证、冲突和无关回复保留证据边界，陌生说法进入现有复核',()=>{
+ const {checkedAt,source,parent,child}=contextualFixture();
+ assert.equal(referencePublicSignal([child],[source],checkedAt),undefined);
+ const later='2026-11-11T20:05:00.000Z',lateParent={...parent,collectedAt:later};
+ assert.equal(referencePublicSignal([child,lateParent],[source],checkedAt),undefined);
+ const late=referencePublicSignal([child,lateParent],[source],later);
+ assert.equal(late?.hint?.kind,'banked_reset');
+ assert.equal(late?.recordedAt,later);
+ assert.equal(projectReferenceSignal(late,[source],checkedAt),undefined);
+ const conflicting={...parent,id:'conflicting',text:'We will reset usage limits for all paid Codex users.'};
+ assert.equal(referencePublicSignal([child,parent,conflicting],[source],checkedAt),undefined);
+ const unknown={...child,text:'Pencils down once the lights come up.'};
+ const pending=referencePublicSignal([unknown,parent],[source],checkedAt);
+ assert.equal(pending?.reviewPending,true);
+ assert.equal(pending?.hint,undefined);
+ const newsDraft={actions:[],publicationMode:'news_only'} as unknown as DraftContent;
+ assert.equal(needsSemanticReview(newsDraft,[unknown,parent]),true);
+ assert.equal(needsSemanticReview(newsDraft,[unknown]),false);
+ assert.equal(referencePublicSignal([{...child,text:'👀'}],[source],checkedAt),undefined);
+ assert.equal(referencePublicSignal([{...child,text:'We should get it done tomorrow.'},{...parent,text:'Our new editor ships today.'}],[source],checkedAt),undefined);
+ const ambiguous={...child,text:'We should ship the new editor tomorrow.'};
+ assert.equal(referencePublicSignal([ambiguous,parent],[source],checkedAt)?.hint,undefined);
+ const cancelled={...child,text:'We will not get it done tomorrow.'};
+ assert.equal(referencePublicSignal([cancelled,parent],[source],checkedAt)?.hint,undefined);
 });

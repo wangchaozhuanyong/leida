@@ -25,7 +25,8 @@ function homeOrbitPresentation(card, now) {
         description: card.description, footnote: '具体安排待公布。' });
       break;
     case 'estimated':
-      Object.assign(view, { title: card.window || '近期可能更新', label: '信号发布时推测', badge: '推测 · 非明确预告', tone: 'violet',
+      Object.assign(view, { title: card.window || '近期可能更新', label: card.metricLabel || '信号发布时推测', badge: card.metric?'推测 · 待确认':'推测 · 非明确预告', tone: 'violet',
+        parts:card.clockParts||[],metric:card.metric||'',
         description: card.description, footnote: '推测时间仅供参考，具体安排待公布。' });
       break;
     case 'announced':

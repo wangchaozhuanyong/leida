@@ -4,6 +4,9 @@ import type {Evidence,Source} from '../lib/types';
 import type {Incoming} from './ingestion';
 import type {BenefitClaim} from './benefit-rules';
 import {isTruncatedBenefitText} from './benefit-rules';
+import {interpretResetHint,interpretResetReplyHint} from './reset-hint';
+import {evidenceBenefitClaims,originalConflict,resetReplyParent} from './source-context';
+import {speechDisposition} from './benefit-language';
 import {forecastSourceAvailable,referenceSnapshotFresh,type ReferencePublicSignal} from '../lib/forecast';
 import {CODEX_LIMITS_OBSERVATION_SOURCE} from './codexlimits-observation-source';
 
@@ -102,16 +105,57 @@ export function referenceCompletionClaim(evidence:Evidence):BenefitClaim|undefin
   return {kind:'automatic_reset',stage:'claimed_complete',scope:'public',eligibility:'公开额度重置（依据 AIPlanWatch 分类，适用套餐以原公告为准）',quote:evidence.text};
 }
 
-/** A public hint is an attributed observation, without an invented forecast
- * window, expiration time, probability or completion classification. */
+const tiboSourceId='tibo-public';
+const recentHintMs=2*86400000;
+const originalPost=/^https:\/\/x\.com\/thsottiaux\/status\/\d{15,20}$/;
+
+/** Keep one current actionable hint. Ambiguous replies may be retained for
+ * review, while fresh, usable clues take precedence on the homepage. */
 export function referencePublicSignal(evidence:Evidence[],sources:Source[],now:string,completedAt?:string):ReferencePublicSignal|undefined {
- if(!forecastSourceAvailable(sources.find(s=>s.id===REFERENCE_SIGNAL_SOURCE.id),now))return;
- const items=evidence.filter(e=>e.sourceId===REFERENCE_SIGNAL_SOURCE.id&&e.provenance==='archive'&&e.textOrigin==='original'&&e.metadata?.sourceGroup==='aiplanwatch'&&e.metadata.referenceSignal?.referenceUrl===REFERENCE_SIGNAL_SOURCE.url&&/^https:\/\/x\.com\/thsottiaux\/status\/\d{15,20}$/.test(e.url)&&e.url.endsWith('/'+e.messageId)&&!isTruncatedBenefitText(e.text)&&Date.parse(e.publishedAt)<=Date.parse(now)&&Date.parse(e.collectedAt)<=Date.parse(now)&&(!completedAt||Date.parse(e.publishedAt)>Date.parse(completedAt)))
-  .sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt));
- const first=items[0];if(!first)return;
- return {id:first.messageId,text:first.metadata!.referenceSignal!.summary,publishedAt:first.publishedAt,recordedAt:first.metadata!.referenceSignal!.recordedAt,sourceUrl:first.url,sourceName:'AIPlanWatch'};
+ const cutoff=Date.parse(now);
+ const fresh=new Set([REFERENCE_SIGNAL_SOURCE.id,tiboSourceId].filter(id=>forecastSourceAvailable(sources.find(s=>s.id===id),now)));
+ if(!fresh.size)return;
+ const known=evidence.filter(e=>Date.parse(e.publishedAt)<=cutoff&&Date.parse(e.collectedAt)<=cutoff);
+ const items=known.filter(e=>fresh.has(e.sourceId)&&e.provenance==='archive'&&e.textOrigin==='original'&&
+   originalPost.test(e.url)&&e.url.endsWith('/'+e.messageId)&&!isTruncatedBenefitText(e.text)&&
+   (e.sourceId===tiboSourceId?e.metadata?.sourceGroup==='fxembed:thsottiaux'&&Date.parse(e.publishedAt)>cutoff-recentHintMs:
+     e.metadata?.sourceGroup==='aiplanwatch'&&e.metadata.referenceSignal?.referenceUrl===REFERENCE_SIGNAL_SOURCE.url))
+   .sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt)||Number(b.sourceId===tiboSourceId)-Number(a.sourceId===tiboSourceId));
+ let pending:ReferencePublicSignal|undefined;
+ const seen=new Set<string>();
+ for(const item of items){
+  if(seen.has(item.messageId)||originalConflict(item,known))continue;
+  const parent=resetReplyParent(item,known,now);
+  const reply=parent&&interpretResetReplyHint(item.text,item.publishedAt,parent.kind);
+  const hint=interpretResetHint(item.text,item.publishedAt)??(reply&&parent?{...reply,parentSourceUrl:parent.parent.url}:undefined);
+  if(hint&&Date.parse(hint.expiresAt)<=cutoff)continue;
+  if(hint?.kind!=='banked_reset'&&completedAt&&Date.parse(item.publishedAt)<=Date.parse(completedAt))continue;
+  const reference=item.metadata?.referenceSignal;
+  const direct=item.sourceId===tiboSourceId;
+  if(direct&&!hint&&(!parent||evidenceBenefitClaims(item,[item,parent.parent]).length||
+    ['denied','reported'].includes(speechDisposition(item.text))))continue;
+  const text=reference?.summary??item.text.slice(0,3000);
+  const recordedAt=reference?.recordedAt??item.collectedAt;
+  const availableAt=parent&&(!hint||hint.parentSourceUrl)?
+    new Date(Math.max(Date.parse(recordedAt),Date.parse(item.collectedAt),Date.parse(parent.parent.collectedAt))).toISOString():recordedAt;
+  const result:ReferencePublicSignal={id:item.messageId,text,publishedAt:item.publishedAt,recordedAt:availableAt,
+    sourceUrl:item.url,sourceName:direct?'Tibo 公开动态':'AIPlanWatch',...(hint?{hint}:direct?{reviewPending:true}:{})};
+  if(hint)return result;
+  seen.add(item.messageId);
+  pending??=result;
+ }
+ return pending;
 }
+
 export function projectReferenceSignal(value:ReferencePublicSignal|undefined,sources:Source[],now:string,completedAt?:string):ReferencePublicSignal|undefined {
- if(!value||value.sourceName!=='AIPlanWatch'||!forecastSourceAvailable(sources.find(s=>s.id===REFERENCE_SIGNAL_SOURCE.id),now)||!/^\d{15,20}$/.test(value.id)||value.sourceUrl!==`https://x.com/thsottiaux/status/${value.id}`||typeof value.text!=='string'||!value.text.trim()||value.text.length>3000||!Number.isFinite(Date.parse(value.publishedAt))||!Number.isFinite(Date.parse(value.recordedAt))||Date.parse(value.publishedAt)>Date.parse(now)||Date.parse(value.recordedAt)>Date.parse(now)||completedAt&&Date.parse(value.publishedAt)<=Date.parse(completedAt))return;
+ if(!value)return;
+ const sourceId=value.sourceName==='Tibo 公开动态'?tiboSourceId:value.sourceName==='AIPlanWatch'?REFERENCE_SIGNAL_SOURCE.id:undefined;
+ const cutoff=Date.parse(now),published=Date.parse(value.publishedAt),recorded=Date.parse(value.recordedAt);
+ if(!sourceId||!forecastSourceAvailable(sources.find(s=>s.id===sourceId),now)||!/^\d{15,20}$/.test(value.id)||
+   value.sourceUrl!==`https://x.com/thsottiaux/status/${value.id}`||typeof value.text!=='string'||!value.text.trim()||value.text.length>3000||
+   !Number.isFinite(published)||!Number.isFinite(recorded)||published>cutoff||recorded>cutoff)return;
+ const hint=value.hint;
+ if(hint&&Date.parse(hint.expiresAt)<=cutoff||value.reviewPending&&published+recentHintMs<=cutoff)return;
+ if(hint?.kind!=='banked_reset'&&completedAt&&published<=Date.parse(completedAt))return;
  return value;
 }

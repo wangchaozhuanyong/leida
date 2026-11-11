@@ -179,6 +179,22 @@ export function directEvidenceBenefitClaims(item:Evidence,all:Evidence[]):Benefi
   // a verified kind or creates a new round from a restatement.
   return [...direct,...(campaign&&!direct.length?[campaign]:[]),...additional.filter(c=>!direct.some(d=>d.kind===c.kind))];
 }
+/** Find a single benefit topic in an explicitly linked original. Only use
+ * evidence that was available at the evaluation time. */
+export function resetReplyParent(primary:Evidence,all:Evidence[],now:string):{parent:Evidence;kind:BenefitClaim['kind']}|undefined {
+  if(!primary.parentId||primary.textOrigin!=='original'||primary.provenance==='manual'||isTruncatedText(primary.text))return;
+  const cutoff=Date.parse(now);
+  const known=all.filter(item=>Date.parse(item.collectedAt)<=cutoff&&Date.parse(item.publishedAt)<=cutoff);
+  if(originalConflict(primary,known))return;
+  const lineage=gatherExplicitEvidenceContext(primary,known);
+  const parent=lineage[1];
+  if(!parent||!/^https:\/\/(?:x|twitter)\.com\/[^/?#]+\/status\/\d{15,20}$/i.test(parent.url)||
+    !parent.url.endsWith('/'+parent.messageId)||lineage.some(e=>e.textOrigin!=='original'||isTruncatedText(e.text)||originalConflict(e,known)))return;
+  const claims=evidenceBenefitClaims(parent,lineage);
+  if(claims.length!==1||claims[0].scope!=='public'||!['promised','in_progress'].includes(claims[0].stage))return;
+  return {parent,kind:claims[0].kind};
+}
+
 export function gatherEvidenceContext(primary:Evidence,all:Evidence[]):Evidence[] {
   const repost=equivalentCompletionOriginal(primary,all);
   const lineage=[...gatherExplicitEvidenceContext(primary,all),...bankedSeriesContext(primary,all),...(repost?[repost]:[])];

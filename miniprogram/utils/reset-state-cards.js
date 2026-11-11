@@ -10,7 +10,7 @@ const at = value => valid(value) ? m.displayTime(value) : '';
 const names = {automatic_reset:'额度重置',banked_reset:'重置卡'};
 const waitingTitle = kind => kind === 'banked_reset' ? '等待下一次重置卡发放' : '等待下一次 Reset';
 function base(kind) {
-  return {kind, name:names[kind] || '公开线索', state:'waiting', tone:'slate', badge:'等待新消息', evidence:'公开动态追踪', title:waitingTitle(kind), description:`暂无新的${kind==='banked_reset'?'重置卡发放':'额度重置'}预告，有可靠消息后更新。`, icon:'radar', metric:'', metricParts:/** @type {{value:number,unit:string}[]} */([]), metricLabel:'', window:'', timeLabel:'当前状态', time:'没有有效的新信号或安排', timeAt:'', oldTime:'', expectedElapsed:'', observationSourceName:'', observationTime:'', observationAt:'', observationPublicationId:'', observationEventId:'', footer:'依据公开信息更新', action:'查看最近公告', publicationId:'', eventId:'', sourceUrl:'', sourceName:'', expiresAt:'', sourceType:'', watchNote:'',progress:/** @type {{label:string,current:boolean}[]} */([])};
+  return {kind, name:names[kind] || '公开线索', state:'waiting', tone:'slate', badge:'等待新消息', evidence:'公开动态追踪', title:waitingTitle(kind), description:`暂无新的${kind==='banked_reset'?'重置卡发放':'额度重置'}预告，有可靠消息后更新。`, icon:'radar', metric:'', metricParts:/** @type {{value:number,unit:string}[]} */([]), metricLabel:'', window:'', timeLabel:'当前状态', time:'没有有效的新信号或安排', timeAt:'', signalAt:'', parentSourceUrl:'', hintForPublicationId:'', oldTime:'', expectedElapsed:'', observationSourceName:'', observationTime:'', observationAt:'', observationPublicationId:'', observationEventId:'', footer:'依据公开信息更新', action:'查看最近公告', publicationId:'', eventId:'', sourceUrl:'', sourceName:'', expiresAt:'', sourceType:'', watchNote:'',progress:/** @type {{label:string,current:boolean}[]} */([])};
 }
 function sourceTarget(card, round) {
   if (!round) return;
@@ -97,19 +97,39 @@ function resetStateCards(data, now=data.serverTime) {
   });
   const activeSignal=m.activeResetWatch(forecasts?.watch,now);
   const reference=forecasts?.referenceSignal;
-  const refValid=reference && valid(reference.publishedAt) && valid(reference.recordedAt) && Date.parse(reference.publishedAt)<=current && Date.parse(reference.recordedAt)<=current;
+  const hint=reference?.hint;
+  const hintActive=hint&&kinds.includes(hint.kind)&&valid(hint.expiresAt)&&Date.parse(hint.expiresAt)>current;
+  const refValid=reference && valid(reference.publishedAt) && valid(reference.recordedAt) && Date.parse(reference.publishedAt)<=current && Date.parse(reference.recordedAt)<=current && (!hint||hintActive);
   const signals=[];
-  if(refValid)signals.push({url:reference.sourceUrl,at:reference.publishedAt,window:'',expiresAt:'',sourceName:reference.sourceName,type:'x_post'});
+  if(refValid)signals.push({url:reference.sourceUrl,at:reference.publishedAt,
+    window:hintActive&&hint.dayLabel ? hint.dayLabel+(hint.kind==='banked_reset'?'可能发放':'可能重置') : '',
+    expiresAt:hintActive?hint.expiresAt:'',kind:hintActive?hint.kind:null,parentSourceUrl:hintActive?hint.parentSourceUrl:'',reviewPending:reference.reviewPending,sourceName:reference.sourceName,type:'x_post'});
   if(activeSignal)signals.push({url:activeSignal.sourceUrl||'',at:activeSignal.observedAt,window:m.resetWatchWindow(activeSignal.forecastWindow),expiresAt:activeSignal.expiresAt,sourceName:'Codex Resets',type:activeSignal.sourceType||'x_post'});
   const signal=signals.sort((a,b)=>Date.parse(b.at)-Date.parse(a.at))[0];
   let untyped=null;
   if(signal){
-    const kind=signalKind(data,signal.url), target=cards.find(c=>c.kind===kind);
+    const kind=signalKind(data,signal.url)||signal.kind||null, target=cards.find(c=>c.kind===kind);
     const resolution=kind ? outlooks[kind].latestResolutions?.[kind] || outlooks[kind].lastResolved : kinds.map(k=>outlooks[k].latestResolutions?.[k]||outlooks[k].lastResolved).filter(Boolean).sort((a,b)=>Date.parse(b.statementAt)-Date.parse(a.statementAt))[0];
     const consumed=observations.some(o=>o.referenceUrl===signal.url&&Date.parse(o.observedAt)>=Date.parse(signal.at))||m.publicActions(data).some(({action})=>['claimed_complete','cancelled'].includes(action.stage) && Date.parse(action.statementAt)>=Date.parse(signal.at) && data.evidence.some(e=>e.url===signal.url && action.evidenceIds.includes(e.id)));
-    if(!consumed && (!resolution || Date.parse(resolution.statementAt)<Date.parse(signal.at)) && (!target || ['waiting','completed','cancelled'].includes(target.state) && (!target.timeAt || Date.parse(signal.at)>Date.parse(target.timeAt)))){
+    const active=kind&&outlooks[kind].active;
+    const parentEvidence=signal.parentSourceUrl&&data.evidence.find(e=>e.url===signal.parentSourceUrl);
+    const linksParent=(item,includeHistory=false)=>!!item&&!!parentEvidence&&data.publications.some(p=>
+      (p.id===item.publicationId||includeHistory&&p.eventId===item.eventId)&&
+      p.event.actions.some(a=>a.id===item.actionId&&a.kind===item.kind&&a.evidenceIds.includes(parentEvidence.id)));
+    const linkedUntimed=target?.state==='announced'&&active?.stage==='promised'&&!valid(active.expectedAt)&&linksParent(active);
+    const available=!target||linkedUntimed||['waiting','completed','observed','cancelled'].includes(target.state)&&(!target.timeAt||Date.parse(signal.at)>Date.parse(target.timeAt));
+    if(!consumed && !linksParent(resolution,true) && available && (!resolution || Date.parse(resolution.statementAt)<Date.parse(signal.at))){
       const card=base(kind);
-      Object.assign(card,{state:signal.window?'estimated':'signal',tone:'violet',badge:signal.window?'信号推测':'信号观察',evidence:'依据公开线索'+(signal.window?'推测':'观察'),title:!kind?'发现重置相关信号':signal.window?kind==='banked_reset'?'预计近期发放重置卡':'预计近期额度重置':kind==='banked_reset'?'发现重置卡发放线索':'发现额度重置信号',description:!kind?'发现公开线索，具体类型及发放安排尚未明确。':'这是信号推测，尚未形成明确安排。',icon:'signal',window:signal.window,timeLabel:'信号发布',time:at(signal.at),timeAt:signal.at,footer:'尚未形成明确预告',action:signal.window?'查看预测依据':'查看信号依据',sourceUrl:signal.url,sourceName:signal.sourceName,sourceType:signal.type,expiresAt:signal.expiresAt,watchNote:signal.expiresAt?'观察有效至 '+at(signal.expiresAt)+' · 北京时间；不是发放截止时间。':'公开线索尚无明确发放时间。'});
+      Object.assign(card,{state:signal.window?'estimated':'signal',tone:'violet',badge:signal.window?'信号推测':'信号观察',evidence:'依据公开线索'+(signal.window?'推测':'观察'),title:!kind?'发现重置相关信号':signal.window?kind==='banked_reset'?'预计近期发放重置卡':'预计近期额度重置':kind==='banked_reset'?'发现重置卡发放线索':'发现额度重置信号',description:!kind?'发现公开线索，具体类型及发放安排尚未明确。':'这是信号推测，尚未形成明确安排。',icon:'signal',window:signal.window,timeLabel:'信号发布',time:at(signal.at),timeAt:signal.at,signalAt:signal.at,parentSourceUrl:signal.parentSourceUrl||'',hintForPublicationId:linkedUntimed?active.publicationId:'',footer:'尚未形成明确预告',action:signal.window?'查看预测依据':'查看信号依据',sourceUrl:signal.url,sourceName:signal.sourceName,sourceType:signal.type,expiresAt:signal.expiresAt,watchNote:signal.kind&&signal.window?'星期按发帖人所在美西时间理解，具体时间待公布。':signal.expiresAt?'观察有效至 '+at(signal.expiresAt)+' · 北京时间；不是发放截止时间。':'公开线索尚无明确发放时间。'});
+      if(signal.reviewPending&&!kind)Object.assign(card,{title:'重置信号待核对',description:'已收到公开回复，正在核对其与重置安排的关系。'});
+      if(signal.kind===kind&&signal.window&&signal.expiresAt){
+        const metricParts=countdownParts(signal.expiresAt,now);
+        Object.assign(card,{
+          metricParts,metric:metricParts.map(part=>part.value+part.unit).join('')||'不足1分钟',
+          metricLabel:'距推测窗口结束',timeLabel:'推测窗口结束',timeAt:signal.expiresAt,time:at(signal.expiresAt),
+          watchNote:'以美西当地日期结束作为推测窗口终点，实际时间待确认。',
+        });
+      }
       if(target)Object.assign(target,card);else untyped=card;
     }
   }

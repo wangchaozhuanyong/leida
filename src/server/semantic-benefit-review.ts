@@ -3,7 +3,8 @@ import type {DraftContent,Evidence} from '../lib/types';
 import {benefitClauses,benefitKinds,benefitStage,benefitTime,claimQualification,eligibilityMatches,type BenefitClaim} from './benefit-rules';
 import {ownBenefitClause,speechDisposition} from './benefit-language';
 import {eligibleOriginal,UNKNOWN_BENEFIT_AUDIENCE} from './benefit-signal';
-import {gatherEvidenceContext,originalConflict} from './source-context';
+import {gatherEvidenceContext,originalConflict,resetReplyParent} from './source-context';
+import {interpretResetHint,interpretResetReplyHint} from './reset-hint';
 
 export const SEMANTIC_REVIEW_VERSION='benefit-review-20261101-1';
 export interface SemanticBenefitProof {
@@ -27,6 +28,9 @@ export function semanticReviewClaims(context:Evidence[],draft:DraftContent):Sema
   const e=context.find(e=>action.evidenceIds.includes(e.id)&&!!action.evidenceQuote&&e.text.includes(action.evidenceQuote));
   if(!e||!eligibleOriginal(e)||Math.abs(Date.parse(e.publishedAt)-Date.parse(action.statementAt))>1000)return;
   const quote=action.evidenceQuote!;
+  const parent=e.parentId&&resetReplyParent(e,context,
+    context.reduce((latest,item)=>item.collectedAt>latest?item.collectedAt:latest,e.collectedAt));
+  if(interpretResetHint(e.text,e.publishedAt)||parent&&interpretResetReplyHint(e.text,e.publishedAt,parent.kind))return;
   const clause=benefitClauses(e.text).find(c=>c.includes(quote)||quote.includes(c));
   if(!clause||!ownBenefitClause(e.text,clause)||speechDisposition(quote)!=='own')return;
   const kinds=benefitKinds(clause),stage=benefitStage(clause);
