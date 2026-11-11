@@ -1,11 +1,12 @@
 import {analyzeBenefitEvidence} from './benefit-analysis';
 import {speechDisposition} from './benefit-language';
+import {interpretResetReplyHint} from './reset-hint';
 import { bankedProgress, eligibleOriginal } from './benefit-signal';
 import {referenceCompletionClaim} from './reference-reset-source';
 import {observedEvidence} from '../lib/reset-observations';
 import { createHash } from 'node:crypto';
 import type { CandidateAutomation, DraftContent, Evidence, BenefitAction } from '../lib/types';
-import { evidenceBenefitClaims, hasCompleteContext, hasStandaloneContext, isTruncatedText, isCampaignResetShorthand, isVerifiedCampaignCalendar, originalConflict, campaignMembership } from './source-context';
+import { evidenceBenefitClaims, hasCompleteContext, hasStandaloneContext, isTruncatedText, isCampaignResetShorthand, isVerifiedCampaignCalendar, originalConflict, campaignMembership, resetReplyParent } from './source-context';
 import { AUTOMATIC_RULES_VERSION, benefitStage, eligibilityKey } from './benefit-rules';
 export { AUTOMATIC_RULES_VERSION } from './benefit-rules';
 
@@ -182,10 +183,15 @@ function attributedNews(primary:Evidence,base:DraftContent):DraftContent {
 
 export function needsSemanticReview(draft:DraftContent|undefined,context:Evidence[]):boolean {
   const primary=context[0];
-  return !!primary&&eligibleOriginal(primary)&&!isTruncatedText(primary.text)&&!originalConflict(primary,context)&&
-    (!primary.parentId||context.some(e=>e.messageId===primary.parentId))&&
-    (analyzeBenefitEvidence(primary,context).unresolved.length>0||draft?.reviewStatus==='pending'||
-      !draft&&primary.sourceId==='tibo-public'&&speechDisposition(primary.text)==='own'&&!isClearlyUnrelated(primary));
+  if(!primary||!eligibleOriginal(primary)||isTruncatedText(primary.text)||originalConflict(primary,context)||
+    primary.parentId&&!context.some(e=>e.messageId===primary.parentId))return false;
+  const reply=primary.parentId?resetReplyParent(primary,context,
+    context.reduce((latest,e)=>e.collectedAt>latest?e.collectedAt:latest,primary.collectedAt)):undefined;
+  if(reply&&interpretResetReplyHint(primary.text,primary.publishedAt,reply.kind))return false;
+  return analyzeBenefitEvidence(primary,context).unresolved.length>0||draft?.reviewStatus==='pending'||
+    primary.sourceId==='tibo-public'&&speechDisposition(primary.text)==='own'&&!isClearlyUnrelated(primary)&&
+    (!draft||!draft.actions.length&&!!reply&&!hasStandaloneContext(primary.text,'product')&&
+      /[\p{L}\p{N}]/u.test(primary.text.replace(/^@\w+\s+/,'')));
 }
 
 export function canUseNewsOnlyAttribution(content:DraftContent,evidence:Evidence[]):boolean {

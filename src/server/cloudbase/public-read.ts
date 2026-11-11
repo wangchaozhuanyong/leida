@@ -149,7 +149,7 @@ function compatibilityRuntime(value:unknown,timestamp:string):{runtime:Compatibl
  if(!evaluation?.automatic_reset||!evaluation.banked_reset)throw new CadenceReadError('EVALUATION_INVALID');
  let cadenceEvaluationByKind:CompatibleRuntime['cadenceEvaluationByKind'];
  try{cadenceEvaluationByKind={automatic_reset:publicCadenceEvaluation(evaluation.automatic_reset),banked_reset:publicCadenceEvaluation(evaluation.banked_reset)};}catch{throw new CadenceReadError('EVALUATION_INVALID');}
- const publicSignal=row.referenceSignal?{id:row.referenceSignal.id,text:row.referenceSignal.text,publishedAt:row.referenceSignal.publishedAt,recordedAt:row.referenceSignal.recordedAt,sourceUrl:row.referenceSignal.sourceUrl,sourceName:row.referenceSignal.sourceName}:undefined;
+ const publicSignal=row.referenceSignal?{id:row.referenceSignal.id,text:row.referenceSignal.text,publishedAt:row.referenceSignal.publishedAt,recordedAt:row.referenceSignal.recordedAt,sourceUrl:row.referenceSignal.sourceUrl,sourceName:row.referenceSignal.sourceName,hint:row.referenceSignal.hint,reviewPending:row.referenceSignal.reviewPending}:undefined;
  const runtime:CompatibleRuntime={id:'forecast_runtime',status:'ready',...(validatedReferenceReview(row.referenceReview)?{referenceReview:validatedReferenceReview(row.referenceReview)}:{}),...(publicSignal?{referenceSignal:publicSignal}:{}),...(row.referenceCadencePublic?{referenceCadencePublic:row.referenceCadencePublic}:{}),cadenceSnapshotId:ids.automatic_reset,cadenceSnapshotIds:{automatic_reset:ids.automatic_reset,banked_reset:ids.banked_reset},cadenceEvaluationByKind,cadenceProjectionDigest:projection.digest};
  return {runtime,projection};
 }

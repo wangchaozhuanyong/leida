@@ -104,7 +104,7 @@ function completedCard(base, kind, round, observations, now) {
     dialStatus:declared?'依据公开完成声明':'依据第三方观测',description:'持续关注下一次安排。',footer:declared?'公开完成消息，个人账户以实际显示为准':observation.sourceName+' · 第三方观测',
     action:'查看记录',oldTime:'',expectedElapsed:'',observationPublicationId:'',observationSourceName:'',observationTime:'',observationAt:'',watchNote:'',validUntil:'',early};
   card.hero=homeOrbitPresentation(card,now);
-  card.hero.badge=declared?'发布者已确认':'第三方报告';
+  card.hero.badge=declared?(banked?'已发放 · 发布者确认':'发布者已确认'):'第三方报告';
   card.hero.timeLabel=card.timeLabel;
   card.hero.description=early ? '预计时间前已有'+(declared?'完成声明。':'重置观测。') : declared?(banked?'发布者已声明发卡完成。':'发布者已声明重置完成。'):'来源：'+observation.sourceName+'。';
   card.hero.footnote=declared?'实际到账以账户显示为准。':early?'来源：'+observation.sourceName+' · 实际额度以账户为准。':'实际额度以账户显示为准。';
@@ -156,7 +156,7 @@ function finalize(card, data) {
   card.validUntil=card.validUntil||(['signal','estimated'].includes(card.state)?card.expiresAt||'':'');
   card.shareTitle=(card.kind==='banked_reset'?'重置卡发放':'额度重置')+' · '+(card.hero.title||card.hero.label)+' · '+card.hero.badge;
   // Clock digits and collection time are intentionally excluded: a minute tick is not a new fact.
-  card.revision=stateRevision(JSON.stringify([card.kind,card.roundKey,card.state,card.publicationId||'',card.timeAt||'',card.expectedAt||'',card.clockAt||'',card.declarationAt||'',card.hero.title,card.hero.badge,card.hero.description,card.hero.footnote,card.sourceName||'',card.sourceUrl||'',card.observationPublicationId||'',card.timeQualifier||'',card.oldTime||'']));
+  card.revision=stateRevision(JSON.stringify([card.kind,card.roundKey,card.state,card.publicationId||'',card.timeAt||'',card.expectedAt||'',card.clockAt||'',card.declarationAt||'',card.hero.title,card.hero.badge,card.hero.description,card.hero.footnote,card.sourceName||'',card.sourceUrl||'',card.parentSourceUrl||'',card.observationPublicationId||'',card.timeQualifier||'',card.oldTime||'']));
   card.sharePath=(card.observationSummaryDate?'/pages/schedule/index?date='+card.observationSummaryDate+'&':card.publicationId?detailPath(card.publicationId)+'&':'/pages/home/index?')+'kind='+card.kind+'&revision='+card.revision;
   return card;
 }
@@ -210,7 +210,12 @@ function homeResetStatus(data, now=data.serverTime) {
     }else if(independent.length)card=completedCard(base,kind,null,[independent[0]],now);
     else card={...base,completedDisplay:false,expiredRound:false};
     // A genuinely newer classified signal replaces history, never a still-active arrangement.
-    if(['signal','estimated'].includes(base.state) && (!latest || millis(base.timeAt)>Math.max(millis(latest.statementAt),millis(card.clockAt))) && !['scheduled','revised','announced','progress','overdue'].includes(card.state))card={...base,completedDisplay:false,expiredRound:false};
+    if(['signal','estimated'].includes(base.state) &&
+      millis(base.signalAt)>Math.max(millis(latest?.statementAt),millis(card.clockAt)) &&
+      (!['scheduled','revised','announced','progress','overdue'].includes(card.state)||
+       card.state==='announced'&&!!base.hintForPublicationId&&base.hintForPublicationId===latest?.publicationId)){
+      card={...base,completedDisplay:false,expiredRound:false,roundKey:kind+':signal:'+base.signalAt};
+    }
     card.lastMessage=historyMessage(record);
     return finalize(card,input);
   });

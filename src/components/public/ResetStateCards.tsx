@@ -36,7 +36,7 @@ export function ResetStateCardView({card}:{card:ResetStateCard}) {
       {card.timeAt?<div className="pub-orbit-schedule"><div><span>{card.timeLabel}</span><time dateTime={card.timeAt}>{card.dateText||card.time}</time></div>{card.clockText&&<div className="pub-orbit-time"><span>北京时间</span><strong>{card.clockText}<small>{card.timeQualifier}</small></strong></div>}</div>:<p className="pub-orbit-waiting">收到明确预告后，将在这里展示时间。</p>}
       {card.oldTime&&<del className="pub-orbit-old">{card.oldTime} · 北京时间</del>}
     </div>
-    <div className="pub-reset-state-footer"><span>{card.metric?'预计安排，以实际发放为准':card.window?'不是承诺发放时间 · '+card.footer:card.footer}</span>{card.sourceName?<details className="pub-reset-state-source"><summary>{card.action} →</summary><div><p>来源：{card.sourceName}{card.sourceType==='observed'?' · 观察记录':''}</p>{card.watchNote&&<p>{card.watchNote}</p>}{card.sourceUrl&&safeUrl(card.sourceUrl)?<a href={card.sourceUrl} target="_blank" rel="noopener noreferrer">查看来源原文 ↗</a>:<p>此观察记录没有公开原文链接。</p>}</div></details>:<Link scroll={false} href={href}>{card.action} →</Link>}</div>
+    <div className="pub-reset-state-footer"><span>{card.state==='estimated'&&card.metric?card.watchNote:card.metric?'预计安排，以实际发放为准':card.window?'不是承诺发放时间 · '+card.footer:card.footer}</span>{card.sourceName?<details className="pub-reset-state-source"><summary>{card.action} →</summary><div><p>来源：{card.sourceName}{card.sourceType==='observed'?' · 观察记录':''}</p>{card.watchNote&&<p>{card.watchNote}</p>}{card.sourceUrl&&safeUrl(card.sourceUrl)?<a href={card.sourceUrl} target="_blank" rel="noopener noreferrer">查看来源原文 ↗</a>:<p>此观察记录没有公开原文链接。</p>}</div></details>:<Link scroll={false} href={href}>{card.action} →</Link>}</div>
   </article>;
 }
 export function ResetStateCards({data}:{data:PublicData}) {
@@ -58,6 +58,7 @@ export function ResetStateCards({data}:{data:PublicData}) {
       {card.oldTime&&<div className="pub-focus-fact">{card.oldTime}</div>}
       {card.observationPublicationId&&<Link className="pub-focus-link" href={'/events/'+encodeURIComponent(card.observationEventId||data.publications.find(p=>p.id===card.observationPublicationId)?.eventId||card.eventId)+'?version='+encodeURIComponent(card.observationPublicationId)}>查看独立观测 · {card.observationTime}</Link>}
       <Link className="pub-focus-link" href={destination(card)}>{card.action} →</Link>
+      {card.parentSourceUrl&&safeUrl(card.parentSourceUrl)&&<Link className="pub-focus-link" href={card.parentSourceUrl}>查看父帖依据 ↗</Link>}
       {secondary&&<Link className="radar-secondary" href={destination(secondary)}><span>{secondary.kind==='banked_reset'?'重置卡发放':'额度重置'} · {secondary.hero.badge} {secondary.time}</span><span>→</span></Link>}
     </article>
     {untyped&&<div className="pub-reset-untyped"><p>类型暂未明确的公开线索</p><ResetStateCardView card={untyped}/></div>}
