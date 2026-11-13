@@ -1,4 +1,5 @@
-import {REFERENCE_RESET_SOURCE,REFERENCE_SOURCES,REFERENCE_SIGNAL_SOURCE,REFERENCE_HISTORY_SOURCE,parseReferenceSignals,parseReferenceHistory,parseReferenceLatest,referenceContentsURL,referenceCollectionHealth} from './reference-reset-source';
+import {REFERENCE_RESET_SOURCE,REFERENCE_SOURCES,REFERENCE_SIGNAL_SOURCE,REFERENCE_HISTORY_SOURCE,isResetWatchLead,parseResetWatchLeads,parseReferenceSignals,parseReferenceHistory,parseReferenceLatest,referenceContentsURL,referenceCollectionHealth} from './reference-reset-source';
+import {RESET_WATCH_ENDPOINT,RESET_WATCH_TIMEOUT_MS,safeResetWatchFailure} from './reset-watch';
 import { load } from 'cheerio';
 import { list, one, put, transaction } from '../db';
 import type { Activity, ActivityDefinition, Evidence, Source, SourceHttpCheckpoint } from '../lib/types';
@@ -24,7 +25,7 @@ export class SourceTransientError extends DomainError {}
 class SourceDiagnosticError extends DomainError {}
 class SourceUnchanged extends Error {}
 export interface SourceRequestEvent {
- requestId:string;phase:'source'|'releases'|'clock';attempt:number;outcome:'failed'|'recovered';elapsedMs:number;
+ requestId:string;phase:'source'|'releases'|'clock'|'reset_watch';attempt:number;outcome:'failed'|'recovered';elapsedMs:number;
  reason?:'http'|'network'|'body'|'format';status?:number;transportCode?:string;retryInMs?:number;
 }
 export interface SourceReadDependencies {fetcher?:typeof fetch;sleep?:(milliseconds:number)=>Promise<void>;onRequestEvent?:(event:SourceRequestEvent)=>Promise<void>;forceFullRead?:boolean;}
@@ -73,6 +74,7 @@ export const RELEASE_PAGE_SIZE=5;
 export const MAX_RELEASE_PAGES=3;
 const RELEASE_LOOKBACK_MS=7*24*3600_000;
 const ARCHIVE_ORIGIN='https://codex-resets.com';
+let watchRetryAt=0;
 
 export function retryAtFromHeaders(headers:Headers,currentTime=Date.now()):string {
  const retryAfter=headers.get('retry-after');
@@ -97,8 +99,8 @@ function allowedSource(source:Source):boolean {
  return source.kind==='activity'&&source.discoveredFrom==='reset-archive'&&source.id===`activity-${hash(challengePath(source.url)??'').slice(0,16)}`&&!!challengePath(source.url);
 }
 async function fetchAllowedURL(url:string,accept='text/html,application/json',context:SourceReadContext=readContext(),phase:SourceRequestEvent['phase']='source'):Promise<string> {
- const cached=responseCache.get(url);
- const saved=context.checkpoints[url],primary=phase!=='clock';
+ const cached=phase==='reset_watch'?undefined:responseCache.get(url);
+ const saved=context.checkpoints[url],primary=phase!=='clock'&&phase!=='reset_watch';
  const headers:Record<string,string>={'User-Agent':'MoyaoResetRadar/1.0 (+local research collector)','Accept':accept};
  const validator=primary&&context.allowUnchanged?saved:cached;
  if(validator?.etag)headers['If-None-Match']=validator.etag;
@@ -108,7 +110,7 @@ async function fetchAllowedURL(url:string,accept='text/html,application/json',co
   const started=performance.now();let detail:Pick<SourceRequestEvent,'reason'|'status'|'transportCode'>={reason:'network'},body:string;
   try{
    let response:Response;
-   try{response=await (context.fetcher??fetch)(url,{signal:AbortSignal.timeout(20_000),redirect:'error',headers});}
+   try{response=await (context.fetcher??fetch)(url,{signal:AbortSignal.timeout(phase==='reset_watch'?RESET_WATCH_TIMEOUT_MS:20_000),redirect:'error',headers});}
    catch(error){detail={reason:'network',transportCode:safeSourceTransportCode(error)};throw new SourceTransientError('来源暂时连接失败，等待自动重试');}
    detail={reason:'http',status:response.status};
    if(response.status===304&&primary&&context.allowUnchanged&&saved){
@@ -122,16 +124,20 @@ async function fetchAllowedURL(url:string,accept='text/html,application/json',co
      await response.body?.cancel();throw new SourceRateLimitError(retryAtFromHeaders(response.headers));
     }
     if(!response.ok){await response.body?.cancel();throw ([408,425].includes(response.status)||response.status>=500?new SourceTransientError(`来源请求失败（状态 ${response.status}）`):new DomainError(`来源请求失败（状态 ${response.status}）`));}
-    const length=Number(response.headers.get('content-length')??0);if(length>3_000_000){await response.body?.cancel();throw new SourceStructureError('来源响应超出结构上限');}
+    const limit=phase==='reset_watch'?64*1024:3_000_000;
+    if(phase==='reset_watch'&&!response.headers.get('content-type')?.includes('application/json')){await response.body?.cancel();throw new SourceStructureError('重置信号接口格式变化');}
+    const length=Number(response.headers.get('content-length')??0);if(length>limit){await response.body?.cancel();throw new SourceStructureError('来源响应超出结构上限');}
     const reader=response.body?.getReader();if(!reader)throw new SourceStructureError('来源响应为空');const chunks:Uint8Array[]=[];let total=0;
-    try{while(true){const {value,done}=await reader.read();if(done)break;total+=value.length;if(total>3_000_000){await reader.cancel();throw new SourceStructureError('来源响应超出结构上限');}chunks.push(value);}}
+    try{while(true){const {value,done}=await reader.read();if(done)break;total+=value.length;if(total>limit){await reader.cancel();throw new SourceStructureError('来源响应超出结构上限');}chunks.push(value);}}
     catch(error){if(error instanceof SourceStructureError)throw error;detail={reason:'body',transportCode:safeSourceTransportCode(error)};throw new SourceTransientError('来源响应读取中断，等待自动重试');}
     finally{reader.releaseLock();}
     body=Buffer.concat(chunks).toString('utf8');
     const checkpoint:SourceHttpCheckpoint={bodyHash:hash(body),etag:safeValidator(response.headers.get('etag')),lastModified:safeValidator(response.headers.get('last-modified'))};
     if(primary){context.checkpoints[url]=checkpoint;while(Object.keys(context.checkpoints).length>16)delete context.checkpoints[Object.keys(context.checkpoints)[0]];}
-    if(!responseCache.has(url)&&responseCache.size>=16)responseCache.delete(responseCache.keys().next().value!);
-    responseCache.set(url,{body,etag:response.headers.get('etag')??undefined,lastModified:response.headers.get('last-modified')??undefined});
+    if(phase!=='reset_watch'){
+     if(!responseCache.has(url)&&responseCache.size>=16)responseCache.delete(responseCache.keys().next().value!);
+     responseCache.set(url,{body,etag:response.headers.get('etag')??undefined,lastModified:response.headers.get('last-modified')??undefined});
+    }
     if(primary&&context.allowUnchanged&&saved?.bodyHash===checkpoint.bodyHash){
      if(attempt>1)await context.onRequestEvent?.({requestId,phase,attempt,outcome:'recovered',elapsedMs:Math.round(performance.now()-started)});
      throw new SourceUnchanged();
@@ -311,6 +317,15 @@ export async function fetchRecords(source:Source,validationOnly=false,dependenci
  }
  return parseArchive(raw,source);
 }
+/** Independent of the HTML archive's checkpoints and conditional requests. */
+export async function fetchArchiveSignalLeads(dependencies:SourceReadDependencies={}):Promise<Incoming[]> {
+ const context=readContext(dependencies);
+ // Retry on the next scheduled collection so an optional source cannot hold the archive's queue.
+ context.retriesRemaining=0;
+ const body=await fetchAllowedURL(RESET_WATCH_ENDPOINT,'application/json',context,'reset_watch');
+ try{return parseResetWatchLeads(JSON.parse(body),now());}
+ catch(error){throw new SourceStructureError('重置信号结构或时效异常（'+safeResetWatchFailure(error)+'）');}
+}
 async function establishActivity(definition:ActivityDefinition):Promise<boolean> {
  return transaction(async c=>{
   const existing=await one<Activity>('activities',definition.id,c,true);
@@ -353,12 +368,35 @@ export async function validateSource(sourceId:string,actor:string) {
   const updated:Source={...source,...(timeline?{timelineScan:timeline.scan}:{}),validated:true,publicationPaused:false,pauseReason:undefined,consecutiveFailures:0,error:undefined,version:source.version+1,referenceSnapshotAt:sourceReadCheckpoints.get(before)?.referenceSnapshotAt??source.referenceSnapshotAt,...referenceCollectionHealth({...source,referenceSnapshotAt:sourceReadCheckpoints.get(before)?.referenceSnapshotAt??source.referenceSnapshotAt},now())};await put('sources',updated,c);if(sourceForecastConfiguration(source)!==sourceForecastConfiguration(updated))await markForecastInputsChanged(c);await audit(actor,'source.validate',sourceId,`适配器通过结构校验，取得 ${records.length} 条样本；持续可用性仍待运行`,undefined,{count:records.length},c);});return {validated:true,count:records.length};}
  catch(e){await transaction(async c=>{const s=await one<Source>('sources',sourceId,c,true);if(s){const waiting=e instanceof SourceRateLimitError||e instanceof SourceTransientError||e instanceof TiboTimelineError&&e.failureKind==='transient';await put('sources',{...s,validated:waiting?s.validated:false,publicationPaused:waiting?s.publicationPaused:e instanceof SourceStructureError,pauseReason:waiting?s.pauseReason:e instanceof SourceStructureError?'structure':undefined,...(waiting?{nextRunAt:e instanceof SourceRateLimitError?e.retryAt:new Date(Date.now()+60_000).toISOString()}:{}),status:'failed',error:e instanceof DomainError?e.message:'来源连接失败',version:s.version+1},c);}});throw e;}
 }
-export async function collectSource(sourceId:string,historical=false):Promise<{seen:number;created:number;healthChanged?:boolean}> {
+export async function collectSource(sourceId:string,historical=false,dependencies:SourceReadDependencies={}):Promise<{seen:number;created:number;healthChanged?:boolean}> {
  const source=await one<Source>('sources',sourceId);if(!source||(!source.validated&&!(source.enabled&&source.publicationPaused&&source.pauseReason==='structure')))throw new DomainError('来源未验证');
  if(!source.enabled)throw new DomainError('来源已由管理员暂停');
- const records=await fetchRecords(source,false,{forceFullRead:historical}),timeline=source.kind==='timeline'?timelineCheckpoints.get(source):undefined;
+ const historyRead=fetchRecords(source,false,{...dependencies,forceFullRead:historical||dependencies.forceFullRead});
+ const watchRead=source.id==='reset-archive'&&source.url===ARCHIVE_ORIGIN+'/zh-CN'&&!historical&&(dependencies.fetcher||watchRetryAt<=Date.now())
+  ?fetchArchiveSignalLeads(dependencies).catch(async error=>{
+    const failure=error instanceof SourceRateLimitError?'rate_limit':error instanceof SourceStructureError?'format':error instanceof SourceTransientError?'transport':'request';
+    const retryAt=error instanceof SourceRateLimitError?error.retryAt:undefined;
+    if(retryAt&&!dependencies.fetcher)watchRetryAt=Date.parse(retryAt);
+    await transaction(c=>audit('worker','source.watch_failed',source.id,'公开信号补读未成功，归档和原帖采集继续',undefined,{failure,retryAt},c));
+    return [];
+  }):Promise.resolve([]);
+ const [historyResult,watchResult]=await Promise.allSettled([historyRead,watchRead]);
+ let created=0;
+ // A successful signal read survives an HTML archive outage.
+ if(watchResult.status==='fulfilled'&&watchResult.value.length){
+  const ids=new Set(watchResult.value.map(item=>item.messageId));
+  const known=(await list<Evidence>('evidence')).filter(item=>ids.has(item.messageId));
+  for(const lead of watchResult.value){
+   if(known.some(item=>isResetWatchLead(item)&&item.messageId===lead.messageId))continue;
+   const result=await createEvidence({...lead,historical:!source.lastSuccessAt||isHistoricalRecord(lead.publishedAt)});
+   if(result.created&&result.candidate)created++;
+  }
+ }
+ if(historyResult.status==='rejected')throw historyResult.reason;
+ if(watchResult.status==='rejected')throw watchResult.reason;
+ const records=historyResult.value,timeline=source.kind==='timeline'?timelineCheckpoints.get(source):undefined;
  const read=sourceReadCheckpoints.get(source),fingerprint=incomingFingerprint(records),unchanged=!historical&&(read?.unchanged===true||source.collectionFingerprint===fingerprint);
- let created=0,healthChanged=false;
+ let healthChanged=false;
  // A new observation must not re-version older observations just because this
  // HTML snapshot was fetched later. Preserve their first stored provenance.
  const knownObservations=[CODEX_LIMITS_OBSERVATION_SOURCE.id,TIBORESET_OBSERVATION_SOURCE.id].includes(source.id)?(await list<Evidence>('evidence')).filter(item=>item.sourceId===source.id).map(({id:_,hash:__,historical:___,...item})=>stableIncoming(item)):[];
@@ -394,5 +432,5 @@ export async function collectSource(sourceId:string,historical=false):Promise<{s
   if(!unchanged||healthChanged)await audit('worker','source.collect',sourceId,`读取 ${records.length} 条，新增 ${created} 条；${timeline?.interrupted?'已保留成功读取的部分，后续读取等待恢复':'保留旧条目回看以发现编辑'}`,undefined,{seen:records.length,created,historical,pipeline:{transportComplete:!timeline?.interrupted,evidenceStored:created,classification:'candidate_queue',publication:'separate_audit',notification:'separate_delivery_records'},releaseScan:scan,partial:!!timeline?.interrupted},c);
  });
  if(timeline?.interrupted)throw timelineError(timeline.interrupted);
- return {seen:records.length,created,healthChanged};
+ return {seen:records.length+watchResult.value.length,created,healthChanged};
 }

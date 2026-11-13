@@ -96,7 +96,8 @@ function resetStateCards(data, now=data.serverTime) {
     return card;
   });
   const activeSignal=m.activeResetWatch(forecasts?.watch,now);
-  const reference=forecasts?.referenceSignal;
+  const pendingReferences=forecasts?.referenceSignals?.filter(item=>item.reviewPending&&!item.hint)??[];
+  const reference=forecasts?.referenceSignals===undefined?forecasts?.referenceSignal:undefined;
   const hint=reference?.hint;
   const hintActive=hint&&kinds.includes(hint.kind)&&valid(hint.expiresAt)&&Date.parse(hint.expiresAt)>current;
   const refValid=reference && valid(reference.publishedAt) && valid(reference.recordedAt) && Date.parse(reference.publishedAt)<=current && Date.parse(reference.recordedAt)<=current && (!hint||hintActive);
@@ -132,6 +133,15 @@ function resetStateCards(data, now=data.serverTime) {
       }
       if(target)Object.assign(target,card);else untyped=card;
     }
+  }
+  // An unresolved clue can coexist with either category's current clock.
+  const pending=pendingReferences.find(item=>valid(item.publishedAt)&&valid(item.recordedAt)&&
+    Date.parse(item.publishedAt)<=current&&Date.parse(item.recordedAt)<=current&&Date.parse(item.publishedAt)+172800000>current);
+  if(pending){
+    untyped=Object.assign(base(null),{state:'signal',tone:'violet',badge:'公开线索',title:'有新消息，待核对',
+      description:'已收录公开消息，正在核对它是否指向下一次重置或发卡。',
+      sourceName:pending.sourceName,sourceUrl:pending.sourceUrl,sourceType:'x_post',action:'查看原文',
+      signalAt:pending.publishedAt,expiresAt:new Date(Date.parse(pending.publishedAt)+172800000).toISOString()});
   }
   const expired=forecasts?.watch?.status==='active' && !activeSignal && valid(forecasts.watch.signal?.expiresAt) && Date.parse(forecasts.watch.signal.expiresAt)<=current;
   const sourceWarning=forecasts?.status==='unavailable'?'趋势分析暂未更新，公开公告与历史记录仍可查看。':forecasts?.watch?.status==='unavailable'?'重置信号更新延迟，已有消息和记录仍可查看。':'';

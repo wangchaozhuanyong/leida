@@ -3,11 +3,11 @@ import {observedResetText} from '../lib/reset-observations';
 import type {Evidence,Source} from '../lib/types';
 import type {Incoming} from './ingestion';
 import type {BenefitClaim} from './benefit-rules';
-import {isTruncatedBenefitText} from './benefit-rules';
-import {interpretResetHint,interpretResetReplyHint} from './reset-hint';
-import {evidenceBenefitClaims,originalConflict,resetReplyParent} from './source-context';
-import {speechDisposition} from './benefit-language';
-import {forecastSourceAvailable,referenceSnapshotFresh,type PublicResetHint,type ReferencePublicSignal} from '../lib/forecast';
+import {benefitClauses,isTruncatedBenefitText} from './benefit-rules';
+import {acceptResetSignalReview,cancelsResetSignal,excludedResetSignal,interpretForwardResetSignal,interpretResetHint,interpretResetReplyHint,isContextualCancellation,isResetSignalDelay,mentionsResetSignal,resetHintTiming,resetSignalKinds,RESET_SIGNAL_LOOKBACK_MS,RESET_SIGNAL_WINDOW_MS} from './reset-hint';
+import {evidenceBenefitClaims,gatherExplicitEvidenceContext,originalConflict,resetReplyParent,selectOriginal} from './source-context';
+import {forecastSourceAvailable,referenceSnapshotFresh,type PublicResetHint,type ReferencePublicSignal,type ResetSignalReview} from '../lib/forecast';
+import {RESET_WATCH_ENDPOINT,parseResetWatchDiscovery} from './reset-watch';
 import {CODEX_LIMITS_OBSERVATION_SOURCE} from './codexlimits-observation-source';
 import {TIBORESET_OBSERVATION_SOURCE} from './tiboreset-observation-source';
 
@@ -107,76 +107,346 @@ export function referenceCompletionClaim(evidence:Evidence):BenefitClaim|undefin
 }
 
 const tiboSourceId='tibo-public';
-const recentHintMs=2*86400000;
+const archiveSourceId='reset-archive';
+const recentHintMs=RESET_SIGNAL_WINDOW_MS;
 const originalPost=/^https:\/\/x\.com\/thsottiaux\/status\/\d{15,20}$/;
+export function isResetWatchLead(evidence:Pick<Evidence,'sourceId'|'metadata'>):boolean {
+ return evidence.sourceId===archiveSourceId&&evidence.metadata?.sourceGroup==='codex-resets'&&evidence.metadata.referenceSignal?.referenceUrl===RESET_WATCH_ENDPOINT;
+}
+
+/** Archive discovery and HTML history have distinct ingestion roles for a
+ * post. Public forecasts still group both with the canonical original ID. */
+export function evidenceLane(evidence:Pick<Evidence,'sourceId'|'messageId'|'metadata'>):string {
+ return evidence.sourceId+':'+evidence.messageId+(isResetWatchLead(evidence)?':watch':'');
+}
+export function signalDiscoveryAvailable(source:Source|undefined):boolean {
+ return !!source?.enabled&&source.id===archiveSourceId&&source.kind==='archive'&&source.url==='https://codex-resets.com/zh-CN'&&
+   (keepKnownDatedHint(source)||source.pauseReason==='structure'&&source.publicationPaused===true);
+}
+
+export function parseResetWatchLeads(value:unknown,collectedAt:string):Incoming[] {
+ const records=new Map<string,Incoming>();
+ for(const watch of parseResetWatchDiscovery(value,collectedAt)){
+  const item=watch.signal??watch.scheduledReset;
+  if(!item?.sourceUrl||item.sourceType==='observed'||!originalPost.test(item.sourceUrl))continue;
+  const messageId=item.sourceUrl.split('/').at(-1)!;
+  const originalAt=Number((BigInt(messageId)>>22n)+1288834974657n), at=Date.parse(collectedAt);
+  if(!Number.isSafeInteger(originalAt)||originalAt>at||originalAt<=at-RESET_SIGNAL_LOOKBACK_MS)continue;
+  const publishedAt=new Date(originalAt).toISOString(), summary=item.text.slice(0,3000);
+  const reportedAt=watch.signal?.observedAt??watch.scheduledReset?.announcedAt??collectedAt;
+  records.set(messageId,{sourceId:archiveSourceId,messageId,url:item.sourceUrl,text:summary,publishedAt,collectedAt,
+   contextComplete:false,provenance:'archive',textOrigin:'archive_excerpt',
+   metadata:{category:'reset',sourceGroup:'codex-resets',referenceSignal:{recordedAt:reportedAt,summary,referenceUrl:RESET_WATCH_ENDPOINT}}});
+ }
+ return [...records.values()];
+}
 function hintDisplayUntil(hint:PublicResetHint){
  return Date.parse(hint.expiresAt)+(hint.dayLabel?86400000:0);
+}
+function signalClosesAt(hint:PublicResetHint|undefined){
+ return ms(hint?.expiresAt)+(hint?.windowBasis==='fallback_48h'?0:86_400_000);
 }
 function keepKnownDatedHint(source:Source|undefined):boolean {
  return !!source?.enabled&&source.validated&&!source.publicationPaused&&source.status!=='paused'&&source.status!=='unconnected';
 }
 
-/** Keep one current actionable hint. Ambiguous replies may be retained for
- * review, while fresh, usable clues take precedence on the homepage. */
-export function referencePublicSignal(evidence:Evidence[],sources:Source[],now:string,completedAt?:string):ReferencePublicSignal|undefined {
- const cutoff=Date.parse(now);
- const enabled=new Set(sources.filter(source=>source.enabled&&[REFERENCE_SIGNAL_SOURCE.id,tiboSourceId].includes(source.id)).map(source=>source.id));
- const fresh=new Set([...enabled].filter(id=>forecastSourceAvailable(sources.find(s=>s.id===id),now)));
- const dated=new Set(sources.filter(keepKnownDatedHint).map(source=>source.id));
- if(!enabled.size)return;
- const known=evidence.filter(e=>Date.parse(e.publishedAt)<=cutoff&&Date.parse(e.collectedAt)<=cutoff);
- const items=known.filter(e=>enabled.has(e.sourceId)&&e.provenance==='archive'&&e.textOrigin==='original'&&
-   originalPost.test(e.url)&&e.url.endsWith('/'+e.messageId)&&!isTruncatedBenefitText(e.text)&&
-   (e.sourceId===tiboSourceId?e.metadata?.sourceGroup==='fxembed:thsottiaux'&&Date.parse(e.publishedAt)>cutoff-(8*86400000):
-     e.metadata?.sourceGroup==='aiplanwatch'&&e.metadata.referenceSignal?.referenceUrl===REFERENCE_SIGNAL_SOURCE.url))
-   .sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt)||Number(b.sourceId===tiboSourceId)-Number(a.sourceId===tiboSourceId));
- let pending:ReferencePublicSignal|undefined,closed:ReferencePublicSignal|undefined;
- const closedKinds=new Set<PublicResetHint['kind']>();
- const seen=new Set<string>();
- for(const item of items){
-  if(seen.has(item.messageId)||originalConflict(item,known))continue;
-  const parent=resetReplyParent(item,known,now);
-  const reply=parent&&interpretResetReplyHint(item.text,item.publishedAt,parent.kind);
-  const hint=interpretResetHint(item.text,item.publishedAt)??(reply&&parent?{...reply,parentSourceUrl:parent.parent.url}:undefined);
-  if(!fresh.has(item.sourceId)&&!(hint?.dayLabel&&dated.has(item.sourceId)))continue;
-  if(hint&&!hint.dayLabel&&hintDisplayUntil(hint)<=cutoff||!hint&&item.sourceId===tiboSourceId&&Date.parse(item.publishedAt)<=cutoff-recentHintMs)continue;
-  if(hint?.kind!=='banked_reset'&&completedAt&&Date.parse(item.publishedAt)<=Date.parse(completedAt))continue;
-  const reference=item.metadata?.referenceSignal;
-  const direct=item.sourceId===tiboSourceId;
-  if(direct&&!hint&&(!parent||evidenceBenefitClaims(item,[item,parent.parent]).length||
-    ['denied','reported'].includes(speechDisposition(item.text))))continue;
-  const text=reference?.summary??item.text.slice(0,3000);
-  const recordedAt=reference?.recordedAt??item.collectedAt;
-  const availableAt=parent&&(!hint||hint.parentSourceUrl)?
-    new Date(Math.max(Date.parse(recordedAt),Date.parse(item.collectedAt),Date.parse(parent.parent.collectedAt))).toISOString():recordedAt;
-  const result:ReferencePublicSignal={id:item.messageId,text,publishedAt:item.publishedAt,recordedAt:availableAt,
-    sourceUrl:item.url,sourceName:direct?'Tibo 公开动态':'AIPlanWatch',...(hint?{hint}:direct?{reviewPending:true}:{})};
-  seen.add(item.messageId);
-  if(hint){
-   if(closedKinds.has(hint.kind))continue;
-   if(hintDisplayUntil(hint)>cutoff)return result;
-   // Keep the last closed date window for a fresh load. Older clues for
-   // that category cannot resume a countdown after a newer window closes.
-   closedKinds.add(hint.kind);
-   closed??=result;
-   continue;
-  }
-  pending??=result;
- }
- return pending&&(!closed||Date.parse(pending.publishedAt)>Date.parse(closed.publishedAt))?pending:closed;
+const sourceNames:Record<string,ReferencePublicSignal['sourceName']>={
+ [tiboSourceId]:'Tibo 公开动态',[REFERENCE_SIGNAL_SOURCE.id]:'AIPlanWatch',[archiveSourceId]:'Codex Resets',
+};
+export interface ReferenceSignalDecision {
+ state:'forecast'|'pending'|'excluded'|'cancelled';at:string;reason:string;
+}
+export interface ReferenceSignalDecisionRecord extends ReferenceSignalDecision {
+ evidenceId:string;publishedAt:string;collectedAt:string;projectedAt?:string;
+}
+const ms=(at?:string)=>Date.parse(at??'');
+const recent=(item:Evidence,now:number)=>ms(item.publishedAt)<=now&&ms(item.publishedAt)>now-RESET_SIGNAL_LOOKBACK_MS&&ms(item.collectedAt)<=now;
+function knownSignalSource(item:Evidence):boolean {
+ if(item.provenance!=='archive'||!originalPost.test(item.url)||!item.url.endsWith('/'+item.messageId))return false;
+ if(item.sourceId===tiboSourceId)return item.metadata?.sourceGroup==='fxembed:thsottiaux';
+ if(item.sourceId===REFERENCE_SIGNAL_SOURCE.id)return item.metadata?.sourceGroup==='aiplanwatch'&&item.metadata.referenceSignal?.referenceUrl===REFERENCE_SIGNAL_SOURCE.url;
+ return item.sourceId===archiveSourceId&&item.metadata?.sourceGroup==='codex-resets'&&item.metadata.category==='reset';
+}
+function isUsableOriginal(item:Evidence):boolean {
+ return item.textOrigin==='original'&&!isTruncatedBenefitText(item.text);
 }
 
-export function projectReferenceSignal(value:ReferencePublicSignal|undefined,sources:Source[],now:string,completedAt?:string):ReferencePublicSignal|undefined {
+function directSignalHints(item:Evidence,context:Evidence[]):PublicResetHint[] {
+ const claims=evidenceBenefitClaims(item,context);
+ const hintFor=(text:string)=>interpretResetHint(text,item.publishedAt)??interpretForwardResetSignal(text,item.publishedAt);
+ if(claims.length)return claims.filter(claim=>claim.scope==='public'&&claim.stage==='promised'&&
+   claims.filter(other=>other.kind===claim.kind).length===1).flatMap(claim=>{
+  const parsed=resetHintTiming(claim.kind,claim.quote,item.publishedAt);
+  if(parsed?.windowBasis==='source_time')return [parsed];
+  if(parsed&&claim.expectedAt&&ms(claim.expectedAt)>ms(item.publishedAt))return [{
+   kind:claim.kind,expiresAt:claim.expectedAt,windowBasis:'source_time',timeNote:claim.timeNote,
+  }];
+  if(parsed?.windowBasis==='fallback_48h'){
+   const combined=hintFor(item.text);
+   if(combined?.kind===claim.kind&&combined.windowBasis!=='fallback_48h')return [combined];
+  }
+  return parsed?[parsed]:[];
+ });
+ const combined=hintFor(item.text);
+ if(combined)return [combined];
+ if(resetSignalKinds(item.text).length===1&&isResetSignalDelay(item.text)&&!cancelsResetSignal(item.text)){
+  const latest=benefitClauses(item.text).at(-1);
+  const update=latest&&hintFor(latest);
+  if(update&&update.windowBasis!=='fallback_48h')return [update];
+ }
+ if(resetSignalKinds(item.text).length!==2||excludedResetSignal(item.text))return [];
+ const clauses=benefitClauses(item.text);
+ const hints=clauses.flatMap(clause=>{
+  const [kind,...otherKinds]=resetSignalKinds(clause);
+  if(!kind||otherKinds.length||clauses.some(other=>other!==clause&&resetSignalKinds(other).includes(kind)))return [];
+  const hint=hintFor(clause);
+  return hint?[hint]:[];
+ });
+ return hints;
+}
+
+/** A dated or uncertain parent can identify a reply's topic before an article
+ * is published. An unrelated quoted post or conflicting lineage cannot. */
+function signalParent(item:Evidence,known:Evidence[],now:string):ReturnType<typeof resetReplyParent> {
+ const formal=resetReplyParent(item,known,now);
+ if(formal)return formal;
+ const lineage=gatherExplicitEvidenceContext(item,known);
+ const parent=lineage[1];
+ if(!parent||lineage.some(row=>!isUsableOriginal(row)||originalConflict(row,known)))return;
+ const hints=directSignalHints(parent,lineage.slice(1));
+ if(hints.length===1&&resetSignalKinds(parent.text).length<=1)return {parent,kind:hints[0].kind};
+}
+
+export function needsResetSignalReview(primary:Evidence,context:Evidence[],now:string):boolean {
+ const cutoff=ms(now);
+ if(!knownSignalSource(primary)||!isUsableOriginal(primary)||!recent(primary,cutoff)||ms(primary.publishedAt)+recentHintMs<=cutoff||
+   originalConflict(primary,context)||excludedResetSignal(primary.text)||evidenceBenefitClaims(primary,context).length||
+   directSignalHints(primary,context).length||!(/[\p{L}\p{N}]/u.test(primary.text.replace(/^@\w+\s+/,''))))return false;
+ const parent=signalParent(primary,context,now);
+ if(context.some(item=>!isUsableOriginal(item)||item.parentId&&!context.some(parent=>parent.messageId===item.parentId)))return false;
+ if(parent&&interpretResetReplyHint(primary.text,primary.publishedAt,parent.kind))return false;
+ return true;
+}
+
+export function needsResetSignalContext(primary:Evidence,context:Evidence[],now:string):boolean {
+ const cutoff=ms(now);
+ return knownSignalSource(primary)&&isUsableOriginal(primary)&&recent(primary,cutoff)&&
+  ms(primary.publishedAt)+recentHintMs>cutoff&&!!primary.parentId&&
+  !context.some(item=>item.messageId===primary.parentId&&isUsableOriginal(item))&&
+  !evidenceBenefitClaims(primary,context).length&&!directSignalHints(primary,context).length;
+}
+
+function publicSignal(item:Evidence,group:Evidence[],recordedAt:string,fields:Partial<ReferencePublicSignal>):ReferencePublicSignal {
+ const names=[...new Set([item,...group].map(row=>sourceNames[row.sourceId]))];
+ return {id:item.messageId,text:item.text.slice(0,3000),publishedAt:item.publishedAt,recordedAt,sourceUrl:item.url,sourceName:names[0],
+  ...(names.length>1?{sourceNames:names}:{}),...fields};
+}
+
+function mergeSignal(previous:ReferencePublicSignal, next:ReferencePublicSignal):ReferencePublicSignal {
+ const first=previous.roundAt??previous.publishedAt;
+ // Soft updates ("soon") carry the original observation window or stated date.
+ const specificity=(hint:PublicResetHint|undefined)=>hint?.windowBasis==='source_time'?2:hint?.dayLabel?1:0;
+ const updatedTime=specificity(next.hint)>0&&specificity(next.hint)>=specificity(previous.hint);
+ const chosen=next.cancelled||updatedTime?next:previous;
+ return {...chosen,roundAt:first,roundSourceUrls:[...new Set([
+  ...(previous.roundSourceUrls??[previous.sourceUrl]),...(next.roundSourceUrls??[next.sourceUrl]),
+ ])].slice(-12)};
+}
+
+function isNewSignalRound(text:string):boolean {
+ return /\b(?:another|second|third|separate|batch\s+\d|new round)\b|下一批|另(?:一|发|补)|第[二三四五\d]+批|新一轮/i.test(text);
+}
+
+interface ReferenceSignalOptions {
+ reviews?:Map<string,ResetSignalReview>;
+ resolvedAt?:Partial<Record<PublicResetHint['kind'],string>>;
+ observedAt?:Partial<Record<PublicResetHint['kind'],string>>;
+ onDecision?:(item:Evidence,decision:ReferenceSignalDecision)=>void;
+}
+
+function applyReferenceSignal(rounds:ReferencePublicSignal[],item:Evidence,group:Evidence[],
+  change:{kind:PublicResetHint['kind'];hint?:PublicResetHint;links:string[];parent?:ReturnType<typeof signalParent>;
+    at:string;resolvedAt?:string;observedAt?:string}):ReferenceSignalDecision {
+ const {kind,hint,links,parent,at}=change;
+ const anchor=ms(item.publishedAt),resolution=ms(change.resolvedAt),observation=ms(change.observedAt);
+ // Shared background posts do not make siblings the same batch.
+ let matching:ReferencePublicSignal[]=[];
+ for(const url of links){
+  matching=rounds.filter(round=>round.hint?.kind===kind&&(round.roundSourceUrls?.includes(url)||round.sourceUrl===url));
+  if(matching.length)break;
+ }
+ let prior=rounds.filter(round=>round.hint?.kind===kind&&ms(round.roundAt??round.publishedAt)<=anchor&&
+  (!Number.isFinite(resolution)||resolution>anchor||ms(round.roundAt??round.publishedAt)>resolution));
+ if(observation<=anchor){
+  const possible=prior.filter(round=>!round.cancelled&&ms(round.roundAt??round.publishedAt)<=observation&&
+   signalClosesAt(round.hint)>=observation);
+  // A report fitting two rounds cannot break a fallback link to either one.
+  if(possible.length===1)prior=prior.filter(round=>round!==possible[0]);
+ }
+ const competing=prior.filter(round=>!round.cancelled&&signalClosesAt(round.hint)>anchor);
+ const distinct=isNewSignalRound(item.text);
+ const explicitChange=!hint||/\b(?:change of plans|rescheduled|correction|instead|moved to)\b|改期|改为|更正|调整为/i.test(item.text);
+ const fallback=hint?.windowBasis==='fallback_48h';
+ const linked=(!distinct||explicitChange)&&matching.length===1?matching[0]:undefined;
+ const singleOpen=!distinct&&!links.length&&competing.length===1&&
+  (explicitChange||fallback||competing[0].hint?.windowBasis==='fallback_48h')?competing[0]:undefined;
+ const previous=linked??singleOpen??(!distinct&&!links.length&&!competing.length&&fallback?
+  prior.findLast(round=>round.hint?.windowBasis==='fallback_48h'&&anchor<=signalClosesAt(round.hint)+recentHintMs):undefined);
+ if(hint){
+  if(previous&&fallback&&(previous.cancelled||signalClosesAt(previous.hint)<=anchor)){
+   return {state:'excluded',at,reason:'closed_round_restatement'};
+  }
+  const next=publicSignal(item,group,at,{hint,roundSourceUrls:[item.url]});
+  if(previous){
+   rounds[rounds.indexOf(previous)]=mergeSignal(previous,next);
+   return {state:'forecast',at,reason:fallback?'retained_round_window':'updated_round_window'};
+  }
+  if(!distinct&&(matching.length>=2||!links.length&&competing.length>=2&&fallback))return {state:'pending',at,reason:'ambiguous_round'};
+  rounds.push(next);
+  return {state:'forecast',at,reason:hint.windowBasis??'source_day'};
+ }
+ if(previous){
+  rounds[rounds.indexOf(previous)]=mergeSignal(previous,publicSignal(item,group,at,{hint:previous.hint,cancelled:true}));
+  return {state:'cancelled',at,reason:'verified_withdrawal'};
+ }
+ if(links.length&&matching.length===0&&parent?.kind===kind){
+  rounds.push(publicSignal(item,group,at,{hint:{kind,expiresAt:item.publishedAt,parentSourceUrl:parent.parent.url},
+   roundAt:parent.parent.publishedAt,roundSourceUrls:[item.url],cancelled:true}));
+  return {state:'cancelled',at,reason:'verified_parent_withdrawal'};
+ }
+ return {state:'excluded',at,reason:'withdrawal_without_unique_round'};
+}
+
+/** Derive per-category rounds from the evidence known at this instant.
+ * Excerpts are discovery only. They cannot set dates, stages or eligibility. */
+export function referencePublicSignals(
+ evidence:Evidence[],sources:Source[],now:string,options:ReferenceSignalOptions={},
+):ReferencePublicSignal[] {
+ const cutoff=ms(now);
+ const enabled=new Map(sources.filter(source=>source.id in sourceNames&&(keepKnownDatedHint(source)||signalDiscoveryAvailable(source))).map(source=>[source.id,source]));
+ if(!enabled.size)return [];
+ const known=evidence.filter(item=>ms(item.collectedAt)<=cutoff&&ms(item.publishedAt)<=cutoff);
+ const groups=new Map<string,Evidence[]>();
+ for(const item of known){
+  if(!recent(item,cutoff)||!enabled.has(item.sourceId)||!knownSignalSource(item))continue;
+  const group=groups.get(item.messageId);
+  if(group)group.push(item);else groups.set(item.messageId,[item]);
+ }
+ const ordered=[...groups.values()].sort((a,b)=>ms(a[0].publishedAt)-ms(b[0].publishedAt)||a[0].messageId.localeCompare(b[0].messageId));
+ const rounds:ReferencePublicSignal[]=[];
+ let pending:ReferencePublicSignal|undefined;
+ for(const group of ordered){
+  // An embedded copy can omit the parent relationship. Keep the richer
+  // original and use the first equivalent collection time when available.
+  const originals=group.filter(isUsableOriginal);
+  const usable=originals.filter(row=>row.parentId);
+  const preferred=usable.length?usable:originals;
+  const item=selectOriginal(preferred.filter(row=>row.sourceId===tiboSourceId))??selectOriginal(preferred.length?preferred:group)!;
+  const equivalent=originals.filter(row=>row.text===item.text&&(!item.parentId||row.parentId===item.parentId));
+  const originalRecordedAt=equivalent.length?Math.min(...equivalent.map(row=>ms(row.collectedAt))):ms(item.collectedAt);
+  const context=gatherExplicitEvidenceContext(item,known);
+  const claims=isUsableOriginal(item)?evidenceBenefitClaims(item,context):[];
+  const parent=isUsableOriginal(item)?signalParent(item,known,now):undefined;
+  const conflict=originalConflict(item,known)||context.some(row=>originalConflict(row,known));
+  const recorded=new Date(Math.max(originalRecordedAt,...context.slice(1).map(row=>ms(row.collectedAt)))).toISOString();
+  const review=!conflict&&isUsableOriginal(item)?equivalent.map(row=>options.reviews?.get(row.id)).find(value=>value&&
+    ms(value.reviewedAt)<=cutoff&&value.evidenceIds.slice(1).join()===context.slice(1).map(row=>row.id).join()):undefined;
+  const reviewed=review?acceptResetSignalReview(review,context,review.reviewedAt):undefined;
+  const reply=parent&&interpretResetReplyHint(item.text,item.publishedAt,parent.kind);
+  const direct=!conflict&&isUsableOriginal(item)?directSignalHints(item,context):[];
+  const inherited=!conflict&&reply&&parent?{...reply,parentSourceUrl:parent.parent.url}:undefined;
+  const inferred=!conflict&&reviewed?.disposition==='future'&&reviewed.kind&&!claims.length&&
+    (!parent||parent.kind===reviewed.kind)?resetHintTiming(reviewed.kind,reviewed.quote,item.publishedAt):undefined;
+  const hints=direct.length?direct:inherited?[inherited]:inferred?[inferred]:[];
+  const links=context.slice(1).map(row=>row.url);
+  const cancelled=!conflict&&isUsableOriginal(item)&&cancelsResetSignal(item.text);
+  const delayed=(!!parent||mentionsResetSignal(item.text))&&isResetSignalDelay(item.text);
+  const cancelKinds=cancelled?resetSignalKinds(item.text):[];
+  const cancelKind=cancelKinds.length===1?cancelKinds[0]:cancelled&&cancelKinds.length===0&&isContextualCancellation(item.text)?parent?.kind:undefined;
+  const anchor=ms(item.publishedAt);
+  const changes=hints.length?hints.map(hint=>({kind:hint.kind,hint})):cancelKind?[{kind:cancelKind,hint:undefined}]:[];
+  if(changes.length){
+   const at=direct.length&&!claims.length?new Date(originalRecordedAt).toISOString():inferred&&reviewed?
+    new Date(Math.max(ms(recorded),ms(reviewed.reviewedAt))).toISOString():recorded;
+   const decisions=changes.map(change=>applyReferenceSignal(rounds,item,group,{...change,links,parent,at,
+    resolvedAt:options.resolvedAt?.[change.kind],observedAt:options.observedAt?.[change.kind]}));
+   if(decisions.some(decision=>decision.state==='pending')&&anchor+recentHintMs>cutoff)pending=publicSignal(item,group,recorded,{reviewPending:true});
+   options.onDecision?.(item,decisions.find(decision=>decision.state==='forecast')??decisions[0]);
+   continue;
+  }
+  if(cancelled||reviewed?.disposition==='excluded'||claims.length||excludedResetSignal(item.text)&&!delayed||anchor+recentHintMs<=cutoff){
+   options.onDecision?.(item,{state:'excluded',at:recorded,reason:cancelled?'withdrawal_without_unique_round':reviewed?.disposition==='excluded'?'semantic_exclusion':claims.length?'handled_by_publication':anchor+recentHintMs<=cutoff?'observation_window_elapsed':'non_future_content'});
+   continue;
+  }
+  const referenceLead=isResetWatchLead(item);
+  const related=mentionsResetSignal(item.text)||!!parent||context.slice(1).some(row=>mentionsResetSignal(row.text)||known.some(other=>other.messageId===row.messageId&&mentionsResetSignal(other.text)))||referenceLead||
+   item.sourceId===REFERENCE_SIGNAL_SOURCE.id&&isUsableOriginal(item)&&forecastSourceAvailable(enabled.get(item.sourceId),now);
+  if(!related){
+   const unresolved=reviewed?.disposition==='pending'||needsResetSignalReview(item,context,now);
+   options.onDecision?.(item,{state:!isUsableOriginal(item)||unresolved?'pending':'excluded',at:recorded,
+    reason:!isUsableOriginal(item)?'missing_original':unresolved?'semantic_context_unresolved':'no_verified_reset_context'});
+   continue;
+  }
+  const displayText=!isUsableOriginal(item)?'来源收录了一条公开线索，原帖仍在核对。':item.text.slice(0,3000);
+  pending=publicSignal(item,group,recorded,{text:displayText,reviewPending:true});
+  options.onDecision?.(item,{state:'pending',at:recorded,reason:conflict?'conflicting_original':!isUsableOriginal(item)?'missing_original':item.parentId&&!parent?'parent_context_unresolved':delayed?'timing_change_unresolved':'future_direction_unresolved'});
+ }
+ const visible=rounds.filter(round=>round.hint&&(
+  !round.cancelled&&signalClosesAt(round.hint)>cutoff||round===rounds.findLast(other=>other.hint?.kind===round.hint?.kind)));
+ // Bound the public payload without letting one busy category crowd out the other.
+ const bounded=['automatic_reset','banked_reset'].flatMap(kind=>visible.filter(round=>round.hint?.kind===kind).slice(-6));
+ return [...bounded,...(pending?[pending]:[])];
+}
+
+/** Compatibility for clients that only understand one dated or untyped clue. */
+export function legacyReferenceSignal(values:ReferencePublicSignal[]|undefined,sources:Source[],now:string,completedAt?:string):ReferencePublicSignal|undefined {
+ return values?.filter(signal=>!signal.cancelled&&signal.sourceName!=='Codex Resets'&&(!signal.hint||signal.hint.dayLabel))
+  .sort((a,b)=>Number(!!b.hint&&hintDisplayUntil(b.hint)>ms(now))-Number(!!a.hint&&hintDisplayUntil(a.hint)>ms(now))||ms(b.publishedAt)-ms(a.publishedAt))
+  .map(signal=>projectReferenceSignal(signal,sources,now,completedAt)).find(Boolean);
+}
+
+export function projectReferenceSignal(value:ReferencePublicSignal|undefined,sources:Source[],now:string,completedAt?:string,preserveRound=false):ReferencePublicSignal|undefined {
  if(!value)return;
- const sourceId=value.sourceName==='Tibo 公开动态'?tiboSourceId:value.sourceName==='AIPlanWatch'?REFERENCE_SIGNAL_SOURCE.id:undefined;
+ const sourceId=Object.keys(sourceNames).find(id=>sourceNames[id]===value.sourceName);
  const source=sources.find(item=>item.id===sourceId);
  const cutoff=Date.parse(now),published=Date.parse(value.publishedAt),recorded=Date.parse(value.recordedAt);
- const knownDatedHint=value.hint?.dayLabel&&keepKnownDatedHint(source);
+ const knownDatedHint=(value.hint?.dayLabel||preserveRound)&&(keepKnownDatedHint(source)||preserveRound&&signalDiscoveryAvailable(source));
  if(!sourceId||(!forecastSourceAvailable(source,now)&&!knownDatedHint)||!/^\d{15,20}$/.test(value.id)||
    value.sourceUrl!==`https://x.com/thsottiaux/status/${value.id}`||typeof value.text!=='string'||!value.text.trim()||value.text.length>3000||
    !Number.isFinite(published)||!Number.isFinite(recorded)||published>cutoff||recorded>cutoff)return;
  const hint=value.hint;
- if(hint&&(!Number.isFinite(hintDisplayUntil(hint))||!hint.dayLabel&&hintDisplayUntil(hint)<=cutoff)||value.reviewPending&&published+recentHintMs<=cutoff)return;
+ if(hint&&(!Number.isFinite(hintDisplayUntil(hint))||!preserveRound&&!hint.dayLabel&&hintDisplayUntil(hint)<=cutoff)||value.reviewPending&&published+recentHintMs<=cutoff)return;
+ if(preserveRound){
+  if(hint&&(!['automatic_reset','banked_reset'].includes(hint.kind)||ms(hint.expiresAt)<=ms(value.roundAt??value.publishedAt)||
+    hint.windowBasis!==undefined&&!['source_time','source_day','fallback_48h'].includes(hint.windowBasis)||
+    hint.parentSourceUrl!==undefined&&!originalPost.test(hint.parentSourceUrl)))return;
+  if(value.roundAt!==undefined&&(!Number.isFinite(ms(value.roundAt))||ms(value.roundAt)>published))return;
+  if(value.roundSourceUrls!==undefined&&(!Array.isArray(value.roundSourceUrls)||value.roundSourceUrls.length>12||value.roundSourceUrls.some(url=>!originalPost.test(url))))return;
+  if(value.sourceNames!==undefined&&(!Array.isArray(value.sourceNames)||value.sourceNames.length>3||value.sourceNames.some(name=>!Object.values(sourceNames).includes(name))))return;
+ }
  if(hint?.kind!=='banked_reset'&&completedAt&&published<=Date.parse(completedAt))return;
  return value;
+}
+
+export function projectReferenceSignals(values:ReferencePublicSignal[]|undefined,sources:Source[],now:string):ReferencePublicSignal[]|undefined {
+ if(!Array.isArray(values))return;
+ return values.slice(0,13).flatMap(value=>{
+  const signal=value&&typeof value==='object'?projectReferenceSignal(value,sources,now,undefined,true):undefined;
+  if(!signal)return [];
+  const {id,text,publishedAt,recordedAt,sourceUrl,sourceName,sourceNames,roundAt,roundSourceUrls,reviewPending,cancelled,hint}=signal;
+  return [{id,text,publishedAt,recordedAt,sourceUrl,sourceName,sourceNames,roundAt,roundSourceUrls,reviewPending:reviewPending===true||undefined,cancelled:cancelled===true||undefined,
+   ...(hint?{hint:{kind:hint.kind,expiresAt:hint.expiresAt,dayLabel:typeof hint.dayLabel==='string'?hint.dayLabel.slice(0,12):undefined,
+    windowBasis:hint.windowBasis,parentSourceUrl:hint.parentSourceUrl,timeNote:typeof hint.timeNote==='string'?hint.timeNote.slice(0,360):undefined}}:{})}];
+ });
+}
+
+/** Only the boundaries affect public cache identity. Seconds on the clock
+ * are rendered locally and must not invalidate the API on every tick. */
+export function referenceSignalVersion(values:unknown,timestamp:string):unknown {
+ if(!Array.isArray(values))return;
+ const now=ms(timestamp);
+ return values.filter(signal=>signal&&typeof signal==='object').map(signal=>{
+  const deadline=signal.hint?ms(signal.hint.expiresAt):ms(signal.publishedAt)+recentHintMs;
+  return [signal,now>=deadline,!!signal.hint&&signal.hint.windowBasis!=='fallback_48h'&&now>=deadline+86400000];
+ });
 }

@@ -234,9 +234,9 @@ test('开始消息沿用倒计时，到点正计，满24小时回到上次发生
   const expired=card(d,at);
   assert.equal(expired.state,'completed');assert.equal(expired.hero.title,'距离上次重置');
   assert.equal(expired.publicationId,'pub-older');assert.equal(expired.clockAt,'2026-10-22T04:00:00Z');
-  assert.equal(expired.roundNotice.label,'本轮重置安排已取消');assert.match(expired.roundNotice.basis,/超时 24 小时/);
+  assert.equal(expired.roundNotice.label,'本轮重置等待确认已结束');assert.match(expired.roundNotice.basis,/超时 24 小时，暂未确认/);
   assert.match(expired.sharePath,/home\/index/);
-  assert.match(statusPosterInput({...d,serverTime:at},'automatic_reset').nextNote,/本轮重置安排已取消/);
+  assert.match(statusPosterInput({...d,serverTime:at},'automatic_reset').nextNote,/本轮重置等待确认已结束/);
  }
 });
 test('24小时内新安排、调整、取消与完成取代旧状态；无关动态不覆盖',()=>{
@@ -272,7 +272,7 @@ test('原生首页无预测数据也能前台到点和24小时退出，每个边
   h.page.syncForecastExpiry();assert.equal(h.refreshes,1);
   h.advanceTo(Date.parse(T)+86400000-1);assert.equal(h.page.data.resetCards[0].state,'overdue');
   h.advanceTo(Date.parse(T)+86400000+100);assert.equal(h.page.data.resetCards[0].state,'cancelled');assert.equal(h.refreshes,2);
-  assert.equal(h.page.data.primaryCard.roundNotice.label,'本轮重置安排已取消');
+  assert.equal(h.page.data.primaryCard.roundNotice.label,'本轮重置等待确认已结束');
   assert.match(h.page.onShareAppMessage().path,/home\/index\?kind=automatic_reset/);
   h.page.openStatusEvidence({currentTarget:{dataset:{kind:'automatic_reset'}}});assert.deepEqual(h.navigations,['/pages/detail/index?publicationId=pub-promise']);
   h.page.redraw();assert.equal(h.page.data.resetCards[0].state,'cancelled');assert.equal(h.refreshes,2);assert.equal(h.timeouts.size,0);
@@ -447,6 +447,8 @@ test('观测汇总分享保留实际日期和类别，空状态回首页',()=>{
 });
 
 test('同一事件内有独立动作身份也要核对旧批次的原预告',()=>{
+ assert.equal(readFileSync(new URL('../src/lib/round-evidence.cjs',import.meta.url),'utf8'),
+   readFileSync(new URL('../miniprogram/utils/round-evidence.js',import.meta.url),'utf8'),'服务器与小程序的观测归属规则同步');
  const native=require('../miniprogram/utils/round-evidence').announcementNeedsReview;
  const prior={actionId:'batch-1',eventId:'event-series',publicationId:'pub-complete',kind:'banked_reset',stage:'claimed_complete',statementAt:T,resolvedAt:T,announcedAt:'2026-10-21T02:00:00Z'} as const;
  for(const guard of [announcementNeedsReview,native]){

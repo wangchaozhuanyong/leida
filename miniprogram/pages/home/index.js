@@ -130,6 +130,7 @@ Page(createPage((data, query, page, app) => {
     if(!state.data){this.stopForecastExpiry();return;}
     const now=Date.parse(state.data.serverTime)+Math.max(0,Date.now()-state.receivedAt);
     const dates=(this.data.resetCards||[]).map(card=>card.validUntil).filter(Boolean);
+    if(this.data.untypedSignal?.expiresAt)dates.push(this.data.untypedSignal.expiresAt);
     if(forecasts?.referenceCadence?.status==='ready')dates.push(forecasts.referenceCadence.validUntil);
     if (forecasts?.watch && forecasts.watch.status==='active' && forecasts.watch.signal) dates.push(forecasts.watch.signal.expiresAt);
     const next=dates.map(Date.parse).filter(at=>Number.isFinite(at)&&at>now).sort((a,b)=>a-b)[0];

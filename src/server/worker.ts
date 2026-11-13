@@ -1,17 +1,18 @@
 import {validSemanticProof,type SemanticBenefitProof} from './semantic-benefit-review';
 import {analyzeBenefitEvidence} from './benefit-analysis';
 import { bankedProgress, bankedSeriesContext, matchingBenefitActions, equivalentCompletionOriginal } from './benefit-signal';
-import {REFERENCE_RESET_SOURCE,REFERENCE_SOURCES,needsReferenceHistoryRecovery,referenceCollectionHealth} from './reference-reset-source';
+import {REFERENCE_RESET_SOURCE,REFERENCE_SOURCES,evidenceLane,isResetWatchLead,needsReferenceHistoryRecovery,needsResetSignalContext,needsResetSignalReview,referenceCollectionHealth,signalDiscoveryAvailable} from './reference-reset-source';
 import { lockTransaction } from '../db';
 import { configuredStorageRpc } from './cloudbase/storage-config';
 import { cloudbaseTasks } from './cloudbase/tasks';
 import { CloudbaseRpcError } from './cloudbase/rpc';
 import { pool, list, one, insert, put, transaction, withAutoPublicationGuard } from '../db';
 import type { Candidate, Evidence, Job, Source, SiteSettings, RadarEvent, DraftContent, CandidateAutomation, Article } from '../lib/types';
-import { AIServiceError, generateContent, reviewBenefitContent, type AIRecord } from './ai';
+import { AIServiceError, generateContent, reviewBenefitContent, reviewResetSignalContent, type AIRecord } from './ai';
 import { collectSource, SourceStructureError, SourceRateLimitError, SourceConfigurationError, SourceTransientError } from './ingestion';
-import { gatherEvidenceContext, gatherExplicitEvidenceContext, hasCompleteContext, evidenceBenefitClaims, directEvidenceBenefitClaims, processingObstacles, isVerifiedCampaignCalendar } from './source-context';
+import { gatherEvidenceContext, gatherExplicitEvidenceContext, hasCompleteContext, evidenceBenefitClaims, directEvidenceBenefitClaims, originalConflict, processingObstacles, isVerifiedCampaignCalendar } from './source-context';
 import { extractBenefitClaims } from './benefit-rules';
+import type {ResetSignalReview} from '../lib/forecast';
 import { buildAutomaticTemplate, evidenceFingerprint, classifyBlockers, isClearlyUnrelated, hasExplicitCorrectionText, needsSemanticReview } from './automatic-content';
 import { enrichKnownEvidence, enrichQuotedResetContext } from './source-enrichment';
 import { DomainError, now, validateDraft, hash } from './domain';
@@ -21,12 +22,17 @@ import {processWechatJob,scheduleWechatDeliveries} from './wechat';
 import {runForecastCycle} from './forecast';
 import {createWorkerCadence,retrySchedulingConflict,safeWorkerFailure,type WorkerPhase} from './worker-timing';
 import {sourceCollectionSchedule,sourceNextCollectionAt,verifiedCollectionWindow} from './source-collection-policy';
+import {markForecastInputsChanged} from './reset-cadence-runtime';
+
+const signalReviewPolicy='reset-signal-review-1';
+type SignalReviewer=(context:Evidence[],version:number)=>Promise<ResetSignalReview|undefined>;
 
 const MAX_ACTIVE_GENERATION = 10;
 const MAX_ACTIVE_HISTORICAL = 2;
 const MAX_GENERATION_ATTEMPTS = 3;
 const activeJob = (job:Job) => job.status === 'queued' || job.status === 'running';
 const enabledSource = (source:Source|undefined) => !!source?.enabled && source.validated && !source.publicationPaused && source.kind !== 'manual' && source.id!=='tibo-timeline';
+const canProcessSource = (source:Source|undefined,item:Evidence) => enabledSource(source)||isResetWatchLead(item)&&signalDiscoveryAvailable(source);
 const CONTEXT_PROBE_INTERVAL = 15 * 60_000;
 export function sourceCollectionDue(source:Source,timestamp=Date.now()):boolean {
   return source.id!=='tibo-timeline' && source.enabled && source.kind!=='manual' && (source.validated || source.pauseReason==='structure'&&source.publicationPaused===true) && (!source.nextRunAt || Date.parse(source.nextRunAt)<=timestamp);
@@ -65,6 +71,14 @@ function sourceFor(candidate:Candidate,evidence:Evidence[],sources:Source[]):Sou
 }
 function untouched(candidate:Candidate):boolean {
   return (candidate.status==='pending' || candidate.status==='published'&&candidate.automation?.templatePublished===true) && !candidate.humanEdited;
+}
+function equivalentSignalReview(primary:Evidence,context:Evidence[],evidence:Evidence[],candidates:Candidate[]):ResetSignalReview|undefined {
+ const contextIds=context.slice(1).map(item=>item.id).join();
+ for(const item of evidence){
+  if(item.textOrigin!=='original'||item.messageId!==primary.messageId||item.url!==primary.url||item.text!==primary.text||item.parentId!==primary.parentId)continue;
+  const reviewed=candidates.find(candidate=>candidate.evidenceId===item.id&&candidate.automation?.signalReview)?.automation?.signalReview;
+  if(reviewed&&reviewed.evidenceIds.slice(1).join()===contextIds)return reviewed;
+ }
 }
 export function fingerprintChange(saved:string|undefined,current:string):'new'|'none'|'rules'|'evidence' {
  if(!saved)return 'new';if(saved===current)return 'none';
@@ -140,8 +154,8 @@ export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichme
       if(active>=MAX_ACTIVE_GENERATION)break;
       if(candidate.automation?.reasonCodes.includes('parent_conflict'))continue;
       const original=evidence.find(item=>item.id===candidate.evidenceId);
-      if(original&&evidence.find(item=>item.sourceId===original.sourceId&&item.messageId===original.messageId)?.id!==original.id)continue;
-      if(!original || original.provenance==='manual' || !enabledSource(sourceFor(candidate,evidence,sources)))continue;
+      if(original&&evidence.find(item=>evidenceLane(item)===evidenceLane(original))?.id!==original.id)continue;
+      if(!original || original.provenance==='manual' || !canProcessSource(sourceFor(candidate,evidence,sources),original))continue;
       if(candidate.status==='pending'&&isClearlyUnrelated(original)) {
         const ignored:Candidate={...candidate,status:'ignored',version:candidate.version+1,reasons:['自动排除无事实信息的回复，原文仍保留'],updatedAt:now(),automation:{state:'ready',reasonCodes:['unrelated_content'],dependencyIds:[],inputFingerprint:evidenceFingerprint([original]),evaluatedAt:now()}};
         await put('candidates',ignored,c);
@@ -158,7 +172,15 @@ export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichme
       if(previous.some(activeJob))continue;
       const latest=previous[0];
       const context=contextFor(candidate,original,evidence);
-      const fingerprint=evidenceFingerprint(context,aiReady(ai)?ai?.version:undefined);
+      const signalContext=gatherExplicitEvidenceContext(original,evidence);
+      const wantsSignalReview=needsResetSignalReview(original,signalContext,now())&&
+        !signalContext.some(item=>originalConflict(item,evidence))&&!equivalentSignalReview(original,signalContext,evidence,candidates);
+      const signalReview=ready&&wantsSignalReview;
+      const watchLead=isResetWatchLead(original);
+      const signalContextMissing=needsResetSignalContext(original,signalContext,now());
+      const fingerprint=evidenceFingerprint(context,ready?ai?.version:undefined);
+      if(watchLead&&original.textOrigin==='original'&&!signalReview&&
+        !signalContextMissing&&candidate.automation?.reasonCodes.includes('signal_source_verified')&&candidate.automation.inputFingerprint===fingerprint)continue;
       const savedFingerprint=candidate.automation?.inputFingerprint??(typeof latest?.payload.inputFingerprint==='string'?latest.payload.inputFingerprint:undefined);
       const change=fingerprintChange(savedFingerprint,fingerprint),ruleOnly=change==='rules';
       const inputChanged=savedFingerprint?change!=='none':previous.some(job=>job.payload.generated===true)&&context.some(item=>!candidate.content.evidenceIds.includes(item.id));
@@ -176,11 +198,11 @@ export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichme
       // A bare historical completion remains unsupported until its pinned
       // snapshot is recovered; that missing proof must still enter the probe queue.
       const historyProofMissing=needsReferenceHistoryRecovery(original);
-      if(!template&&!ready&&!enrichArticle&&!obstacles.missing&&!historyProofMissing){
-        if(inputChanged||!savedFingerprint)await put('candidates',{...candidate,automation:{state:obstacles.conflict?'conflict':semanticNeeded?'configuration':'deferred',reasonCodes:semanticNeeded?['ai_unconfigured','semantic_pending',...obstacles.codes]:obstacles.codes,dependencyIds:[],inputFingerprint:fingerprint,evaluatedAt:now()},updatedAt:now()},c);
+      if(!template&&!ready&&!enrichArticle&&!obstacles.missing&&!historyProofMissing&&!signalContextMissing){
+        if(inputChanged||!savedFingerprint)await put('candidates',{...candidate,automation:{...candidate.automation,state:obstacles.conflict?'conflict':semanticNeeded||wantsSignalReview?'configuration':'deferred',reasonCodes:semanticNeeded||wantsSignalReview?['ai_unconfigured','semantic_pending',...obstacles.codes]:obstacles.codes,dependencyIds:[],inputFingerprint:fingerprint,evaluatedAt:now()},updatedAt:now()},c);
         continue;
       }
-      const probeDue=(obstacles.missing||historyProofMissing) && options.allowEnrichment!==false && canEnrich(original) && (!candidate.automation?.resumeAt||Date.parse(candidate.automation.resumeAt)<=Date.now());
+      const probeDue=(obstacles.missing||historyProofMissing||signalContextMissing) && options.allowEnrichment!==false && canEnrich(original) && (!candidate.automation?.resumeAt||Date.parse(candidate.automation.resumeAt)<=Date.now());
       const newsContextProbe=enrichArticle&&actualArticle?.publicationMode==='news_only'&&!original.messageId.startsWith('observed-')&&!hasCompleteContext(original,context)&&probeDue;
       const candidateEvent=events.find(event=>event.id===(candidate.content.eventId??actualArticle?.eventId));
       if(ruleOnly&&candidate.automation?.state==='conflict'&&!isStaleMachineConflict(candidate,candidateEvent)&&!isMissingDeadlineConflict(candidate,fallbackTemplate,candidateEvent,actualArticle,original,context)&&!isResolvedNewsContextConflict(candidate,original,context,events,evidence,articles))continue;
@@ -196,6 +218,16 @@ export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichme
         latest.payload.blockedReason==='budget'&&(Date.parse(String(latest.payload.resumeAfter))<=Date.now()||latest.payload.aiVersion!==ai?.version)||
         ['configuration','capacity'].includes(String(latest.payload.blockedReason))&&latest.payload.aiVersion!==ai?.version||
         latest.payload.blockedReason==='source'||latest.payload.blockedReason==='cooldown'&&Date.parse(String(latest.payload.resumeAfter))<=Date.now());
+      const reviewPolicyChanged=signalReview&&latest?.payload.signalReviewPolicy!==signalReviewPolicy&&!historical;
+      const needsSignalJob=signalReview&&(reviewPolicyChanged||inputChanged||!latest||failureDue);
+      if(needsSignalJob){
+        await queueJob('generate',{candidateId:candidate.id,automatic:true,signalReviewPolicy,signalReviewOnly:enrichArticle,
+         historical,evidencePublishedAt:original.publishedAt,aiVersion:ai?.version,expectedVersion:candidate.version,inputFingerprint:fingerprint,
+         ...(enrichArticle?{enrichArticle:true}:{})},c);
+        active++;
+        if(historical)historicalActive++;
+        continue;
+      }
       if(candidate.automation?.state==='conflict'&&!inputChanged)continue;
       if(partial&&generated&&!inputChanged&&!publishOnly&&!contextProbe&&!failureDue)continue;
       if(augmentationGenerated&&!inputChanged&&!publishOnly&&!contextProbe&&!failureDue)continue;
@@ -218,16 +250,32 @@ export async function scheduleDue(options:{allowTemplates?:boolean;allowEnrichme
 export async function claimJob():Promise<Job|undefined> {
   const rpc=configuredStorageRpc();if(rpc)return cloudbaseTasks(rpc).claim();
   return transaction(async c=>{
+    // Due reminders take a turn ahead of history, including expired history leases.
+    // Promote waiting live work together by due time so collection also keeps moving.
     const row=await c.query(`SELECT id,payload FROM radar_jobs
-      WHERE (payload->>'status'='queued' AND (payload->>'availableAt')::timestamptz<=now())
-        OR (payload->>'status'='running' AND (payload->>'leaseUntil')::timestamptz<now())
-      ORDER BY CASE WHEN payload->>'status'='running' THEN 0
-        WHEN payload->>'kind'='collect' THEN 1
-        WHEN payload->>'kind'='generate' AND coalesce(payload#>>'{payload,historical}','false')<>'true' THEN 2
-        WHEN payload->>'kind'='generate' THEN 3 ELSE 4 END,
-        CASE WHEN payload->>'kind'='generate' AND coalesce(payload#>>'{payload,historical}','false')<>'true' THEN payload#>>'{payload,evidencePublishedAt}' END DESC NULLS LAST,
-        CASE WHEN payload->>'kind'='generate' AND payload#>>'{payload,historical}'='true' THEN payload#>>'{payload,evidencePublishedAt}' END ASC NULLS LAST,
-        created_at ASC FOR UPDATE SKIP LOCKED LIMIT 1`);
+      CROSS JOIN LATERAL (
+        SELECT payload->>'kind' AS kind, payload->>'status' AS status,
+          (payload->>'availableAt')::timestamptz AS due_at,
+          coalesce(payload#>>'{payload,historical}','false')='true' AS historical
+      ) AS job
+      CROSS JOIN LATERAL (
+        SELECT CASE
+          WHEN job.kind='backfill' OR (job.kind='generate' AND job.historical) THEN 5
+          WHEN job.status='running' THEN 0
+          WHEN job.kind IN ('collect','generate','wechat_send') AND job.due_at<=now()-interval '60 seconds' THEN 1
+          WHEN job.kind='collect' THEN 2
+          WHEN job.kind='generate' THEN 3
+          WHEN job.kind='wechat_send' THEN 4
+          ELSE 6 END AS priority
+      ) AS queue
+      WHERE (job.status='queued' AND job.due_at<=now())
+         OR (job.status='running' AND (payload->>'leaseUntil')::timestamptz<now())
+      ORDER BY queue.priority,
+        CASE WHEN queue.priority=1 THEN job.due_at END ASC NULLS LAST,
+        CASE WHEN job.status='running' THEN 0 ELSE 1 END,
+        CASE WHEN job.kind='generate' AND NOT job.historical THEN payload#>>'{payload,evidencePublishedAt}' END DESC NULLS LAST,
+        CASE WHEN job.kind='generate' AND job.historical THEN payload#>>'{payload,evidencePublishedAt}' END ASC NULLS LAST,
+        created_at ASC, id ASC FOR UPDATE SKIP LOCKED LIMIT 1`);
     const old=row.rows[0]?.payload as Job|undefined;
     if(!old)return;
     const job:Job={...old,status:'running',attempts:old.attempts+1,leaseUntil:new Date(Date.now()+120_000).toISOString()};
@@ -307,7 +355,7 @@ async function saveAutomation(candidate:Candidate,automation:CandidateAutomation
     if(current?.version===candidate.version&&!current.humanEdited)await put('candidates',{...current,automation,reasons,updatedAt:now()},c);
   });
 }
-async function generateCandidate(job:Job,generator:Generator,allowTemplates:boolean,enrich:typeof enrichKnownEvidence,enrichQuoted:typeof enrichQuotedResetContext,reviewer=reviewBenefitContent):Promise<boolean> {
+async function generateCandidate(job:Job,generator:Generator,allowTemplates:boolean,enrich:typeof enrichKnownEvidence,enrichQuoted:typeof enrichQuotedResetContext,reviewer=reviewBenefitContent,signalReviewer:SignalReviewer=reviewResetSignalContent):Promise<boolean> {
   let candidate=await one<Candidate>('candidates',job.candidateId!);
   if(!candidate||candidate.status==='ignored'||candidate.status==='published'&&(!job.payload.enrichArticle||!candidate.automation?.templatePublished))return false;
   if(candidate.humanEdited&&!job.payload.force)throw new DomainError('人工修改的候选不会被自动生成覆盖',409);
@@ -320,7 +368,7 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
   if(!job.payload.force) {
     const source=await one<Source>('sources',primary.sourceId);
     if(primary.provenance==='manual')throw new DomainError('人工补录不能由自动任务发布');
-    if(!enabledSource(source))throw new SourcePausedError('来源已暂停或未通过验证，自动处理已暂停');
+    if(!canProcessSource(source,primary))throw new SourcePausedError('来源已暂停或未通过验证，自动处理已暂停');
   }
   if(canEnrich(primary)&&!job.payload.publishOnly&&!generatedCheckpoint&&(!job.payload.enrichArticle||job.payload.contextProbe)) {
     let enriched:Evidence|undefined;
@@ -338,7 +386,8 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
       generatedCheckpoint=false;
     }
   }
-  if(primary.provenance==='archive'&&primary.textOrigin==='original'&&!hasCompleteContext(primary,contextFor(candidate,primary,all))) {
+  if(primary.provenance==='archive'&&primary.textOrigin==='original'&&(!hasCompleteContext(primary,contextFor(candidate,primary,all))||
+    needsResetSignalContext(primary,gatherExplicitEvidenceContext(primary,all),now()))) {
     let quoted:Evidence[]=[];
     try {quoted=await enrichQuoted(primary,all);} catch { /* An unavailable quoted original leaves this message waiting for evidence. */ }
     for(const item of quoted){
@@ -358,12 +407,56 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
   const fingerprint=evidenceFingerprint(context,aiReady(ai)?ai?.version:undefined);
   const previousFingerprint=candidate.automation?.inputFingerprint;
   if(generatedCheckpoint&&job.payload.inputFingerprint!==fingerprint)generatedCheckpoint=false;
+  const signalContext=gatherExplicitEvidenceContext(primary,all);
+  let signalReview=candidate.automation?.signalReview;
+  if(!job.payload.force&&aiReady(ai)&&needsResetSignalReview(primary,signalContext,now())&&!signalContext.some(item=>originalConflict(item,all))&&
+    (!signalReview||signalReview.evidenceIds.join()!==signalContext.map(item=>item.id).join())){
+    // A verified copy of the same text and context reuses its saved review.
+    const existing=equivalentSignalReview(primary,signalContext,all,await list<Candidate>('candidates'));
+    const reviewed=existing??await signalReviewer(signalContext,ai!.version);
+    if(reviewed&&!existing)await transaction(async c=>{
+      const current=await one<Candidate>('candidates',candidate.id,c,true);
+      const lease=await one<Job>('jobs',job.id,c,true);
+      if(!current||current.humanEdited||current.version!==candidate.version||lease?.status!=='running'||lease.leaseUntil!==job.leaseUntil||Date.parse(lease.leaseUntil??'')<=Date.now())
+        throw new DomainError('候选或任务已变化，未保存旧复核结论',409);
+      const state=current.automation??{state:'deferred' as const,reasonCodes:[],dependencyIds:[]};
+      await put('candidates',{...current,automation:{...state,signalReview:reviewed},updatedAt:now()},c);
+      await markForecastInputsChanged(c);
+      await audit('worker','candidate.signal_review',current.id,'原帖预测线索完成复核',undefined,{
+        disposition:reviewed.disposition,evidenceIds:reviewed.evidenceIds,kind:reviewed.kind,reviewedAt:reviewed.reviewedAt,
+      },c);
+    });
+    signalReview=reviewed??signalReview;
+  }
+  // API discoveries only bootstrap original verification and presentation.
+  // Any matching official article must pass its ordinary collection flow.
+  if(isResetWatchLead(primary)&&primary.textOrigin==='original'){
+    const obstacles=processingObstacles(context);
+    const missingParent=needsResetSignalContext(primary,signalContext,now());
+    const waiting=obstacles.missing||missingParent;
+    await saveAutomation(candidate,{state:waiting?'waiting_evidence':obstacles.conflict?'conflict':'ready',reasonCodes:missingParent?['missing_parent']:waiting||obstacles.conflict?obstacles.codes:['signal_source_verified'],
+      dependencyIds:waiting&&primary.parentId?[primary.parentId]:[],inputFingerprint:fingerprint,evaluatedAt:now(),
+      resumeAt:waiting?new Date(Date.now()+CONTEXT_PROBE_INTERVAL).toISOString():undefined,signalReview});
+    return false;
+  }
+  if(isResetWatchLead(primary)){
+    const contextMissing=processingObstacles(context);
+    await saveAutomation(candidate,{state:'waiting_evidence',reasonCodes:contextMissing.codes,dependencyIds:primary.parentId?[primary.parentId]:[],
+      inputFingerprint:fingerprint,evaluatedAt:now(),resumeAt:new Date(Date.now()+CONTEXT_PROBE_INTERVAL).toISOString()});
+    return false;
+  }
+  if(job.payload.signalReviewOnly||signalReview?.disposition==='future'&&!buildAutomaticTemplate(context)){
+    await saveAutomation(candidate,{...classifyBlockers(candidate.reasons,context),state:'ready',reasonCodes:['signal_reviewed'],
+      inputFingerprint:fingerprint,evaluatedAt:now(),articleId:candidate.automation?.articleId,
+      templatePublished:candidate.automation?.templatePublished,signalReview});
+    return false;
+  }
   if(job.payload.contextProbe&&previousFingerprint===fingerprint) {
     const blocked=classifyBlockers(candidate.reasons,context);
     const obstacles=processingObstacles(context);
     const waiting=obstacles.missing||needsReferenceHistoryRecovery(primary);
     const state=waiting?Date.now()-Date.parse(candidate.createdAt)>24*3600_000?'deferred':'waiting_evidence':obstacles.conflict?'conflict':'deferred';
-    await saveAutomation(candidate,{...blocked,state,reasonCodes:obstacles.codes,inputFingerprint:fingerprint,evaluatedAt:now(),resumeAt:waiting?new Date(Date.now()+CONTEXT_PROBE_INTERVAL).toISOString():undefined,articleId:candidate.automation?.articleId,templatePublished:candidate.automation?.templatePublished});
+    await saveAutomation(candidate,{...blocked,state,reasonCodes:obstacles.codes,inputFingerprint:fingerprint,evaluatedAt:now(),resumeAt:waiting?new Date(Date.now()+CONTEXT_PROBE_INTERVAL).toISOString():undefined,articleId:candidate.automation?.articleId,templatePublished:candidate.automation?.templatePublished,signalReview});
     return false;
   }
   const actualArticle=job.payload.enrichArticle?publishedTemplateArticle(candidate,primary,all,await list<Article>('articles'),await list<RadarEvent>('events')):undefined;
@@ -380,7 +473,7 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
     const blocked=classifyBlockers(candidate.reasons,context);
     const obstacles=processingObstacles(context);
     const waiting=obstacles.missing||needsReferenceHistoryRecovery(primary);
-    await saveAutomation(candidate,{...blocked,state:waiting?'waiting_evidence':obstacles.conflict?'conflict':needsSemanticReview(fallbackTemplate,context)?'configuration':'deferred',reasonCodes:needsSemanticReview(fallbackTemplate,context)?['ai_unconfigured','semantic_pending',...obstacles.codes]:obstacles.codes,inputFingerprint:fingerprint,evaluatedAt:now(),resumeAt:waiting?new Date(Date.now()+CONTEXT_PROBE_INTERVAL).toISOString():undefined,articleId:candidate.automation?.articleId,templatePublished:candidate.automation?.templatePublished});
+    await saveAutomation(candidate,{...blocked,state:waiting?'waiting_evidence':obstacles.conflict?'conflict':needsSemanticReview(fallbackTemplate,context)?'configuration':'deferred',reasonCodes:needsSemanticReview(fallbackTemplate,context)?['ai_unconfigured','semantic_pending',...obstacles.codes]:obstacles.codes,inputFingerprint:fingerprint,evaluatedAt:now(),resumeAt:waiting?new Date(Date.now()+CONTEXT_PROBE_INTERVAL).toISOString():undefined,articleId:candidate.automation?.articleId,templatePublished:candidate.automation?.templatePublished,signalReview});
     return false;
   }
   draft.evidenceIds=[...new Set([primary.id,...draft.evidenceIds,...context.map(item=>item.id)])];
@@ -441,7 +534,7 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
       }
       const retained=current.reasons.filter(reason=>/由人工草稿/.test(reason));
       const nextReasons=[...new Set([...retained,...reasons])];
-      const automation:CandidateAutomation={...classifyBlockers(nextReasons,context),inputFingerprint:fingerprint,evaluatedAt:now(),articleId:current.automation?.articleId,templatePublished:current.automation?.templatePublished};
+      const automation:CandidateAutomation={...classifyBlockers(nextReasons,context),inputFingerprint:fingerprint,evaluatedAt:now(),articleId:current.automation?.articleId,templatePublished:current.automation?.templatePublished,signalReview};
       if(['waiting_evidence','deferred'].includes(automation.state))automation.resumeAt=new Date(Date.now()+CONTEXT_PROBE_INTERVAL).toISOString();
       const next:Candidate={...current,content:draft,reasons:nextReasons,automation,version:current.version+1,updatedAt:now()};
       await put('candidates',next,c);
@@ -460,7 +553,7 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
           const current=await one<Candidate>('candidates',persisted.id,c,true);
           if(current?.version===persisted.version&&!current.humanEdited) {
             const nextReasons=[...new Set([...current.reasons,error.message])];
-            const automation={...classifyBlockers(nextReasons,context),inputFingerprint:fingerprint,evaluatedAt:now(),articleId:current.automation?.articleId,templatePublished:current.automation?.templatePublished};
+            const automation={...classifyBlockers(nextReasons,context),inputFingerprint:fingerprint,evaluatedAt:now(),articleId:current.automation?.articleId,templatePublished:current.automation?.templatePublished,signalReview};
             await put('candidates',{...current,reasons:nextReasons,automation,updatedAt:now()},c);
           }
         });
@@ -469,7 +562,7 @@ async function generateCandidate(job:Job,generator:Generator,allowTemplates:bool
     return true;
   },job);
 }
-export interface WorkerDependencies { onStage?:(phase:WorkerPhase)=>void; generate?:Generator; review?:typeof reviewBenefitContent; collect?:typeof collectSource; enrich?:typeof enrichKnownEvidence; enrichQuoted?:typeof enrichQuotedResetContext; schedule?:boolean; allowTemplates?:boolean; wechat?:typeof processWechatJob; cadence?:ReturnType<typeof createWorkerCadence>; }
+export interface WorkerDependencies { onStage?:(phase:WorkerPhase)=>void; generate?:Generator; review?:typeof reviewBenefitContent; reviewSignal?:SignalReviewer; collect?:typeof collectSource; enrich?:typeof enrichKnownEvidence; enrichQuoted?:typeof enrichQuotedResetContext; schedule?:boolean; allowTemplates?:boolean; wechat?:typeof processWechatJob; cadence?:ReturnType<typeof createWorkerCadence>; }
 const workerCadence=createWorkerCadence();
 let forecastInputsChanged=false;
 export async function writeWorkerHeartbeat(error?:string,processed:boolean|string=false):Promise<void> {
@@ -517,7 +610,8 @@ export async function runOne(dependencies:WorkerDependencies={}):Promise<boolean
     const enrich=dependencies.enrich??(dependencies.generate?async()=>undefined:enrichKnownEvidence);
     const enrichQuoted=dependencies.enrichQuoted??(dependencies.generate?async()=>[]:enrichQuotedResetContext);
     phase(job.kind==='generate'?'job_generate':'job_collect');
-    const generated=job.kind==='generate'?await generateCandidate(job,dependencies.generate??generateContent,allowTemplates,enrich,enrichQuoted,dependencies.review):false;
+    const reviewSignal=dependencies.reviewSignal??(dependencies.generate?async()=>undefined:reviewResetSignalContent);
+    const generated=job.kind==='generate'?await generateCandidate(job,dependencies.generate??generateContent,allowTemplates,enrich,enrichQuoted,dependencies.review,reviewSignal):false;
     if(job.kind!=='generate') {
       const collected=await (dependencies.collect??collectSource)(job.sourceId!,job.kind==='backfill'||job.payload.historical===true);
       phase('job_result');

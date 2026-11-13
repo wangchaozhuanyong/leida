@@ -1,17 +1,17 @@
 <page-meta root-background-color="#f8f9f7" page-style="background-color:#f8f9f7" />
 <navigation-header pulling="{{pullRefreshing}}" title="模钥重置雷达" brand="{{true}}" paper="{{true}}" />
 <view class="page home-page {{motionActive && connected && !error ? 'motion-live' : ''}}">
-  <view class="home-heading">
+  <view wx:if="{{snapshotPending || sourceDelayed || error}}" class="home-heading">
     <button class="freshness-summary" bindtap="toggleFreshness" aria-label="公开资料状态" aria-expanded="{{freshnessOpen}}"><view class="health-dot {{snapshotPending ? 'cached' : sourceDelayed || error ? 'delayed' : ''}}" aria-hidden="true"/><text>{{snapshotPending ? '上次公开资料 · 待更新' : error ? connected ? '更新暂时中断' : '暂时无法连接' : connected ? sourceStatusLabel : loading ? '正在读取公开消息' : '等待连接公开资料'}}</text><text class="info-symbol" aria-hidden="true">ⓘ</text></button>
   </view>
-  <view wx:if="{{freshnessOpen && connected}}" class="freshness-detail"><view>来源最近更新：{{collectedAt}} · 北京时间</view><view>最新消息发布于：{{latestSourceTime}} · 北京时间</view><view class="muted">来源分别更新；具体重置时间请查看对应消息。</view></view>
+  <view wx:if="{{freshnessOpen && connected && (snapshotPending || sourceDelayed || error)}}" class="freshness-detail"><view>来源最近更新：{{collectedAt}} · 北京时间</view><view>最新消息发布于：{{latestSourceTime}} · 北京时间</view><view class="muted">来源分别更新；具体重置时间请查看对应消息。</view></view>
   <view wx:if="{{!connected && (clockUntrusted || error || unconfigured)}}" class="connection-card"><view class="connection-symbol" aria-hidden="true">◎</view><view class="connection-title">{{clockUntrusted ? '消息时间暂不可用' : '暂时无法获取动态'}}</view><view class="connection-description">{{clockUntrusted ? '请联网后重新加载；若仍异常，请检查手机日期和时间。' : '连接恢复后更新，暂不能判断是否出现新消息。'}}</view><button class="primary" bindtap="retry" disabled="{{loading}}">{{loading ? '正在重试…' : '重新获取'}}</button></view>
   <page-loader wx:elif="{{!connected}}" variant="home" />
   <view wx:else class="home-content {{contentMotion}}">
     <view wx:if="{{error}}" class="warning">连接暂时中断，正在显示上次内容。<button class="text-button" bindtap="retry" loading="{{loading}}">重新连接 →</button></view>
     <view wx:if="{{historical}}" class="warning">当前显示历史收录。</view>
     <template is="reset-state" data="{{card:primaryCard,secondary:secondaryCard,secondaryExpanded:secondaryCard && expandedSourceKind===secondaryCard.kind,expanded:expandedSourceKind===selectedResetKind,collectedAt:collectedAt,motionAllowed:motionActive && !error}}"/>
-    <view wx:if="{{untypedSignal}}" class="untyped-signal"><view class="untyped-title">发现相关消息</view><view>{{untypedSignal.description}}</view><view wx:if="{{untypedSignal.window}}">信号发布时推测：{{untypedSignal.window}}</view><button class="text-button" data-kind="untyped" bindtap="openStatusEvidence">查看信号依据 →</button><view wx:if="{{expandedSourceKind==='untyped'}}" class="reset-state-source"><view>来源：{{untypedSignal.sourceName}}</view><view>{{untypedSignal.watchNote}}</view><button wx:if="{{untypedSignal.sourceUrl}}" class="text-button" data-url="{{untypedSignal.sourceUrl}}" bindtap="copyStatusSource">复制来源原文链接 ↗</button></view></view>
+    <view wx:if="{{untypedSignal}}" class="untyped-signal"><view class="untyped-title">{{untypedSignal.title}}</view><view>{{untypedSignal.description}}</view><view wx:if="{{untypedSignal.window}}">信号发布时推测：{{untypedSignal.window}}</view><button class="text-button" data-kind="untyped" bindtap="openStatusEvidence">{{untypedSignal.action}} →</button><view wx:if="{{expandedSourceKind==='untyped'}}" class="reset-state-source"><view>来源：{{untypedSignal.sourceName}}</view><view wx:if="{{untypedSignal.watchNote}}">{{untypedSignal.watchNote}}</view><button wx:if="{{untypedSignal.sourceUrl}}" class="text-button" data-url="{{untypedSignal.sourceUrl}}" bindtap="copyStatusSource">复制来源原文链接 ↗</button></view></view>
     <view wx:if="{{signalExpiredNote}}" class="reset-expired">{{signalExpiredNote}}</view>
     <view class="home-card-actions"><button class="primary home-action" bindtap="openWechatSettings">微信提醒</button><button class="secondary home-action {{snapshotPending ? 'is-pending-snapshot' : ''}}" bindtap="openPoster" disabled="{{snapshotPending}}">{{snapshotPending ? '更新后可分享' : '分享动态'}}</button></view>
     <view wx:if="{{activity}}" class="activity-entry" data-path="{{activity.path}}" bindtap="navigate" role="button" hover-class="entry-pressed"><image src="/assets/neural/calendar-blue.png" class="action-icon" aria-hidden="true"/><view class="grow"><view class="activity-title">{{activity.title}}</view><view class="small muted">{{activity.phase}}</view></view><text aria-hidden="true">→</text></view>
@@ -25,14 +25,14 @@
 <template name="reset-state">
   <view class="radar-panel motion-step motion-step-0 reset-orbit kind-{{card.kind}} tone-{{card.hero.tone}} {{motionAllowed?'is-live':''}}" aria-label="{{card.hero.title || card.title}}">
     <view class="radar-mast"><view class="radar-name"><view class="radar-mark"/>{{card.kind==='banked_reset'?'重置卡发放':'额度重置'}}</view><text wx:if="{{card.hero.badge}}" class="radar-basis">{{card.hero.badge}}</text></view>
-    <view wx:if="{{card.roundNotice}}" class="orbit-round-note"><view>{{card.roundNotice.label}}</view><text wx:if="{{card.roundNotice.basis}}">{{card.roundNotice.basis}}</text></view>
+    <view wx:if="{{card.roundNotice}}" class="orbit-round-note"><view>{{card.roundNotice.label}}</view><text wx:if="{{card.roundNotice.basis}}">{{card.roundNotice.basis}}</text><button wx:if="{{card.roundNotice.sourceUrl}}" class="text-button" data-url="{{card.roundNotice.sourceUrl}}" bindtap="copyStatusSource">复制取消原文链接 ↗</button></view>
     <view class="radar-field">
       <view class="signal-art" aria-hidden="true">
         <view class="signal-wing signal-wing-left"><image class="signal-fold" src="/assets/neural/signal-fold.png" mode="aspectFit"/></view>
         <view class="signal-wing signal-wing-right"><image class="signal-fold" src="/assets/neural/signal-fold.png" mode="aspectFit"/></view>
       </view>
       <view class="radar-readout">
-        <view wx:if="{{card.hero.metric || card.hero.label}}" class="radar-caption">{{card.hero.metric?(card.hero.title || card.hero.label):card.hero.label}}</view>
+        <view wx:if="{{card.hero.metric || card.hero.label}}" class="radar-caption">{{card.hero.metric?(card.state === 'estimated' && card.metricLabel !== '距推测窗口结束' ? card.hero.label : (card.hero.title || card.hero.label)):card.hero.label}}</view>
         <view wx:if="{{card.hero.parts.length}}" class="radar-value {{card.hero.parts.length===3?'with-days':''}} {{card.hero.long?'long':''}}" aria-label="{{card.hero.metric}}">
           <view wx:for="{{card.hero.parts}}" wx:key="unit" class="radar-number">{{item.value}}<text class="radar-unit">{{item.unit}}</text></view>
         </view>
@@ -45,7 +45,7 @@
       <view wx:if="{{card.oldTime}}" class="orbit-old">{{card.oldTime}} · 北京时间</view>
       <view wx:if="{{card.observationPublicationId}}" class="independent-evidence"><view>另有第三方观测 · {{card.observationSourceName}}</view><view>{{card.observationTime}} · 北京时间</view><button class="text-button" data-kind="{{card.kind}}" bindtap="openObservation">查看观测 →</button></view>
       <view class="orbit-evidence"><view class="orbit-check"><view class="orbit-date-label">来源更新</view><text>{{collectedAt}}</text></view><button class="text-button" data-kind="{{card.kind}}" bindtap="openStatusEvidence">{{card.action}} →</button></view>
-      <view wx:if="{{expanded && card.sourceName}}" class="reset-state-source"><view>来源：{{card.sourceName}}{{card.sourceType === 'observed' ? ' · 第三方观察记录' : ''}}</view><view wx:if="{{card.watchNote}}">{{card.watchNote}}</view><button wx:if="{{card.sourceUrl}}" class="text-button" data-url="{{card.sourceUrl}}" bindtap="copyStatusSource">复制来源原文链接 ↗</button><button wx:if="{{card.parentSourceUrl}}" class="text-button" data-url="{{card.parentSourceUrl}}" bindtap="copyStatusSource">复制父帖链接 ↗</button><view wx:if="{{!card.sourceUrl}}">此观察记录没有公开原文链接。</view></view>
+      <view wx:if="{{expanded && card.sourceName}}" class="reset-state-source"><view>来源：{{card.sourceName}}{{card.sourceType === 'observed' ? ' · 第三方观察记录' : ''}}</view><view wx:if="{{card.sourceNames.length > 1}}">同一原帖另有公开来源收录。</view><view wx:if="{{card.watchNote}}">{{card.watchNote}}</view><button wx:if="{{card.sourceUrl}}" class="text-button" data-url="{{card.sourceUrl}}" bindtap="copyStatusSource">复制来源原文链接 ↗</button><button wx:if="{{card.parentSourceUrl}}" class="text-button" data-url="{{card.parentSourceUrl}}" bindtap="copyStatusSource">复制父帖链接 ↗</button><view wx:if="{{!card.sourceUrl}}">此观察记录没有公开原文链接。</view></view>
     </view>
     <button wx:if="{{secondary}}" class="radar-secondary" data-kind="{{secondary.kind}}" bindtap="openSecondary" hover-class="entry-pressed"><text>{{secondary.label}} · {{secondary.note}}</text><text aria-hidden="true">→</text></button>
     <view wx:if="{{secondaryExpanded && secondary.sourceUrl}}" class="reset-state-source"><view>{{secondary.sourceName}}</view><button class="text-button" data-url="{{secondary.sourceUrl}}" bindtap="copyStatusSource">复制来源原文链接 ↗</button></view>

@@ -20,12 +20,12 @@ function dataFor(text:string):PublicData{
  return {serverTime:now,events:[event],articles:[article],publications:[publication],evidence:[evidence],sources:[],activities:[],notices:[],site:{name:'本地时间限定回归',description:'',version:1,autoPublish:false}};
 }
 for(const kind of ['automatic_reset','banked_reset'] as ActionKind[]){
- for(const [wording,qualifier,label] of [['in 2 hours','','距离预计安排'],['in about 2 hours','左右','距离预计时间（约）'],['within 2 hours','前','距离预计最晚时间']]){
+ for(const [wording,qualifier,label] of [['in 2 hours','','距离预计安排'],['in about 2 hours','左右','距离预计时间（约）'],['within 2 hours','前',kind==='banked_reset'?'距离预计最晚发放':'距离预计最晚重置']]){
   test(`${kind}: ${wording} preserves point/approximate/deadline in home, timeline and both posters`,()=>{
    const verb=kind==='automatic_reset'?'reset usage limits':'grant a banked reset';
    const data=dataFor(`We will ${verb} for all paid users ${wording}.`),action=data.events[0].actions[0];
    const card=selectedHomeStatus(data,kind);assert.equal(card.timeQualifier,qualifier);assert.equal(card.metricLabel,label);
-   const shared=resetStateCards(data).cards.find((c:any)=>c.kind===kind);assert.equal(shared.metricLabel,label);assert.equal(/ 前$/.test(shared.time),qualifier==='前');
+   const shared=resetStateCards(data).cards.find((c:any)=>c.kind===kind);assert.equal(shared.metricLabel,qualifier==='前'?'距离预计最晚时间':label);assert.equal(/ 前$/.test(shared.time),qualifier==='前');
    const active={...action,actionId:action.id,eventId:data.events[0].id,publicationId:data.publications[0].id};
    const web=statusTimelineModel({status:'scheduled',active},now),native=nativeTimeline.statusTimelineModel({status:'scheduled',active},now);
    assert.equal(native.lead,web.lead);assert.equal(/最晚/.test(native.lead),qualifier==='前');assert.equal(/ 左右$/.test(native.note),qualifier==='左右');

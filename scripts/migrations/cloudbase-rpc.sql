@@ -92,15 +92,31 @@ BEGIN
   IF (nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'role') IS DISTINCT FROM 'service_role' THEN
     RAISE EXCEPTION 'backend role required' USING ERRCODE = '42501';
   END IF;
+  -- Match the native worker's ordering of live work and historical generation.
   SELECT id,payload INTO job_id,current_job FROM public.radar_jobs
-    WHERE (payload->>'status'='queued' AND (payload->>'availableAt')::timestamptz<=now())
-       OR (payload->>'status'='running' AND (payload->>'leaseUntil')::timestamptz<now())
-    ORDER BY CASE WHEN payload->>'status'='running' THEN 0 WHEN payload->>'kind'='collect' THEN 1
-      WHEN payload->>'kind'='generate' AND coalesce(payload#>>'{payload,historical}','false')<>'true' THEN 2
-      WHEN payload->>'kind'='generate' THEN 3 ELSE 4 END,
-      CASE WHEN payload->>'kind'='generate' AND coalesce(payload#>>'{payload,historical}','false')<>'true' THEN payload#>>'{payload,evidencePublishedAt}' END DESC NULLS LAST,
-      CASE WHEN payload->>'kind'='generate' AND payload#>>'{payload,historical}'='true' THEN payload#>>'{payload,evidencePublishedAt}' END ASC NULLS LAST,
-      created_at ASC FOR UPDATE SKIP LOCKED LIMIT 1;
+    CROSS JOIN LATERAL (
+      SELECT payload->>'kind' AS kind, payload->>'status' AS status,
+        (payload->>'availableAt')::timestamptz AS due_at,
+        coalesce(payload#>>'{payload,historical}','false')='true' AS historical
+    ) AS job
+    CROSS JOIN LATERAL (
+      SELECT CASE
+        WHEN job.kind='backfill' OR (job.kind='generate' AND job.historical) THEN 5
+        WHEN job.status='running' THEN 0
+        WHEN job.kind IN ('collect','generate','wechat_send') AND job.due_at<=now()-interval '60 seconds' THEN 1
+        WHEN job.kind='collect' THEN 2
+        WHEN job.kind='generate' THEN 3
+        WHEN job.kind='wechat_send' THEN 4
+        ELSE 6 END AS priority
+    ) AS queue
+    WHERE (job.status='queued' AND job.due_at<=now())
+       OR (job.status='running' AND (payload->>'leaseUntil')::timestamptz<now())
+    ORDER BY queue.priority,
+      CASE WHEN queue.priority=1 THEN job.due_at END ASC NULLS LAST,
+      CASE WHEN job.status='running' THEN 0 ELSE 1 END,
+      CASE WHEN job.kind='generate' AND NOT job.historical THEN payload#>>'{payload,evidencePublishedAt}' END DESC NULLS LAST,
+      CASE WHEN job.kind='generate' AND job.historical THEN payload#>>'{payload,evidencePublishedAt}' END ASC NULLS LAST,
+      created_at ASC, id ASC FOR UPDATE SKIP LOCKED LIMIT 1;
   IF job_id IS NULL THEN RETURN NULL; END IF;
   claimed:=current_job || jsonb_build_object('status','running','attempts',(current_job->>'attempts')::integer+1,
     'leaseUntil',to_char(clock_timestamp()+interval '120 seconds','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'));

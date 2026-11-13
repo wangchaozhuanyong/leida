@@ -51,14 +51,14 @@ export function ResetStateCards({data}:{data:PublicData}) {
   return <section aria-label="重置动态">
     <article className={`radar-panel is-live kind-${card.kind}`}>
       <header className="radar-mast"><strong className="radar-name"><i aria-hidden="true" className="radar-mark"/>{card.kind==='banked_reset'?'重置卡发放':'额度重置'}</strong>{card.hero.badge&&<span className="radar-basis">{card.hero.badge}</span>}</header>
-      {card.roundNotice&&<div className="pub-orbit-round-note"><strong>{card.roundNotice.label}</strong>{card.roundNotice.basis&&<small>{card.roundNotice.basis}</small>}</div>}
+      {card.roundNotice&&<div className="pub-orbit-round-note"><strong>{card.roundNotice.label}</strong>{card.roundNotice.basis&&<small>{card.roundNotice.basis}</small>}{safeUrl(card.roundNotice.sourceUrl)&&<a href={card.roundNotice.sourceUrl} target="_blank" rel="noopener noreferrer">查看取消原文 ↗</a>}</div>}
       <div className="radar-field">
         <div className="signal-art" aria-hidden="true">
           <div className="signal-wing signal-wing-left"><img className="signal-fold" src="/skin/signal-fold.png" width="615" height="368" alt=""/></div>
           <div className="signal-wing signal-wing-right"><img className="signal-fold" src="/skin/signal-fold.png" width="615" height="368" alt=""/></div>
         </div>
         <div className="radar-readout">
-        {(card.hero.metric||card.hero.label)&&<div className="radar-caption">{card.hero.metric?(card.hero.title||card.hero.label):card.hero.label}</div>}
+        {(card.hero.metric||card.hero.label)&&<div className="radar-caption">{card.hero.metric&&(card.state!=='estimated'||card.metricLabel==='距推测窗口结束')?(card.hero.title||card.hero.label):card.hero.label}</div>}
         {card.hero.parts.length?<div className={`radar-value ${card.hero.parts.length===3?'with-days':''} ${card.hero.long?'long':''}`} aria-label={card.hero.metric}>{card.hero.parts.map((part:{unit:string,value:string})=><span className="radar-number" key={part.unit}>{part.value}<small className="radar-unit">{part.unit}</small></span>)}</div>:<strong className="radar-verdict">{card.hero.metric||card.hero.title}</strong>}
       </div></div>
       {card.timeAt&&<div className="pub-focus-fact"><span>{card.timeLabel} · 北京时间</span><strong>{card.time}</strong></div>}
@@ -68,7 +68,7 @@ export function ResetStateCards({data}:{data:PublicData}) {
       {card.parentSourceUrl&&safeUrl(card.parentSourceUrl)&&<Link className="pub-focus-link" href={card.parentSourceUrl}>查看父帖依据 ↗</Link>}
       {secondary&&<Link className="radar-secondary" href={destination(secondary)}><span>{secondary.kind==='banked_reset'?'重置卡发放':'额度重置'} · {secondary.roundNotice?.label||[secondary.hero.badge,secondary.time].filter(Boolean).join(' ')}</span><span>→</span></Link>}
     </article>
-    {untyped&&<div className="pub-reset-untyped"><p>类型暂未明确的公开线索</p><ResetStateCardView card={untyped}/></div>}
+    {untyped&&<aside className="pub-reset-untyped"><strong>{untyped.title}</strong><p>{untyped.description}</p>{safeUrl(untyped.sourceUrl)&&<a href={untyped.sourceUrl} target="_blank" rel="noopener noreferrer">{untyped.action} ↗</a>}</aside>}
   </section>;
 }
 

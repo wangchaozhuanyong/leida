@@ -260,7 +260,7 @@ test('已收录的发卡原文和观测走真实采集发布，预测、正计�
     assert.equal(selectedHomeStatus(compact,'banked_reset',deadline)?.hero.metric,'0秒');
     const afterLimit = new Date(Date.parse(deadline) + 86_400_000).toISOString();
     const closed = selectedHomeStatus(compact,'banked_reset',afterLimit)!;
-    assert.equal(closed.roundNotice?.label,'本轮发卡安排已取消');
+    assert.equal(closed.roundNotice?.label,'本轮发卡等待确认已结束');
     assert.equal(closed.timeAt,observedAt);
   } finally {
     globalThis.fetch = oldFetch;

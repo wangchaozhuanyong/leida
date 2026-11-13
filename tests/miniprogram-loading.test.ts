@@ -69,7 +69,7 @@ test('缓存数据先按实际经过时间重算到点及24小时失效，不复
   const due=homeResetStatus(saved.data,new Date(baseTime+3600000).toISOString()).cards[0];
   assert.equal(due.state,'overdue');assert.equal(due.hero.metric,'0秒');
   const expired=homeResetStatus(saved.data,new Date(baseTime+25*3600000).toISOString()).cards[0];
-  assert.equal(expired.state,'cancelled');assert.equal(expired.roundNotice.label,'本轮重置安排已取消');assert(expired.expiredRound);
+  assert.equal(expired.state,'cancelled');assert.equal(expired.roundNotice.label,'本轮重置等待确认已结束');assert(expired.expiredRound);
  }finally{n.reply(0);await work;client.stop();}
 });
 test('切页和后台丢弃迟到缓存；十次快速切页后旧请求不能覆盖当前页',async()=>{
