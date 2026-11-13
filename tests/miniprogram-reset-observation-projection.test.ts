@@ -123,7 +123,7 @@ test('小程序海报从实际 model 入口显示观测标题和时间，和网�
   assert.equal(poster.statementAt,observedAt);assert.equal(poster.publicationId,'observed-publication');
   assert.equal(poster.statementAt,web.statementAt);assert.equal(poster.publicationId,web.publicationId);
   assert.match(poster.sourceLabel,/Codex Resets.*第三方观测/);assert.match(poster.nextNote,/来源：Codex Resets/);assert.doesNotMatch(poster.nextNote,/不是采集时间|确认声明不会|轮次/);
-  assert.equal(poster.value,'13小时0分钟');assert.equal(poster.unit,'');
+  assert.equal(poster.value,'13小时0分钟0秒');assert.equal(poster.unit,'');
   assert.doesNotMatch(`${poster.title} ${poster.label} ${poster.statementLabel}`,/公告称|公告时间|距该公告/);
 });
 

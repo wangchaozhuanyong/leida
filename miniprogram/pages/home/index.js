@@ -14,7 +14,7 @@ function recentMessage(record, now) {
   if (!record) return null;
   const days = Number(record.days), hours = Number(record.hours), minutes = Number(record.minutes);
   const duration = days ? `${days}天${hours ? hours + '小时' : ''}`
-    : hours ? `${hours}小时${minutes ? minutes + '分钟' : ''}` : minutes ? `${minutes}分钟` : homeClock(record.statementAt,now).metric;
+    : hours ? `${hours}小时${minutes ? minutes + '分钟' : ''}` : minutes ? `${minutes}分钟` : Math.max(0,Math.floor((Date.parse(now)-Date.parse(record.statementAt))/1000))+'秒';
   const [dateText, clockText] = record.displayTime.split(' ');
   return {
     publicationId: record.publicationId, sourceType: record.sourceType, sourceName: record.sourceName,
@@ -32,6 +32,21 @@ function companion(states,selected) {
   if(!other||other.state==='waiting')return null;
   const kindLabel=other.kind==='banked_reset'?'重置卡发放':'额度重置';
   return {kind:other.kind,label:kindLabel,sourceUrl:other.sourceUrl||'',sourceName:other.sourceName||'',note:other.roundNotice?.label||[other.hero.badge,other.time].filter(Boolean).join(' · ')};
+}
+// Update clock leaves in place. A new fact or state still replaces its whole card.
+function clockCardPatch(patch, prefix, previous, next) {
+  if (JSON.stringify(previous) === JSON.stringify(next)) return;
+  if (!previous || previous.revision !== next.revision || previous.kind !== next.kind) {
+    patch[prefix] = next; return;
+  }
+  for (const [key, value] of Object.entries(next)) {
+    if (JSON.stringify(previous[key]) === JSON.stringify(value)) continue;
+    if (key === 'hero') {
+      for (const [name, field] of Object.entries(value)) {
+        if (JSON.stringify(previous.hero[name]) !== JSON.stringify(field)) patch[prefix + '.hero.' + name] = field;
+      }
+    } else patch[prefix + '.' + key] = value;
+  }
 }
 Page(createPage((data, query, page, app) => {
   if (!data) return { name: '模钥重置雷达', latest: null, completions: [], pending: null, forecast: null, recent: [], activity: null, sharePath: '', timeline: null, posterPath: '', posterDescription: '' };
@@ -157,9 +172,12 @@ Page(createPage((data, query, page, app) => {
   stopForecastExpiry() { if(this._forecastExpiryTimer)clearTimeout(this._forecastExpiryTimer);this._forecastExpiryTimer=null;this._forecastExpiryAt=null; },
   resetCardsPatch(data, now) {
     const states=homeStateCards(data,now),patch={};
-    for(const [key,value] of Object.entries({resetCards:states.cards,untypedSignal:states.untyped,stateWarning:states.sourceWarning,signalExpiredNote:states.expiredNote}))if(JSON.stringify(this.data[key])!==JSON.stringify(value))patch[key]=value;
+    if(!this.data.resetCards||this.data.resetCards.length!==states.cards.length)patch.resetCards=states.cards;
+    else states.cards.forEach((card,index)=>clockCardPatch(patch,'resetCards['+index+']',this.data.resetCards[index],card));
+    for(const [key,value] of Object.entries({untypedSignal:states.untyped,stateWarning:states.sourceWarning,signalExpiredNote:states.expiredNote}))if(JSON.stringify(this.data[key])!==JSON.stringify(value))patch[key]=value;
     const selected=focusFor(states,this.data.entryKind);
-    for(const [key,value] of Object.entries({primaryCard:selected,selectedResetKind:selected.kind,secondaryCard:companion(states,selected)}))if(JSON.stringify(this.data[key])!==JSON.stringify(value))patch[key]=value;
+    clockCardPatch(patch,'primaryCard',this.data.primaryCard,selected);
+    for(const [key,value] of Object.entries({selectedResetKind:selected.kind,secondaryCard:companion(states,selected)}))if(JSON.stringify(this.data[key])!==JSON.stringify(value))patch[key]=value;
     for(const [key,value] of Object.entries({shareTitle:selected.shareTitle,sharePath:selected.sharePath}))if(this.data[key]!==value)patch[key]=value;
     const history=recentMessage(selected.kind==='banked_reset'?states.lastCard:states.lastReset,now);
     if(!history||!this.data.lastReset){if(JSON.stringify(history)!==JSON.stringify(this.data.lastReset))patch.lastReset=history;}

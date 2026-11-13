@@ -139,7 +139,7 @@ function nativeHarness(data=fixture(),publicApi:(path:string)=>{promise:Promise<
     let definition:any;const cache=new Map<string,{exports:any}>();
     function load(filename:string):any {if(cache.has(filename))return cache.get(filename)!.exports;const module={exports:{}};cache.set(filename,module);const sandbox={module,exports:module.exports,Page(value:any){definition=value;},getApp(){return app;},wx:{navigateTo({url}:{url:string}){ui.navigations.push(url);},setClipboardData({data}:{data:string}){ui.copies.push(data);},showShareMenu(){},hideShareMenu(){},showToast(){},stopPullDownRefresh(){}},setInterval(fn:()=>void,delay:number){const timer=setInterval(fn,delay);timer.unref();return timer;},clearInterval,setTimeout(fn:()=>void,delay:number){const timer=setTimeout(fn,delay);timer.unref();return timer;},clearTimeout,Date,require(path:string){const file=resolve(dirname(filename),path.endsWith('.js')?path:`${path}.js`);assert.ok(file.startsWith(resolve(root,'miniprogram')+'/'));return load(file);}};new Script(readFileSync(filename,'utf8'),{filename}).runInNewContext(sandbox);return module.exports;}
     load(resolve(root,`miniprogram/pages/${name}/index.js`));assert.ok(definition);
-    const instance={...definition,data:structuredClone(definition.data||{}),setData(patch:Record<string,unknown>){Object.assign(this.data,patch);}} as NativePage;
+    const instance={...definition,data:structuredClone(definition.data||{}),setData(patch:Record<string,unknown>){for(const [key,value] of Object.entries(patch)){const parts=key.replace(/\[(\d+)\]/g,'.$1').split('.');let target=this.data;for(const part of parts.slice(0,-1))target=target[part];target[parts.at(-1)!]=value;}}} as NativePage;
     instance.onLoad?.(query);if(autoShow)instance.onShow?.();return instance;
   }
   return {page,calls,ui,get subscriptions(){return listeners.size;},replace(next:PublicData,error=''){data=next;listeners.forEach(fn=>fn({data,receivedAt:Date.now(),error}));}};
@@ -176,7 +176,7 @@ test('服务端完成转为24小时结果计时，取消结束计时，不回退
       next.events=[structuredClone(p.event)];next.articles=[structuredClone(p.article)];
     }
     h.replace(next);assert.equal(page.data.pending,null);assert.equal(page.data.forecast,null);assert.equal(page.data.outlookStatus,status);assert.match(page.data.waitingText,/等待下一次预告/);
-    if(status==='completed'){assert.ok(page._countdownTimer);assert.equal(page.data.timeline.completed,true);assert.match(page.data.latest.elapsed,/^\d+秒$/);assert.equal(page.data.latest.title,'公告称已重置用量');assert.match(page.data.sharePath,/^\/pages\/detail\/index\?publicationId=live-publication&kind=automatic_reset&revision=home-[a-f0-9]{16}$/);}
+    if(status==='completed'){assert.ok(page._countdownTimer);assert.equal(page.data.timeline.completed,true);assert.match(page.data.latest.elapsed,/^0小时0分钟\d+秒$/);assert.equal(page.data.latest.title,'公告称已重置用量');assert.match(page.data.sharePath,/^\/pages\/detail\/index\?publicationId=live-publication&kind=automatic_reset&revision=home-[a-f0-9]{16}$/);}
     else assert.equal(page._countdownTimer,null);
     page.onUnload();
   }
@@ -197,12 +197,12 @@ test('逾期经过时长更新仍保留原预计安排，隐藏和卸载释放�
     const data=withOutlook(fixture(),{status:'scheduled',active:outlookAction({kind})});data.serverTime='2026-10-10T14:33:00Z';
     const h=nativeHarness(data),page=h.page('home'),card=()=>page.data.resetCards.find((item:{kind:string})=>item.kind===kind);
     try{
-      assert.equal(card().state,'overdue');assert.equal(card().timeAt,outlookDeadline);assert.equal(card().time,'2026-10-10 21:00');assert.equal(card().hero.metric,'1小时33分钟');assert.ok(page._countdownTimer);
+      assert.equal(card().state,'overdue');assert.equal(card().timeAt,outlookDeadline);assert.equal(card().time,'2026-10-10 21:00');assert.equal(card().hero.metric,'1小时33分钟0秒');assert.ok(page._countdownTimer);
       data.serverTime='2026-10-10T14:34:00Z';page.tickCountdown();
-      assert.equal(card().hero.metric,'1小时34分钟');assert.equal(card().timeAt,outlookDeadline);assert.equal(card().time,'2026-10-10 21:00');assert.equal(card().publicationId,'live-publication');assert.equal(page.data.timeline.completed,false);assert.equal(page.data.pending.counting,false);
+      assert.equal(card().hero.metric,'1小时34分钟0秒');assert.equal(card().timeAt,outlookDeadline);assert.equal(card().time,'2026-10-10 21:00');assert.equal(card().publicationId,'live-publication');assert.equal(page.data.timeline.completed,false);assert.equal(page.data.pending.counting,false);
       page.onHide();assert.equal(page._countdownTimer,null);assert.equal(h.subscriptions,0);
       const hiddenCards=page.data.resetCards;data.serverTime='2026-10-10T14:35:00Z';page.tickCountdown();assert.equal(page.data.resetCards,hiddenCards,'隐藏后的迟到 tick 不更新页面');
-      page.onShow();assert.ok(page._countdownTimer);assert.equal(h.subscriptions,1);assert.equal(card().hero.metric,'1小时35分钟');assert.equal(card().timeAt,outlookDeadline);
+      page.onShow();assert.ok(page._countdownTimer);assert.equal(h.subscriptions,1);assert.equal(card().hero.metric,'1小时35分钟0秒');assert.equal(card().timeAt,outlookDeadline);
     }finally{page.onUnload();}
     assert.equal(page._countdownTimer,null);assert.equal(h.subscriptions,0);
   }

@@ -26,15 +26,15 @@ test('两款海报保留事实和真码，不再印扫码引导、平台名称�
   }
 });
 test('两款固定海报在无公告、预告、进行中和逾期时均可用，不捏造完成或经过天数',()=>{
-  for(const [stage,time,value]of [[undefined,undefined,'暂无新消息'],['promised','2026-10-15T03:00:00Z','3小时0分钟'],['in_progress',undefined,'重置时间待公布'],['promised','2026-10-14T23:00:00Z','1小时0分钟']] as const){
+  for(const [stage,time,value]of [[undefined,undefined,'暂无新消息'],['promised','2026-10-15T03:00:00Z','3小时0分钟0秒'],['in_progress',undefined,'重置时间待公布'],['promised','2026-10-14T23:00:00Z','1小时0分钟0秒']] as const){
     const data=fixture(stage,time),input=native.statusPosterInput(data);
     assert.equal(input.value,value);assert.notEqual(input.label,'距该公告');assert.ok(native.statusPosterAvailable(input,data));
-    for(const theme of ['precision','editorial']){const layout=native.createStatusPosterLayout(input,measure,theme);assert.equal(layout.width,1080);assert.equal(layout.height,1920);assert.match(layout.background,new RegExp(theme+'\\.jpg$'));assert.ok(layout.commands.some((c:any)=>c.value===value));assert.equal(layout.commands.some((c:any)=>c.asset==='code'||c.asset==='website'),false);}
+    for(const theme of ['precision','editorial']){const layout=native.createStatusPosterLayout(input,measure,theme);assert.equal(layout.width,1080);assert.equal(layout.height,1920);assert.match(layout.background,new RegExp(theme+'\\.jpg$'));assert.ok(layout.commands.some((c:any)=>c.value===(input.clockParts?.length?input.clockParts.filter((p:any)=>['小时','分钟','秒'].includes(p.unit)).map((p:any)=>p.value).join(' : '):value)));assert.equal(layout.commands.some((c:any)=>c.asset==='code'||c.asset==='website'),false);}
   }
 });
 test('完成海报冻结声明和生成时间；布局切换不改事实，撤回后不能保存',()=>{
   const data=fixture('claimed_complete'),input=native.statusPosterInput(data);
-  assert.equal(input.value,'4小时0分钟');assert.equal(input.unit,'');assert.equal(input.label,'已经过去');assert.equal(input.title,'距离上次重置');
+  assert.equal(input.value,'4小时0分钟0秒');assert.equal(input.unit,'');assert.equal(input.label,'已经过去');assert.equal(input.title,'距离上次重置');
   const dark=native.createStatusPosterLayout(input,measure,'precision',true),light=native.createStatusPosterLayout(input,measure,'editorial',true);
   assert.notDeepEqual(dark.commands,light.commands);assert.equal(input.generatedAt,now);
   for(const layout of [dark,light]){const circle=layout.commands.find((c:any)=>c.type==='circle'),code=layout.commands.find((c:any)=>c.asset==='code');for(const x of [code.x,code.x+code.width])for(const y of [code.y,code.y+code.height])assert.ok(Math.hypot(x-circle.x,y-circle.y)<circle.r);assert.ok(layout.commands.filter((c:any)=>c.type==='text').map((c:any)=>c.value).join('').includes(input.title));}
@@ -43,7 +43,7 @@ test('完成海报冻结声明和生成时间；布局切换不改事实，撤�
 test('黑金海报的数字与单位保留独立安全区，覆盖分钟、小时、天及三位数',()=>{
   const input=native.statusPosterInput(fixture('claimed_complete'));
   for(const value of ['1','3','28','365'])for(const unit of ['分钟','小时','天']){
-    const layout=native.createStatusPosterLayout({...input,value,unit},measure,'precision');
+    const layout=native.createStatusPosterLayout({...input,clockParts:undefined,value,unit},measure,'precision');
     const number=layout.commands.find((c:any)=>c.value===value),label=layout.commands.find((c:any)=>c.value===unit);
     assert.ok(number.y+number.size*.25<label.y-label.size,'含数字下沿和文字顶端仍有间隔');
     assert.ok(measure(value,number.size)<=640);assert.equal(label.align,'center');
@@ -104,7 +104,7 @@ test('小程序完成满24小时仍分享上次完成时长与对应记录，不
   for(const event of [data.events[0],data.publications[0].event])event.actions[0].statementAt='2026-10-10T20:00:00Z';
   const input=native.statusPosterInput(data),snapshot=statusPosterSnapshot(data);
   assert.equal(input.publicationId,'fixed-publication');assert.equal(input.codePublicationId,'fixed-publication');
-  assert.equal(input.value,'4天4小时0分钟');assert.equal(input.statementAt,'2026-10-10T20:00:00Z');assert.equal(input.sourceLabel,'依据：发布者公开完成声明');assert.doesNotMatch(input.title+input.label+input.sourceLabel,/周期/);
+  assert.equal(input.value,'4天4小时0分钟0秒');assert.equal(input.statementAt,'2026-10-10T20:00:00Z');assert.equal(input.sourceLabel,'依据：发布者公开完成声明');assert.doesNotMatch(input.title+input.label+input.sourceLabel,/周期/);
   assert.equal(snapshot.publicationId,input.publicationId);assert.equal(snapshot.value,input.value);
   data.articles[0].status='withdrawn';assert.equal(native.statusPosterAvailable(input,data),false);
 });
@@ -113,4 +113,20 @@ test('无可分享消息或只有已合并版本时，等待海报不制造扫�
   const empty=fixture();assert.equal(native.statusPosterInput(empty).codePublicationId,'');assert.equal(statusPosterSnapshot(empty).codePublicationId,'');
   const merged=fixture('claimed_complete');merged.events[0].status='merged';
   assert.equal(native.statusPosterInput(merged).codePublicationId,'');assert.equal(statusPosterSnapshot(merged).codePublicationId,'');
+});
+
+test('年月日与秒级时钟分行，首页与两种海报保留同一锚点和秒数',()=>{
+ const d=fixture('claimed_complete');const at='2024-08-02T01:02:03Z';
+ for(const p of d.publications){p.event.actions[0].statementAt=at;p.publishedAt=at;p.article.publishedAt=at;}
+ d.events[0].actions[0].statementAt=at;
+ const input=native.statusPosterInput(d);
+ assert.equal(input.value,'2年2个月12天22小时57分钟57秒');
+ for(const theme of ['precision','editorial'] as const){
+  const layout=native.createStatusPosterLayout(input,measure,theme);
+  const calendar=layout.commands.find((c:any)=>c.value==='2年 2个月 12天');
+  const clock=layout.commands.find((c:any)=>c.value==='22 : 57 : 57');
+  assert(calendar&&clock);assert(calendar.y<clock.y);assert(clock.size>=60);assert(calendar.size>=36);
+  const svg=currentStatusPosterSvg(d,now,'state:'+input.round,theme);
+  assert(svg.includes('22 : 57 : 57')&&svg.includes('2年 2个月 12天'));
+ }
 });

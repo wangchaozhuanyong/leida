@@ -48,7 +48,7 @@ test('云端既有版本摘要遗漏新信号字段时，补读只投影安全�
  const [home,version]=await Promise.all([reader.read({view:'home'}),reader.version()]);
  assert.equal(home.contentVersion,version.contentVersion);
  assert.equal(f.reads,2,'首页和版本请求各只补一次固定行');
- assert.equal(homeResetStatus(home.data).primary.hero.metric,'1天23小时0分钟');
+ assert.equal(homeResetStatus(home.data).primary.hero.metric,'1天23小时0分钟0秒');
  assert.equal(JSON.stringify(home).includes(canary),false);
 }));
 

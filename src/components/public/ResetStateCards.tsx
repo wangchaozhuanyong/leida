@@ -59,7 +59,10 @@ export function ResetStateCards({data}:{data:PublicData}) {
         </div>
         <div className="radar-readout">
         {(card.hero.metric||card.hero.label)&&<div className="radar-caption">{card.hero.metric&&(card.state!=='estimated'||card.metricLabel==='距推测窗口结束')?(card.hero.title||card.hero.label):card.hero.label}</div>}
-        {card.hero.parts.length?<div className={`radar-value ${card.hero.parts.length===3?'with-days':''} ${card.hero.long?'long':''}`} aria-label={card.hero.metric}>{card.hero.parts.map((part:{unit:string,value:string})=><span className="radar-number" key={part.unit}>{part.value}<small className="radar-unit">{part.unit}</small></span>)}</div>:<strong className="radar-verdict">{card.hero.metric||card.hero.title}</strong>}
+        {card.hero.timeParts.length?<div className="radar-duration" aria-label={card.hero.metric}>
+          <div className="radar-calendar" aria-hidden="true">{card.hero.calendarParts.map((part:{unit:string,value:string})=><span className="radar-calendar-part" key={part.unit}><span className="radar-calendar-value">{part.value}</span><span className="radar-calendar-unit">{part.unit}</span></span>)}</div>
+          <div className="radar-time" aria-hidden="true">{card.hero.timeParts.map((part:{unit:string,value:string},index:number)=><Fragment key={part.unit}>{index>0&&<span className="radar-colon">:</span>}<span className={`radar-time-part ${part.unit==='秒'?'seconds':''}`}><span className="radar-digits">{part.value}</span><small className="radar-unit">{part.unit}</small></span></Fragment>)}</div>
+        </div>:<strong className="radar-verdict">{card.hero.metric||card.hero.title}</strong>}
       </div></div>
       {card.timeAt&&<div className="pub-focus-fact"><span>{card.timeLabel} · 北京时间</span><strong>{card.time}</strong></div>}
       {card.oldTime&&<div className="pub-focus-fact">{card.oldTime}</div>}

@@ -67,7 +67,7 @@ test('缓存数据先按实际经过时间重算到点及24小时失效，不复
  try{
   assert.equal(homeResetStatus(saved.data,new Date(baseTime).toISOString()).cards[0].state,'scheduled');
   const due=homeResetStatus(saved.data,new Date(baseTime+3600000).toISOString()).cards[0];
-  assert.equal(due.state,'overdue');assert.equal(due.hero.metric,'0秒');
+  assert.equal(due.state,'overdue');assert.equal(due.hero.metric,'0小时0分钟0秒');
   const expired=homeResetStatus(saved.data,new Date(baseTime+25*3600000).toISOString()).cards[0];
   assert.equal(expired.state,'cancelled');assert.equal(expired.roundNotice.label,'本轮重置等待确认已结束');assert(expired.expiredRound);
  }finally{n.reply(0);await work;client.stop();}

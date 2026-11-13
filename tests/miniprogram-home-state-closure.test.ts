@@ -118,9 +118,10 @@ function nativeHome(data:PublicData|null,at:number,kind='automatic_reset',option
   return module.exports;
  }
  load(resolve(root,'miniprogram/pages/home/index.js'));
- const page={...definition,data:structuredClone(definition.data),setData(patch:Record<string,unknown>,done?:()=>void){for(const [key,value] of Object.entries(patch)){const parts=key.split('.');let target=this.data;for(const part of parts.slice(0,-1))target=target[part];target[parts.at(-1)!]=value;}done?.();}};
+ const patches:Record<string,unknown>[]=[];
+ const page={...definition,data:structuredClone(definition.data),setData(patch:Record<string,unknown>,done?:()=>void){patches.push(structuredClone(patch));for(const [key,value] of Object.entries(patch)){const parts=key.replace(/\[(\d+)\]/g,'.$1').split('.');let target=this.data;for(const part of parts.slice(0,-1))target=target[part];target[parts.at(-1)!]=value;}done?.();}};
  page.onLoad({kind});page.onShow();
- return {page,navigations,tabs,timeouts,intervals,get refreshes(){return refreshes;},advanceTo(target:number){
+ return {page,navigations,tabs,timeouts,intervals,patches,get refreshes(){return refreshes;},advanceTo(target:number){
   for(let count=0;count<10;count++){const next=[...timeouts].filter(([,timer])=>timer.at<=target).sort((a,b)=>a[1].at-b[1].at)[0];if(!next){time=target;return;}timeouts.delete(next[0]);time=next[1].at;next[1].fn();}throw new Error('重复调度边界计时器');
  }};
 }
@@ -142,7 +143,7 @@ test('纯观测超过7天仍保留经过时长及来源，两款海报与首页�
  const d=fixture();observation(d,'last-observation','2026-10-24T01:40:00Z');d.serverTime='2026-10-31T02:00:00Z';
  const c=card(d),input=statusPosterInput(d);
  assert.equal(c.state,'observed');assert.equal(c.hero.title,'距离上次重置（观测）');assert.equal(c.hero.badge,'第三方报告');
- assert.equal(c.clockAt,'2026-10-24T01:40:00Z');assert.equal(c.timeAt,c.clockAt);assert.equal(c.hero.metric,'7天0小时20分钟');
+ assert.equal(c.clockAt,'2026-10-24T01:40:00Z');assert.equal(c.timeAt,c.clockAt);assert.equal(c.hero.metric,'7天0小时20分钟0秒');
  assert.equal(input.value,c.hero.metric);assert.equal(input.statementAt,c.clockAt);assert.match(input.sourceLabel,/第三方观测/);
  for(const theme of ['precision','editorial']){
   const layout=createStatusPosterLayout(input,(text:string,size:number)=>text.length*size*.55,theme,false);
@@ -172,7 +173,7 @@ test('旧轮已有最早观测，不阻挡匹配窗口之外的新独立重置�
  assert.equal(current.hero.title,'距离上次重置（观测）');assert.equal(current.hero.label,'已经过去');assert.equal(current.expectedAt,'');assert.equal(current.early,false);
  assert.notEqual(current.roundKey,old.roundKey);assert.notEqual(current.revision,old.revision);assert.equal(statusPosterAvailable(snapshot,d),false);
  assert.equal(poster.statementAt,current.clockAt);assert.equal(poster.publicationId,current.publicationId);assert.equal(poster.sharePath,current.sharePath);
- for(const theme of ['precision','editorial'])assert.ok(createStatusPosterLayout(poster,(s:string,n:number)=>s.length*n,theme).commands.some((c:any)=>c.value===poster.value));
+ for(const theme of ['precision','editorial'])assert.ok(createStatusPosterLayout(poster,(s:string,n:number)=>s.length*n,theme).commands.some((c:any)=>c.value===(poster.clockParts?.length?poster.clockParts.filter((part:any)=>['小时','分钟','秒'].includes(part.unit)).map((part:any)=>part.value).join(' : '):poster.value)));
  assert.match(current.sharePath,/publicationId=pub-new-reset/);
  const h=nativeHome(d,Date.parse(d.serverTime));try{assert.equal(h.page.data.resetCards[0].clockAt,current.clockAt);assert.equal(h.page.onShareAppMessage().path,current.sharePath);}finally{h.page.onUnload();}
 });
@@ -226,9 +227,9 @@ test('旧观测、不同类别及竞争轮次不冒充当前预告的完成；�
 });
 test('开始消息沿用倒计时，到点正计，满24小时回到上次发生计时',()=>{
  const d=fixture();action(d,'older','claimed_complete','2026-10-22T04:00:00Z',undefined);action(d,'promise');action(d,'started','in_progress','2026-10-24T00:00:00Z',T,'automatic_reset','promise');
- const before=card(d,'2026-10-24T01:59:59Z');assert.equal(before.state,'scheduled');assert.equal(before.hero.metric,'1秒');
- const overdue=card(d,T);assert.equal(overdue.state,'overdue');assert.equal(overdue.hero.metric,'0秒');assert.equal(overdue.validUntil,'2026-10-25T02:00:00.000Z');
- assert.equal(card(d,'2026-10-24T02:00:29Z').hero.metric,'29秒');
+ const before=card(d,'2026-10-24T01:59:59Z');assert.equal(before.state,'scheduled');assert.equal(before.hero.metric,'0小时0分钟1秒');
+ const overdue=card(d,T);assert.equal(overdue.state,'overdue');assert.equal(overdue.hero.metric,'0小时0分钟0秒');assert.equal(overdue.validUntil,'2026-10-25T02:00:00.000Z');
+ assert.equal(card(d,'2026-10-24T02:00:29Z').hero.metric,'0小时0分钟29秒');
  assert.equal(card(d,'2026-10-25T01:59:59Z').state,'overdue');
  for(const at of ['2026-10-25T02:00:00Z','2026-10-26T03:00:00Z']){
   const expired=card(d,at);
@@ -257,7 +258,7 @@ test('首页精简数据只保留服务端outlook时，同样执行进行中超�
 });
 test('首页、两种海报、分享与类别一致；按分钟走时不失效，事实变化或24小时边界使旧快照失效',()=>{
  const d=fixture();action(d,'regular');action(d,'banked','claimed_complete','2026-10-23T00:00:00Z',undefined,'banked_reset');observation(d,'observed','2026-10-24T01:40:00Z');const before=JSON.stringify(d);
- for(const kind of ['automatic_reset','banked_reset']){const home=card(d,NOW,kind),poster=statusPosterInput(d,kind);assert.equal(poster.title,home.hero.title||home.title);assert.equal(poster.value,home.hero.metric||home.hero.title);assert.equal(poster.sharePath,home.sharePath);assert.equal(poster.shareTitle,home.shareTitle);assert.equal(poster.publicationId,['cycle','history'].includes(home.evidenceType)?'':home.publicationId);assert.equal(poster.round,home.revision);for(const theme of ['precision','editorial']){const layout=createStatusPosterLayout(poster,(s:string,n:number)=>s.length*n,theme);assert.ok(layout.commands.some((c:any)=>c.value===poster.value));}assert.equal(statusPosterAvailable(poster,{...d,serverTime:'2026-10-24T03:01:00Z'}),true);}
+ for(const kind of ['automatic_reset','banked_reset']){const home=card(d,NOW,kind),poster=statusPosterInput(d,kind);assert.equal(poster.title,home.hero.title||home.title);assert.equal(poster.value,home.hero.metric||home.hero.title);assert.equal(poster.sharePath,home.sharePath);assert.equal(poster.shareTitle,home.shareTitle);assert.equal(poster.publicationId,['cycle','history'].includes(home.evidenceType)?'':home.publicationId);assert.equal(poster.round,home.revision);for(const theme of ['precision','editorial']){const layout=createStatusPosterLayout(poster,(s:string,n:number)=>s.length*n,theme);assert.ok(layout.commands.some((c:any)=>c.value===(poster.clockParts?.length?poster.clockParts.filter((part:any)=>['小时','分钟','秒'].includes(part.unit)).map((part:any)=>part.value).join(' : '):poster.value)));}assert.equal(statusPosterAvailable(poster,{...d,serverTime:'2026-10-24T03:01:00Z'}),true);}
  assert.equal(JSON.stringify(d),before,'所有状态与分享推导不得改写输入');
  const e=fixture();action(e,'promise');const snap=statusPosterInput(e);assert.equal(statusPosterAvailable(snap,{...e,serverTime:'2026-10-25T02:00:00Z'}),false);const waiting=statusPosterInput({...e,serverTime:'2026-10-25T02:00:00Z'});assert.equal(waiting.codePublicationId,'');assert.match(waiting.sharePath,/home\/index/);
  const linked=statusPosterInput(d);d.articles.find(a=>a.id==='article-observed')!.status='withdrawn';assert.equal(statusPosterAvailable(linked,d),false);
@@ -288,14 +289,14 @@ test('仅有推测信号时也开启原生倒计时，新发卡完成消息接�
  try {
   assert.equal(h.page.data.lastReset,null);
   assert.equal(h.page.data.primaryCard.state,'estimated');
-  assert.equal(h.page.data.primaryCard.hero.metric,'1天4小时0分钟');
+  assert.equal(h.page.data.primaryCard.hero.metric,'1天4小时0分钟0秒');
   const poster=statusPosterInput(d);
   assert.equal(poster.value,h.page.data.primaryCard.hero.metric);
   assert.equal(poster.statementLabel,'推测窗口结束');
   assert.equal(h.intervals.size,1);
   h.advanceTo(start+60_000);
   for(const tick of h.intervals.values())tick();
-  assert.equal(h.page.data.primaryCard.hero.metric,'1天3小时59分钟');
+  assert.equal(h.page.data.primaryCard.hero.metric,'1天3小时59分钟0秒');
   action(d,'actual-banked','claimed_complete',new Date(start+30_000).toISOString(),undefined,'banked_reset');
   h.page.redraw();
   assert.equal(h.page.data.primaryCard.state,'completed');
@@ -475,4 +476,23 @@ test('两批都已发卡时按完成时间选择，补回第二批更早的预�
   assert.equal(poster.publicationId,current.publicationId);
   assert.equal(poster.round,homeResetStatus(compact).primary.revision);
  }
+});
+
+test('每秒只更新计时字段，不替换首页卡片或列表，后台停止并按真实经过时间恢复',()=>{
+ const d=fixture();observation(d,'observed-seconds','2026-10-24T01:40:00Z');
+ const start=Date.parse(NOW),h=nativeHome(d,start);
+ try{
+  h.advanceTo(start+1000);h.patches.length=0;for(const tick of h.intervals.values())tick();
+  assert.equal(h.page.data.primaryCard.hero.timeParts[2].value,'01');
+  const keys=h.patches.flatMap(p=>Object.keys(p));
+  assert(keys.includes('primaryCard.hero.timeParts'));
+  assert(!keys.some(k=>['primaryCard','resetCards','recent','motionActive','pageEntrance'].includes(k)),keys.join(','));
+  const revision=h.page.data.primaryCard.revision,anchor=h.page.data.primaryCard.clockAt;
+  h.page.onHide();assert.equal(h.intervals.size,0);
+  h.advanceTo(start+61000);h.page.onShow();for(const tick of h.intervals.values())tick();
+  assert.equal(h.page.data.primaryCard.hero.metric,'1小时21分钟1秒');
+  assert.equal(h.page.data.primaryCard.revision,revision);assert.equal(h.page.data.primaryCard.clockAt,anchor);
+  const poster=statusPosterInput({...d,serverTime:new Date(start+61000).toISOString()});
+  assert.equal(poster.value,h.page.data.primaryCard.hero.metric);assert.equal(poster.statementAt,anchor);
+ }finally{h.page.onUnload();}assert.equal(h.intervals.size,0);
 });
