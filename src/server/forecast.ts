@@ -1,9 +1,9 @@
-import {referencePublicSignal,projectReferenceSignal,REFERENCE_SIGNAL_SOURCE} from './reference-reset-source';
+import {legacyReferenceSignal,referencePublicSignals,projectReferenceSignal,projectReferenceSignals,REFERENCE_SIGNAL_SOURCE,type ReferenceSignalDecisionRecord} from './reference-reset-source';
 import {buildReferenceCadence,referenceCadenceReplay,publicReferenceCadence,referenceResetPoints,projectReferenceCadence,validatedReferenceReview} from '../lib/reference-cadence';
 import { lockTransaction } from '../db';
 import {createHash} from 'node:crypto';
 import {isCloudbaseClient,pool,list,one,insert,put,transaction,type Client} from '../db';
-import type {Evidence,Source,Publication,RadarEvent,Article} from '../lib/types';
+import type {Evidence,Source,Publication,RadarEvent,Article,Candidate} from '../lib/types';
 import {FORECAST_RULE_VERSION,FORECAST_MODEL_VERSION,referenceForecast,forecastWindows,forecastSourceAvailable,qualifyForecastSignal,matchForecastCase,buildForecastSnapshot,publicForecastCaseProjection,effectiveForecastOutcome,type ForecastPublicData,type ForecastCase,type ForecastSnapshot,type ForecastOutcome} from '../lib/forecast';
 import {executeResetCadence,getCadenceSnapshot,isCadence,projectCadenceForecast,cadenceOutcomes,publicCadenceHorizonOutcomes,forecastCycleDue,type CadenceRuntime,type StoredCadenceForecast} from './reset-cadence-runtime';
 import {configuredPublicRpc} from './cloudbase/public-config';
@@ -55,9 +55,11 @@ export function projectPublicForecastRecords(input:{cases:ForecastCase[];outcome
  const visibleCadence=(snapshots as unknown as StoredCadenceForecast[]).filter(s=>visibleCadenceIds.has(s.id));
  const cadenceHorizonOutcomes=compact==='home'?undefined:publicCadenceHorizonOutcomes(outcomes,visibleCadence,timestamp);
  const completionAt=base.outlook.latestGlobalCompletionAt;
- const referenceSignal=projectReferenceSignal(runtime?.referenceSignal,sources,timestamp,completionAt);
+ const referenceSignals=projectReferenceSignals(runtime?.referenceSignals,sources,timestamp);
+ const referenceSignal=referenceSignals===undefined?projectReferenceSignal(runtime?.referenceSignal,sources,timestamp,completionAt):
+  legacyReferenceSignal(referenceSignals,sources,timestamp,completionAt);
  const signalSource=sources.find(source=>source.id===REFERENCE_SIGNAL_SOURCE.id);
- return {...base,...(referenceSignal?{referenceSignal}:{}),watch:{status:forecastSourceAvailable(signalSource,timestamp)?'none':'unavailable',checkedAt:signalSource?.lastSuccessAt??timestamp},referenceCadence:projectReferenceCadence(unavailable||!sources.some(source=>['tibo-public','reset-archive'].includes(source.id)&&forecastSourceAvailable(source,timestamp))?undefined:runtime?.referenceCadencePublic,publicResetOutlook(facts).latestGlobalCompletionAt??null,timestamp),status:unavailable?'unavailable':'ready',...(unavailable?{reason:readingFailed?'预测信息暂时不可用，稍后会自动更新；公开公告与历史记录仍可查看。':'预测观察处理失败，暂不提供当前实验估计；公开公告与固定历史记录继续保留。'}:{}),cadence:unavailable?undefined:cadence,cadenceByKind:unavailable?undefined:cadenceByKind,cadenceEvaluationByKind:runtime?.cadenceEvaluationByKind,cadenceHistory,cadenceOutcomes:cadenceOutcomes(outcomes).slice(0,12),...(cadenceHorizonOutcomes?{cadenceHorizonOutcomes}:{}),cases:cases.slice().sort((a,b)=>Date.parse(b.signalAt)-Date.parse(a.signalAt)).map(c=>{
+ return {...base,...(referenceSignal?{referenceSignal}:{}),...(referenceSignals?{referenceSignals}:{}),watch:{status:forecastSourceAvailable(signalSource,timestamp)?'none':'unavailable',checkedAt:signalSource?.lastSuccessAt??timestamp},referenceCadence:projectReferenceCadence(unavailable||!sources.some(source=>['tibo-public','reset-archive'].includes(source.id)&&forecastSourceAvailable(source,timestamp))?undefined:runtime?.referenceCadencePublic,publicResetOutlook(facts).latestGlobalCompletionAt??null,timestamp),status:unavailable?'unavailable':'ready',...(unavailable?{reason:readingFailed?'预测信息暂时不可用，稍后会自动更新；公开公告与历史记录仍可查看。':'预测观察处理失败，新闻与发放状态流程继续运行。'}:{}),cadence:unavailable?undefined:cadence,cadenceByKind:unavailable?undefined:cadenceByKind,cadenceEvaluationByKind:runtime?.cadenceEvaluationByKind,cadenceHistory,cadenceOutcomes:cadenceOutcomes(outcomes).slice(0,12),...(cadenceHorizonOutcomes?{cadenceHorizonOutcomes}:{}),cases:cases.slice().sort((a,b)=>Date.parse(b.signalAt)-Date.parse(a.signalAt)).map(c=>{
   const available=forecastSourceAvailable(sources.find(s=>s.id===c.sourceId),timestamp);
   const projectedCase={...c,coverage:!available?{status:'gap' as const,sourceIds:c.coverage.sourceIds,reason:'信号来源暂停、失效或结构异常，不能据未找到消息标阴性'}:c.coverage},snapshot=snapshots.find(s=>s.id===c.snapshotId);
   const {status}=publicForecastCaseProjection(projectedCase,snapshot,timestamp);
@@ -73,7 +75,7 @@ export async function runForecastCycle(timestamp=iso(),options:{force?:boolean;i
   const runtime=await one<CadenceRuntime&{ruleVersion?:string}>('settings','forecast_runtime',c);
   const inputs=await one<{id:string;revision?:string}>('settings','forecast_inputs',c);
   // A no-change worker tick reads only these two tiny settings rows. No history scan.
-  if(!options.force&&runtime?.ruleVersion===FORECAST_RULE_VERSION&&!forecastCycleDue(runtime,inputs?.revision,timestamp,options.inputsChanged))return result;
+  if(!options.force&&runtime?.ruleVersion===FORECAST_RULE_VERSION&&Array.isArray(runtime.referenceSignals)&&!forecastCycleDue(runtime,inputs?.revision,timestamp,options.inputsChanged))return result;
   if(!await forecastTablesAvailable(c))return {...result,status:'unavailable'};
   const sources=await list<Source>('sources',c),all=await list<Evidence>('evidence',c),cases=await list<ForecastCase>('forecast_cases',c),outcomes=await list<ForecastOutcome>('forecast_outcomes',c),publications=await list<Publication>('publications',c),events=await list<RadarEvent>('events',c),articles=await list<Article>('articles',c);
   // Existing evidence versions retain their own public/collection times; older updates cannot reset a case window.
@@ -157,11 +159,35 @@ export async function runForecastCycle(timestamp=iso(),options:{force?:boolean;i
   await insert('forecast_snapshots',{...reference,id:referenceId,recordType:'reference_cadence'},c);
   const cadence=await executeResetCadence(c,all,sources,timestamp);
   result.cadenceSnapshots=cadence.snapshots;result.cadenceOutcomes=cadence.outcomes;
-  await put('settings',{id:'forecast_runtime',...(validatedReferenceReview(runtime?.referenceReview)?{referenceReview:validatedReferenceReview(runtime?.referenceReview)}:{}),referenceCadencePublic:publicReferenceCadence(reference),referenceSignal:referencePublicSignal(all,sources,timestamp,publicResetOutlook({events,articles,publications,evidence:all,serverTime:timestamp}).latestGlobalCompletionAt),checkedAt:timestamp,status:'ready',ruleVersion:FORECAST_RULE_VERSION,modelVersion:FORECAST_MODEL_VERSION,cadencePublicProjection:cadence.publicProjection,cadenceSnapshotId:cadence.snapshotId,cadenceSnapshotIds:cadence.snapshotIds,cadenceEvaluationByKind:cadence.evaluationByKind,inputsRevision:inputs?.revision,cadenceModelVersion:cadence.evaluationByKind.automatic_reset?.modelVersion,nextDueAt:cadence.nextDueAt},c);
+  const outlook=publicResetOutlook(referenceFacts);
+  const reviews=new Map((await list<Candidate>('candidates',c)).flatMap(candidate=>candidate.automation?.signalReview&&candidate.status!=='ignored'?
+   [[candidate.evidenceId,candidate.automation.signalReview] as const]:[]));
+  const signalDecisions:Record<string,ReferenceSignalDecisionRecord>={};
+  const referenceSignals=referencePublicSignals(all,sources,timestamp,{reviews,resolvedAt:{
+   automatic_reset:outlook.latestResolutions?.automatic_reset?.statementAt,
+   banked_reset:outlook.latestResolutions?.banked_reset?.statementAt,
+  },observedAt:{
+   automatic_reset:outlook.byKind?.automatic_reset?.latestObservation?.observedAt,
+   banked_reset:outlook.byKind?.banked_reset?.latestObservation?.observedAt,
+  },onDecision:(item,decision)=>{
+   const collectedAt=all.filter(row=>row.messageId===item.messageId&&row.url===item.url&&row.provenance!=='manual'&&Date.parse(row.collectedAt)<=Date.parse(timestamp))
+    .map(row=>row.collectedAt).sort()[0]??item.collectedAt;
+   signalDecisions[item.messageId]={...decision,evidenceId:item.id,publishedAt:item.publishedAt,collectedAt};
+  }});
+  for(const signal of referenceSignals){
+   const decision=signalDecisions[signal.id];
+   if(decision)decision.projectedAt=runtime?.referenceSignals?.some(previous=>previous.id===signal.id&&previous.hint?.expiresAt===signal.hint?.expiresAt&&previous.reviewPending===signal.reviewPending)?
+    runtime.signalDecisions?.[signal.id]?.projectedAt??timestamp:timestamp;
+  }
+  await put('settings',{id:'forecast_runtime',...(validatedReferenceReview(runtime?.referenceReview)?{referenceReview:validatedReferenceReview(runtime?.referenceReview)}:{}),referenceCadencePublic:publicReferenceCadence(reference),referenceSignals,signalDecisions,checkedAt:timestamp,status:'ready',ruleVersion:FORECAST_RULE_VERSION,modelVersion:FORECAST_MODEL_VERSION,cadencePublicProjection:cadence.publicProjection,cadenceSnapshotId:cadence.snapshotId,cadenceSnapshotIds:cadence.snapshotIds,cadenceEvaluationByKind:cadence.evaluationByKind,inputsRevision:inputs?.revision,cadenceModelVersion:cadence.evaluationByKind.automatic_reset?.modelVersion,nextDueAt:cadence.nextDueAt},c);
   return result;
  });}catch(error){
   console.error('FORECAST_COMPUTE_FAILED',error instanceof CloudbaseRpcError?error.diagnosticCode:'UNCLASSIFIED');
-  try{await put('settings',{id:'forecast_runtime',checkedAt:timestamp,status:'error',error:'预测观察处理失败，新闻与发放状态流程继续运行'});}catch{/* A storage failure cannot be repaired by this observation task. */}
+  try{await transaction(async c=>{
+   const previous=await one<CadenceRuntime&{status?:string}>('settings','forecast_runtime',c,true);
+   if(previous&&Date.parse(previous.checkedAt)>Date.parse(timestamp))return;
+   await put('settings',{...previous,id:'forecast_runtime',checkedAt:timestamp,status:'error',error:'预测观察处理失败，新闻与发放状态流程继续运行'},c);
+  });}catch{/* A storage failure cannot be repaired by this observation task. */}
   return {status:'error',discovered:0,snapshots:0,outcomes:0};
  }
 }

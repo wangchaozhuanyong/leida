@@ -1,4 +1,4 @@
-import {REFERENCE_SOURCES,parseReferenceHistoricalLatest,needsReferenceHistoryRecovery,referenceCompletionClaim} from './reference-reset-source';
+import {REFERENCE_SOURCES,isResetWatchLead,parseReferenceHistoricalLatest,needsReferenceHistoryRecovery,referenceCompletionClaim} from './reference-reset-source';
 import { load } from 'cheerio';
 import type { Evidence } from '../lib/types';
 import { hasStandaloneContext, isTruncatedText } from './source-context';
@@ -53,13 +53,9 @@ async function boundedJSON(response:Response):Promise<unknown> {
 export async function enrichKnownEvidence(evidence:Evidence,fetcher:typeof fetch=fetch):Promise<Evidence|undefined> {
  if(evidence.messageId.startsWith('observed-'))return; // Do not replace an observation with its linked announcement's text/time.
  const post=knownPostIdentity(evidence.url);if(!post||evidence.provenance==='manual')return undefined;
- if(REFERENCE_SOURCES.some(source=>source.id===evidence.sourceId)&&evidence.textOrigin!=='original'){
-  try{
-   const response=await fetcher(`https://api.fxtwitter.com/status/${post.messageId}`,{signal:AbortSignal.timeout(10000),redirect:'error',headers:{Accept:'application/json'}});
-   if(!response.ok){await response.body?.cancel();return undefined;}
-   const original=parseReferenceOriginal(await boundedJSON(response),evidence);
-   return original ? (await recoverReferenceHistoryEvidence(original,fetcher))??original : undefined;
-  }catch{return undefined;}
+ if((isResetWatchLead(evidence)||REFERENCE_SOURCES.some(source=>source.id===evidence.sourceId))&&evidence.textOrigin!=='original'){
+  const original=await fetchKnownRelayOriginal(evidence,fetcher);
+  return original ? (await recoverReferenceHistoryEvidence(original,fetcher))??original : undefined;
  }
  if(needsReferenceHistoryRecovery(evidence))return recoverReferenceHistoryEvidence(evidence,fetcher);
  const currentTime=Date.now(),cached=fetcher===fetch?attempts.get(post.url):undefined;
@@ -135,8 +131,8 @@ export async function enrichQuotedResetContext(evidence:Evidence,available:Evide
   const links=explicitShortLinks(child.text);
   if(links.length>MAX_QUOTE_LINKS)return [];
   const targets=new Map<string,NonNullable<ReturnType<typeof knownPostIdentity>>>();
-  if(!links.length&&evidence.parentId){
-   const target=knownPostIdentity(`https://x.com/${childIdentity.account}/status/${evidence.parentId}`);
+  if(child.parentId){
+   const target=knownPostIdentity(`https://x.com/${childIdentity.account}/status/${child.parentId}`);
    if(!target||!snowflakeTime(target.messageId)||BigInt(target.messageId)>=BigInt(childIdentity.messageId))return [];
    targets.set(target.messageId,target);
   }
@@ -151,12 +147,20 @@ export async function enrichQuotedResetContext(evidence:Evidence,available:Evide
   const publishedAt=snowflakeTime(target.messageId)!;
   const metadata=evidence.metadata?{...(evidence.metadata.sourceGroup?{sourceGroup:evidence.metadata.sourceGroup}:{}),category:'reset' as const}:undefined;
   const prototype:Evidence={id:`${evidence.id}:quoted:${target.messageId}`,hash:'',sourceId:evidence.sourceId,messageId:target.messageId,url:target.url,text:'',publishedAt,collectedAt:new Date().toISOString(),contextComplete:false,historical:true,provenance:evidence.provenance,textOrigin:'archive_excerpt',metadata};
-  const existing=available.filter(item=>item.sourceId===evidence.sourceId&&item.provenance!=='manual'&&item.textOrigin==='original'&&item.contextComplete&&item.messageId===target.messageId&&knownPostIdentity(item.url)?.messageId===target.messageId&&hasStandaloneContext(item.text,'reset')).sort((a,b)=>b.collectedAt.localeCompare(a.collectedAt)||b.id.localeCompare(a.id))[0];
-  const original=existing??await enrichKnownEvidence(prototype,fetcher);
+  const watchLead=isResetWatchLead(evidence);
+  const existing=available.filter(item=>item.sourceId===evidence.sourceId&&item.provenance!=='manual'&&item.textOrigin==='original'&&
+   item.messageId===target.messageId&&knownPostIdentity(item.url)?.messageId===target.messageId&&
+   (watchLead?!isTruncatedText(item.text):item.contextComplete&&hasStandaloneContext(item.text,'reset')))
+   .sort((a,b)=>Number(!!b.parentId)-Number(!!a.parentId)||b.collectedAt.localeCompare(a.collectedAt)||b.id.localeCompare(a.id))[0];
+  const childAlreadyLinked=watchLead&&target.messageId===evidence.parentId&&child.text===evidence.text;
+  if(existing&&childAlreadyLinked)return [];
+  const original=existing??await (watchLead?fetchKnownRelayOriginal(prototype,fetcher):enrichKnownEvidence(prototype,fetcher));
   if(!original||original.textOrigin!=='original'||isTruncatedText(original.text))return [];
   // A previously verified same-author record retains its own source, clock,
   // eligibility and schedule. Only a newly fetched prototype uses thin metadata.
-  const parent:Evidence=existing?{...existing}:{...prototype,text:original.text,textOrigin:'original',contextComplete:hasStandaloneContext(original.text,'reset')};
+  const parent:Evidence=existing?{...existing}:{...prototype,text:original.text,textOrigin:'original',parentId:original.parentId,
+   contextComplete:!original.parentId&&hasStandaloneContext(original.text,'reset')};
+  if(childAlreadyLinked)return [parent];
   return [parent,{...child,parentId:target.messageId,contextComplete:false,collectedAt:new Date().toISOString()}];
  }catch {return [];}
 }
@@ -183,6 +187,16 @@ export function parseReferenceOriginal(value:unknown,evidence:Evidence,collected
  if(!REFERENCE_SOURCES.some(source=>source.id===evidence.sourceId))return;
  return parseKnownRelayOriginal(value,evidence,collectedAt);
 }
+async function fetchKnownRelayOriginal(evidence:Evidence,fetcher:typeof fetch):Promise<Evidence|undefined> {
+ try{
+  const response=await fetcher('https://api.fxtwitter.com/status/'+evidence.messageId,{
+   signal:AbortSignal.timeout(10000),redirect:'error',headers:{Accept:'application/json'},
+  });
+  if(!response.ok){await response.body?.cancel();return;}
+  return parseKnownRelayOriginal(await boundedJSON(response),evidence);
+ }catch{return;}
+}
+
 export function parseKnownRelayOriginal(value:unknown,evidence:Evidence,collectedAt=new Date().toISOString()):Evidence|undefined {
  if(knownPostIdentity(evidence.url)?.messageId!==evidence.messageId||evidence.provenance==='manual'||!value||typeof value!=='object')return;
  const data=value as {code?:unknown;tweet?:{id?:unknown;text?:unknown;created_at?:unknown;author?:{screen_name?:unknown;id?:unknown;protected?:unknown};replying_to?:unknown;replying_to_status?:unknown;quote?:{id?:unknown;url?:unknown;author?:{screen_name?:unknown;id?:unknown}}}};

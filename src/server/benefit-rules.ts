@@ -245,7 +245,8 @@ function validIsoBenefitTime(value: string): boolean {
     (match[7] === 'Z' || Number(match[8]) < 14 && Number(match[9]) < 60 || Number(match[8]) === 14 && Number(match[9]) === 0);
 }
 
-export function benefitTime(text: string, publishedAt: string): Pick<BenefitClaim, 'expectedAt' | 'timeNote'> {
+/** Separate the delivery time from qualification and use conditions before parsing it. */
+export function benefitTimingText(text: string): {text:string;reason?:string} {
   const normalized=normalize(text);
   const activation=normalized.match(bankedActivation);
   const lead=activation?normalized.slice(0,activation.index):'';
@@ -259,9 +260,15 @@ export function benefitTime(text: string, publishedAt: string): Pick<BenefitClai
   const validity=(s:string)=>/有效期|过期|到期失效|自行使用|\bexpires?\b|\bvalid for\b|use (?:it|the reset)|apply (?:it|the reset)/i.test(s);
   const delivery=parts.filter(part=>!qualification(part)&&!validity(part));
   const s=delivery.length&&delivery.length<parts.length?delivery.join(', '):original;
+  const reason=qualification(s)?'原文时间用于账户资格截止，不作为发放截止。':
+    validity(s)?'原文描述使用或有效期，不作为发放截止。':undefined;
+  return {text:s,reason};
+}
+
+export function benefitTime(text: string, publishedAt: string, maxRelativeHours=48): Pick<BenefitClaim, 'expectedAt' | 'timeNote'> {
+  const {text:s,reason}=benefitTimingText(text);
   if(!Number.isFinite(Date.parse(publishedAt)))return {timeNote:'原帖发布时间无效，未生成精确预计时间。'};
-  if(qualification(s))return {timeNote:'原文时间用于账户资格截止，不作为发放截止。'};
-  if(validity(s))return {timeNote:'原文描述使用或有效期，不作为发放截止。'};
+  if(reason)return {timeNote:reason};
   const offset = fixedOffset(s);
   const namedZone = s.match(/\b(PST|PDT)\b/i)?.[1]?.toUpperCase();
   const zoneNote = namedZone ? `按原文${namedZone}字面${namedZone === 'PST' ? 'UTC-8' : 'UTC-7'}换算，未自行改用当地夏令时；这是公告预计时间，仍待实际确认。` : '已换算为北京时间（UTC+8）';
@@ -298,7 +305,8 @@ export function benefitTime(text: string, publishedAt: string): Pick<BenefitClai
     // Do not silently use the first component of a range or an unsupported
     // compound duration. Limits apply to the total duration, not the unit count.
     const extraDuration = /^\s*(?:(?:and|or|to|until)\b|[-–—/,]|(?:和|又))?\s*(?:~\s*|about\s+|approximately\s+|roughly\s+|约|大约)?(?:\d|an?\b|half\b|一|二|两|三|四|五|六|七|八|九|十)/i.test(remainder);
-    if (!extraDuration && amount >= 0 && (relative[3] === undefined || hours && minutes >= 0 && minutes < 60) && duration > 0 && duration <= 48 * 3_600_000 && Number.isFinite(Date.parse(publishedAt))) return { expectedAt: new Date(Date.parse(publishedAt) + duration).toISOString(), timeNote: pointNote };
+    const expected=new Date(Date.parse(publishedAt)+duration);
+    if (!extraDuration && amount >= 0 && (relative[3] === undefined || hours && minutes >= 0 && minutes < 60) && duration > 0 && duration <= maxRelativeHours * 3_600_000 && Number.isFinite(expected.getTime())) return { expectedAt: expected.toISOString(), timeNote: pointNote };
   }
   const local = s.match(/(今天|明天|后天|today|tomorrow)\s*(?:at|于)?\s*(\d{1,2}):(\d{2})/i);
   if (local && offset !== undefined && Number(local[2]) < 24 && Number(local[3]) < 60) {

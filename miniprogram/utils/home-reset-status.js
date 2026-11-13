@@ -1,33 +1,21 @@
-const {announcementNeedsReview}=require('./round-evidence');
+const {assignObservations,latestResolution,openRounds,orderRounds,pending,publishedRounds,roundExpiry,
+  roundKey:keyOf,signalRounds,withSignal}=require('./round-evidence');
 const m = require('./model');
 const { resetStateCards } = require('./reset-state-cards');
 const { observationDayGroups, observationSources } = require('./reset-records');
 const { homeClock, homeOrbitPresentation } = require('./home-orbit');
-/** @typedef {{label:string,basis:string,at:string,publicationId?:string}} RoundNotice */
+/** @typedef {{label:string,basis:string,at:string,publicationId?:string,sourceUrl?:string,sourceName?:string}} RoundNotice */
 const DAY = 86400000;
 const valid = value => typeof value === 'string' && Number.isFinite(Date.parse(value));
 const millis = value => valid(value) ? Date.parse(value) : -Infinity;
 const kinds = ['automatic_reset', 'banked_reset'];
 const validKind = kind => kinds.includes(kind) ? kind : 'automatic_reset';
-const keyOf = item => item.eventId + ':' + item.actionId;
 const detailPath = id => '/pages/detail/index?publicationId=' + encodeURIComponent(id);
 // Compact UI revision only; not a credential or a security signature.
 function stateRevision(value) {
   let first=2166136261,second=5381;
   for(let i=0;i<value.length;i++){first=Math.imul(first^value.charCodeAt(i),16777619);second=Math.imul(second,33)^value.charCodeAt(i);}
   return 'home-'+(first>>>0).toString(16).padStart(8,'0')+(second>>>0).toString(16).padStart(8,'0');
-}
-const pending = round => round.stage === 'promised' || round.stage === 'in_progress';
-const resolved = round => round.stage === 'claimed_complete' || round.stage === 'cancelled';
-function orderRounds(a, b) {
-  return millis(b.startAt)-millis(a.startAt)||millis(b.statementAt)-millis(a.statementAt)||keyOf(a).localeCompare(keyOf(b));
-}
-function latestResolution(rounds) {
-  return rounds.filter(resolved).sort((a,b)=>millis(b.statementAt)-millis(a.statementAt))[0];
-}
-function openRounds(rounds, resolution) {
-  return rounds.filter(round=>pending(round) &&
-    !announcementNeedsReview(round,resolution&&{...resolution,announcedAt:resolution.hasPromise?resolution.startAt:undefined},round.eventId));
 }
 function overlappingClock(rounds, active) {
   const prior=rounds.find(round=>round!==active&&pending(round)&&!round.remote&&valid(round.expectedAt)&&
@@ -43,29 +31,10 @@ function dateFields(at, qualifier='') {
   return {timeAt:at||'',time:time+(qualifier?' '+qualifier:''),dateText:date.replace(/^(\d{4})-(\d{2})-(\d{2})$/,(_,y,mo,d)=>`${y}年${Number(mo)}月${Number(d)}日`),clockText,timeQualifier:qualifier};
 }
 function roundsFor(data, kind, now) {
-  const current = millis(now), facts = m.publicActions(data).filter(({action,publication})=>action.kind===kind && millis(action.statementAt)<=current && valid(action.statementAt) && valid(publication.publishedAt) && millis(publication.publishedAt)<=current);
+  const current=millis(now), facts=m.publicActions(data).filter(({action})=>action.kind===kind);
   const outlook=data.forecasts?.outlook&&m.resetOutlookModel(data,data.forecasts.outlook.byKind?kind:undefined);
-  const rounds = facts.map(({action,event,publication})=>{
-    const versions = data.publications.filter(p=>p.eventId===event.id && !m.isNewsOnly(p) && !m.publicationWithdrawn(data,p) && millis(p.publishedAt)<=millis(publication.publishedAt))
-      .flatMap(p=>p.event.actions.filter(a=>a.id===action.id && a.kind===kind && a.scope==='public' && valid(a.statementAt) && millis(a.statementAt)<=current).map(a=>({...a,publicationId:p.id})))
-      .sort((a,b)=>millis(a.statementAt)-millis(b.statementAt));
-    const promises = versions.filter(a=>['promised','in_progress'].includes(a.stage));
-    const first = promises[0], prior = promises.filter(a=>valid(a.expectedAt)&&a.publicationId!==publication.id).pop();
-    const projected=outlook?.latestResolutions?.[kind];
-    const sameResolution=projected?.publicationId===publication.id&&projected.actionId===action.id&&projected.stage===action.stage?projected:null;
-    const knownStart=first?.statementAt||sameResolution?.announcedAt;
-    const timed = promises.filter(a=>valid(a.expectedAt)).pop();
-    const deadline = valid(action.expectedAt) ? action.expectedAt : timed?.expectedAt || sameResolution?.announcedDeadline || '';
-    const ids = new Set(versions.flatMap(a=>a.evidenceIds||[]).concat(action.evidenceIds||[]));
-    const urls = data.evidence.filter(e=>ids.has(e.id)).map(e=>e.url);
-    const timeNote = (valid(action.expectedAt) && action.timeNote)
-      || (timed?.expectedAt === deadline && timed.timeNote)
-      || (sameResolution?.announcedDeadline === deadline && sameResolution.announcedDeadlineNote)
-      || action.timeNote || '';
-    return {...action,timeNote,actionId:action.id,eventId:event.id,publicationId:publication.id,startAt:knownStart||action.statementAt,expectedAt:deadline,
-      timingPublicationId:!valid(action.expectedAt)&&pending(action)?timed?.publicationId:undefined,
-      previousExpectedAt:prior?.expectedAt && prior.expectedAt!==deadline ? prior.expectedAt : '',urls,remote:false,hasPromise:valid(knownStart)};
-  });
+  const snapshots=data.publications.filter(p=>!m.isNewsOnly(p)&&!m.publicationWithdrawn(data,p));
+  const rounds=publishedRounds(facts,snapshots,data.evidence,now,outlook?.latestResolutions);
   // The home payload can omit an older publication while retaining its existing
   // server outlook. Apply the same deadline rules to that validated projection.
   if(outlook){
@@ -81,77 +50,6 @@ function roundsFor(data, kind, now) {
   return rounds.sort(orderRounds);
 }
 
-function datedHint(data, kind, now) {
-  const signal=data.forecasts?.referenceSignal, hint=signal?.hint, current=millis(now);
-  if(hint?.kind!==kind||!hint.dayLabel||!valid(signal.publishedAt)||!valid(signal.recordedAt)||
-    millis(signal.publishedAt)>current||millis(signal.recordedAt)>current||millis(hint.expiresAt)<=millis(signal.publishedAt))return null;
-  return signal;
-}
-
-// A dated signal is a clock reference. A later start message with no time
-// can keep that clock when it explicitly links back or has one compatible round.
-function withDatedHint(rounds, signal) {
-  if(!signal)return rounds;
-  const resolution=latestResolution(rounds), open=openRounds(rounds,resolution);
-  const anchor=millis(signal.publishedAt),deadline=millis(signal.hint.expiresAt);
-  const related=rounds.filter(round=>round.urls.includes(signal.hint.parentSourceUrl||signal.sourceUrl));
-  if(related.some(resolved)||resolution&&millis(resolution.statementAt)>=anchor)return rounds;
-  const active=open[0];
-  if(active){
-    const timed=valid(active.expectedAt);
-    const supersedesExpired=timed&&millis(active.expectedAt)+DAY<=millis(signal.recordedAt)&&
-      anchor>millis(active.statementAt)&&!signal.hint.parentSourceUrl;
-    if(timed&&!supersedesExpired)return rounds;
-    const linked=related.length===1&&related[0]===active;
-    const compatible=!related.length&&!signal.hint.parentSourceUrl&&open.length===1&&active.stage==='in_progress'&&
-      millis(active.statementAt)>=anchor&&millis(active.statementAt)<=deadline+DAY;
-    if(!supersedesExpired){
-      if(!linked&&!compatible)return rounds;
-      return rounds.map(round=>round===active?{...round,startAt:linked?round.startAt:signal.publishedAt,
-        expectedAt:signal.hint.expiresAt,signal}:round);
-    }
-  }
-  if(signal.hint.parentSourceUrl)return rounds;
-  return [...rounds,{kind:signal.hint.kind,stage:'promised',actionId:signal.id,eventId:'signal',publicationId:'',
-    statementAt:signal.publishedAt,startAt:signal.publishedAt,expectedAt:signal.hint.expiresAt,
-    hasPromise:true,urls:[signal.sourceUrl],sourceName:signal.sourceName,sourceUrl:signal.sourceUrl,
-    sourceType:'x_post',signal}].sort(orderRounds);
-}
-function assignObservations(rounds, observations) {
-  const assignments = new Map(), independent = [], unassigned = [];
-  // Establish earlier evidence first. A full history must not let an old,
-  // already observed arrangement compete with the next announced round.
-  for(const observation of observations.slice().sort((a,b)=>millis(a.observedAt)-millis(b.observedAt))){
-    // A shared source/index URL is provenance, not an occurrence identity.
-    // Only a distinct referenced post can explicitly bind different records.
-    const postReference=observation.referenceUrl&&observation.referenceUrl!==observation.sourceUrl;
-    const explicit = rounds.filter(r=>r.stage!=='cancelled' && (!r.hasPromise||millis(observation.observedAt)>=millis(r.startAt)) && (r.eventId===observation.eventId || postReference&&r.urls.includes(observation.referenceUrl)));
-    const resolution=rounds.filter(r=>resolved(r)&&millis(r.statementAt)<=millis(observation.observedAt))
-      .sort((a,b)=>millis(b.statementAt)-millis(a.statementAt))[0];
-    const possible=rounds.filter(r=>r.stage!=='cancelled' && r.hasPromise && millis(observation.observedAt)>=millis(r.startAt) &&
-      !announcementNeedsReview(r,resolution&&{...resolution,announcedAt:resolution.hasPromise?resolution.startAt:undefined},r.eventId) &&
-      (valid(r.expectedAt) ? millis(observation.observedAt)<=millis(r.expectedAt)+DAY :
-        pending(r)||r.stage==='claimed_complete'&&millis(r.statementAt)-millis(observation.observedAt)>=0&&
-        millis(r.statementAt)-millis(observation.observedAt)<=DAY));
-    const candidates = explicit.length ? explicit : possible.filter(r=>{
-      const prior=assignments.get(keyOf(r));
-      if(!prior?.length)return true;
-      const observedAt=Math.min(...prior.map(o=>millis(o.observedAt)));
-      // Only an established observation followed by a new arrangement closes
-      // this fallback window. Two unresolved arrangements remain ambiguous.
-      return !possible.some(other=>keyOf(other)!==keyOf(r)&&millis(other.startAt)>observedAt);
-    });
-    if(candidates.length===1){const key=keyOf(candidates[0]);assignments.set(key,[...(assignments.get(key)||[]),observation]);}
-    else {
-      independent.push(observation);
-      // Ambiguous evidence can be shown alongside an arrangement, but must not
-      // be promoted into a separate later round while it still matches one.
-      if(!candidates.length)unassigned.push(observation);
-    }
-  }
-  const newestFirst=(a,b)=>millis(b.observedAt)-millis(a.observedAt);
-  return {assignments,independent:independent.sort(newestFirst),unassigned:unassigned.sort(newestFirst)};
-}
 function completedCard(base, kind, round, observations) {
   // Source-observation time stays the clock anchor when a later declaration upgrades evidence.
   const observation = observations.slice().sort((a,b)=>millis(a.observedAt)-millis(b.observedAt))[0];
@@ -178,32 +76,36 @@ function completedCard(base, kind, round, observations) {
 function pendingCard(base, round, now) {
   const time=millis(now),deadline=millis(round.expectedAt),timed=valid(round.expectedAt),overdue=timed&&time>=deadline;
   const signal=round.signal;
+  const fallback=signal?.hint.windowBasis==='fallback_48h', namedDay=!!signal?.hint.dayLabel;
   const card={...base,completedDisplay:false,expiredRound:false,roundKey:keyOf(round),expectedAt:round.expectedAt||'',clockAt:'',declarationAt:'',declarationTime:'',evidenceType:signal?'signal':'announcement',
     publicationId:round.publicationId,eventId:round.eventId,sourceName:round.sourceName||'',sourceUrl:round.sourceUrl||'',sourceType:round.sourceType||'',
     timingPublicationId:!signal&&round.timingPublicationId||'',
-    observationPublicationId:'',observationSourceName:'',observationTime:'',observationAt:'',oldTime:'',expectedElapsed:'',metric:'',clockParts:[],window:'',watchNote:'',validUntil:timed?new Date(overdue?deadline+DAY:deadline).toISOString():''};
+    observationPublicationId:'',observationSourceName:'',observationTime:'',observationAt:'',oldTime:'',expectedElapsed:'',metric:'',clockParts:[],window:'',watchNote:'',validUntil:timed?new Date(overdue?roundExpiry(round):deadline).toISOString():''};
   if(signal){
-    const label=round.kind==='banked_reset'?'可能发放':'可能重置';
+    const banked=round.kind==='banked_reset';
     Object.assign(card,{sourceName:signal.sourceName,sourceUrl:signal.sourceUrl,sourceType:'x_post',
-      parentSourceUrl:signal.hint.parentSourceUrl||'',signalAt:signal.publishedAt,window:signal.hint.dayLabel+label});
+      sourceNames:signal.sourceNames, parentSourceUrl:signal.hint.parentSourceUrl||'',signalAt:signal.publishedAt,
+      window:fallback?(banked?'可能发放重置卡':'额度可能重置'):namedDay?signal.hint.dayLabel+(banked?'可能发放':'可能重置'):(banked?'预计发放重置卡':'预计额度重置'),
+      watchNote:fallback?'原帖未给发放时间，按 48 小时观察。':namedDay?'按发布者当地日期的结束时间推算。':'时间依据发布者原文，结果以公开声明或观测为准。'});
   }
   const adjusted=valid(round.previousExpectedAt),note=round.timeNote||'',timing=/^原文近似时间/.test(note)?'approximate':/^原文预计时刻/.test(note)?'point':/(?:日终|最晚|之前|以内|截止|\bby\b|\bwithin\b)/i.test(note)?'deadline':'point';
   const qualifier=timing==='deadline'?'前':timing==='approximate'?'左右':'';
   card.state=overdue?'overdue':signal?'estimated':timed?adjusted?'revised':'scheduled':'announced';
   card.title=overdue?(signal?'推测窗口已过':'原预计时间已过'):signal?card.window:round.kind==='banked_reset'?'预计发放重置卡':'预计额度重置';
-  card.timeLabel=signal?'推测窗口结束':timed?(overdue?'原预计安排':adjusted?'最新安排':'预计安排'):'消息时间';
-  card.metricLabel=signal?'距推测窗口结束':overdue?card.title:adjusted?'距离最新预计安排':timing==='deadline'?'距离预计最晚时间':timing==='approximate'?'距离预计时间（约）':'距离预计安排';
+  card.timeLabel=fallback?'观察窗口结束':namedDay?'推测窗口结束':timed?(overdue?'原预计安排':adjusted?'最新安排':'预计安排'):'消息时间';
+  card.metricLabel=fallback?'距离观察窗口结束':namedDay?'距推测窗口结束':overdue?card.title:adjusted?'距离最新预计安排':timing==='deadline'?(round.kind==='banked_reset'?'距离预计最晚发放':'距离预计最晚重置'):timing==='approximate'?'距离预计时间（约）':'距离预计安排';
   Object.assign(card,dateFields(timed?round.expectedAt:round.statementAt,timed?qualifier:''));
   if(adjusted)card.oldTime='原预计 '+m.displayTime(round.previousExpectedAt);
   card.action=signal?'查看预测依据':overdue?'查看原预告':adjusted?'查看调整说明':'查看安排依据';
   return card;
 }
 function closeRound(base, round, last, now) {
-  const explicit=round.stage==='cancelled', at=explicit?round.statementAt:new Date(millis(round.expectedAt)+DAY).toISOString();
+  const explicit=round.stage==='cancelled', fallback=round.signal?.hint.windowBasis==='fallback_48h';
+  const at=explicit?round.statementAt:new Date(roundExpiry(round)).toISOString();
   const subject=round.kind==='banked_reset'?'发卡':'重置';
-  const label='本轮'+subject+(round.signal?'预测已结束':'安排已取消');
-  const basis=explicit?'发布者取消声明':round.signal?'推测窗口已过 24 小时':'超时 24 小时，系统关闭本轮';
-  const roundNotice={label,basis,at,publicationId:round.publicationId};
+  const label='本轮'+subject+(explicit?'安排已取消':round.signal?'预测已结束':'等待确认已结束');
+  const basis=explicit?'发布者取消声明':fallback?'48 小时内暂未确认':round.signal?'推测窗口已过 24 小时':'超时 24 小时，暂未确认';
+  const roundNotice={label,basis,at,publicationId:round.publicationId,sourceUrl:explicit?round.sourceUrl:undefined,sourceName:explicit?round.sourceName:undefined};
   if(last)return {...last,roundNotice,expiredRound:!explicit};
   return {...pendingCard(base,round,now),state:'cancelled',title:label,roundNotice,expiredRound:!explicit,
     validUntil:'',metricLabel:'',...dateFields(explicit?round.statementAt:round.expectedAt),
@@ -233,8 +135,8 @@ function historyMessage(record, now) {
 function homeResetStatus(data, now=data.serverTime) {
   const input={...data,serverTime:now},states=resetStateCards(input,now),observations=observationSources(input);
   const cards=states.cards.map(base=>{
-    const kind=base.kind, signal=datedHint(input,kind,now);
-    const rounds=withDatedHint(roundsFor(input,kind,now),signal),assigned=assignObservations(rounds,observations.filter(o=>o.kind===kind));
+    const kind=base.kind, signals=signalRounds(input.forecasts?.referenceSignals??[input.forecasts?.referenceSignal],kind,now);
+    const rounds=signals.reduce(withSignal,roundsFor(input,kind,now)),assigned=assignObservations(rounds,observations.filter(o=>o.kind===kind));
     // A late report from another source must not create a second occurrence or
     // restart the clock. Unlinked evidence stays a clearly labelled date summary.
     const summarize=rows=>observationDayGroups(input,rows,{separateSourceTimes:true}).map(g=>({...g.observations[0],...(g.isObservationSummary?{displaySummary:g}:{})}));
@@ -259,11 +161,11 @@ function homeResetStatus(data, now=data.serverTime) {
       // Select the current occurrence before choosing its clock anchor. Keeping
       // the earliest proof inside one round must not pin every future reset to it.
       const resolvedAt=Math.max(millis(latest.statementAt),...bound.map(o=>millis(o.observedAt)));
-      const newer=unassigned.find(o=>millis(o.observedAt)>resolvedAt);
-      card=newer?completedCard(base,kind,null,[newer]):completedCard(base,kind,latest,bound);
+      const actual=completedCard(base,kind,latest,bound),other=lastCompletion();
+      card=other&&millis(other.clockAt)>resolvedAt?other:actual;
     }
     else if(latest&&pending(latest)){
-      const timed=valid(latest.expectedAt), expires=millis(latest.expectedAt)+DAY;
+      const timed=valid(latest.expectedAt), expires=roundExpiry(latest);
       const last=(!timed||millis(now)>=expires)?lastCompletion():null;
       if(timed&&millis(now)>=expires){
         card=last&&millis(last.clockAt)>expires?last:closeRound(base,latest,last,now);
@@ -279,7 +181,7 @@ function homeResetStatus(data, now=data.serverTime) {
     }else if(independent.length)card=completedCard(base,kind,null,[independent[0]]);
     else card={...base,state:'waiting',publicationId:'',eventId:'',sourceUrl:'',sourceName:'',timeLabel:'',...dateFields(''),completedDisplay:false,expiredRound:false};
     // A genuinely newer classified signal replaces history, never a still-active arrangement.
-    if(['signal','estimated'].includes(base.state) && !(signal&&base.sourceUrl===signal.sourceUrl) &&
+    if(['signal','estimated'].includes(base.state) && !signals.some(signal=>base.sourceUrl===signal.sourceUrl) &&
       millis(base.signalAt)>Math.max(millis(latest?.statementAt),millis(card.clockAt)) &&
       (!['scheduled','revised','announced','progress','overdue'].includes(card.state)||
        card.state==='announced'&&!!base.hintForPublicationId&&base.hintForPublicationId===latest?.publicationId)){

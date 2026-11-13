@@ -7,7 +7,8 @@ import {reminderContentCurrent} from '../src/lib/reminder-lifecycle';
 import {statusTimelineModel,statusPosterSnapshot} from '../src/lib/status-timeline';
 import {projectPublicForecastRecords} from '../src/server/forecast';
 import {REFERENCE_CADENCE_VERSION,referencePointsAt,buildReferenceCadence} from '../src/lib/reference-cadence';
-import {parseReferenceSignals,parseReferenceHistory,referencePublicSignal,projectReferenceSignal,REFERENCE_SIGNAL_SOURCE} from '../src/server/reference-reset-source';
+import {parseReferenceSignals,parseReferenceHistory,legacyReferenceSignal,referencePublicSignals,projectReferenceSignal,REFERENCE_SIGNAL_SOURCE} from '../src/server/reference-reset-source';
+import type {Source} from '../src/lib/types';
 import {extractBenefitClaims} from '../src/server/benefit-rules';
 import {interpretResetHint} from '../src/server/reset-hint';
 import {needsSemanticReview} from '../src/server/automatic-content';
@@ -18,6 +19,9 @@ import {evidenceBenefitClaims} from '../src/server/source-context';
 import {homeResetStatus} from '../miniprogram/utils/home-reset-status';
 const require=createRequire(import.meta.url),native=require('../miniprogram/utils/model.js'),timeline=require('../miniprogram/utils/status-timeline.js');
 const now='2026-10-18T03:00:00.000Z',doneAt='2026-10-17T21:12:21.000Z';
+function referencePublicSignal(evidence:Evidence[],sources:Source[],at:string,completedAt?:string){
+ return legacyReferenceSignal(referencePublicSignals(evidence,sources,at),sources,at,completedAt);
+}
 function published(stage:'promised'|'claimed_complete',id:string):Publication {
  const at=stage==='promised'?'2026-10-17T16:21:13.000Z':doneAt;
  const action={id:'action-'+id,kind:'automatic_reset' as const,stage,scope:'public' as const,eligibility:'所有用户',evidenceIds:['proof-'+id],evidenceQuote:stage==='promised'?'Global reset by EOD PST.':'Done',statementAt:at,...(stage==='promised'?{expectedAt:'2026-10-18T08:00:00.000Z',timeNote:'原文承诺日终前完成，预计最晚时间已换算为北京时间（UTC+8）'}:{})};
@@ -120,7 +124,9 @@ test('核验原文中的发卡暗示进入首页主卡，窗口关闭后冷加�
  const source={...REFERENCE_SIGNAL_SOURCE,enabled:true,validated:true,status:'healthy' as const,lastSuccessAt:checkedAt,referenceSnapshotAt:checkedAt};
  const [archive]=parseReferenceSignals({schema_version:1,generated_at:checkedAt,signals:[{signal_id:id,signal_type:'forecast_source',recorded_at:publishedAt,summary:text,source:{url}}]},checkedAt);
  const evidence={...archive,id:'hint-proof',hash:'fixture',historical:false,textOrigin:'original' as const};
- assert.equal(referencePublicSignal([{...evidence,textOrigin:'archive_excerpt'}],[source],checkedAt),undefined);
+ const excerpt=referencePublicSignal([{...evidence,textOrigin:'archive_excerpt'}],[source],checkedAt);
+ assert.equal(excerpt?.reviewPending,true);
+ assert.equal(excerpt?.hint,undefined);
  assert.equal(referencePublicSignal([{...evidence,text:'We went for a walk.'}],[source],checkedAt)?.hint,undefined);
  const older=previousCardCompletion();
  const quota=published('claimed_complete','quota');
@@ -275,7 +281,9 @@ test('缺父帖、迟到补证、冲突和无关回复保留证据边界，陌�
  assert.equal(late?.recordedAt,later);
  assert.equal(projectReferenceSignal(late,[source],checkedAt),undefined);
  const conflicting={...parent,id:'conflicting',text:'We will reset usage limits for all paid Codex users.'};
- assert.equal(referencePublicSignal([child,parent,conflicting],[source],checkedAt),undefined);
+ const conflict=referencePublicSignal([child,parent,conflicting],[source],checkedAt);
+ assert.equal(conflict?.reviewPending,true);
+ assert.equal(conflict?.hint,undefined);
  const unknown={...child,text:'Pencils down once the lights come up.'};
  const pending=referencePublicSignal([unknown,parent],[source],checkedAt);
  assert.equal(pending?.reviewPending,true);

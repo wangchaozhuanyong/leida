@@ -26,10 +26,20 @@ export interface ForecastReference extends ForecastEstimate {sampleIds:string[];
 export interface ForecastCadenceOutcome {id:string;recordType:'reset_cadence_outcome';snapshotId:string;observedAt:string;actualAt:string;evidenceIds:string[];url:string;inWindow:boolean;absoluteErrorHours:number;}
 export interface CadenceHorizonOutcome {id:string;recordType:'reset_cadence_horizon_outcome';snapshotId:string;modelVersion:string;target:import('./reset-cadence').CadenceTarget;horizonHours:24|48;windowStart:string;windowEnd:string;observedAt:string;result:'occurred'|'not_occurred'|'unknown';scorable:boolean;actualAt?:string;evidenceIds:string[];reason:string;supersedes?:string;}
 export interface CadenceEvaluation {modelVersion:string;maturedSamples:number;positiveSamples:number;unknownSamples:number;brierScore:number|null;baselineBrierScore:number|null;skill:number|null;calibrated:false;externalWeight:0;explanation:string;}
-export interface PublicResetHint {kind:ActionKind;dayLabel?:string;expiresAt:string;parentSourceUrl?:string;}
-export interface ReferencePublicSignal {id:string;text:string;publishedAt:string;recordedAt:string;sourceUrl:string;sourceName:'AIPlanWatch'|'Tibo 公开动态';hint?:PublicResetHint;reviewPending?:boolean;}
+export interface PublicResetHint {
+ kind:ActionKind;dayLabel?:string;expiresAt:string;parentSourceUrl?:string;
+ windowBasis?:'source_time'|'source_day'|'fallback_48h';timeNote?:string;
+}
+export interface ReferencePublicSignal {
+ id:string;text:string;publishedAt:string;recordedAt:string;sourceUrl:string;sourceName:'AIPlanWatch'|'Tibo 公开动态'|'Codex Resets';
+ hint?:PublicResetHint;reviewPending?:boolean;cancelled?:boolean;roundAt?:string;roundSourceUrls?:string[];sourceNames?:ReferencePublicSignal['sourceName'][];
+}
+export interface ResetSignalReview {
+ disposition:'future'|'pending'|'excluded';kind?:ActionKind;quote:string;evidenceIds:string[];reviewedAt:string;
+}
 export interface ForecastPublicData {
  referenceSignal?:ReferencePublicSignal;
+ referenceSignals?:ReferencePublicSignal[];
  referenceCadence?:import('./reference-cadence').ReferenceCadencePublic;watch?:import('./reset-watch').ResetWatch;status:'ready'|'unavailable';reason?:string;ruleVersion:string;modelVersion:string;generatedAt:string;cases:ForecastCaseView[];reference:ForecastReference;outlook?:import('./reset-outlook').ResetOutlook;cadence?:import('./reset-cadence').ResetCadenceForecast;cadenceByKind?:Partial<Record<import('./reset-cadence').CadenceTarget,import('./reset-cadence').ResetCadenceForecast>>;cadenceEvaluationByKind?:Partial<Record<import('./reset-cadence').CadenceTarget,CadenceEvaluation>>;cadenceHistory?:import('./reset-cadence').ResetCadenceForecast[];cadenceOutcomes?:ForecastCadenceOutcome[];cadenceHorizonOutcomes?:CadenceHorizonOutcome[];}
 export const FORECAST_REFERENCE_SAMPLES=[
  {id:'01KK26XE1W536H7DQV2EXM3GHE',signalAt:'2026-03-06T18:35:00Z',announcementAt:'2026-03-08T02:42:13Z',delayHours:32.12027777777778,incidentUrl:'https://status.openai.com/incidents/01KK26XE1W536H7DQV2EXM3GHE',announcementUrl:'https://x.com/thsottiaux/status/2030474136024400173'},

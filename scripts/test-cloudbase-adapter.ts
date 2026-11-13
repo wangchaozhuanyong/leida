@@ -205,8 +205,24 @@ try{
   assert.equal(finished.filter(Boolean).length,1);
   const orderFixtures=[['history-new',true,'2026-10-15T06:28:13.000Z'],['history-old',true,'2026-10-15T04:56:07.000Z'],['fresh-old',false,'2026-10-16T04:56:07.000Z'],['fresh-new',false,'2026-10-16T06:28:13.000Z']] as const;
   for(const [suffix,historical,evidencePublishedAt] of orderFixtures){const job:Job={id:'qa-order-'+suffix,kind:'generate',status:'queued',attempts:0,availableAt:now,createdAt:now,payload:{historical,evidencePublishedAt}};await pool.query('INSERT INTO public.radar_jobs(id,payload) VALUES($1,$2)',[job.id,JSON.stringify(job)]);}
-  for(const suffix of ['fresh-new','fresh-old','history-old','history-new']){const job=await tasks.claim();assert.equal(job?.id,'qa-order-'+suffix,'live messages first, historical promises before completions');assert.equal(await tasks.finish(job!,{status:'succeeded',payload:job!.payload,availableAt:now,finishedAt:now}),true);}
-  pass('actual_job_payload_and_fence','concurrent claims and lease fencing passed; live jobs newest first, historical jobs source order');
+  const aged=(seconds:number)=>new Date(Date.parse(now)-seconds*1000).toISOString();
+  const newJobs:Job[]=[
+    {id:'qa-order-waiting-send',kind:'wechat_send',status:'queued',attempts:0,availableAt:aged(90),createdAt:aged(90),payload:{}},
+    {id:'qa-order-waiting-collect',kind:'collect',status:'queued',attempts:0,availableAt:aged(120),createdAt:aged(120),payload:{}},
+    {id:'qa-order-send',kind:'wechat_send',status:'queued',attempts:0,availableAt:now,createdAt:now,payload:{}},
+    {id:'qa-order-history-lease',kind:'generate',status:'running',attempts:1,availableAt:aged(180),leaseUntil:aged(1),createdAt:aged(180),payload:{historical:true}},
+    {id:'qa-order-future-send',kind:'wechat_send',status:'queued',attempts:0,availableAt:aged(-60),createdAt:now,payload:{}}
+  ];
+  for(const job of newJobs)await pool.query('INSERT INTO public.radar_jobs(id,payload) VALUES($1,$2)',[job.id,JSON.stringify(job)]);
+  for(const suffix of ['waiting-collect','waiting-send','fresh-new','fresh-old','send','history-lease','history-old','history-new']){
+    const job=await tasks.claim();
+    assert.equal(job?.id,'qa-order-'+suffix);
+    assert.equal(await tasks.finish(job!,{status:'succeeded',payload:job!.payload,availableAt:now,finishedAt:now}),true);
+  }
+  assert.equal(await tasks.claim(),undefined,'future retry remains unavailable');
+  // The following delivery checks require an empty queue of synthetic sends.
+  await pool.query("DELETE FROM public.radar_jobs WHERE id=ANY($1::text[])",[newJobs.map(job=>job.id)]);
+  pass('actual_job_payload_and_fence','concurrent claims, lease fencing, live reminders before history and aged live work by due time');
 
   phase='anonymous-permission-gate';
   const anonymous:typeof fetch=(input,init)=>transport(input,{...init,headers:{...Object.fromEntries(new Headers(init?.headers)),'x-qa-role':'anon'}});

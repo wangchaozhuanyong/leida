@@ -19,6 +19,7 @@ import { CloudbaseRpc, CloudbaseRpcError } from './rpc';
 import {createHash} from 'node:crypto';
 import {parseCadencePublicProjection,publicCadenceEvaluation,type CadencePublicProjection} from '../cadence-public-projection';
 import {RESET_CADENCE_MODEL_VERSION} from '../../lib/reset-cadence';
+import {projectReferenceSignals,referenceSignalVersion} from '../reference-reset-source';
 
 interface VersionData {
   digests: string[]; sources: Source[]; settings: Record<string,unknown>[];
@@ -40,7 +41,7 @@ function validVersion(value:unknown):asserts value is VersionData {
 export function cloudbasePublicVersion(value:unknown,timestamp:string) {
   validVersion(value);
   const expired=(time:string)=>Date.parse(time)<=Date.parse(timestamp);
-  const settings=value.settings.map(p=>p.id==='site'?p:{id:p.id??undefined,status:p.status??undefined,cadenceSnapshotId:p.cadenceSnapshotId??undefined,cadenceSnapshotIds:p.cadenceSnapshotIds??undefined,cadenceEvaluationByKind:p.cadenceEvaluationByKind??undefined,cadenceProjectionDigest:p.cadenceProjectionDigest??undefined,...(p.referenceSignal?{referenceSignal:p.referenceSignal}:{}),...(p.referenceCadencePublic?{referenceCadencePublic:p.referenceCadencePublic,referenceExpired:expired(String((p.referenceCadencePublic as {validUntil?:unknown}).validUntil??''))}:{})});
+  const settings=value.settings.map(p=>p.id==='site'?p:{id:p.id??undefined,status:p.status??undefined,cadenceSnapshotId:p.cadenceSnapshotId??undefined,cadenceSnapshotIds:p.cadenceSnapshotIds??undefined,cadenceEvaluationByKind:p.cadenceEvaluationByKind??undefined,cadenceProjectionDigest:p.cadenceProjectionDigest??undefined,referenceSignals:referenceSignalVersion(p.referenceSignals,timestamp),...(p.referenceSignal?{referenceSignal:p.referenceSignal}:{}),...(p.referenceCadencePublic?{referenceCadencePublic:p.referenceCadencePublic,referenceExpired:expired(String((p.referenceCadencePublic as {validUntil?:unknown}).validUntil??''))}:{})});
   const parts:unknown[]=[...value.digests,settings,value.deadlines.map(row=>[row.id,row.action,expired(row.deadline)]),value.cases.map(row=>[row.id,row.digest,expired(row.w24),expired(row.w48)]),value.snapshots.map(row=>[row.id,expired(row.until),Date.parse(row.generated)>Date.parse(timestamp)]),value.outcomeDigest];
   if (value.projectionRevision !== undefined) {
     if (typeof value.projectionRevision !== 'string' || !/^[a-z0-9-]{1,64}$/.test(value.projectionRevision)) throw new CloudbaseRpcError('response');
@@ -150,11 +151,11 @@ function compatibilityRuntime(value:unknown,timestamp:string):{runtime:Compatibl
  let cadenceEvaluationByKind:CompatibleRuntime['cadenceEvaluationByKind'];
  try{cadenceEvaluationByKind={automatic_reset:publicCadenceEvaluation(evaluation.automatic_reset),banked_reset:publicCadenceEvaluation(evaluation.banked_reset)};}catch{throw new CadenceReadError('EVALUATION_INVALID');}
  const publicSignal=row.referenceSignal?{id:row.referenceSignal.id,text:row.referenceSignal.text,publishedAt:row.referenceSignal.publishedAt,recordedAt:row.referenceSignal.recordedAt,sourceUrl:row.referenceSignal.sourceUrl,sourceName:row.referenceSignal.sourceName,hint:row.referenceSignal.hint,reviewPending:row.referenceSignal.reviewPending}:undefined;
- const runtime:CompatibleRuntime={id:'forecast_runtime',status:'ready',...(validatedReferenceReview(row.referenceReview)?{referenceReview:validatedReferenceReview(row.referenceReview)}:{}),...(publicSignal?{referenceSignal:publicSignal}:{}),...(row.referenceCadencePublic?{referenceCadencePublic:row.referenceCadencePublic}:{}),cadenceSnapshotId:ids.automatic_reset,cadenceSnapshotIds:{automatic_reset:ids.automatic_reset,banked_reset:ids.banked_reset},cadenceEvaluationByKind,cadenceProjectionDigest:projection.digest};
+ const runtime:CompatibleRuntime={id:'forecast_runtime',status:'ready',...(validatedReferenceReview(row.referenceReview)?{referenceReview:validatedReferenceReview(row.referenceReview)}:{}),...(publicSignal?{referenceSignal:publicSignal}:{}),...(Array.isArray(row.referenceSignals)?{referenceSignals:row.referenceSignals}:{}),...(row.referenceCadencePublic?{referenceCadencePublic:row.referenceCadencePublic}:{}),cadenceSnapshotId:ids.automatic_reset,cadenceSnapshotIds:{automatic_reset:ids.automatic_reset,banked_reset:ids.banked_reset},cadenceEvaluationByKind,cadenceProjectionDigest:projection.digest};
  return {runtime,projection};
 }
 /** Existing backend-only fixed-row read. Never list settings, commit, lease, or read credentials. */
-async function readCompatibilityRuntime(rpc:CloudbaseRpc,timestamp:string,signal:AbortSignal) {
+async function readForecastRuntimeRow(rpc:CloudbaseRpc,signal:AbortSignal):Promise<unknown> {
  if(signal.aborted)throw new CloudbaseRpcError('unknown',undefined,'REQUEST_TIMEOUT');
  const value=await rpc.call<{fingerprint?:unknown;rows?:unknown;more?:unknown;after?:unknown}>('radar_cb_store_read',{p_table:'settings',p_after:null,p_id:'forecast_runtime'},{signal});
  if(!value||typeof value.fingerprint!=='string'||!/^[a-f0-9]{32}$/.test(value.fingerprint)||!Array.isArray(value.rows)||value.rows.length!==1||value.more!==false||value.after!==null)throw new CadenceReadError('READ_RESPONSE_INVALID');
@@ -162,7 +163,10 @@ async function readCompatibilityRuntime(rpc:CloudbaseRpc,timestamp:string,signal
  if(!row||row.id!=='forecast_runtime'||!Number.isFinite(Date.parse(row.createdAt??'')))throw new CadenceReadError('READ_RESPONSE_INVALID');
  // fingerprint describes the entire settings table, including unrelated heartbeats.
  // Consistency below compares the fixed prediction's validated public projection.
- return compatibilityRuntime(row.payload,timestamp);
+ return row.payload;
+}
+async function readCompatibilityRuntime(rpc:CloudbaseRpc,timestamp:string,signal:AbortSignal) {
+ return compatibilityRuntime(await readForecastRuntimeRow(rpc,signal),timestamp);
 }
 function patchVersionRuntime(version:VersionData,runtime:Record<string,unknown>,projection?:CadencePublicProjection):VersionData {
  const snapshots=new Map(version.snapshots.map(s=>[s.id,s]));
@@ -175,8 +179,25 @@ function patchVersionRuntime(version:VersionData,runtime:Record<string,unknown>,
 async function supplementLegacyProjection(rpc:CloudbaseRpc,version:VersionData,timestamp:string,bundle?:Bundle):Promise<{version:VersionData;bundle?:Bundle}> {
  validVersion(version);
  const original=version.settings.find(row=>row.id==='forecast_runtime');
- if(process.env.RADAR_STORAGE_BACKEND!=='cloudbase'||!original||has(original,'cadenceSnapshotIds'))return {version,bundle};
+ if(process.env.RADAR_STORAGE_BACKEND!=='cloudbase'||!original)return {version,bundle};
  if(original.status==='error')return {version,bundle};
+ if(has(original,'cadenceSnapshotIds')){
+  if(has(original,'referenceSignals')&&(!bundle||has(bundle.forecastRecords.runtime??{},'referenceSignals')))return {version,bundle};
+  // Current SQL projections can still omit additive signal fields. Reuse the
+  // fixed settings lookup and patch only public signal fields on success.
+  try{
+   const row=await readForecastRuntimeRow(rpc,AbortSignal.timeout(1500)) as CadenceRuntime&{status?:string};
+   if(row?.id!=='forecast_runtime'||row.status!==original.status||row.cadenceSnapshotId!==original.cadenceSnapshotId||
+     compatHash(row.cadenceSnapshotIds)!==compatHash(original.cadenceSnapshotIds)||
+     !Number.isFinite(Date.parse(row.checkedAt))||Date.parse(row.checkedAt)>Date.parse(timestamp))return {version,bundle};
+   const referenceSignals=projectReferenceSignals(row.referenceSignals,version.sources,timestamp);
+   if(referenceSignals===undefined)return {version,bundle};
+   const next=patchVersionRuntime(version,{...original,referenceSignals});
+   return {version:next,...(bundle?{bundle:{...bundle,versionData:next,forecastRecords:{
+    ...bundle.forecastRecords,runtime:{...bundle.forecastRecords.runtime,referenceSignals},
+   }}}:{})};
+  }catch{return {version,bundle};}
+ }
  const unavailable=(reason:CadenceReadFailure,error?:unknown)=>{
   // Only fixed reason codes and the RPC's already-sanitized diagnostic code reach logs.
   console.warn('FORECAST_READ_UNAVAILABLE',reason,error instanceof CloudbaseRpcError?error.diagnosticCode:'');

@@ -7,6 +7,7 @@ import {createCloudbasePublicReader} from '../src/server/cloudbase/public-read';
 import {CloudbaseRpc} from '../src/server/cloudbase/rpc';
 import type {CadenceHorizonOutcome} from '../src/lib/forecast';
 import {setTimeout as delay} from 'node:timers/promises';
+import {homeResetStatus} from '../miniprogram/utils/home-reset-status';
 
 const at='2026-10-16T00:00:00.000Z',time=Date.parse(at),when=(hours:number)=>new Date(time+hours*3600_000).toISOString();
 function fixture(){
@@ -31,6 +32,25 @@ function fixture(){
  return {automatic,banked,historical,horizon,evaluation,runtime,version,bundle,calls,rpc,transport,snapshot,get reads(){return reads;}};
 }
 async function fullStorage<T>(fn:()=>Promise<T>){const prior=process.env.RADAR_STORAGE_BACKEND;process.env.RADAR_STORAGE_BACKEND='cloudbase';try{return await fn();}finally{if(prior===undefined)delete process.env.RADAR_STORAGE_BACKEND;else process.env.RADAR_STORAGE_BACKEND=prior;}}
+
+test('云端既有版本摘要遗漏新信号字段时，补读只投影安全字段且版本同步变化',()=>fullStorage(async()=>{
+ const f=fixture();
+ const advertised=f.version.settings.find(row=>row.id==='forecast_runtime')!;
+ Object.assign(advertised,{cadenceSnapshotIds:f.runtime.cadenceSnapshotIds});
+ Object.assign(f.bundle.forecastRecords.runtime,{cadenceSnapshotIds:f.runtime.cadenceSnapshotIds});
+ const id='2111176111111111111',canary='internal-canary';
+ Object.assign(f.runtime,{referenceSignals:[{
+  id,text:'We might issue a banked reset.',publishedAt:when(-1),recordedAt:at,sourceName:'Tibo 公开动态',
+  sourceUrl:'https://x.com/thsottiaux/status/'+id,hint:{kind:'banked_reset',expiresAt:when(47),windowBasis:'fallback_48h',privateValue:canary},
+  privateValue:canary,
+ }],signalDecisions:{privateValue:canary}});
+ const reader=createCloudbasePublicReader(f.rpc,()=>at);
+ const [home,version]=await Promise.all([reader.read({view:'home'}),reader.version()]);
+ assert.equal(home.contentVersion,version.contentVersion);
+ assert.equal(f.reads,2,'首页和版本请求各只补一次固定行');
+ assert.equal(homeResetStatus(home.data).primary.hero.metric,'1天23小时0分钟');
+ assert.equal(JSON.stringify(home).includes(canary),false);
+}));
 
 test('云端首页轻量投影保留连续多次同类型完成，不只保留每类最后一条且不增加RPC',async()=>{
  const f=fixture();
@@ -78,7 +98,7 @@ test('旧SQL：只有banked快照变化也更新公开版本，读取时钟不�
 }));
 
 test('新SQL完整投影零额外RPC，未启用完整存储也不越权读取settings',async()=>{
- const f=fixture();Object.assign(f.version.settings[1],{cadenceSnapshotIds:f.runtime.cadenceSnapshotIds,cadenceEvaluationByKind:f.evaluation});Object.assign(f.bundle.forecastRecords.runtime,f.runtime);f.bundle.forecastRecords.snapshots=[f.automatic,f.banked];
+ const f=fixture();Object.assign(f.version.settings[1],{cadenceSnapshotIds:f.runtime.cadenceSnapshotIds,cadenceEvaluationByKind:f.evaluation,referenceSignals:[]});Object.assign(f.bundle.forecastRecords.runtime,f.runtime,{referenceSignals:[]});f.bundle.forecastRecords.snapshots=[f.automatic,f.banked];
  await fullStorage(async()=>{const reader=createCloudbasePublicReader(f.rpc,()=>at);assert.equal((await reader.read({view:'home'})).data.forecasts?.cadenceByKind?.banked_reset?.id,f.banked.id);assert.equal(f.calls.length,1);});
  const old=fixture(),prior=process.env.RADAR_STORAGE_BACKEND;process.env.RADAR_STORAGE_BACKEND='native';try{await createCloudbasePublicReader(old.rpc,()=>at).read({view:'home'});assert.equal(old.calls.length,1);}finally{if(prior===undefined)delete process.env.RADAR_STORAGE_BACKEND;else process.env.RADAR_STORAGE_BACKEND=prior;}
 });

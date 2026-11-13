@@ -15,6 +15,7 @@ import {forecastSourceAvailable} from '../lib/forecast';
 import { publicCached } from './public-cache';
 import { configuredPublicRpc } from './cloudbase/public-config';
 import {resetWatchVersion} from './reset-watch';
+import {referenceSignalVersion} from './reference-reset-source';
 
 const views: PublicView[] = ['home', 'history', 'news', 'detail', 'activity', 'notices', 'methodology', 'state', 'calendar'];
 const fail = () => { throw Object.assign(new Error('公开读取参数无效，请重新打开页面'), { status: 400 }); };
@@ -62,7 +63,7 @@ export async function readPublicVersion(client: Client, timestamp = new Date().t
     parts.push(result.rows[0].digest);
   }
   const settings = await client.query("SELECT payload FROM radar_settings WHERE id IN ('site','forecast_runtime') ORDER BY id");
-  parts.push(settings.rows.map(row => { const p = row.payload; return p.id === 'site' ? p : { id: p.id, status: p.status, cadenceSnapshotId: p.cadenceSnapshotId, cadenceSnapshotIds:p.cadenceSnapshotIds,cadenceEvaluationByKind:p.cadenceEvaluationByKind,...(p.referenceSignal?{referenceSignal:p.referenceSignal}:{}),...(p.referenceCadencePublic?{referenceCadencePublic:p.referenceCadencePublic,referenceExpired:Date.parse(p.referenceCadencePublic.validUntil)<=Date.parse(timestamp)}:{}) }; }));
+  parts.push(settings.rows.map(row => { const p = row.payload; return p.id === 'site' ? p : { id: p.id, status: p.status, cadenceSnapshotId: p.cadenceSnapshotId, cadenceSnapshotIds:p.cadenceSnapshotIds,cadenceEvaluationByKind:p.cadenceEvaluationByKind,referenceSignals:referenceSignalVersion(p.referenceSignals,timestamp),...(p.referenceSignal?{referenceSignal:p.referenceSignal}:{}),...(p.referenceCadencePublic?{referenceCadencePublic:p.referenceCadencePublic,referenceExpired:Date.parse(p.referenceCadencePublic.validUntil)<=Date.parse(timestamp)}:{}) }; }));
   // Deadlines and source health can change without a new publication row.
   const deadlines = await client.query("SELECT payload->>'id' AS id, a->>'id' AS action, a->>'expectedAt' AS deadline FROM radar_events CROSS JOIN LATERAL jsonb_array_elements(payload->'actions') a WHERE a->>'expectedAt' IS NOT NULL ORDER BY id, action");
   parts.push(deadlines.rows.map(row => [row.id, row.action, Date.parse(row.deadline) <= Date.parse(timestamp)]));

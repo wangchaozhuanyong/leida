@@ -1047,13 +1047,93 @@ test('明确凭据失效会刷新当前缓存，成功前不丢授权次数',asy
  assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).remainingCount,0);
 });
 
-async function pendingReminder(f:Awaited<ReturnType<typeof fixture>>,kind:'automatic_reset'|'banked_reset'='automatic_reset'){
+async function pendingReminder(f:Awaited<ReturnType<typeof fixture>>,kind:'automatic_reset'|'banked_reset'='automatic_reset',stage:'promised'|'in_progress'='promised'){
  f.advance(1000);const messageId=(((BigInt(f.now()-86400000)-1288834974657n)<<22n)+1n).toString();
  f.evidence.url=`https://x.com/thsottiaux/status/${messageId}`;f.evidence.messageId=messageId;await f.store.put('evidence',f.evidence);
- f.publication.event.actions=[{id:'pending-fixture',kind,stage:'promised',scope:'public',eligibility:'公开用户',evidenceIds:['ev'],statementAt:new Date(f.now()).toISOString(),expectedAt:new Date(f.now()+3600000).toISOString()}];
+ f.publication.event.actions=[{id:'pending-fixture',kind,stage,scope:'public',eligibility:'公开用户',evidenceIds:['ev'],statementAt:new Date(f.now()).toISOString(),...(stage==='promised'?{expectedAt:new Date(f.now()+3600000).toISOString()}:{})}];
  await f.store.put('publications',f.publication);await f.store.put('events',f.publication.event);
  return f.notice({categories:['announcement']});
 }
+
+async function bankedObservation(f:Awaited<ReturnType<typeof fixture>>,historical:boolean){
+ const at=new Date(f.now()).toISOString();
+ const id=((BigInt(f.now())-1288834974657n)<<22n).toString();
+ const url='https://tiboreset.com/r/'+id,text='A new banked Codex reset landed on our monitoring accounts.';
+ const evidence:Evidence={...f.evidence,id:'tracker-'+id,sourceId:'tiboreset-observations',messageId:'observed-'+id,url,text,
+  publishedAt:at,collectedAt:at,provenance:'archive',textOrigin:'archive_excerpt',contextComplete:false,historical,
+  metadata:{sourceGroup:'tiboreset',category:'reset',benefitKind:'banked_reset',
+   referenceReset:{eventId:'tiboreset:banked_reset:'+id,referenceUrl:url,occurredAt:at,snapshotAt:at,summary:text}}};
+ const draft=buildAutomaticTemplate([evidence]);assert.ok(draft);
+ const event:RadarEvent={...f.event,id:'tracker-event',publicationId:'tracker-pub',actions:[],evidenceIds:[evidence.id],updatedAt:at};
+ const article:Article={...f.article,...draft,id:'tracker-article',eventId:event.id,publicationId:event.publicationId,
+  sourcePublishedAt:at,publishedAt:at,updatedAt:at,historical};
+ const publication:Publication={...f.publication,id:event.publicationId,eventId:event.id,articleId:article.id,event,article,mode:'news_only',publishedAt:at,cutoffAt:at};
+ await f.store.put('evidence',evidence);
+ await f.store.put('events',event);
+ await f.store.put('articles',article);
+ await f.store.insert('publications',publication);
+ return publication;
+}
+
+test('独立发卡观测替代排队中的同轮进展，同一次调度释放次数并接续新结果',async()=>{
+ const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);
+ const progress=await pendingReminder(f,'banked_reset','in_progress');
+ const [oldJob]=await f.queued();assert.ok(oldJob);
+ f.advance(60_000);
+ const publication=await bankedObservation(f,false);
+ const result=await f.notice({publicationId:publication.id,eventId:publication.eventId,categories:['result']});
+ const jobs=await f.queued();
+ const deliveries=await f.store.list<WechatDelivery>('wechat_deliveries');
+ const cancelled=deliveries.find(item=>item.noticeId===progress.id);
+ const queued=deliveries.find(item=>item.noticeId===result.id);
+ assert.equal(cancelled?.status,'cancelled');
+ assert.equal(cancelled.attempts,0);
+ assert.equal(queued?.status,'queued');
+ assert.equal(queued.creditId,cancelled.creditId);
+ assert.equal((await f.service.processWechatJob(oldJob)).state,'cancelled');
+ const resultJob=jobs.find(job=>job.payload.deliveryId===queued.id);assert.ok(resultJob);
+ assert.equal((await f.service.processWechatJob(resultJob)).state,'sent');
+ assert.equal((await f.service.processWechatJob(resultJob)).state,'sent');
+ const sends=f.calls.filter(call=>call.url.includes('/message/subscribe/send'));
+ assert.equal(sends.length,1);
+ assert.deepEqual(sends[0].body?.data,{thing1:{value:'Codex重置卡'},phrase2:{value:'发卡观测'},time3:{value:'2026-10-10 10:01'}});
+});
+
+test('历史发卡观测在最后一次发送检查前到达，取消旧进展且不补发',async()=>{
+ const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);
+ await pendingReminder(f,'banked_reset','in_progress');
+ const [job]=await f.queued();assert.ok(job);
+ const transaction=f.store.transaction.bind(f.store);
+ let injected=false;
+ f.store.transaction=async<T>(fn:(client:Client)=>Promise<T>)=>{
+  const result=await transaction(fn);
+  if(result===true&&!injected){
+   injected=true;
+   f.advance(60_000);
+   await bankedObservation(f,true);
+  }
+  return result;
+ };
+ assert.equal((await f.service.processWechatJob(job)).state,'cancelled');
+ assert.equal(injected,true);
+ assert.equal(f.calls.filter(call=>call.url.includes('/message/subscribe/send')).length,0);
+ assert.equal((await f.service.adminWechat()).sendsToday,0);
+ const [delivery]=await f.store.list<WechatDelivery>('wechat_deliveries');
+ assert.equal(delivery.attempts,0);
+ const state=await f.service.wechatSubscriptionState(session.sessionToken);
+ assert.equal(state.remainingCount,1);assert.equal(state.pendingCount,0);
+ assert.equal((await f.queued()).length,1,'历史观测无结果通知，旧进展也不能重入队');
+});
+
+test('无明确期限的进展满24小时自动释放预留，且不会补发',async()=>{
+ const f=await fixture(),session=await f.login();await f.accept(session.sessionToken);
+ await pendingReminder(f,'banked_reset','in_progress');
+ const [job]=await f.queued();assert.ok(job);
+ f.advance(Date.parse(f.publication.event.actions[0].statementAt)+86_400_000-f.now());
+ assert.equal((await f.service.processWechatJob(await f.claim(job))).state,'cancelled');
+ assert.equal(f.calls.filter(call=>call.url.includes('/message/subscribe/send')).length,0);
+ assert.equal((await f.service.wechatSubscriptionState(session.sessionToken)).pendingCount,0);
+});
 
 async function referencedObservation(f:Awaited<ReturnType<typeof fixture>>,at=new Date(f.now()).toISOString(),reference=f.evidence){
  const collectedAt=new Date(f.now()).toISOString();

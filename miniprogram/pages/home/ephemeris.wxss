@@ -55,16 +55,18 @@
   from { transform: translateX(-5px) translateY(-3px); opacity: .60; }
   to { transform: translateX(5px) translateY(3px); opacity: .82; }
 }
-.radar-readout { position: relative; width: 100%; max-width: 360px; min-width: 0; text-align: center; }
-.radar-caption { color: var(--ink); font-size: 23px; font-weight: 600; line-height: 1.45; overflow-wrap: anywhere; }
+/* Keep the heading and every time column on the same horizontal center. */
+.radar-readout { position: relative; display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 360px; min-width: 0; text-align: center; }
+.radar-caption { width: 100%; text-align: center; color: var(--ink); font-size: 23px; font-weight: 600; line-height: 1.45; overflow-wrap: anywhere; }
 .radar-value {
   display: flex;
   justify-content: center;
+  width: 100%;
   gap: 12px;
   margin: 14px auto 0;
   font-variant-numeric: tabular-nums;
 }
-.radar-number { flex: 0 1 46%; min-width: 0; font-size: 66px; font-weight: 500; letter-spacing: -.055em; line-height: 1.1; }
+.radar-number { display: flex; flex-direction: column; align-items: center; flex: 1 1 0; min-width: 0; text-align: center; font-size: 66px; font-weight: 500; letter-spacing: 0; line-height: 1.1; }
 .radar-unit { display: block; margin-top: 5px; color: #53636b; font-size: 13px; font-weight: 400; letter-spacing: 0; line-height: 1.5; }
 .radar-value.with-days .radar-number { flex: 1; font-size: 48px; }
 .radar-value.long .radar-number { font-size: 40px; }
@@ -94,6 +96,6 @@
   .radar-field { min-height: 238px; padding-left: 12px; padding-right: 12px; }
   .radar-number { font-size: 60px; }
   .radar-value.with-days .radar-number { font-size: 40px; }
-  .radar-value.long .radar-number { font-size: 34px; }
+  .radar-value.long .radar-number { font-size: 30px; }
 }
 @media (prefers-reduced-motion: reduce) { .signal-fold { animation: none; } }

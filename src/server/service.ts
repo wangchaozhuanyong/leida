@@ -3,6 +3,7 @@ import {analyzeBenefitEvidence} from './benefit-analysis';
 import { bankedProgress, bankedSeriesContext, matchingBenefitActions } from './benefit-signal';
 import {sourceCollectionSchedule,sourceForecastConfiguration} from './source-collection-policy';
 import {markForecastInputsChanged} from './reset-cadence-runtime';
+import {evidenceLane} from './reference-reset-source';
 import { lockTransaction, repeatableRead } from '../db';
 import { z } from 'zod';
 import { list, one, insert, put, transaction, type Client } from '../db';
@@ -294,10 +295,11 @@ export async function publishHistoricalDraft(content:DraftContent,c:Client,reaso
 
 export async function createEvidence(input: Omit<Evidence,'id'|'hash'>,actor?:string):Promise<{evidence:Evidence;created:boolean;candidate?:Candidate}> {
   return transaction(async c=> {
-    await lockTransaction(c,'evidence:'+input.sourceId+':'+input.messageId);
+    const lane=evidenceLane(input);
+    await lockTransaction(c,'evidence:'+lane);
     let parentConflict:string|undefined;
     if(input.textOrigin!=='original'){
-      const original=(await list<Evidence>('evidence',c)).find(item=>item.sourceId===input.sourceId&&item.messageId===input.messageId&&item.textOrigin==='original');
+      const original=(await list<Evidence>('evidence',c)).find(item=>evidenceLane(item)===lane&&item.textOrigin==='original');
       if(original){
         if(input.parentId&&original.parentId&&input.parentId!==original.parentId){
           parentConflict=`明确父帖关系冲突：已保存 ${original.parentId}，归档新增 ${input.parentId}，等待核对`;
@@ -312,7 +314,7 @@ export async function createEvidence(input: Omit<Evidence,'id'|'hash'>,actor?:st
     const finish=async(result:{evidence:Evidence;created:boolean;candidate?:Candidate})=>{if(actor)await audit(actor,'candidate.create',result.candidate?.id??result.evidence.id,result.created?'人工原文已保存并进入候选处理':'重复原文，保留已有记录',undefined,{outcome:result.created?'created':'duplicate',evidenceId:result.evidence.id,candidateId:result.candidate?.id},c);return result;};
     const prior=(await list<Evidence>('evidence',c)).find(e=>e.sourceId===ev.sourceId&&e.messageId===ev.messageId&&e.text===ev.text&&e.url===ev.url&&Date.parse(e.publishedAt)===Date.parse(ev.publishedAt)&&e.parentId===ev.parentId&&e.contextComplete===ev.contextComplete&&e.provenance===ev.provenance&&e.textOrigin===ev.textOrigin&&JSON.stringify(e.metadata)===JSON.stringify(ev.metadata));if(prior)return finish({evidence:prior,created:false});const created=await insert('evidence',ev,c); if(!created){const existing=(await list<Evidence>('evidence',c)).find(e=>e.sourceId===ev.sourceId&&e.messageId===ev.messageId&&e.hash===ev.hash);return finish({evidence:existing??ev,created:false});}
     await markForecastInputsChanged(c);
-    const edits=(await list<Evidence>('evidence',c)).filter(e=>e.id!==ev.id&&e.sourceId===ev.sourceId&&e.messageId===ev.messageId).sort((a,b)=>b.collectedAt.localeCompare(a.collectedAt));
+    const edits=(await list<Evidence>('evidence',c)).filter(e=>e.id!==ev.id&&evidenceLane(e)===lane).sort((a,b)=>b.collectedAt.localeCompare(a.collectedAt));
     const latest=edits[0];const sameOriginal=!!latest&&latest.text===ev.text&&latest.url===ev.url&&Date.parse(latest.publishedAt)===Date.parse(ev.publishedAt);
     const existingCandidates=await list<Candidate>('candidates',c);const olderIds=new Set(edits.map(e=>e.id));
     if(sameOriginal&&!parentConflict){

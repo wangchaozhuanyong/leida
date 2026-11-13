@@ -51,7 +51,7 @@ export function parseResetWatchResponse(value: unknown, checkedAt: string): Rese
   }
   const watch = value.data.active_watch;
   if (watch === null) return {status: 'none', checkedAt};
-  if (!record(watch) || watch.reset_chance_percent !== null && (typeof watch.reset_chance_percent !== 'number' || !Number.isInteger(watch.reset_chance_percent) || watch.reset_chance_percent < 0 || watch.reset_chance_percent > 100)) throw new WatchReadError('SIGNAL_INVALID','Invalid reset watch source');
+  if (!record(watch)) throw new WatchReadError('SIGNAL_INVALID','Invalid reset watch source');
   const result = {status: 'active', checkedAt, signal: {
     ...sourceFields(watch.source), text: watch.text, level: watch.level,
     observedAt: canonicalTime(watch.observed_at), expiresAt: canonicalTime(watch.expires_at), forecastWindow: watch.forecast_window, chancePercent:watch.reset_chance_percent,
@@ -61,6 +61,21 @@ export function parseResetWatchResponse(value: unknown, checkedAt: string): Rese
   // A published reset supersedes earlier speculation. Expiry cannot become a completion.
   if (!activeResetWatch(result, checkedAt, resolvedAt) || value.data.scheduled_reset !== null) return {status: 'none', checkedAt};
   return result;
+}
+
+/** The homepage's legacy watch is a single slot. The collector reads both
+ * discovery entries independently and verifies each against the original. */
+export function parseResetWatchDiscovery(value:unknown,checkedAt:string):ResetWatch[] {
+  if(!record(value)||!record(value.data)||!Object.hasOwn(value.data,'active_watch')||!Object.hasOwn(value.data,'scheduled_reset'))
+    throw new WatchReadError('RESPONSE_INVALID','Missing reset status fields');
+  const results:ResetWatch[]=[];
+  let failure:unknown;
+  for(const fields of [{active_watch:null,latest_reset:null},{scheduled_reset:null,latest_reset:null}]){
+    try {results.push(parseResetWatchResponse({...value,data:{...value.data,...fields}},checkedAt));}
+    catch(error){failure=error;}
+  }
+  if(failure&&!results.some(item=>item.signal||item.scheduledReset))throw failure;
+  return results;
 }
 
 interface FailureDetails {phase:'headers'|'body'|'parse';elapsedMs:number;}

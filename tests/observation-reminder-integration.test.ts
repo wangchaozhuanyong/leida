@@ -9,7 +9,7 @@ test('真实隔离库：新观测发布、结果通知、微信任务与发送�
   const {pool,put,list,one}=await import('../src/db');
   const {createEvidence,publishCandidate,previewCandidate,defaultSite}=await import('../src/server/service');
   const {createWechatService}=await import('../src/server/wechat');
-  const {runOne}=await import('../src/server/worker');
+  const {claimJob,runOne}=await import('../src/server/worker');
   const realFetch=globalThis.fetch;globalThis.fetch=async()=>{throw new Error('No external calls in isolated reminder validation');};
   let clock=Date.now()-10*60_000,sequence=0;
   const calls:{path:string;body:Record<string,unknown>}[]=[];
@@ -58,8 +58,14 @@ test('真实隔离库：新观测发布、结果通知、微信任务与发送�
     await t.test('实际SQL入队和worker任务完成，微信替身收到第三方限定与原观测时间',async()=>{
       clock=Date.now();await service.scheduleWechatDeliveries();
       const jobs=(await list<Job>('jobs')).filter(j=>j.kind==='wechat_send');assert.equal(jobs.length,1);
+      const oldAt=new Date(Date.now()-60*60_000).toISOString();
+      for(let i=0;i<156;i++){
+        await put('jobs',{id:'qa-historical-'+i,kind:'generate',status:'queued',attempts:0,
+          availableAt:oldAt,createdAt:oldAt,payload:{historical:true,evidencePublishedAt:oldAt}} satisfies Job);
+      }
       assert.equal(await runOne({schedule:false,wechat:job=>service.processWechatJob(job)}),true);
       assert.equal((await one<Job>('jobs',jobs[0].id))?.status,'succeeded');
+      assert.equal((await list<Job>('jobs')).filter(job=>job.payload.historical===true&&job.attempts===0).length,156);
       const sends=calls.filter(call=>call.path.endsWith('/subscribe/send'));assert.equal(sends.length,1);
       const expected=new Date(Date.parse(at)+8*3600_000).toISOString().slice(0,16).replace('T',' ');
       assert.deepEqual(sends[0].body.data,{thing1:{value:'Codex额度'},thing3:{value:'已观测到重置（第三方）'},time5:{value:expected}});
@@ -87,6 +93,25 @@ test('真实隔离库：新观测发布、结果通知、微信任务与发送�
       await service.scheduleWechatDeliveries();assert.equal((await list<Job>('jobs')).filter(j=>j.kind==='wechat_send').length,1);
       assert.equal((await service.wechatSubscriptionState(session.sessionToken)).remainingCount,2);
       assert.ok((await list<WechatGrant>('wechat_grants'))[0].credits?.filter(c=>c.status==='available').length===2);
+    });
+    await t.test('到期实时任务按等待时间轮转，超时历史租约和未来重试不会压住采集或提醒',async()=>{
+      const due=(ms:number)=>new Date(Date.now()-ms).toISOString();
+      const fixtures:Job[]=[
+        {id:'qa-expired-history',kind:'generate',status:'running',attempts:1,availableAt:due(300_000),leaseUntil:due(1000),createdAt:due(300_000),payload:{historical:true,evidencePublishedAt:due(300_000)}},
+        {id:'qa-expired-backfill',kind:'backfill',status:'running',attempts:1,availableAt:due(600_000),leaseUntil:due(1000),createdAt:due(600_000),payload:{historical:true}},
+        {id:'qa-waiting-collect',kind:'collect',status:'queued',attempts:0,availableAt:due(180_000),createdAt:due(180_000),payload:{}},
+        {id:'qa-waiting-send',kind:'wechat_send',status:'queued',attempts:0,availableAt:due(120_000),createdAt:due(120_000),payload:{}},
+        {id:'qa-fresh-collect',kind:'collect',status:'queued',attempts:0,availableAt:due(1000),createdAt:due(1000),payload:{}},
+        {id:'qa-future-send',kind:'wechat_send',status:'queued',attempts:0,availableAt:due(-60_000),createdAt:due(3600_000),payload:{}},
+      ];
+      for(const job of fixtures)await put('jobs',job);
+      for(const expected of ['qa-waiting-collect','qa-waiting-send','qa-fresh-collect','qa-expired-history','qa-expired-backfill']){
+        const claimed=await claimJob();
+        assert.equal(claimed?.id,expected);
+        assert.equal(claimed.attempts,expected.startsWith('qa-expired-')?2:1);
+        await put('jobs',{...claimed,status:'succeeded',leaseUntil:undefined});
+      }
+      assert.equal((await one<Job>('jobs','qa-future-send'))?.attempts,0);
     });
   }finally{globalThis.fetch=realFetch;await pool.end();}
 });

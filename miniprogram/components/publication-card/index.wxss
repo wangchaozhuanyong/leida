@@ -19,7 +19,7 @@
   color: #182933;
 }
 .publication-card.is-editorial > .row:first-child { gap: 4px 12px; }
-.publication-card.is-editorial .badge { padding: 0; background: transparent; font-size: 13px; color: #315caa; }
+.publication-card.is-editorial .badge { padding: 0; border: 0; background: transparent; font-size: 13px; color: #315caa; }
 .publication-card.is-editorial .badge.purple { color: #684d91; }
 .publication-card.is-editorial .time { margin-left: auto; text-align: right; color: #53636b; font-variant-numeric: tabular-nums; }
 .publication-card.is-editorial .announcement-title { margin: 8px 0; font-size: 17px; }
