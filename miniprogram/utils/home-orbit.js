@@ -86,6 +86,8 @@ function homeOrbitPresentation(card, now) {
       break;
   }
   view.long = view.parts.some(part => part.value.length > 2);
+  // The evidence badge carries the qualifier; keep the central reading axis on the subject.
+  view.captionTitle = view.title.replace(/（观测）$/, '');
   return view;
 }
 

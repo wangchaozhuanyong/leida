@@ -32,7 +32,7 @@
         <view class="signal-wing signal-wing-right"><image class="signal-fold" src="/assets/neural/signal-fold.png" mode="aspectFit"/></view>
       </view>
       <view class="radar-readout">
-        <view wx:if="{{card.hero.metric || card.hero.label}}" class="radar-caption">{{card.hero.metric?(card.state === 'estimated' && card.metricLabel !== '距推测窗口结束' ? card.hero.label : (card.hero.title || card.hero.label)):card.hero.label}}</view>
+        <view wx:if="{{card.hero.metric || card.hero.label}}" class="radar-caption"><text class="radar-caption-text">{{card.hero.metric?(card.state === 'estimated' && card.metricLabel !== '距推测窗口结束' ? card.hero.label : (card.hero.captionTitle || card.hero.title || card.hero.label)):card.hero.label}}</text></view>
         <view wx:if="{{card.hero.timeParts.length}}" class="radar-duration" aria-label="{{card.hero.metric}}">
           <view class="radar-calendar" aria-hidden="true">
             <view wx:for="{{card.hero.calendarParts}}" wx:key="unit" class="radar-calendar-part"><text class="radar-calendar-value">{{item.value}}</text><text class="radar-calendar-unit">{{item.unit}}</text></view>
@@ -40,7 +40,7 @@
           <view class="radar-time" aria-hidden="true">
             <block wx:for="{{card.hero.timeParts}}" wx:key="unit">
               <text wx:if="{{index}}" class="radar-colon">:</text>
-              <view class="radar-time-part {{item.unit==='秒'?'seconds':''}}"><text class="radar-digits">{{item.value}}</text><text class="radar-unit">{{item.unit}}</text></view>
+              <view class="radar-time-part {{item.unit==='秒'?'seconds':''}}"><view class="radar-digits"><text class="radar-digit">{{item.value[0]}}</text><text class="radar-digit">{{item.value[1]}}</text></view><text class="radar-unit">{{item.unit}}</text></view>
             </block>
           </view>
         </view>

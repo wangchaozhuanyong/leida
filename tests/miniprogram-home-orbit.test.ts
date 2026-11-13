@@ -60,7 +60,7 @@ test('两类完成主标题直接解释经过时长，观测括号不冒充公�
   for(const kind of ['automatic_reset','banked_reset']){
     const subject=kind==='banked_reset'?'发卡':'重置';
     const observed=homeOrbitPresentation(card('observed',kind),now),completed=homeOrbitPresentation(card('completed',kind),now);
-    assert.equal(observed.title,'距离上次'+subject+'（观测）');assert.equal(completed.title,'距离上次'+subject);
+    assert.equal(observed.title,'距离上次'+subject+'（观测）');assert.equal(observed.captionTitle,'距离上次'+subject);assert.equal(completed.captionTitle,observed.captionTitle);assert.equal(completed.title,'距离上次'+subject);
     assert.equal(observed.label,'已经过去');assert.deepEqual(observed.parts,completed.parts);assert.equal(observed.metric,'1小时12分钟0秒');
     assert.equal(observed.timeLabel,'来源观测时间');assert.equal(completed.timeLabel,'完成消息时间');
     assert.notEqual(observed.badge,completed.badge);
