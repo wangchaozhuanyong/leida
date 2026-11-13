@@ -48,7 +48,7 @@ test('26日两条来源跨过活动午夜，三处只展示一个北京时间观
  assert.equal(activity.selectedBeijingRange,'2026-10-25 15:00 — 2026-10-26 15:00（不含）');
  assert.equal(news.length,1);assert.equal(news[0].observation.id,calendar.selectedItems[0].id);assert.equal(news[0].updates.length,2);
  const home=selectedHomeStatus(data,'automatic_reset'),poster=statusPosterInput(data);
- assert.equal(home.clockAt,calendar.selectedItems[0].at);assert.equal(home.hero.timeLabel,'最早观测时间');assert.match(home.hero.description,/来源：Codex Limits、AIPlanWatch/);assert.equal(home.hero.footnote,'实际额度以账户显示为准。');
+ assert.equal(home.clockAt,calendar.selectedItems[0].at);assert.equal(home.hero.timeLabel,'最早观测时间');assert.match(home.hero.description,/来源：Codex Limits、AIPlanWatch/);
  assert.match(home.sharePath,/^\/pages\/schedule\/index\?date=2026-10-26&kind=automatic_reset&revision=/);
  assert.equal(poster.statementAt,home.clockAt);assert.equal(poster.sharePath,home.sharePath);assert.equal(poster.codePublicationId,'');assert.match(poster.nextNote,/来源：Codex Limits、AIPlanWatch/);assert.doesNotMatch(poster.nextNote,/轮次|不据此|汇总/);assert.equal(statusPosterAvailable(poster,data),true);
  assert.deepEqual(publicActions(data),[]);assert.equal(resetObservations(data).length,2);assert.deepEqual(data,before);

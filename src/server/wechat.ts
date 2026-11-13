@@ -75,10 +75,10 @@ export function wechatTemplateData(settings:WechatSettings,notice:Notice,publica
     const allActions=observation?[]:publicQuotaActions(publication),cited=allActions.filter(action=>action.evidenceIds.some(id=>publication.article.evidenceIds.includes(id)));
     const actions=cited.length?cited:allActions,kinds=new Set(actions.map(action=>action.kind)),stages=new Set(actions.map(action=>action.stage));
     // The actual template labels this field as quota type, not an article title.
-    title=kinds.size>1?'Codex额度与重置卡':kinds.has('banked_reset')?'Codex重置卡':'Codex额度';
+    title=kinds.size>1?'Codex额度与重置卡':kinds.has('banked_reset')||observation?.kind==='banked_reset'?'Codex重置卡':'Codex额度';
     const stage=actions[0]?.stage,banked=kinds.has('banked_reset');
     if(notice.categories.includes('correction'))status='重置信息已更正';
-    else if(observation)status='已观测到重置（第三方）';
+    else if(observation)status=observation.kind==='banked_reset'?'已观测到发卡（第三方）':'已观测到重置（第三方）';
     else if(stages.size>1)status='多项重置进展已更新';
     else if(stage){
       status={promised:banked?'已发布发卡预告，时间待公布':'已发布重置预告，时间待公布',in_progress:'已宣布开始，完成待确认',claimed_complete:banked?'发布者已声明发卡完成':'发布者已声明重置完成',cancelled:'本轮安排已取消'}[stage];
@@ -89,7 +89,7 @@ export function wechatTemplateData(settings:WechatSettings,notice:Notice,publica
       }
     }
     // Keep evidence qualifiers even when the chosen WeChat field only permits five characters.
-    if(fields.status.startsWith('phrase'))status=notice.categories.includes('correction')?'信息已更正':observation?'重置观测':stages.size>1?'进展已更新':stage?{promised:'重置预告',in_progress:'正在发放',claimed_complete:'声明已完成',cancelled:'安排已取消'}[stage]:status;
+    if(fields.status.startsWith('phrase'))status=notice.categories.includes('correction')?'信息已更正':observation?(observation.kind==='banked_reset'?'发卡观测':'重置观测'):stages.size>1?'进展已更新':stage?{promised:'重置预告',in_progress:'进展已更新',claimed_complete:'声明已完成',cancelled:'安排已取消'}[stage]:status;
   }
   const at=Date.parse(publication?reminderStatementAt(notice,publication,evidence):notice.createdAt);if(!Number.isFinite(at))throw new WechatServiceError('消息时间无效','configuration');
   const time=new Date(at+8*3600_000).toISOString().slice(0,16).replace('T',' ');

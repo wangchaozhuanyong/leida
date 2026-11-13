@@ -86,7 +86,7 @@ test('内部趋势读取失败不归咎第三方信号，保留公告状态与�
 test('旧接口单状态可显示，当前两类投影可靠时优先使用，两类切换入口不混成阶段线',()=>{
  const d=fixture();projected(d);d.forecasts!.outlook={status:'scheduled',active:{actionId:'a',eventId:'e',publicationId:'p',kind:'banked_reset',stage:'promised',statementAt:'2026-10-18T10:00:00Z',expectedAt:'2026-10-18T14:00:00Z'}};
  assert.equal(card(d,'banked_reset').state,'scheduled');assert.equal(card(d).state,'waiting');
- const html=renderToStaticMarkup(createElement(ResetStateCards,{data:d}));assert.doesNotMatch(html,/role="tablist"/);assert.match(html,/重置卡/);assert.match(html,/时间已公布/);assert.match(html,/radar-readout/);assert.doesNotMatch(html,/aria-label="当前事件进度"/);assert.doesNotMatch(html,/较早的安排/);
+ const html=renderToStaticMarkup(createElement(ResetStateCards,{data:d}));assert.doesNotMatch(html,/role="tablist"/);assert.match(html,/重置卡/);assert.match(html,/公开预告/);assert.match(html,/radar-readout/);assert.doesNotMatch(html,/aria-label="当前事件进度"/);assert.doesNotMatch(html,/较早的安排/);
 });
 
 test('未验证的实验分类不能替未知信号归类，旧线索不盖过较新的完成；两个信号按发布时间选择',()=>{

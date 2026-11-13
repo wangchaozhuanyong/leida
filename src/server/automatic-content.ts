@@ -7,7 +7,7 @@ import {observedEvidence} from '../lib/reset-observations';
 import { createHash } from 'node:crypto';
 import type { CandidateAutomation, DraftContent, Evidence, BenefitAction } from '../lib/types';
 import { evidenceBenefitClaims, hasCompleteContext, hasStandaloneContext, isTruncatedText, isCampaignResetShorthand, isVerifiedCampaignCalendar, originalConflict, campaignMembership, resetReplyParent } from './source-context';
-import { AUTOMATIC_RULES_VERSION, benefitStage, eligibilityKey } from './benefit-rules';
+import { AUTOMATIC_RULES_VERSION, benefitStage, eligibilityKey, usesUpdatedRolloutWording } from './benefit-rules';
 export { AUTOMATIC_RULES_VERSION } from './benefit-rules';
 
 export function isTruncated(text:string):boolean {
@@ -46,7 +46,8 @@ export function evidenceFingerprint(evidence:Evidence[],semanticVersion?:number)
   // Only affected originals need a new generation when their raw bytes did not
   // change. Existing human, parent-conflict and source-pause gates still apply.
   const transport=evidence.some(item=>item.textOrigin==='original'&&/&(?:amp|#0*38|#x0*26);/i.test(item.text))?'-original-amp-1':'';
-  return `${AUTOMATIC_RULES_VERSION}${semantic}${transport}${observation?'-observation-template-2':''}${evidence[0]&&attributedActivityExcerpt(evidence[0])?'-activity-attribution-1':''}${evidence[0]&&originalProductSummary(evidence[0],evidence)?'-original-product-1':''}:${inputs}`;
+  const rollout=evidence[0]?.textOrigin==='original'&&evidence.some(item=>item.textOrigin==='original'&&usesUpdatedRolloutWording(item.text))?'-rollout-activation-1':'';
+  return `${AUTOMATIC_RULES_VERSION}${semantic}${transport}${rollout}${observation?'-observation-template-2':''}${evidence[0]&&attributedActivityExcerpt(evidence[0])?'-activity-attribution-1':''}${evidence[0]&&originalProductSummary(evidence[0],evidence)?'-original-product-1':''}:${inputs}`;
 }
 
 export function classifyBlockers(reasons:string[],evidence:Evidence[]):CandidateAutomation {
@@ -65,7 +66,12 @@ export function buildAutomaticTemplate(evidence:Evidence[]):DraftContent|undefin
   if(hasCompleteContext(primary,evidence))evidence=evidence.filter(item=>hasCompleteContext(item,evidence)||isVerifiedCampaignCalendar(item,evidence));
   const base:DraftContent={title:'',summary:'',translation:'',category:'product',actions:[],evidenceIds:evidence.map(item=>item.id),publicationMode:'news_only',contentOrigin:'template'};
   const observation=observedEvidence(primary,primary.collectedAt);
-  if(observation)return {...base,title:'来源观测：Codex 用量重置记录',category:'reset',summary:`${observation.sourceName} 记录用量重置观测，观测时间：${new Date(observation.observedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})}（北京时间）。这不是原作者的新完成公告，个人账户是否到账请查看实际额度。`};
+  if(observation){
+    const stamp=new Date(observation.observedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false});
+    if(observation.kind==='banked_reset')return {...base,title:'重置卡到账观测',category:'reset',
+      summary:`${observation.sourceName} 报告其监测账户已收到重置卡，观测时间：${stamp}（北京时间）。`};
+    return {...base,title:'来源观测：Codex 用量重置记录',category:'reset',summary:`${observation.sourceName} 记录用量重置观测，观测时间：${stamp}（北京时间）。这不是原作者的新完成公告，个人账户是否到账请查看实际额度。`};
+  }
   const attachment=primary.metadata?.activity;
   if(attachment&&primary.metadata?.activityDay){base.activityId=attachment.id;base.activityDay=primary.metadata.activityDay;base.category='activity';}
   else if(membership){Object.assign(base,membership);base.category='activity';}

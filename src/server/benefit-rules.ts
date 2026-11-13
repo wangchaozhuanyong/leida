@@ -10,6 +10,21 @@ export interface BenefitClaim {
 interface Qualification { label: string; key: string; scope: BenefitAction['scope']; }
 const normalize = (text: string) => text.replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim();
 const banked = bankedObject;
+const bankedRolloutObject = String.raw`(?:banked|reserve|stored|saved)\s+(?:reset\s+cards?|resets?)`;
+const activationModifiers = String.raw`(?:(?:just|now|already)\s+)*`;
+const bankedActivation = new RegExp(
+  [
+    String.raw`\b${bankedRolloutObject}\s+(?:has|have)\s+${activationModifiers}been\s+${activationModifiers}(?:activated|initiated)\b`,
+    String.raw`\b(?:we|i)(?:\s+have|'ve)?\s+${activationModifiers}(?:activated|initiated)\s+(?:(?:the|a)\s+)?${bankedRolloutObject}\b(?=\s+(?:for|to|across|and)\b|\s*[,.;!]|$)`,
+  ].join('|'),
+  'i',
+);
+const everyoneAccounts = /\beveryone['’]?s\s+(?:(?:paid|free)\s+)?accounts?\b/i;
+const misspelledEveryoneAccounts = /\beveryones\s+(?:(?:paid|free)\s+)?accounts?\b/i;
+export const isBankedRolloutActivation = (text: string) => bankedActivation.test(normalize(text));
+export function usesUpdatedRolloutWording(text: string): boolean {
+  return isBankedRolloutActivation(text) || misspelledEveryoneAccounts.test(text);
+}
 const usage = /(?:usage(?:\s+limits?)?|rate\s+limits?|用量|使用(?:额度|限制|限额|量)).{0,40}(?:reset|重置)|(?:reset|重置).{0,40}(?:usage(?:\s+limits?)?|rate\s+limits?|用量|使用(?:额度|限制|限额|量))/i;
 const globalReset = /\bglobal\s+(?:(?:usage|rate\s+limits?)\s+)?reset\b|全局(?:用量)?重置/i;
 // A short completion can inherit a benefit only through extractReplyClaims' explicit parent.
@@ -86,7 +101,11 @@ function isQuestionOrHypothesis(text: string): boolean {
 export function benefitStage(text: string): ActionStage | undefined {
   const s = normalize(text);
   if (speechDisposition(s)!=='own'||isQuestionOrHypothesis(s) || excludedBenefitAssertion(s)) return;
-  const interpreted=languageStage(s);if(interpreted)return interpreted;
+  const activation = s.match(bankedActivation);
+  if (!activation) {
+    const interpreted = languageStage(s);
+    if (interpreted) return interpreted;
+  }
   // "No banked resets have been loaded" denies the benefit itself, even though
   // its verb otherwise resembles a completion. Do not treat unrelated "no
   // delays/issues" wording as a negated benefit.
@@ -95,6 +114,16 @@ export function benefitStage(text: string): ActionStage | undefined {
   if(/\b(?:users?|customers?|subscribers?|accounts?|people|members?)\s+(?:have|has)\s+(?:already\s+|now\s+|just\s+|fully\s+)*(?:added|loaded|given|granted|deposited|reset)\b|(?:用户|账户|客户)(?:已|已经).{0,12}(?:自行|主动)(?:添加|重置|使用)/i.test(s))return;
   if (/\b(?:not|never|won't|haven't|hasn't|didn't|cannot|can't|not yet)\b.{0,35}(?:reset|giv|add|load|credit|grant|land|propagat|complet|cancel|withdraw)|(?:尚未|没有|并未|未曾|不会|不再|不).{0,15}(?:发放|重置|添加|存入|到账|落地|取消|撤回)/i.test(s) && !/不再发放/.test(s)) return;
   if (/\b(?:cancelled|canceled|withdrawn|withdrew|cancel|withdraw)\b|取消|撤回|不再发放/i.test(s)) return 'cancelled';
+  if (activation?.index !== undefined) {
+    const before = s.slice(0, activation.index);
+    if (!ownBenefitClause(s, activation[0]) || /\b(?:if|unless)\b/i.test(s) ||
+        /\b(?:when|once|whether|until|after|before|will|should|could|heard|told|said|believe|assume|hope|expect\w*)\b/i.test(before)) return;
+    const after = s.slice(activation.index + activation[0].length);
+    // Activation starts delivery. A following "should land" describes arrival,
+    // while an explicit completed delivery can still establish completion.
+    const delivered = /^\s*,?\s+and\s+(?:(?:it|they)\s+)?(?:(?:has|have)\s+(?:(?:now|already|fully|all)\s+)*(?:landed|propagated|been\s+(?:credited|loaded|delivered|issued|sent))|(?:is|are)\s+now\s+available)\b/i;
+    return delivered.test(after) ? 'claimed_complete' : 'in_progress';
+  }
   if (/\b(?:will|(?:we|i|they)'ll|going to|scheduled to|plan to|should|expect(?:ed)?)\b.{0,80}(?:reset|giv|add|load|credit|grant|land|propagat|complet|be there|be showing)|将(?:会|于)?|计划|预计|安排|承诺|(?:改为|调整为)(?:稍后|之后|以后).{0,12}(?:发放|重置)/i.test(s)) return 'promised';
   if (/^give\s+us\s+\d+(?:\.\d+)?\s+(?:hours?|minutes?)\s+to\s+(?:reset|refill|refresh|restore)\b/i.test(s)) return 'promised';
   if (/\b(?:landing|lands?)\b.{0,60}(?:\btomorrow\b|\btoday\b|\bsoon\b|\bin\b|\bwithin\b|\bby\b|\d{1,2}(?::\d{2})?\s*[ap]m\b)/i.test(s)) return 'promised';
@@ -123,7 +152,7 @@ export function claimQualification(text: string, inferredAudience?: string): Qua
   const plans = ['Plus', 'Pro', 'Business'].filter(plan => new RegExp(`\\b${plan}\\b`, 'i').test(s));
   const paid = /\bpaid\b|付费/i.test(s);
   const free = /\bfree\b|免费/i.test(s);
-  const universal = /\b(?:all|every)\b.{0,70}\b(?:users?|accounts?|plans?|subscriptions?)\b|\beveryone(?:'s)?\b|所有|全部|每(?:一)?位|每个|每个人/i.test(s);
+  const universal = /\b(?:all|every)\b.{0,70}\b(?:users?|accounts?|plans?|subscriptions?)\b|\beveryone(?:'s)?\b|所有|全部|每(?:一)?位|每个|每个人/i.test(s) || everyoneAccounts.test(s);
   const global = globalReset.test(s);
   if (!plans.length && !paid && !free && !universal && !global && !targeted.test(s)) return;
   const products = [/ChatGPT\s*Work/i.test(s) ? 'ChatGPT Work' : '', /\bCodex\b/i.test(s) ? 'Codex' : ''].filter(Boolean);
@@ -217,7 +246,12 @@ function validIsoBenefitTime(value: string): boolean {
 }
 
 export function benefitTime(text: string, publishedAt: string): Pick<BenefitClaim, 'expectedAt' | 'timeNote'> {
-  const original=normalize(text);
+  const normalized=normalize(text);
+  const activation=normalized.match(bankedActivation);
+  const lead=activation?normalized.slice(0,activation.index):'';
+  // An unrelated update in the same sentence can have its own date.
+  const followsOtherNews=activation&&/\band\s+(?:(?:the|a)\s+)?$/i.test(lead)&&!benefitKinds(lead).length;
+  const original=followsOtherNews?normalized.slice(activation.index):normalized;
   // Keep independent temporal roles separate. Splitting is for timing only:
   // qualification/negation continue to validate the unchanged source quote.
   const parts=original.split(/\s*[,，;；]\s*|\s+and\s+(?=(?:this|the|these|that|it|accounts?|users?|valid|expires?)\b)/i);
@@ -328,13 +362,14 @@ export function extractBenefitClaims(text: string, publishedAt: string): Benefit
     const usageReturn=namedUsageAnnouncement?clauses.slice(index+1,index+4).find((item,position)=>
       /^Should\s+have\s+(?:that\s+)?(?:sweet\s+)?100%\s+weekly\s+usage\s+limit\s+back\s+(?:in|within)\s+(?:a\s+few|\d+)\s+minutes?[.!]?$/i.test(normalize(item))&&
       ownBenefitClause(text,item)&&!clauses.slice(index+1,index+1+position).some(other=>benefitKinds(other).length||/\b(?:reset|banked|if|unless|only|except|selected|affected|hours?|minutes?|within|before|tomorrow)\b/i.test(other))):undefined;
-    const rolloutFollowup=usageReturn??(next&&ownBenefitClause(text,next)&&/^(?:propagating|landing|lands?|should\s+land)\b.{0,30}\b(?:in|over|within)\b/i.test(normalize(next))&&benefitKinds(next).length===0?next:undefined);
+    const deliveryFollowup = isBankedRolloutActivation(clause) && /^it\s+should\s+land\s+(?:in|over|within)\b/i.test(normalize(next ?? ''));
+    const rolloutFollowup=usageReturn??(next&&ownBenefitClause(text,next)&&(deliveryFollowup||/^(?:propagating|landing|lands?|should\s+land)\b.{0,30}\b(?:in|over|within)\b/i.test(normalize(next)))&&benefitKinds(next).length===0?next:undefined);
     const rolloutAnnouncement=namedUsageAnnouncement||/^(?:enjoy\s+(?:a\s+)?full\s+reset\b|(?:another\s+)?usage\s+limit\s+reset\b)/i.test(normalize(clause));
     const stage = greetingLanding?'promised':benefitStage(clause)??(rolloutAnnouncement&&rolloutFollowup?'in_progress':undefined);
     // A possessive "everyone's account" may refer to one explicitly introduced
     // product-user audience in this same original post. It never lends plan/region/tense.
     const antecedents=clauses.slice(0,index).filter(item=>/(?:active\s+)?users\s+(?:who\s+are\s+(?:now\s+)?using|across|of)\b/i.test(item)&&/\bCodex\b|ChatGPT\s*Work/i.test(item));
-    const antecedent=/\beveryone(?:'s|’s)\s+(?:paid\s+)?accounts?\b/i.test(clause)&&!(/\bCodex\b|ChatGPT/i.test(clause))&&antecedents.length===1?antecedents[0]:undefined;
+    const antecedent=everyoneAccounts.test(clause)&&!(/\bCodex\b|ChatGPT/i.test(clause))&&antecedents.length===1?antecedents[0]:undefined;
     const productAntecedents=clauses.slice(0,index).filter(item=>/\b(?:active\s+)?users\s+(?:who\s+are\s+(?:now\s+)?using|across|of)\b/i.test(item)&&/\bCodex\b|ChatGPT\s*Work/i.test(item));
     const allAntecedent=/\bfor\s+all[.!]?$/i.test(normalize(clause))&&productAntecedents.length===1?productAntecedents[0]:undefined;
     const audienceAntecedent=antecedent??allAntecedent;

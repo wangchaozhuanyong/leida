@@ -12,3 +12,25 @@
 .support-icon image{width:28px;height:28px}
 
 .inbox-pin{color:#2458ce;font-size:12px;font-weight:600}
+.settings-page { padding: 12px 20px 32px; background: #f8f9f7; color: #182933; }
+.settings-page .inbox-card { padding: 0; border: 0; border-radius: 0; background: transparent; }
+.settings-page .inbox-card > .row { margin-bottom: 0; border-bottom: 1px solid #dbe0df; }
+.settings-page .inbox-card .text-button { white-space: normal; text-align: right; color: #315caa; }
+.settings-page .heading { font-size: 18px; }
+.settings-page .inbox-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 12px;
+  min-height: 58px;
+  border-bottom: 1px solid #dbe0df;
+}
+.settings-page .inbox-copy { min-width: 0; }
+.settings-page .inbox-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 15px; line-height: 1.55; font-weight: 500; }
+.settings-page .inbox-summary { color: #53636b; }
+.settings-page .inbox-date { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; color: #53636b; font-size: 12px; line-height: 1.65; text-align: right; font-variant-numeric: tabular-nums; }
+.settings-page .support-card { margin: 12px 0 24px; min-height: 68px; background: #edf1ef; border-color: #dbe0df; border-radius: 12px; }
+.settings-page .support-icon { background: #e1e9f2; }
+.settings-page .reminder-card { border-color: #dbe0df; }
+.settings-page .reminder-number { color: #253e57; }
+@media (max-width: 360px) { .settings-page { padding-left: 16px; padding-right: 16px; } }

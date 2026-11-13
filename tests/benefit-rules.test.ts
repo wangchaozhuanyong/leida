@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { DraftContent, Evidence } from '../src/lib/types';
-import { AUTOMATIC_RULES_VERSION, buildAutomaticTemplate, evidenceFingerprint, normalizedEligibility } from '../src/server/automatic-content';
+import { AUTOMATIC_RULES_VERSION, buildAutomaticTemplate, evidenceFingerprint, needsSemanticReview, normalizedEligibility } from '../src/server/automatic-content';
 import { validateDraft } from '../src/server/domain';
 import { evidenceBenefitClaims, hasCompleteContext, hasStandaloneContext } from '../src/server/source-context';
 import { benefitTime, eligibilityMatches, extractBenefitClaims, extractReplyClaims } from '../src/server/benefit-rules';
@@ -18,6 +18,54 @@ test('规则版本是可解析指纹前缀，原证据摘要保持稳定',()=>{
   const e=ev('We have added a banked reset to all paid accounts.');
   assert.match(evidenceFingerprint([e]),new RegExp(`^${AUTOMATIC_RULES_VERSION}:[a-f0-9]{64}$`));
   assert.equal(evidenceFingerprint([e]),evidenceFingerprint([{...e,collectedAt:'2026-10-11T04:00:00Z'}]));
+});
+
+test('发卡已启动和稍后到账是一条进展，保留原文和资格，不借用产品更新时间', () => {
+  const text = 'We shipped some good updates to dots today and the banked reset has been activated and should land in everyones accounts sometime soon!';
+  const publishedAt = '2026-11-12T21:59:39.000Z';
+  const evidence = ev(text, {
+    sourceId: 'tibo-public', messageId: '2120999993079451919',
+    url: 'https://x.com/thsottiaux/status/2120999993079451919',
+    publishedAt, collectedAt: '2026-11-12T22:06:51.839Z', contextComplete: false,
+    metadata: { sourceGroup: 'fxembed:thsottiaux', category: 'reset' },
+  });
+  const draft = buildAutomaticTemplate([evidence])!;
+  assert.equal(draft.publicationMode, 'state_change');
+  assert.deepEqual(draft.actions.map(({kind, stage, scope, eligibility, statementAt, expectedAt, timeNote, evidenceQuote}) => (
+    {kind, stage, scope, eligibility, statementAt, expectedAt, timeNote, evidenceQuote}
+  )), [{
+    kind: 'banked_reset', stage: 'in_progress', scope: 'public', eligibility: '所有账户',
+    statementAt: publishedAt, expectedAt: undefined, timeNote: undefined, evidenceQuote: text,
+  }]);
+  assert.deepEqual(validateDraft(draft, [evidence], true), []);
+  assert.equal(needsSemanticReview(draft, [evidence]), false);
+  assert.match(evidenceFingerprint([evidence]), /-rollout-activation-1:[a-f0-9]{64}$/);
+
+  const timed = extractBenefitClaims('We have initiated a reserve reset for all paid accounts. It should land in 2 hours.', publishedAt)[0];
+  assert.equal(timed?.stage, 'in_progress');
+  assert.equal(timed?.expectedAt, '2026-11-12T23:59:39.000Z');
+  assert.equal(timed?.eligibility, '付费账户');
+  const datedUpdate = 'We shipped an update at 2026-11-11T09:00:00Z and the banked reset has been activated for all users.';
+  assert.equal(extractBenefitClaims(datedUpdate, publishedAt)[0]?.expectedAt, undefined);
+  assert.equal(extractBenefitClaims('The banked reset has been activated and has landed in everyone’s accounts.', publishedAt)[0]?.stage, 'claimed_complete');
+  assert.equal(extractBenefitClaims('The banked reset has been activated for selected paid users.', publishedAt)[0]?.scope, 'targeted');
+});
+
+test('发卡启动规则拒绝个人用卡、引述、否定及尚未发生的启动', () => {
+  for (const text of [
+    'We have activated a banked reset.',
+    'We have activated banked reset redemption for all users.',
+    'The banked reset has been activated for my account.',
+    'The banked reset has not been activated for everyone’s accounts.',
+    'If the banked reset has been activated it should land in everyone’s accounts.',
+    'We will announce when the banked reset has been activated for all paid accounts.',
+    'I heard the banked reset has been activated for all users.',
+    'A user wrote "the banked reset has been activated" for all users.',
+  ]) {
+    assert.ok(!buildAutomaticTemplate([ev(text)])?.actions.some(action => action.scope === 'public'), text);
+  }
+  const excerpt = ev('The banked reset has been activated for all accounts.', {textOrigin: 'archive_excerpt'});
+  assert.ok(!buildAutomaticTemplate([excerpt])?.actions.length);
 });
 test('双动作独立相对期限由原帖时间换算，明确旧期限不变完成',()=>{
   const e=ev('We will reset usage for all paid accounts within 2 hours. We will load a banked reset for all free accounts in 3 hours.');

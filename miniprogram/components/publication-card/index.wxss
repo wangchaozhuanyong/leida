@@ -9,3 +9,19 @@
 
 
 .publication-card.is-compact{padding:16px;border-color:#e4ebf6;background:rgba(255,255,255,.92);border-radius:16px}.is-compact .announcement-title{font-size:16px;line-height:24px;margin:12px 0 8px}.is-compact .publication-summary{font-size:14px;line-height:23px;color:#14263e;-webkit-line-clamp:2}.is-compact .publication-footer{margin-top:6px}.is-compact .time{font-size:12px;line-height:20px}
+.publication-card.is-editorial {
+  margin: 0;
+  padding: 16px 0 8px;
+  border: 0;
+  border-bottom: 1px solid #dbe0df;
+  border-radius: 0;
+  background: transparent;
+  color: #182933;
+}
+.publication-card.is-editorial > .row:first-child { gap: 4px 12px; }
+.publication-card.is-editorial .badge { padding: 0; background: transparent; font-size: 13px; color: #315caa; }
+.publication-card.is-editorial .badge.purple { color: #684d91; }
+.publication-card.is-editorial .time { margin-left: auto; text-align: right; color: #53636b; font-variant-numeric: tabular-nums; }
+.publication-card.is-editorial .announcement-title { margin: 8px 0; font-size: 17px; }
+.publication-card.is-editorial .publication-summary { color: #53636b; }
+.publication-card.is-editorial .news-progress { margin-top: 0; border: 0; padding-top: 0; }

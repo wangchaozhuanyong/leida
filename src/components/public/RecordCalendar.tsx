@@ -18,9 +18,11 @@ export function RecordCalendar({ data, date, kind, onDate, onKind }: { data: Pub
     <section className="pub-record-sheet" aria-label="重置月历">
       <div className="pub-month-calendar">
         <div className="pub-month-heading">
-          <div><select aria-label="选择月份" value={model.month} onChange={event => selectMonth(event.target.value)}>{model.months.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select><p>完成声明 {model.confirmedCount} 条 · 观测日期 {model.observedDateCount} 天</p></div>
-          <div className="pub-month-controls"><button aria-label="上个月" disabled={model.monthIndex === model.months.length - 1} onClick={() => selectMonth(model.months[model.monthIndex + 1].value)}>‹</button><button aria-label="下个月" disabled={model.monthIndex === 0} onClick={() => selectMonth(model.months[model.monthIndex - 1].value)}>›</button></div>
+          <button className="pub-month-arrow" aria-label="上个月" disabled={model.monthIndex === model.months.length - 1} onClick={() => selectMonth(model.months[model.monthIndex + 1].value)}>‹</button>
+          <select aria-label="选择月份" value={model.month} onChange={event => selectMonth(event.target.value)}>{model.months.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
+          <button className="pub-month-arrow" aria-label="下个月" disabled={model.monthIndex === 0} onClick={() => selectMonth(model.months[model.monthIndex - 1].value)}>›</button>
         </div>
+        <p className="pub-month-count">完成声明 {model.confirmedCount} 条 · 观测日期 {model.observedDateCount} 天</p>
         <RecordKindFilter value={kind} onChange={onKind} />
         <div className="pub-month-week" aria-hidden="true">{['一', '二', '三', '四', '五', '六', '日'].map(day => <span key={day}>{day}</span>)}</div>
         <div className="pub-month-days">{model.days.map(day => <button key={day.date} disabled={day.disabled} aria-pressed={day.selected} aria-label={`${day.date}，完成确认${day.confirmedCount}条，来源观测${day.observedCount}条`} className={`${day.outsideMonth ? 'outside-month' : ''} ${day.selected ? 'selected' : ''} ${day.today ? 'today' : ''}`} onClick={() => onDate(day.date)}><span>{day.day}</span><span className="pub-day-markers">{day.confirmedAutomatic && <i className="pub-record-dot automatic_reset" />}{day.confirmedBanked && <i className="pub-record-dot banked_reset" />}{day.observed && <i className="pub-record-dot observed" />}</span></button>)}</div>
@@ -28,7 +30,17 @@ export function RecordCalendar({ data, date, kind, onDate, onKind }: { data: Pub
       </div>
       <section className="pub-record-detail" aria-label="所选日期记录" aria-live="polite">
         <div className="pub-record-heading"><h2>{model.selectedLabel}</h2><span>{model.selectedItems.length} 条记录 · 北京时间</span></div>
-        {model.selectedItems.length ? model.selectedItems.map(item => <article key={item.id} data-reading-id={item.id}><Link scroll={false} className="pub-date-record" href={item.href} aria-label={`${item.title}，${item.time}，${item.statusLabel}，查看依据`}><span className={`pub-record-seal ${item.kind} ${item.evidenceType}`} aria-hidden="true">{item.evidenceType === 'observed' ? '◎' : '✓'}</span><span className="pub-record-copy"><span className="pub-record-meta"><span className={`pub-record-label ${item.kind}`}>{item.label}</span><span className={`pub-record-status ${item.evidenceType}`}>{item.statusLabel}</span><time dateTime={item.at}>{item.time}</time></span><h3>{item.title}</h3>{item.evidenceType === 'observed' && <span className="pub-record-source">{item.sourceName}</span>}</span><span className="pub-record-chevron" aria-hidden="true">›</span></Link>{item.sources.length > 1 && <details className="pub-record-sources"><summary>查看 {item.evidenceCount} 条观测报告</summary>{item.sources.map((source: {id:string;publicationId:string;title:string;time:string}) => { const publication = data.publications.find(p => p.id === source.publicationId); return publication ? <Link key={source.id} scroll={false} href={`/events/${encodeURIComponent(publication.eventId)}?version=${encodeURIComponent(publication.id)}`}>{source.title} · {source.time} →</Link> : null; })}</details>}</article>) : <div className="pub-date-empty"><strong>这一天暂无已收录记录</strong><p>选择有标记的日期，查看完成声明或来源观测。</p>{model.recentDate && model.recentDate !== model.selected && <button onClick={() => onDate(model.recentDate)}>查看最近一次记录 →</button>}</div>}
+        {model.selectedItems.length ? model.selectedItems.map(item => <article key={item.id} data-reading-id={item.id}>
+          <Link scroll={false} className="pub-date-record" href={item.href} aria-label={`${item.title}，${item.time}，${item.statusLabel}，查看依据`}>
+            <time dateTime={item.at}>{item.time}</time>
+            <span className="pub-record-copy">
+              <span className="pub-record-meta"><span className={`pub-record-label ${item.kind}`}>{item.label}</span><span className={`pub-record-status ${item.evidenceType}`}>{item.statusLabel}</span></span>
+              <h3>{item.title}</h3>{item.evidenceType === 'observed' && <span className="pub-record-source">{item.sourceName}</span>}
+            </span>
+            <span className="pub-record-chevron" aria-hidden="true">›</span>
+          </Link>
+          {item.sources.length > 1 && <details className="pub-record-sources"><summary>查看 {item.evidenceCount} 条观测报告</summary>{item.sources.map((source: {id:string;publicationId:string;title:string;time:string}) => { const publication = data.publications.find(p => p.id === source.publicationId); return publication ? <Link key={source.id} scroll={false} href={`/events/${encodeURIComponent(publication.eventId)}?version=${encodeURIComponent(publication.id)}`}>{source.title} · {source.time} →</Link> : null; })}</details>}
+        </article>) : <div className="pub-date-empty"><strong>这一天暂无已收录记录</strong><p>选择有标记的日期，查看完成声明或来源观测。</p>{model.recentDate && model.recentDate !== model.selected && <button onClick={() => onDate(model.recentDate)}>查看最近一次记录 →</button>}</div>}
       </section>
     </section>
     <details className="pub-record-notes"><summary><span>近半年记录</span><span>收录说明 <i aria-hidden="true">⌄</i></span></summary><p>{model.periodLabel}<br />记录来自公开完成声明和第三方观测，均可查看来源。时间为北京时间；未收录的日期不代表没有重置。活动日期请以活动页标注为准。</p></details>

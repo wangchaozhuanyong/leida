@@ -7,14 +7,15 @@ import {isTruncatedBenefitText} from './benefit-rules';
 import {interpretResetHint,interpretResetReplyHint} from './reset-hint';
 import {evidenceBenefitClaims,originalConflict,resetReplyParent} from './source-context';
 import {speechDisposition} from './benefit-language';
-import {forecastSourceAvailable,referenceSnapshotFresh,type ReferencePublicSignal} from '../lib/forecast';
+import {forecastSourceAvailable,referenceSnapshotFresh,type PublicResetHint,type ReferencePublicSignal} from '../lib/forecast';
 import {CODEX_LIMITS_OBSERVATION_SOURCE} from './codexlimits-observation-source';
+import {TIBORESET_OBSERVATION_SOURCE} from './tiboreset-observation-source';
 
 export const REFERENCE_DATA_ROOT='https://raw.githubusercontent.com/gdutxiaoxu/codex-reset-radar/master/data';
 export const REFERENCE_RESET_SOURCE:Source={id:'aiplanwatch-reference',name:'AIPlanWatch 公开数据对账',kind:'archive',url:`${REFERENCE_DATA_ROOT}/latest.json`,enabled:false,validated:false,intervalMinutes:30,collectionPolicy:'manual',version:1,status:'unconnected'};
 export const REFERENCE_SIGNAL_SOURCE:Source={...REFERENCE_RESET_SOURCE,id:'aiplanwatch-signals',name:'AIPlanWatch 公开信号对账',url:`${REFERENCE_DATA_ROOT}/signals.json`};
 export const REFERENCE_HISTORY_SOURCE:Source={...REFERENCE_RESET_SOURCE,id:'aiplanwatch-history',name:'AIPlanWatch 重置与重置卡对账',url:`${REFERENCE_DATA_ROOT}/resets.json`,intervalMinutes:360};
-export const REFERENCE_SOURCES=[REFERENCE_RESET_SOURCE,REFERENCE_SIGNAL_SOURCE,REFERENCE_HISTORY_SOURCE,CODEX_LIMITS_OBSERVATION_SOURCE];
+export const REFERENCE_SOURCES=[REFERENCE_RESET_SOURCE,REFERENCE_SIGNAL_SOURCE,REFERENCE_HISTORY_SOURCE,CODEX_LIMITS_OBSERVATION_SOURCE,TIBORESET_OBSERVATION_SOURCE];
 /** The public Contents API serves the same fixed repository files. Keep the
  * canonical source URL/proof unchanged; never derive a request from user input. */
 export function referenceContentsURL(source:Source):string|undefined {
@@ -108,27 +109,37 @@ export function referenceCompletionClaim(evidence:Evidence):BenefitClaim|undefin
 const tiboSourceId='tibo-public';
 const recentHintMs=2*86400000;
 const originalPost=/^https:\/\/x\.com\/thsottiaux\/status\/\d{15,20}$/;
+function hintDisplayUntil(hint:PublicResetHint){
+ return Date.parse(hint.expiresAt)+(hint.dayLabel?86400000:0);
+}
+function keepKnownDatedHint(source:Source|undefined):boolean {
+ return !!source?.enabled&&source.validated&&!source.publicationPaused&&source.status!=='paused'&&source.status!=='unconnected';
+}
 
 /** Keep one current actionable hint. Ambiguous replies may be retained for
  * review, while fresh, usable clues take precedence on the homepage. */
 export function referencePublicSignal(evidence:Evidence[],sources:Source[],now:string,completedAt?:string):ReferencePublicSignal|undefined {
  const cutoff=Date.parse(now);
- const fresh=new Set([REFERENCE_SIGNAL_SOURCE.id,tiboSourceId].filter(id=>forecastSourceAvailable(sources.find(s=>s.id===id),now)));
- if(!fresh.size)return;
+ const enabled=new Set(sources.filter(source=>source.enabled&&[REFERENCE_SIGNAL_SOURCE.id,tiboSourceId].includes(source.id)).map(source=>source.id));
+ const fresh=new Set([...enabled].filter(id=>forecastSourceAvailable(sources.find(s=>s.id===id),now)));
+ const dated=new Set(sources.filter(keepKnownDatedHint).map(source=>source.id));
+ if(!enabled.size)return;
  const known=evidence.filter(e=>Date.parse(e.publishedAt)<=cutoff&&Date.parse(e.collectedAt)<=cutoff);
- const items=known.filter(e=>fresh.has(e.sourceId)&&e.provenance==='archive'&&e.textOrigin==='original'&&
+ const items=known.filter(e=>enabled.has(e.sourceId)&&e.provenance==='archive'&&e.textOrigin==='original'&&
    originalPost.test(e.url)&&e.url.endsWith('/'+e.messageId)&&!isTruncatedBenefitText(e.text)&&
-   (e.sourceId===tiboSourceId?e.metadata?.sourceGroup==='fxembed:thsottiaux'&&Date.parse(e.publishedAt)>cutoff-recentHintMs:
+   (e.sourceId===tiboSourceId?e.metadata?.sourceGroup==='fxembed:thsottiaux'&&Date.parse(e.publishedAt)>cutoff-(8*86400000):
      e.metadata?.sourceGroup==='aiplanwatch'&&e.metadata.referenceSignal?.referenceUrl===REFERENCE_SIGNAL_SOURCE.url))
    .sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt)||Number(b.sourceId===tiboSourceId)-Number(a.sourceId===tiboSourceId));
- let pending:ReferencePublicSignal|undefined;
+ let pending:ReferencePublicSignal|undefined,closed:ReferencePublicSignal|undefined;
+ const closedKinds=new Set<PublicResetHint['kind']>();
  const seen=new Set<string>();
  for(const item of items){
   if(seen.has(item.messageId)||originalConflict(item,known))continue;
   const parent=resetReplyParent(item,known,now);
   const reply=parent&&interpretResetReplyHint(item.text,item.publishedAt,parent.kind);
   const hint=interpretResetHint(item.text,item.publishedAt)??(reply&&parent?{...reply,parentSourceUrl:parent.parent.url}:undefined);
-  if(hint&&Date.parse(hint.expiresAt)<=cutoff)continue;
+  if(!fresh.has(item.sourceId)&&!(hint?.dayLabel&&dated.has(item.sourceId)))continue;
+  if(hint&&!hint.dayLabel&&hintDisplayUntil(hint)<=cutoff||!hint&&item.sourceId===tiboSourceId&&Date.parse(item.publishedAt)<=cutoff-recentHintMs)continue;
   if(hint?.kind!=='banked_reset'&&completedAt&&Date.parse(item.publishedAt)<=Date.parse(completedAt))continue;
   const reference=item.metadata?.referenceSignal;
   const direct=item.sourceId===tiboSourceId;
@@ -140,22 +151,32 @@ export function referencePublicSignal(evidence:Evidence[],sources:Source[],now:s
     new Date(Math.max(Date.parse(recordedAt),Date.parse(item.collectedAt),Date.parse(parent.parent.collectedAt))).toISOString():recordedAt;
   const result:ReferencePublicSignal={id:item.messageId,text,publishedAt:item.publishedAt,recordedAt:availableAt,
     sourceUrl:item.url,sourceName:direct?'Tibo 公开动态':'AIPlanWatch',...(hint?{hint}:direct?{reviewPending:true}:{})};
-  if(hint)return result;
   seen.add(item.messageId);
+  if(hint){
+   if(closedKinds.has(hint.kind))continue;
+   if(hintDisplayUntil(hint)>cutoff)return result;
+   // Keep the last closed date window for a fresh load. Older clues for
+   // that category cannot resume a countdown after a newer window closes.
+   closedKinds.add(hint.kind);
+   closed??=result;
+   continue;
+  }
   pending??=result;
  }
- return pending;
+ return pending&&(!closed||Date.parse(pending.publishedAt)>Date.parse(closed.publishedAt))?pending:closed;
 }
 
 export function projectReferenceSignal(value:ReferencePublicSignal|undefined,sources:Source[],now:string,completedAt?:string):ReferencePublicSignal|undefined {
  if(!value)return;
  const sourceId=value.sourceName==='Tibo 公开动态'?tiboSourceId:value.sourceName==='AIPlanWatch'?REFERENCE_SIGNAL_SOURCE.id:undefined;
+ const source=sources.find(item=>item.id===sourceId);
  const cutoff=Date.parse(now),published=Date.parse(value.publishedAt),recorded=Date.parse(value.recordedAt);
- if(!sourceId||!forecastSourceAvailable(sources.find(s=>s.id===sourceId),now)||!/^\d{15,20}$/.test(value.id)||
+ const knownDatedHint=value.hint?.dayLabel&&keepKnownDatedHint(source);
+ if(!sourceId||(!forecastSourceAvailable(source,now)&&!knownDatedHint)||!/^\d{15,20}$/.test(value.id)||
    value.sourceUrl!==`https://x.com/thsottiaux/status/${value.id}`||typeof value.text!=='string'||!value.text.trim()||value.text.length>3000||
    !Number.isFinite(published)||!Number.isFinite(recorded)||published>cutoff||recorded>cutoff)return;
  const hint=value.hint;
- if(hint&&Date.parse(hint.expiresAt)<=cutoff||value.reviewPending&&published+recentHintMs<=cutoff)return;
+ if(hint&&(!Number.isFinite(hintDisplayUntil(hint))||!hint.dayLabel&&hintDisplayUntil(hint)<=cutoff)||value.reviewPending&&published+recentHintMs<=cutoff)return;
  if(hint?.kind!=='banked_reset'&&completedAt&&published<=Date.parse(completedAt))return;
  return value;
 }

@@ -111,7 +111,7 @@ test('历史回放使用当时版本，撤回与未来补录不改写先前训�
 });
 
 
-test('核验原文中的发卡暗示进入首页主卡并保留周四和来源，到期不再显示',()=>{
+test('核验原文中的发卡暗示进入首页主卡，窗口关闭后冷加载也恢复上次发卡计时',()=>{
  const publishedAt='2026-11-11T06:57:08.459Z';
  const checkedAt='2026-11-11T12:00:00.000Z';
  const id='2120410480204525936';
@@ -131,6 +131,10 @@ test('核验原文中的发卡暗示进入首页主卡并保留周四和来源�
  d.serverTime=checkedAt;d.sources=[source];
  const signal=referencePublicSignal([evidence],[source],checkedAt,quotaAt);
  assert.deepEqual(signal?.hint,{kind:'banked_reset',dayLabel:'周四',expiresAt:'2026-11-13T08:00:00.000Z'});
+ const delayedSource={...source,status:'delayed' as const};
+ assert.deepEqual(referencePublicSignal([evidence],[delayedSource],checkedAt,quotaAt),signal);
+ assert.deepEqual(projectReferenceSignal(signal,[delayedSource],checkedAt),signal);
+ assert.equal(projectReferenceSignal(signal,[{...delayedSource,enabled:false}],checkedAt),undefined);
  d.forecasts=projectPublicForecastRecords({cases:[],outcomes:[],sources:[source],snapshots:[],runtime:{referenceSignal:signal}},checkedAt,d,'home');
  const home=homeResetStatus(d);
  assert.equal(home.primary.kind,'banked_reset');
@@ -151,7 +155,7 @@ test('核验原文中的发卡暗示进入首页主卡并保留周四和来源�
  const end='2026-11-13T08:00:00.000Z';
  const lastMoment=homeResetStatus(d,'2026-11-13T07:59:59.999Z').primary;
  assert.equal(lastMoment.state,'estimated');
- assert.equal(lastMoment.hero.metric,'不足1分钟');
+ assert.equal(lastMoment.hero.metric,'1秒');
 
  const delivered=previousCardCompletion('2026-11-12T17:00:00.000Z','new-banked');
  const afterDelivery=facts(older,quota,delivered);
@@ -165,8 +169,21 @@ test('核验原文中的发卡暗示进入首页主卡并保留周四和来源�
  assert.equal(switched.hero.metric,'20分钟');
  assert.equal(switched.publicationId,delivered.id);
  assert.notEqual(switched.revision,home.primary.revision);
- assert.equal(homeResetStatus(d,end).cards.find(card=>card.kind==='banked_reset')?.state,'completed');
- assert.equal(projectReferenceSignal(signal,[{...source,lastSuccessAt:end,referenceSnapshotAt:end}],end),undefined);
+ const past=homeResetStatus(d,end).cards.find(card=>card.kind==='banked_reset');
+ assert.equal(past?.state,'overdue');assert.equal(past?.hero.metric,'0秒');assert.equal(past?.hero.label,'推测窗口已过');
+ assert.equal(projectReferenceSignal(signal,[{...source,lastSuccessAt:end,referenceSnapshotAt:end}],end)?.hint?.expiresAt,end);
+ const limit='2026-11-14T08:00:00.000Z',closed=homeResetStatus(d,limit).cards.find(card=>card.kind==='banked_reset');
+ assert.equal(closed?.state,'completed');assert.equal(closed?.roundNotice?.label,'本轮发卡预测已结束');
+ const reloaded=facts(older,quota);reloaded.serverTime=limit;
+ const currentSource={...source,lastSuccessAt:limit,referenceSnapshotAt:limit};
+ const retained=referencePublicSignal([evidence],[currentSource],limit,quotaAt);
+ assert.deepEqual(retained,signal,'任务重算后保留最近一次已经关闭的推测依据');
+ reloaded.forecasts=projectPublicForecastRecords({cases:[],outcomes:[],sources:[currentSource],snapshots:[],runtime:{referenceSignal:retained}},limit,reloaded,'home');
+ const refreshed=homeResetStatus(reloaded).cards.find(card=>card.kind==='banked_reset');
+ assert.equal(refreshed?.timeAt,older.event.actions[0].statementAt);
+ const refreshedPoster=statusPosterSnapshot(reloaded);
+ assert.equal(refreshedPoster.round,statusPosterSnapshot(d,limit).round);
+ assert.match(refreshedPoster.nextNote,/本轮发卡预测已结束/);
 });
 
 function previousCardCompletion(at=doneAt,id='banked') {

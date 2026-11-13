@@ -1,1 +1,8 @@
 @import "../announcements/index.wxss";
+
+.news-page { padding: 10px 20px 32px; background: #f8f9f7; color: #182933; }
+.news-page .chips { margin-bottom: 12px; border-color: #dbe0df; }
+.news-page .chips button { flex: 1; min-width: 0; padding: 0 4px; justify-content: center; }
+.news-page .chips button.active { color: #315caa; border-color: #315caa; }
+.news-page .reading-item { margin: 0; }
+@media (max-width: 360px) { .news-page { padding-left: 16px; padding-right: 16px; } }

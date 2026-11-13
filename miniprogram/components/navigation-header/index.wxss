@@ -1,6 +1,7 @@
 :host{display:block;flex:none}
 .navigation-space,.navigation-header,.navigation-inner,.navigation-copy,.navigation-back{box-sizing:border-box}
 .navigation-header{position:fixed;z-index:30;top:0;left:0;right:0;background:#f2f5fb;color:#14263e}
+.navigation-header.navigation-paper{background:#f8f9f7;color:#182933}
 .navigation-inner{display:flex;align-items:center;min-width:0;padding-left:16px;gap:8px}
 .navigation-logo{flex:none;width:32px;height:32px;margin-left:0;margin-right:0}
 .navigation-symbol{width:32px;height:32px;flex:none}

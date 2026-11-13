@@ -176,7 +176,7 @@ test('服务端完成转为24小时结果计时，取消结束计时，不回退
       next.events=[structuredClone(p.event)];next.articles=[structuredClone(p.article)];
     }
     h.replace(next);assert.equal(page.data.pending,null);assert.equal(page.data.forecast,null);assert.equal(page.data.outlookStatus,status);assert.match(page.data.waitingText,/等待下一次预告/);
-    if(status==='completed'){assert.ok(page._countdownTimer);assert.equal(page.data.timeline.completed,true);assert.equal(page.data.latest.elapsed,'刚刚');assert.equal(page.data.latest.title,'公告称已重置用量');assert.match(page.data.sharePath,/^\/pages\/detail\/index\?publicationId=live-publication&kind=automatic_reset&revision=home-[a-f0-9]{16}$/);}
+    if(status==='completed'){assert.ok(page._countdownTimer);assert.equal(page.data.timeline.completed,true);assert.match(page.data.latest.elapsed,/^\d+秒$/);assert.equal(page.data.latest.title,'公告称已重置用量');assert.match(page.data.sharePath,/^\/pages\/detail\/index\?publicationId=live-publication&kind=automatic_reset&revision=home-[a-f0-9]{16}$/);}
     else assert.equal(page._countdownTimer,null);
     page.onUnload();
   }

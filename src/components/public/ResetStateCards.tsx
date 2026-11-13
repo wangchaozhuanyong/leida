@@ -44,22 +44,29 @@ export function ResetStateCards({data}:{data:PublicData}) {
   const {primary:card,secondary,untyped}=homeResetStatus(data,now);
   const destination=(item:typeof card)=>{
     if(item.observationSummaryDate)return '/history?date='+encodeURIComponent(item.observationSummaryDate);
-    if(item.publicationId&&item.eventId)return '/events/'+encodeURIComponent(item.eventId)+'?version='+encodeURIComponent(item.publicationId);
+    const publicationId=item.timingPublicationId||item.publicationId;
+    if(publicationId&&item.eventId)return '/events/'+encodeURIComponent(item.eventId)+'?version='+encodeURIComponent(publicationId);
     return safeUrl(item.sourceUrl)||'/history';
   };
   return <section aria-label="重置动态">
     <article className={`radar-panel is-live kind-${card.kind}`}>
-      <header className="radar-mast"><strong className="radar-name"><i aria-hidden="true" className="radar-mark"/>{card.kind==='banked_reset'?'重置卡发放':'额度重置'}</strong><span className="radar-basis">{card.hero.badge}</span></header>
-      <div className="radar-field"><div className="radar-face"><i className="radar-pearl" aria-hidden="true"/><div className="radar-readout">
-        <div className="radar-caption">{card.hero.metric?(card.hero.title||card.hero.label):card.hero.label}</div>
-        {card.hero.parts.length?<div className={`radar-value ${card.hero.long?'long':''}`} aria-label={card.hero.metric}>{card.hero.parts.map((part:{unit:string,value:string})=><span className="radar-number" key={part.unit}>{part.value}<small className="radar-unit">{part.unit}</small></span>)}</div>:<strong className="radar-verdict">{card.hero.metric||card.hero.title}</strong>}
-      </div></div></div>
-      <div className="pub-focus-fact"><span>{card.timeAt?card.timeLabel+' · 北京时间':'当前状态'}</span><strong>{card.time||card.hero.badge}</strong></div>
+      <header className="radar-mast"><strong className="radar-name"><i aria-hidden="true" className="radar-mark"/>{card.kind==='banked_reset'?'重置卡发放':'额度重置'}</strong>{card.hero.badge&&<span className="radar-basis">{card.hero.badge}</span>}</header>
+      {card.roundNotice&&<div className="pub-orbit-round-note"><strong>{card.roundNotice.label}</strong>{card.roundNotice.basis&&<small>{card.roundNotice.basis}</small>}</div>}
+      <div className="radar-field">
+        <div className="signal-art" aria-hidden="true">
+          <div className="signal-wing signal-wing-left"><img className="signal-fold" src="/skin/signal-fold.png" width="615" height="368" alt=""/></div>
+          <div className="signal-wing signal-wing-right"><img className="signal-fold" src="/skin/signal-fold.png" width="615" height="368" alt=""/></div>
+        </div>
+        <div className="radar-readout">
+        {(card.hero.metric||card.hero.label)&&<div className="radar-caption">{card.hero.metric?(card.hero.title||card.hero.label):card.hero.label}</div>}
+        {card.hero.parts.length?<div className={`radar-value ${card.hero.parts.length===3?'with-days':''} ${card.hero.long?'long':''}`} aria-label={card.hero.metric}>{card.hero.parts.map((part:{unit:string,value:string})=><span className="radar-number" key={part.unit}>{part.value}<small className="radar-unit">{part.unit}</small></span>)}</div>:<strong className="radar-verdict">{card.hero.metric||card.hero.title}</strong>}
+      </div></div>
+      {card.timeAt&&<div className="pub-focus-fact"><span>{card.timeLabel} · 北京时间</span><strong>{card.time}</strong></div>}
       {card.oldTime&&<div className="pub-focus-fact">{card.oldTime}</div>}
       {card.observationPublicationId&&<Link className="pub-focus-link" href={'/events/'+encodeURIComponent(card.observationEventId||data.publications.find(p=>p.id===card.observationPublicationId)?.eventId||card.eventId)+'?version='+encodeURIComponent(card.observationPublicationId)}>查看独立观测 · {card.observationTime}</Link>}
-      <Link className="pub-focus-link" href={destination(card)}>{card.action} →</Link>
+      <div className="pub-focus-fact pub-focus-source"><span>消息依据</span><Link className="pub-focus-link" href={destination(card)}>{card.action} →</Link></div>
       {card.parentSourceUrl&&safeUrl(card.parentSourceUrl)&&<Link className="pub-focus-link" href={card.parentSourceUrl}>查看父帖依据 ↗</Link>}
-      {secondary&&<Link className="radar-secondary" href={destination(secondary)}><span>{secondary.kind==='banked_reset'?'重置卡发放':'额度重置'} · {secondary.hero.badge} {secondary.time}</span><span>→</span></Link>}
+      {secondary&&<Link className="radar-secondary" href={destination(secondary)}><span>{secondary.kind==='banked_reset'?'重置卡发放':'额度重置'} · {secondary.roundNotice?.label||[secondary.hero.badge,secondary.time].filter(Boolean).join(' ')}</span><span>→</span></Link>}
     </article>
     {untyped&&<div className="pub-reset-untyped"><p>类型暂未明确的公开线索</p><ResetStateCardView card={untyped}/></div>}
   </section>;
