@@ -4,10 +4,21 @@ const valid=value=>typeof value==='string'&&Number.isFinite(Date.parse(value));
 const archive='https://codex-resets.com/zh-CN';
 const reference='https://raw.githubusercontent.com/gdutxiaoxu/codex-reset-radar/master/data/latest.json';
 const codexLimits='https://codexlimits.com/reset-history';
+const tiboresetBankedObservationText=text=>/^(?:The banked reset Tibo announced|A new banked Codex reset) landed on our monitoring accounts\.$/i.test(text);
 const observedResetText=text=>typeof text==='string'&&/^(?:Codex\s*使用限额已重置[。.!]?\s*(?:查看你的限额[。.!]?)?|Codex usage limits have been reset[.!]?(?:\s*Check your limits[.!]?)?)$/i.test(text.trim());
 /** A source observation is never an author's completion announcement or a training outcome. */
 function observedEvidence(e,now) {
   if(!e||e.provenance!=='archive'||e.textOrigin!=='archive_excerpt'||!valid(now)||!valid(e.publishedAt)||!valid(e.collectedAt)||Date.parse(e.publishedAt)>Date.parse(e.collectedAt)||Date.parse(e.collectedAt)>Date.parse(now))return null;
+  if(e.sourceId==='tiboreset-observations'){
+    const id=e.messageId.match(/^observed-(\d{15,20})$/)?.[1], proof=e.metadata?.referenceReset;
+    if(!id||e.url!=='https://tiboreset.com/r/'+id||e.parentId||e.contextComplete||e.metadata?.category!=='reset'||
+      e.metadata?.sourceGroup!=='tiboreset'||e.metadata?.benefitKind!=='banked_reset'||!tiboresetBankedObservationText(e.text)||
+      proof?.summary!==e.text||proof.referenceUrl!==e.url||proof.eventId!=='tiboreset:banked_reset:'+id||
+      proof.occurredAt!==e.publishedAt||proof.snapshotAt!==e.collectedAt||
+      Math.floor(Number((BigInt(id)>>22n)+1288834974657n)/1000)!==Math.floor(Date.parse(e.publishedAt)/1000))return null;
+    return {kind:'banked_reset',observedAt:e.publishedAt,collectedAt:e.collectedAt,evidenceId:e.id,sourceId:e.sourceId,
+      sourceName:'Tibo Reset Tracker',sourceUrl:e.url,referenceUrl:e.url,sourceType:'observed'};
+  }
   if(e.sourceId==='codexlimits-observations'){
     const proof=e.metadata?.referenceReset,date=new Date(e.publishedAt);
     const stamp=`${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][date.getUTCMonth()]} ${date.getUTCDate()}, ${String(date.getUTCHours()).padStart(2,'0')}:${String(date.getUTCMinutes()).padStart(2,'0')} UTC.`;

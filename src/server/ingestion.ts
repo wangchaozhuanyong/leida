@@ -13,6 +13,7 @@ import {isDeepStrictEqual} from 'node:util';
 import {markForecastInputsChanged} from './reset-cadence-runtime';
 import {sourceCollectionSchedule,sourceNextCollectionAt,sourceForecastConfiguration} from './source-collection-policy';
 import {CODEX_LIMITS_OBSERVATION_SOURCE,parseCodexLimitsObservations} from './codexlimits-observation-source';
+import {TIBORESET_OBSERVATION_SOURCE,parseTiboresetObservations} from './tiboreset-observation-source';
 
 export class SourceStructureError extends DomainError {}
 export class SourceRateLimitError extends DomainError {
@@ -46,7 +47,7 @@ const safeValidator=(value:string|null)=>value&&value.length<=1024&&!/[\r\n]/.te
 export function sourceReadCheckpoint(source:Source){return sourceReadCheckpoints.get(source);}
 function stableIncoming({collectedAt:_,...record}:Incoming) {
  const proof=record.metadata?.referenceReset;
- if([REFERENCE_RESET_SOURCE.id,CODEX_LIMITS_OBSERVATION_SOURCE.id].includes(record.sourceId)&&proof){const {snapshotAt:__,...stable}=proof;return {...record,metadata:{...record.metadata,referenceReset:stable}};}
+ if([REFERENCE_RESET_SOURCE.id,CODEX_LIMITS_OBSERVATION_SOURCE.id,TIBORESET_OBSERVATION_SOURCE.id].includes(record.sourceId)&&proof){const {snapshotAt:__,...stable}=proof;return {...record,metadata:{...record.metadata,referenceReset:stable}};}
  return record;
 }
 export function incomingFingerprint(records:Incoming[]):string {
@@ -292,10 +293,14 @@ export async function fetchRecords(source:Source,validationOnly=false,dependenci
  }}
  catch(error){if(!(error instanceof SourceUnchanged)){if(referenceURL)console.warn('REFERENCE_SNAPSHOT_UNAVAILABLE',source.id,error instanceof SourceTransientError?'TRANSPORT':error instanceof SourceRateLimitError?'RATE_LIMIT':error instanceof SourceStructureError?'FORMAT':'REQUEST');throw error;}sourceReadCheckpoints.set(source,{httpCheckpoints:context.checkpoints,unchanged:true,referenceSnapshotAt:source.referenceSnapshotAt});return [];}
  sourceReadCheckpoints.set(source,{httpCheckpoints:context.checkpoints,unchanged:false});
- if(source.id===CODEX_LIMITS_OBSERVATION_SOURCE.id){
+ if(source.id===CODEX_LIMITS_OBSERVATION_SOURCE.id||source.id===TIBORESET_OBSERVATION_SOURCE.id){
   const time=now();
-  try{const records=parseCodexLimitsObservations(raw,time);sourceReadCheckpoints.set(source,{httpCheckpoints:context.checkpoints,unchanged:false,referenceSnapshotAt:time});return records;}
-  catch{throw new SourceStructureError('CODEX_LIMITS_OBSERVATION_STRUCTURE_INVALID');}
+  try{
+   const parse=source.id===TIBORESET_OBSERVATION_SOURCE.id?parseTiboresetObservations:parseCodexLimitsObservations;
+   const records=parse(raw,time);
+   sourceReadCheckpoints.set(source,{httpCheckpoints:context.checkpoints,unchanged:false,referenceSnapshotAt:time});
+   return records;
+  }catch{throw new SourceStructureError(source.id===TIBORESET_OBSERVATION_SOURCE.id?'TIBORESET_OBSERVATION_STRUCTURE_INVALID':'CODEX_LIMITS_OBSERVATION_STRUCTURE_INVALID');}
  }
  if(REFERENCE_SOURCES.some(item=>item.id===source.id)){try{const value=JSON.parse(raw),time=now(),records=source.id===REFERENCE_SIGNAL_SOURCE.id?parseReferenceSignals(value,time):source.id===REFERENCE_HISTORY_SOURCE.id?parseReferenceHistory(value,time):parseReferenceLatest(value,time);sourceReadCheckpoints.set(source,{httpCheckpoints:context.checkpoints,unchanged:false,referenceSnapshotAt:value.generated_at});return records;}catch{console.warn('REFERENCE_SNAPSHOT_UNAVAILABLE',source.id,'FORMAT');throw new SourceStructureError('REFERENCE_SNAPSHOT_INVALID');}}
  if(source.kind==='status')return parseStatus(raw,source);
@@ -356,7 +361,7 @@ export async function collectSource(sourceId:string,historical=false):Promise<{s
  let created=0,healthChanged=false;
  // A new observation must not re-version older observations just because this
  // HTML snapshot was fetched later. Preserve their first stored provenance.
- const knownObservations=source.id===CODEX_LIMITS_OBSERVATION_SOURCE.id?(await list<Evidence>('evidence')).filter(item=>item.sourceId===source.id).map(({id:_,hash:__,historical:___,...item})=>stableIncoming(item)):[];
+ const knownObservations=[CODEX_LIMITS_OBSERVATION_SOURCE.id,TIBORESET_OBSERVATION_SOURCE.id].includes(source.id)?(await list<Evidence>('evidence')).filter(item=>item.sourceId===source.id).map(({id:_,hash:__,historical:___,...item})=>stableIncoming(item)):[];
  for(const raw of unchanged?[]:records){
   const {activityDay,...incoming}=raw;const definition=incoming.metadata?.activity;
   if(knownObservations.some(previous=>isDeepStrictEqual(previous,stableIncoming(incoming))))continue;

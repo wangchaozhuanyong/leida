@@ -4,10 +4,10 @@ import type { Activity, Article, Evidence, PublicData, Publication, RadarEvent, 
 import type { PublicReadEnvelope, PublicReadOptions, PublicView } from '../lib/public-read';
 import { projectPublicHistory } from '../lib/history';
 import { activityPublicationIds } from '../lib/activity-share';
-import { publicActions, completedPublicActions, publicationSourceTime, recentCompletedBenefits } from '../lib/public-facts';
+import { publicActions, completedPublicActions, publicationSourceTime, recentCompletedBenefits, isNewsOnly, publicationWithdrawn } from '../lib/public-facts';
 import { publicNewsGroups, homeNewsGroups } from '../lib/public-feed';
 import { publicResetOutlook } from '../lib/reset-outlook';
-import {resetObservations,resetObservationSources} from '../lib/reset-observations';
+import {resetObservations,resetObservationSources,TIBORESET_OBSERVATION_ID} from '../lib/reset-observations';
 import { activityDayNumber } from '../lib/activity-display';
 import { getPublicForecast, forecastTablesAvailable } from './forecast';
 import { hash } from './domain';
@@ -94,7 +94,7 @@ export async function getLightPublicVersion() {
 const articleSummary = `(payload - 'translation' - 'summary') || jsonb_build_object('translation','', 'summary',left(payload->>'summary',360))`;
 const thinPublication = `(payload - 'article') || jsonb_build_object('article', ((payload->'article') - 'translation' - 'summary') || jsonb_build_object('translation','', 'summary',left(payload->'article'->>'summary',360)))`;
 // Retain bounded observation proof in compact reads; ordinary original bodies stay omitted.
-const thinEvidence = `CASE WHEN payload->>'sourceId' IN ('reset-archive','aiplanwatch-reference','codexlimits-observations') AND payload->>'messageId' LIKE 'observed-%' THEN payload ELSE (payload - 'text' - 'metadata') || jsonb_build_object('text','') END`;
+const thinEvidence = `CASE WHEN payload->>'sourceId' IN ('reset-archive','aiplanwatch-reference','codexlimits-observations','${TIBORESET_OBSERVATION_ID}') AND payload->>'messageId' LIKE 'observed-%' THEN payload ELSE (payload - 'text' - 'metadata') || jsonb_build_object('text','') END`;
 export async function readPublicFacts(client: Client, timestamp: string): Promise<PublicData> {
   const events = (await client.query('SELECT payload FROM radar_events ORDER BY created_at DESC,id')).rows.map(row => row.payload as RadarEvent);
   const articles = (await client.query(`SELECT ${articleSummary} AS payload FROM radar_articles ORDER BY created_at DESC,id`)).rows.map(row => row.payload as Article);
@@ -144,14 +144,15 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
       page = grouped.page;
     } else if (options.view === 'history') {
       // Filtering, ordering and the 20-row window happen in SQL, never Array.slice pagination.
-      const cursor = decodeCursor(options.cursor, options), args: unknown[] = [options.filter || 'all',resetObservations(facts).map(o=>o.publicationId)];
+      const observations=resetObservations(facts), filter=options.filter||'all';
+      const cursor = decodeCursor(options.cursor, options), args: unknown[] = [filter,observations.map(o=>o.publicationId),observations.filter(o=>o.kind===filter).map(o=>o.publicationId)];
       const history = options.view === 'history';
       const from = history ? `FROM radar_events e LEFT JOIN radar_publications current ON current.id=e.payload->>'publicationId' JOIN LATERAL (SELECT CASE WHEN current.id IS NOT NULL AND (current.id=ANY($2::text[]) OR coalesce(current.payload->>'mode',current.payload->'article'->>'publicationMode','state_change')<>'news_only') THEN current.payload ELSE (SELECT p.payload FROM radar_publications p WHERE p.payload->>'eventId'=e.id AND (p.payload->>'id'=ANY($2::text[]) OR coalesce(p.payload->>'mode',p.payload->'article'->>'publicationMode','state_change')<>'news_only') ORDER BY (p.payload->>'publishedAt')::timestamptz DESC,p.id LIMIT 1) END AS payload) p ON p.payload IS NOT NULL` : 'FROM radar_articles a JOIN radar_publications p ON p.id=a.payload->>\'publicationId\'';
       const at = history ? `coalesce(greatest((p.payload->'article'->>'sourcePublishedAt')::timestamptz, (SELECT max((action->>'statementAt')::timestamptz) FROM jsonb_array_elements(p.payload->'event'->'actions') action)), (p.payload->'article'->>'publishedAt')::timestamptz)` : `coalesce((a.payload->>'sourcePublishedAt')::timestamptz,(a.payload->>'publishedAt')::timestamptz)`;
-      const where = history ? `e.payload->>'status'<>'merged' AND (jsonb_array_length(p.payload->'event'->'actions')>0 OR p.payload->>'id'=ANY($2::text[])) AND ($1='all' OR ($1='automatic_reset' AND p.payload->>'id'=ANY($2::text[])) OR EXISTS (SELECT 1 FROM jsonb_array_elements(p.payload->'event'->'actions') action WHERE action->>'kind'=$1))` : `($1='all' OR a.payload->>'category'=$1)`;
+      const where = history ? `e.payload->>'status'<>'merged' AND (jsonb_array_length(p.payload->'event'->'actions')>0 OR p.payload->>'id'=ANY($2::text[])) AND ($1='all' OR p.payload->>'id'=ANY($3::text[]) OR EXISTS (SELECT 1 FROM jsonb_array_elements(p.payload->'event'->'actions') action WHERE action->>'kind'=$1))` : `($1='all' OR a.payload->>'category'=$1)`;
       const base = `SELECT p.payload->>'id' AS id, ${at} AS at, (p.payload->>'publishedAt')::timestamptz AS published ${from} WHERE ${where}`;
       const count = await client.query(`SELECT count(*)::int AS total FROM (${base}) records`, args);
-      const after = cursor ? (args.push(cursor.at,cursor.publishedAt,cursor.id), ' WHERE (at<$3::timestamptz OR (at=$3::timestamptz AND (published<$4::timestamptz OR (published=$4::timestamptz AND id>$5))))') : '';
+      const after = cursor ? (args.push(cursor.at,cursor.publishedAt,cursor.id), ' WHERE (at<$4::timestamptz OR (at=$4::timestamptz AND (published<$5::timestamptz OR (published=$5::timestamptz AND id>$6))))') : '';
       const rows = (await client.query(`SELECT * FROM (${base}) records${after} ORDER BY at DESC, published DESC, id ASC LIMIT 21`, args)).rows;
       const visible = rows.slice(0, 20); visible.forEach(row => selected.add(row.id));
       page = { ids: visible.map(row => row.id), total: count.rows[0].total, nextCursor: rows.length > 20 ? encodePublicCursor({ at: new Date(visible.at(-1)!.at).toISOString(), publishedAt:new Date(visible.at(-1)!.published).toISOString(), id: visible.at(-1)!.id, view: options.view, filter: options.filter || 'all' }) : null };
@@ -197,7 +198,26 @@ async function getStoredPublicRead(options: PublicReadOptions): Promise<PublicRe
     // Repeated same-kind occurrences share an event, but each retained source
     // article must be available to the client for its own record and share link.
     const selectedEvents=new Set(facts.publications.filter(p=>selected.has(p.id)).map(p=>p.eventId));
-    for(const item of publicActions(facts))if(selectedEvents.has(item.event.id))selected.add(item.publication.id);
+    const includeClockHistory = options.view === 'home' || options.view === 'methodology';
+    for (const {action,event,publication} of publicActions(facts)) {
+      if (!selectedEvents.has(event.id)) continue;
+      selected.add(publication.id);
+      if (!includeClockHistory) continue;
+      // Keep only the original announcement and the last timed version of
+      // this action. An untimed update must not erase the published clock.
+      const prior = facts.publications
+        .filter(p => p.eventId === event.id && p.id !== publication.id && p.event.status === 'published'
+          && p.article.status === 'published' && !isNewsOnly(p) && !publicationWithdrawn(facts,p)
+          && Date.parse(p.publishedAt) <= Math.min(Date.parse(publication.publishedAt),Date.parse(now)))
+        .flatMap(p => p.event.actions
+          .filter(a => a.id === action.id && a.kind === action.kind && a.scope === 'public'
+            && ['promised','in_progress'].includes(a.stage) && Date.parse(a.statementAt) <= Date.parse(action.statementAt))
+          .map(a => ({action:a,id:p.id,publishedAt:p.publishedAt})))
+        .sort((a,b) => Date.parse(a.action.statementAt)-Date.parse(b.action.statementAt) || Date.parse(a.publishedAt)-Date.parse(b.publishedAt));
+      const first = prior[0], timed = prior.findLast(item => Number.isFinite(Date.parse(item.action.expectedAt ?? '')));
+      if (first) selected.add(first.id);
+      if (timed) selected.add(timed.id);
+    }
     let selectedFacts:Publication[]=(await client.query(`SELECT ${thinPublication} AS payload FROM radar_publications WHERE id=ANY($1::text[])`,[[...selected]])).rows.map(row=>row.payload);
     if(detailed&&selectedFacts.length){
       const events:RadarEvent[]=(await client.query('SELECT payload FROM radar_events WHERE id=ANY($1::text[])',[selectedFacts.map(p=>p.eventId)])).rows.map(row=>row.payload);

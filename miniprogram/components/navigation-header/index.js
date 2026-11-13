@@ -6,6 +6,7 @@ Component({
     brand: { type: Boolean, value: false },
     icon: { type: String, value: 'document' },
     back: { type: Boolean, value: false },
+    paper: { type: Boolean, value: false },
     pulling: { type: Boolean, value: false }
   },
   data: navigationMetrics(typeof wx === 'undefined' ? {} : wx),

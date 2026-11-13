@@ -268,7 +268,8 @@ function noticeModel(data, preferences, read) {
 function publicArticleTitle(article) {
   if (article.contentOrigin !== 'template' || article.manualFields?.includes('title')) return article.title;
   return article.title.replace(/^公开归档收录重置相关动态$/, '重置相关消息')
-    .replace(/^公开归档收录产品动态$/, '产品更新').replace(/^活动归档：/, '');
+    .replace(/^公开归档收录产品动态$/, '产品更新').replace(/^活动归档：/, '')
+    .replace(/(重置卡|用量重置)：发放中(?=；|$)/g, '$1：发放消息');
 }
 /** Public reading copy; ingestion metadata remains unchanged in the stored article. */
 function publicArticleSummary(article) {
@@ -298,6 +299,8 @@ function publicArticleSummary(article) {
     .replace('已保存发布说明；完整中文改动会在智能服务可用后自动补充。', '更新细节请查看官方发布说明。')
     .replace(/^公开归档收录(?:产品动态|消息)：[“「]([\s\S]*?)[”」]。此条仅作(?:产品)?消息记录，完整细节请查看原文。$/, '$1')
     .replace(/根据(?:公开归档保存的原帖|公开原文)，/g, '')
+    .replace(/重置卡发放中，适用对象：/g, '发布方称已启动发卡，适用对象：')
+    .replace(/用量重置发放中，适用对象：/g, '发布方称已启动额度重置，适用对象：')
     .replace(/\s*原文发布时间：[^。\n]*。这是中文事实摘要，/g, ' ')
     .replace(/原文最晚期限：北京时间(?=\s*(?:(?:个人|实际)到账|$))/g, '预计为最晚时间，以实际发放为准。')
     .replace(/原文预计时刻：并非最晚截止；北京时间(?=\s*(?:(?:个人|实际)到账|$))/g, '预计时间仅供参考，以实际发放为准。')

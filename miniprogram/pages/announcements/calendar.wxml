@@ -6,8 +6,9 @@
     <view class="record-sheet motion-container">
       <view class="month-calendar motion-step motion-step-0">
         <view class="month-heading">
-          <view><picker mode="selector" range="{{months}}" range-key="label" value="{{monthIndex}}" bindchange="selectMonth"><view class="month-select">{{months[monthIndex].label}} ⌄</view></picker></view>
-          <view class="month-controls"><button aria-label="上个月" disabled="{{monthIndex===months.length-1}}" bindtap="previousMonth">‹</button><button aria-label="下个月" disabled="{{monthIndex===0}}" bindtap="nextMonth">›</button></view>
+          <button class="month-arrow" aria-label="上个月" disabled="{{monthIndex===months.length-1}}" bindtap="previousMonth">‹</button>
+          <picker class="month-choice" mode="selector" range="{{months}}" range-key="label" value="{{monthIndex}}" bindchange="selectMonth"><view class="month-select">{{months[monthIndex].label}} ⌄</view></picker>
+          <button class="month-arrow" aria-label="下个月" disabled="{{monthIndex===0}}" bindtap="nextMonth">›</button>
         </view>
         <view class="month-subtitle">本月全部 · 完成声明 {{confirmedCount}} 条 · 观测日期 {{observedDateCount}} 天</view>
         <view wx:if="{{observedCount}}" class="month-count-note">共 {{observationEvidenceCount}} 条观测报告，可展开查看。</view>
@@ -19,7 +20,7 @@
       <view class="record-detail motion-step motion-step-1">
         <view class="record-heading"><text>{{selectedLabel}}</text><text class="record-count">{{selectedItems.length}} 条记录 · 北京时间</text></view>
         <block wx:for="{{selectedItems}}" wx:key="id">
-          <button class="date-record" aria-label="{{item.title}}，{{item.timeLabel}} {{item.time}}，{{item.statusLabel}}，查看依据" data-path="{{item.path}}" bindtap="navigate"><text class="record-seal {{item.kind}} {{item.evidenceType}}" aria-hidden="true">{{item.evidenceType==='observed'?'◎':'✓'}}</text><view class="record-copy"><view class="record-meta"><text class="record-label {{item.kind}}">{{item.label}}</text><text class="record-status {{item.evidenceType}}">{{item.statusLabel}}</text><text class="record-time">{{item.time}}</text></view><view class="record-title">{{item.title}}</view><view wx:if="{{item.evidenceType==='observed'}}" class="record-source">{{item.isObservationSummary ? item.sourceCount+'个来源 · '+item.timeLabel+' '+item.time : item.sourceName}}</view></view><text class="record-chevron" aria-hidden="true">›</text></button>
+          <button class="date-record" aria-label="{{item.title}}，{{item.timeLabel}} {{item.time}}，{{item.statusLabel}}，查看依据" data-path="{{item.path}}" bindtap="navigate"><text class="record-time">{{item.time}}</text><view class="record-copy"><view class="record-meta"><text class="record-label {{item.kind}}">{{item.label}}</text><text class="record-status {{item.evidenceType}}">{{item.statusLabel}}</text></view><view class="record-title">{{item.title}}</view><view wx:if="{{item.evidenceType==='observed'}}" class="record-source">{{item.isObservationSummary ? item.sourceCount+'个来源 · '+item.timeLabel : item.sourceName}}</view></view><text class="record-chevron" aria-hidden="true">›</text></button>
           <view wx:if="{{item.sources.length>1}}" class="record-sources"><button class="text-button" data-id="{{item.id}}" bindtap="toggleRecordSources" aria-expanded="{{expandedRecord===item.id}}">{{expandedRecord===item.id?'收起':'查看'}} {{item.evidenceCount}} 条来源依据</button><view wx:if="{{expandedRecord===item.id}}"><button wx:for="{{item.sources}}" wx:for-item="source" wx:key="id" class="record-source-link" data-path="{{source.path}}" bindtap="navigate">{{source.title}} · {{source.time}} →</button></view></view>
         </block>
         <view wx:if="{{!selectedItems.length}}" class="date-empty"><view>这一天暂无已收录记录</view><view class="small muted">选择有标记的日期，查看完成声明或来源观测。</view><button wx:if="{{recentDate && recentDate!==selected}}" class="text-button" bindtap="recentRecord">查看最近一次记录 →</button></view>

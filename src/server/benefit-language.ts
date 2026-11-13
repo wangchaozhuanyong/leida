@@ -6,7 +6,7 @@ const resetObject=/\b(?:reset\w*|refill\w*|refresh\w*|replenish\w*)\b|\brestor\w
 const usageObject=/\busage(?:\s+limits?)?\b|\brate\s+limits?\b|\bCodex\s+(?:limits?|quotas?|allowance)\b|\bconsumed\b.{0,30}\bquota\b|用量|使用(?:额度|限制|限额|量)/i;
 export const bankedObject=/\b(?:reserve|stored|saved)\s+(?:resets?|reset\s+cards?)\b|banked\s*(?:resets?|重置)|\bresets?\b[\s.…,:;—-]{1,20}banked\b|^(?:banked(?:\s+resets?)?|重置卡)\s*\d{1,2}\s*(?:\/|of)\s*\d{1,2}[.!。！]?\s*$|reset\s+bank|重置卡|存卡|备用重置|累积(?:重置)?额度/i;
 const benefitNoun=/\b(?:resets?|banked|reserve|stored|saved|usage|limits?|quotas?|allowance)\b|重置|额度|发卡/i;
-const actionVerb=/\b(?:reset\w*|refill\w*|refresh\w*|replenish\w*|restor\w*|giv\w*|grant\w*|load\w*|credit\w*|issu\w*|deliver\w*|send|sent|available|ready|land\w*|complet\w*|propagat\w*)\b|重置|发放|恢复|到账|取消|撤回/i;
+const actionVerb=/\b(?:reset\w*|refill\w*|refresh\w*|replenish\w*|restor\w*|giv\w*|grant\w*|load\w*|credit\w*|issu\w*|deliver\w*|send|sent|available|ready|land\w*|complet\w*|propagat\w*|activat\w*|initiat\w*)\b|重置|发放|恢复|到账|取消|撤回/i;
 
 export function speechDisposition(text:string):'own'|'denied'|'reported'|'uncertain' {
   const s=text.replace(/[’‘]/g,"'").trim();

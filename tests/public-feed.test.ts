@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {publicNewsGroups, homeNewsGroups} from '../src/lib/public-feed';
 import {paginatePublicNews} from '../src/server/public-read';
-import {publicArticleSummary, publicReviewMessage, publicSourceNotes} from '../src/lib/public-content';
+import {publicArticleTitle, publicArticleSummary, publicReviewMessage, publicSourceNotes} from '../src/lib/public-content';
 import {createCloudbasePublicReader} from '../src/server/cloudbase/public-read';
 import {CloudbaseRpc} from '../src/server/cloudbase/rpc';
 import type {PublicData, Publication, ActionStage, ActionKind} from '../src/lib/types';
@@ -74,6 +74,20 @@ test('正文隐藏内部分类与时间换算说明，保留来源限定、日�
   assert.match(publicReviewMessage(p.article),/尚不能确认/);assert.doesNotMatch(publicReviewMessage(p.article),/补抓/);
   const notes=publicSourceNotes(p.article,p.event.actions);assert.ok(notes.includes('预计为最晚时间，以实际发放为准。'));assert.doesNotMatch(notes.join(' '),/字面|夏令时|补抓|未虚构/);assert.ok(notes.includes(publicReviewMessage(p.article)));assert.equal(native.publicArticleSummary(p.article),summary);assert.equal(JSON.stringify(p),before);
   p.article.manualFields=['summary'];assert.equal(publicArticleSummary(p.article),p.article.summary);
+});
+
+test('旧模板的启动消息明确归于发布方，不把发放中作为动态的当前状态',()=>{
+  const p=add(fixture(),'progress','progress','in_progress','banked_reset');
+  const article={...p.article,contentOrigin:'template' as const,title:'重置卡：发放中',
+    summary:'根据公开原文，重置卡发放中，适用对象：Pro。'};
+  const expected='发布方称已启动发卡，适用对象：Pro。';
+  assert.equal(publicArticleTitle(article),'重置卡：发放消息');
+  assert.equal(native.publicArticleTitle(article),publicArticleTitle(article));
+  assert.equal(publicArticleSummary(article),expected);
+  assert.equal(native.publicArticleSummary(article),expected);
+  const manual:Publication['article']={...article,manualFields:['title','summary']};
+  assert.equal(publicArticleTitle(manual),article.title);
+  assert.equal(publicArticleSummary(manual),article.summary);
 });
 
 test('CloudBase复用既有只读轻量接口，分组分页结果与本地读取一致，保留原文入口',async()=>{

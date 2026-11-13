@@ -58,11 +58,12 @@ test('首页单盘显示当前进度，预告不会清空最近完成记录',()=
   const idle=render();assert.match(idle,/pub-home-dashboard/);assert.match(idle,/距离上次重置/);
   assert.doesNotMatch(idle,/pub-dial-face|pub-home-dial/);
   assert.doesNotMatch(idle,/role="tablist"/);
-  assert.ok(idle.indexOf('radar-face')<idle.indexOf('pub-home-card-actions'));
+  assert.match(idle,/class="signal-art" aria-hidden="true"/);
+  assert.ok(idle.indexOf('radar-field')<idle.indexOf('pub-home-card-actions'));
   const pending=structuredClone(publication);pending.id='v2';pending.article.id='article2';pending.article.publicationId='v2';pending.event.id='event2';pending.eventId='event2';pending.event.publicationId='v2';
   pending.event.actions=[{...pending.event.actions[0],id:'new-action',stage:'promised',statementAt:'2026-10-12T04:30:00Z',expectedAt:'2026-10-12T08:20:00Z',timeNote:'原文预计时刻'}];
   data.publications.push(pending);data.events.push(pending.event);data.articles.push(pending.article);
-  const active=render();assert.doesNotMatch(active,/pub-dial-face/);assert.match(active,/3小时20分钟/);assert.match(active,/时间已公布/);
+  const active=render();assert.doesNotMatch(active,/pub-dial-face/);assert.match(active,/3小时20分钟/);assert.match(active,/公开预告/);
   assert.match(active,/查看安排依据/);assert.match(active,/href="\/events\/event2\?version=v2"/);
   assert.doesNotMatch(active,/pub-home-record-evidence/);
   assert.equal((active.match(/class="pub-home-completions"/g)||[]).length,1,'完成记录不因当前预告重复分组');

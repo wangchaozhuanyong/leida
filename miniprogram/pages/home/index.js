@@ -1,7 +1,8 @@
 const { createPage } = require('../../utils/page');
 const m = require('../../utils/model');
 const { homeResetStatus: homeStateCards, selectedHomeStatus, validKind } = require('../../utils/home-reset-status');
-const { statusTimelineModel, countdownParts } = require('../../utils/status-timeline');
+const { statusTimelineModel } = require('../../utils/status-timeline');
+const { homeClock } = require('../../utils/home-orbit');
 function completionDate(value, now) {
   const full = m.completionTime(value);
   if (full === '暂无记录') return full;
@@ -9,15 +10,15 @@ function completionDate(value, now) {
   return `${year}${full.slice(5, 7)}月${full.slice(8, 10)}日 ${full.slice(11, 16)}`;
 }
 // History is a dated message, not a second countdown to another reset.
-function recentMessage(record) {
+function recentMessage(record, now) {
   if (!record) return null;
   const days = Number(record.days), hours = Number(record.hours), minutes = Number(record.minutes);
   const duration = days ? `${days}天${hours ? hours + '小时' : ''}`
-    : hours ? `${hours}小时${minutes ? minutes + '分钟' : ''}` : minutes ? `${minutes}分钟` : '';
+    : hours ? `${hours}小时${minutes ? minutes + '分钟' : ''}` : minutes ? `${minutes}分钟` : homeClock(record.statementAt,now).metric;
   const [dateText, clockText] = record.displayTime.split(' ');
   return {
     publicationId: record.publicationId, sourceType: record.sourceType, sourceName: record.sourceName,
-    dateText, clockText, relativeTime: duration ? `距今 ${duration}` : '刚刚',
+    dateText, clockText, relativeTime: `距今 ${duration}`,
     timeLabel: record.sourceType === 'observed' ? '来源记录时间' : '完成消息时间',
     badge: record.sourceType === 'observed' ? '第三方报告' : '公开完成声明',
     note: record.sourceType === 'observed' ? '依据第三方观测，个人额度以账户为准。' : '依据公开完成消息，个人到账以账户为准。'
@@ -30,7 +31,7 @@ function companion(states,selected) {
   const other=selected===states.primary?states.secondary:states.primary;
   if(!other||other.state==='waiting')return null;
   const kindLabel=other.kind==='banked_reset'?'重置卡发放':'额度重置';
-  return {kind:other.kind,label:kindLabel,sourceUrl:other.sourceUrl||'',sourceName:other.sourceName||'',note:[other.hero.badge,other.time].filter(Boolean).join(' · ')};
+  return {kind:other.kind,label:kindLabel,sourceUrl:other.sourceUrl||'',sourceName:other.sourceName||'',note:other.roundNotice?.label||[other.hero.badge,other.time].filter(Boolean).join(' · ')};
 }
 Page(createPage((data, query, page, app) => {
   if (!data) return { name: '模钥重置雷达', latest: null, completions: [], pending: null, forecast: null, recent: [], activity: null, sharePath: '', timeline: null, posterPath: '', posterDescription: '' };
@@ -57,8 +58,8 @@ Page(createPage((data, query, page, app) => {
     primaryCard:selected,secondaryCard:companion(states,selected),resetCards:states.cards,untypedSignal:states.untyped,stateWarning:states.sourceWarning,signalExpiredNote:states.expiredNote,selectedResetKind,
     bankedResetUnread:!!page.entryKind&&selectedResetKind!=='banked_reset'&&!!app.homeTabNotices?.unread(states.cards,data),
     historicalProbability: m.referenceCadenceView(data.forecasts?.referenceCadence,data.serverTime),
-    lastReset: recentMessage(selectedResetKind==='banked_reset'?states.lastCard:states.lastReset),
-    latest: latest ? { title: latest.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', elapsed: m.elapsed(latest.statementAt, data.serverTime), time: m.completionTime(latest.statementAt), eligibility: latestAction.eligibility, path: pathFor(latest) } : null,
+    lastReset: recentMessage(selectedResetKind==='banked_reset'?states.lastCard:states.lastReset,data.serverTime),
+    latest: latest ? { title: latest.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', elapsed: homeClock(latest.statementAt,data.serverTime).metric, time: m.completionTime(latest.statementAt), eligibility: latestAction.eligibility, path: pathFor(latest) } : null,
     completions: m.recentCompletedBenefits(data).map(item => ({ id:item.action.id, kind: item.action.kind, title: item.action.kind === 'banked_reset' ? '公告称已发放重置卡' : '公告称已重置用量', label: item.action.kind === 'banked_reset' ? '重置卡发放' : '用量重置', time: m.completionTime(item.action.statementAt), shortTime: completionDate(item.action.statementAt, data.serverTime), path: pathFor({ publicationId: item.publication.id }) })),
     evidencePath: pathFor(pending || latest) || '/pages/announcements/index',
     evidenceLabel: pending ? '查看本次公告' : latest ? '查看最近公告' : '浏览历史记录',
@@ -103,7 +104,7 @@ Page(createPage((data, query, page, app) => {
   currentHomeStatus() { const state=getApp().client.getState();if(!state.data||state.snapshotPending)return null;const now=new Date(Date.parse(state.data.serverTime)+Math.max(0,Date.now()-(state.receivedAt||Date.now()))).toISOString();return focusFor(homeStateCards(state.data,now),this.data.entryKind); },
   openPoster() { if(this.data.snapshotPending){wx.showToast({title:'更新最新消息后可分享',icon:'none'});return;}const card=this.data.connected&&this.currentHomeStatus();if(card)wx.navigateTo({url:'/packages/poster/index?kind='+card.kind+(this.data.entryKind?'':'&focus=auto')+'&revision='+encodeURIComponent(card.revision),fail(){wx.showToast({title:'海报页面加载失败，请重试。',icon:'none'});} }); },
   syncCountdown() {
-    if (!this.data.lastReset && !this.data.resetCards?.some(card=>['scheduled','revised','overdue'].includes(card.state)||(card.state==='progress'&&card.expectedAt)||(card.state==='estimated'&&card.metric)||(card.kind===this.data.selectedResetKind&&['completed','observed'].includes(card.state))) && !(this.data.pending && this.data.pending.counting) && !(this.data.timeline && (this.data.timeline.completed || this.data.timeline.scheduled))) { this.stopCountdown(); return; }
+    if (!this.data.lastReset && !this.data.resetCards?.some(card=>card.validUntil||card.kind===this.data.selectedResetKind&&card.clockAt)) { this.stopCountdown(); return; }
     if (!this._countdownTimer) this._countdownTimer = setInterval(() => this.tickCountdown(), 1000);
   },
   tickCountdown() {
@@ -159,7 +160,7 @@ Page(createPage((data, query, page, app) => {
     const selected=focusFor(states,this.data.entryKind);
     for(const [key,value] of Object.entries({primaryCard:selected,selectedResetKind:selected.kind,secondaryCard:companion(states,selected)}))if(JSON.stringify(this.data[key])!==JSON.stringify(value))patch[key]=value;
     for(const [key,value] of Object.entries({shareTitle:selected.shareTitle,sharePath:selected.sharePath}))if(this.data[key]!==value)patch[key]=value;
-    const history=recentMessage(selected.kind==='banked_reset'?states.lastCard:states.lastReset);
+    const history=recentMessage(selected.kind==='banked_reset'?states.lastCard:states.lastReset,now);
     if(!history||!this.data.lastReset){if(JSON.stringify(history)!==JSON.stringify(this.data.lastReset))patch.lastReset=history;}
     else for(const [key,value] of Object.entries(history))if(value!==this.data.lastReset[key])patch['lastReset.'+key]=value;
     return patch;
@@ -168,9 +169,10 @@ Page(createPage((data, query, page, app) => {
   openSecondary(event) {
     const card=this.data.resetCards.find(item=>item.kind===event.currentTarget.dataset.kind);
     if(!card)return;
+    if(card.roundNotice?.basis){this.selectResetKind(event);return;}
     if(card.observationSummaryDate || card.publicationId){
       if(card.observationSummaryDate)wx.navigateTo({url:card.sharePath});
-      else wx.navigateTo({url:'/pages/detail/index?publicationId='+encodeURIComponent(card.publicationId)});
+      else wx.navigateTo({url:'/pages/detail/index?publicationId='+encodeURIComponent(card.timingPublicationId||card.publicationId)});
     }else if(card.sourceUrl) this.setData({expandedSourceKind:this.data.expandedSourceKind===card.kind?'':card.kind});
     else wx.switchTab({url:'/pages/news/index'});
   },
@@ -178,10 +180,10 @@ Page(createPage((data, query, page, app) => {
     const kind=event.currentTarget.dataset.kind,card=kind==='untyped'?this.data.untypedSignal:this.data.resetCards.find(item=>item.kind===kind);
     if(!card)return;
     if(card.observationSummaryDate){wx.navigateTo({url:'/pages/schedule/index?date='+encodeURIComponent(card.observationSummaryDate)+'&kind='+card.kind});return;}
-    if(card.expiredRound||card.state==='waiting'&&!card.publicationId){wx.switchTab({url:'/pages/announcements/index'});return;}
     if(card.completedDisplay&&card.publicationId){wx.navigateTo({url:'/pages/detail/index?publicationId='+encodeURIComponent(card.publicationId),fail(){wx.showToast({title:'记录加载失败，请重试',icon:'none'});}});return;}
+    if(card.state==='waiting'&&!card.publicationId){wx.switchTab({url:'/pages/announcements/index'});return;}
     if(card.sourceName){this.setData({expandedSourceKind:this.data.expandedSourceKind===kind?'':kind});return;}
-    if(card.publicationId)wx.navigateTo({url:'/pages/detail/index?publicationId='+encodeURIComponent(card.publicationId)});
+    if(card.publicationId)wx.navigateTo({url:'/pages/detail/index?publicationId='+encodeURIComponent(card.timingPublicationId||card.publicationId)});
     else wx.switchTab({url:'/pages/news/index'});
   },
   openLastReset() { if(this.data.lastReset?.publicationId)wx.navigateTo({url:'/pages/detail/index?publicationId='+encodeURIComponent(this.data.lastReset.publicationId),fail(){wx.showToast({title:'消息详情加载失败，请重试',icon:'none'});}}); },

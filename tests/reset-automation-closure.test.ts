@@ -79,8 +79,8 @@ test('发卡与额度一样保留上次完成计时，24小时与7天不会自�
 test('an in-progress statement with an explicit deadline still counts down for both benefit kinds',()=>{
  for(const kind of ['automatic_reset','banked_reset'] as ActionKind[]){
   const d=fixture(kind,time(.1));add(d,'next',kind,'in_progress',time(.1),time(.2));
-  const c=selectedHomeStatus(d,kind);assert.equal(c.state,'progress');assert.equal(c.hero.label,'距离预计完成时间');assert.ok(c.hero.parts.length);assert.equal(c.hero.metric,c.metric);
-  const late=selectedHomeStatus(d,kind,time(.3));assert.equal(late.state,'overdue');assert.match(late.hero.description,/已宣布开始/);
+  const c=selectedHomeStatus(d,kind);assert.equal(c.state,'scheduled');assert.match(c.hero.label,/距离预计/);assert.ok(c.hero.parts.length);assert.equal(c.hero.metric,c.metric);
+  const late=selectedHomeStatus(d,kind,time(.3));assert.equal(late.state,'overdue');assert.equal(late.hero.label,'原预计时间已过');assert.ok(late.hero.parts.length);
  }
 });
 

@@ -1,27 +1,99 @@
-/* Motion adapted from Magic UI Orbiting Circles, MIT. See Magic-UI-LICENSE.txt.
-   Upstream 43c0915a4e319e1eb037c55f7714f488c9ad238d, registry orbit keyframes. */
-.radar-panel{--ink:#162945;--accent:#3565a9;--mist:#d6e6fb;--face:#f5f8fd;position:relative;background:linear-gradient(155deg,#fff 8%,var(--face) 63%,#fff);border:1px solid #d3ddec;border-radius:18px;overflow:hidden;color:var(--ink);box-shadow:0 5px 18px #1c38500a}
-.radar-panel.kind-banked_reset{--accent:#7054a2;--mist:#e6ddf5;--face:#f8f6fc}
-.radar-mast{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 16px;padding:14px 0 10px;border-bottom:1px solid #e2e8f1}
-.radar-name{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:16px;font-weight:600}
-.radar-mark{width:10px;height:10px;box-sizing:border-box;border:2px solid var(--accent);border-radius:50%}
-.radar-basis{font-size:12px;color:var(--accent)}
-.radar-field{height:248px;position:relative;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 46%,var(--mist) 0%,transparent 65%)}
-.radar-face{--radius:100px;position:relative;width:224px;height:224px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:50%;background:linear-gradient(140deg,#fff 0%,var(--mist) 32%,#9dacc494 42%,#fff 51%,var(--mist) 75%,#fff 93%);box-shadow:0 4px 15px #35577c14,inset 0 0 0 1px #a7b9cd65}
-.radar-face::before,.radar-face::after{content:"";position:absolute;border-radius:50%;pointer-events:none}
-.radar-face::before{inset:3px;background:repeating-conic-gradient(from 0deg,#798fa866 0deg 0.6deg,transparent 0.6deg 6deg)}
-.radar-face::after{inset:8px;border:1px solid #cad7e6;background:radial-gradient(circle at 34% 24%,#fff 8%,var(--face) 72%,var(--mist));box-shadow:inset 0 0 0 5px #ffffff82,inset 0 0 0 6px #c6d5e74d}
-.radar-pearl{position:absolute;left:50%;top:50%;width:7px;height:7px;margin:-3.5px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--mist),0 0 8px var(--accent);z-index:1;transform:rotate(-42deg) translateY(var(--radius)) rotate(42deg);animation:radar-orbit 26s linear infinite;animation-play-state:paused}
-.radar-panel.is-live .radar-pearl{animation-play-state:running}
-@keyframes radar-orbit{from{transform:rotate(-42deg) translateY(var(--radius)) rotate(42deg)}to{transform:rotate(318deg) translateY(var(--radius)) rotate(-318deg)}}
-.radar-readout{position:relative;z-index:2;text-align:center;max-width:174px}
-.radar-caption{color:#475c79;font-size:13px;line-height:20px;font-weight:500}
-.radar-value{display:flex;align-items:baseline;justify-content:center;gap:8px;margin:6px auto;color:var(--ink);font-variant-numeric:tabular-nums}
-.radar-number{font-size:35px;font-weight:600;letter-spacing:-1px;line-height:1.2}
-.radar-unit{display:block;font-size:11px;line-height:18px;color:#5c708a;letter-spacing:0;font-weight:400}
-.radar-value.long .radar-number{font-size:27px}
-.radar-verdict{font-size:20px;font-weight:600;line-height:1.4;overflow-wrap:anywhere}
-.radar-panel .orbit-facts{border:0;border-radius:0;background:#ffffff9c}
-.radar-secondary{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:44px;margin:0;padding:8px 16px;background:#f4f7fb;border:0;border-radius:0;color:#334f76;font-size:13px;text-align:left;line-height:20px}
-.radar-secondary::after{border:0}
-@media(prefers-reduced-motion:reduce){.radar-panel .radar-pearl{animation:none}}
+/* The paper surface keeps the fold artwork behind a clear, flexible clock. */
+.radar-panel {
+  --ink: #182933;
+  --accent: #315caa;
+  position: relative;
+  overflow: hidden;
+  background: #f8f9f7;
+  border: 1px solid #cbd4d0;
+  border-radius: 16px;
+  color: var(--ink);
+}
+.radar-panel.kind-banked_reset { --accent: #684d91; }
+.radar-mast {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  margin: 0 20px;
+  padding: 20px 0 0;
+}
+.radar-name { display: flex; align-items: center; gap: 8px; color: var(--accent); font-size: 13px; font-weight: 600; }
+.radar-mark { flex: none; width: 6px; height: 6px; background: var(--accent); border-radius: 50%; }
+.radar-basis { margin-left: auto; color: var(--accent); font-size: 13px; text-align: right; }
+.radar-field {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 260px;
+  padding: 24px 16px;
+  box-sizing: border-box;
+}
+.signal-art { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.signal-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, #f8f9f7 32%, #f8f9f7de 54%, #f8f9f700 78%);
+}
+.signal-wing { position: absolute; width: 280px; height: 192px; top: 50%; margin-top: -96px; }
+.signal-wing-left { left: -150px; transform: rotate(-24deg); }
+.signal-wing-right { right: -150px; transform: rotate(156deg); }
+.signal-fold {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: .72;
+  animation: signal-fold-breathe 20s ease-in-out infinite alternate paused;
+}
+.signal-wing-right .signal-fold { animation-delay: -10s; }
+.radar-panel.is-live .signal-fold { animation-play-state: running; }
+@keyframes signal-fold-breathe {
+  from { transform: translateX(-5px) translateY(-3px); opacity: .60; }
+  to { transform: translateX(5px) translateY(3px); opacity: .82; }
+}
+.radar-readout { position: relative; width: 100%; max-width: 360px; min-width: 0; text-align: center; }
+.radar-caption { color: var(--ink); font-size: 23px; font-weight: 600; line-height: 1.45; overflow-wrap: anywhere; }
+.radar-value {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 14px auto 0;
+  font-variant-numeric: tabular-nums;
+}
+.radar-number { flex: 0 1 46%; min-width: 0; font-size: 66px; font-weight: 500; letter-spacing: -.055em; line-height: 1.1; }
+.radar-unit { display: block; margin-top: 5px; color: #53636b; font-size: 13px; font-weight: 400; letter-spacing: 0; line-height: 1.5; }
+.radar-value.with-days .radar-number { flex: 1; font-size: 48px; }
+.radar-value.long .radar-number { font-size: 40px; }
+.radar-verdict { font-size: 25px; font-weight: 600; line-height: 1.45; overflow-wrap: anywhere; }
+.radar-secondary {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 10px 20px;
+  border: 0;
+  border-top: 1px solid #dbe0df;
+  border-radius: 0;
+  background: #edf1ef;
+  color: #314f62;
+  font-size: 13px;
+  text-align: left;
+  line-height: 1.6;
+}
+.radar-secondary::after { border: 0; }
+@media (max-width: 360px) {
+  .radar-mast { margin-left: 16px; margin-right: 16px; }
+  .radar-field { min-height: 238px; padding-left: 12px; padding-right: 12px; }
+  .radar-number { font-size: 60px; }
+  .radar-value.with-days .radar-number { font-size: 40px; }
+  .radar-value.long .radar-number { font-size: 34px; }
+}
+@media (prefers-reduced-motion: reduce) { .signal-fold { animation: none; } }

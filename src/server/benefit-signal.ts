@@ -1,6 +1,6 @@
 import {ownBenefitClause} from './benefit-language';
 import type { BenefitAction, Evidence } from '../lib/types';
-import { benefitClauses, benefitKinds, benefitStage, benefitTime, extractBenefitClaims, eligibilityKey, isTruncatedBenefitText, type BenefitClaim } from './benefit-rules';
+import { benefitClauses, benefitKinds, benefitStage, benefitTime, extractBenefitClaims, eligibilityKey, isBankedRolloutActivation, isTruncatedBenefitText, type BenefitClaim } from './benefit-rules';
 
 export const UNKNOWN_BENEFIT_AUDIENCE = '适用范围未说明';
 const clean = (s:string) => s.replace(/https?:\/\/\S+/g, '').replace(/[’‘]/g,"'").replace(/\s+/g,' ').trim();
@@ -11,7 +11,9 @@ export function originalBenefitSignal(item:Evidence):BenefitClaim[] {
   return benefitClauses(item.text).flatMap(quote => {
     if(!ownBenefitClause(item.text,quote))return [];
     const kinds=benefitKinds(quote),stage=benefitStage(quote);
-    if(kinds.length!==1||!stage||extractBenefitClaims(quote,item.publishedAt).length||
+    // A bare activation may be a user applying a saved card. Require the
+    // recipient evidence used by the regular claim extractor for this wording.
+    if(kinds.length!==1||!stage||isBankedRolloutActivation(quote)||extractBenefitClaims(quote,item.publishedAt).length||
       /\b(?:no|not|never|if|unless|only|except|excluding|selected|specific|affected|users?|accounts?|plans?|groups?|cohorts?|teams?|members?|subscribers?|paid|free|plus|pro|business|regions?|countr\w*|eligible|someone|report\w*|rumou?r\w*|said|says|my|your|our)\b|部分|个人|付费|免费|套餐|账户|用户|据说|传闻|否认|取消了传闻/i.test(quote))return [];
     // An unparsed recipient/condition is not a missing recipient. Preserve
     // it for review instead of silently dropping e.g. 'for UK' or 'without X'.

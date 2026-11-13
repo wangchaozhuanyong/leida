@@ -2,12 +2,12 @@ const {preserveNativeReturn}=require('../../utils/entry-navigation');
 const { createPage } = require('../../utils/page');
 const { noticeModel } = require('../../utils/model');
 // Bundled client version; keep this aligned with the development-tool upload.
-const buildVersion = '1.0.91';
+const buildVersion = '1.0.92';
 Page(createPage((data, query, page, app) => {
   const stored=app.preferences.snapshot(),notices=data?noticeModel(data,stored.preferences,stored.read):[];
   const state=app.wechat?.getState();
   const reveal=page.awaitingWechat&&!!(state?.safe||state?.error||state?.privacyNeeded);
-  return { notices:notices.slice(0,3),unread:notices.filter(n=>!n.read).length,storageError:stored.error,
+  return { notices:notices.slice(0,3).map(notice=>({...notice,date:notice.time.slice(0,10)})),unread:notices.filter(n=>!n.read).length,storageError:stored.error,
     awaitingWechat:page.awaitingWechat&&!reveal,...(reveal?{wechat:state}:{}) };
 }, { view:()=>({view:'notices'}),presentable(patch){return !patch.awaitingWechat;},data: { awaitingWechat:true,wechatAction:'',notices:[],unread:0,storageError: '', clientVersion:buildVersion, wechat:{safe:null,label:'加载中',busy:true,ready:false,canPrepare:false,canRevoke:false,error:'',privacyNeeded:false} },
   load(){

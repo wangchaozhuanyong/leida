@@ -91,3 +91,15 @@
 .recent-reset-more{width:100%;min-height:46px;margin:0;padding:12px 0;background:transparent;color:#3467c5;font-size:13px;font-weight:500;line-height:22px;border-radius:0;border-top:1px solid #edf1f7}
 .recent-reset-more::after{border:0}
 .recent-reset-end{padding:16px 0;font-size:11px;color:#4d607b;text-align:center;border-top:1px solid #edf1f7;line-height:1.6}
+.records-page { padding: 12px 20px 32px; background: #f8f9f7; color: #182933; }
+.records-page .record-sheet, .records-page .recent-reset-sheet { border-color: #dbe0df; background: transparent; }
+.records-page .month-heading { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 8px; }
+.records-page .month-choice { min-width: 0; }
+.records-page .month-select { max-width: none; justify-content: center; text-align: center; color: #182933; }
+.records-page .month-arrow { width: 44px; height: 44px; padding: 0; background: transparent; color: #315caa; font-size: 27px; }
+.records-page .month-arrow[disabled] { color: #77838a; opacity: .58; }
+.records-page .month-subtitle, .records-page .month-count-note { margin: 0 0 6px; text-align: center; color: #53636b; }
+.records-page .date-record { align-items: flex-start; }
+.records-page .date-record > .record-time { flex: 0 0 42px; margin: 0; text-align: left; color: #53636b; font-variant-numeric: tabular-nums; }
+.records-page .date-record .record-title { font-size: 15px; color: #182933; }
+@media (max-width: 360px) { .records-page { padding-left: 16px; padding-right: 16px; } }
