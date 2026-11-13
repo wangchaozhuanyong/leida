@@ -1,19 +1,38 @@
-const { countdownParts } = require('./status-timeline');
+const BEIJING = 8 * 3600000;
+const DAY = 86400000;
+
+// Calendar units are display-only. Deadlines and occurrence anchors stay unchanged.
+function addMonths(at, months) {
+  const date = new Date(at + BEIJING), day = date.getUTCDate();
+  date.setUTCDate(1);
+  date.setUTCMonth(date.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
+  date.setUTCDate(Math.min(day, lastDay));
+  return date.getTime() - BEIJING;
+}
 
 function homeClock(at, now, down = false) {
   const start = Date.parse(at), current = Date.parse(now);
   const duration = down ? start - current : current - start;
-  if (!Number.isFinite(duration) || duration < 0) return {parts: [], metric: ''};
-  if (duration < 60000) {
-    const seconds = down ? Math.min(59, Math.ceil(duration / 1000)) : Math.floor(duration / 1000);
-    return {parts: [{unit: '秒', value: String(seconds).padStart(2, '0')}], metric: seconds + '秒'};
-  }
-  const durationParts = down ? countdownParts(at, now) : countdownParts(now, at);
-  const units = durationParts.some(part => part.unit === '天') ? ['天', '小时', '分钟'] : ['小时', '分钟'];
-  return {
-    parts: units.map(unit => ({unit, value: String(durationParts.find(part => part.unit === unit)?.value || 0).padStart(2, '0')})),
-    metric: durationParts.map(({unit, value}) => value + unit).join(''),
-  };
+  if (!Number.isFinite(duration) || duration < 0) return {parts: [], calendarParts: [], timeParts: [], metric: ''};
+  const from = down ? current : start;
+  const end = from + (down ? Math.ceil(duration / 1000) : Math.floor(duration / 1000)) * 1000;
+  const a = new Date(from + BEIJING), b = new Date(end + BEIJING);
+  let months = (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + b.getUTCMonth() - a.getUTCMonth();
+  if (addMonths(from, months) > end) months--;
+  const years = Math.floor(months / 12), month = months % 12;
+  let rest = end - addMonths(from, months);
+  const days = Math.floor(rest / DAY); rest %= DAY;
+  const hours = Math.floor(rest / 3600000); rest %= 3600000;
+  const minutes = Math.floor(rest / 60000), seconds = Math.floor(rest % 60000 / 1000);
+  const calendarParts = [];
+  if (years) calendarParts.push({unit: '年', value: String(years)});
+  if (months) calendarParts.push({unit: '个月', value: String(month)});
+  if (months || days) calendarParts.push({unit: '天', value: String(days)});
+  const timeParts = [{unit: '小时', value: hours}, {unit: '分钟', value: minutes}, {unit: '秒', value: seconds}]
+    .map(part => ({unit: part.unit, value: String(part.value).padStart(2, '0')}));
+  const parts = [...calendarParts, ...timeParts];
+  return {parts, calendarParts, timeParts, metric: parts.map(({unit, value}) => Number(value) + unit).join('')};
 }
 
 // The same clock displays time until a deadline and time since it or an occurrence.
@@ -21,7 +40,7 @@ function homeOrbitPresentation(card, now) {
   const banked = card.kind === 'banked_reset';
   const subject = banked ? '发卡' : '重置';
   const view = {title: '暂无新消息', label: '', badge: '', tone: 'slate',
-    description: '', footnote: '', parts: [], metric: '', long: false, animated: true,
+    description: '', footnote: '', parts: [], calendarParts: [], timeParts: [], metric: '', long: false, animated: true,
     timeLabel: card.timeLabel || '', symbol: '◎'};
   switch (card.state) {
     case 'signal':

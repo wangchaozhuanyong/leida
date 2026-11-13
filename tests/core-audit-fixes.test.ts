@@ -146,13 +146,13 @@ test('核验原文中的发卡暗示进入首页主卡，窗口关闭后冷加�
  assert.equal(home.primary.kind,'banked_reset');
  assert.equal(home.primary.state,'estimated');
  assert.equal(home.primary.hero.title,'周四可能发放');
- assert.equal(home.primary.hero.metric,'1天20小时0分钟');
+ assert.equal(home.primary.hero.metric,'1天20小时0分钟0秒');
  assert.equal(home.primary.hero.label,'距推测窗口结束');
  assert.equal(home.primary.timeLabel,'推测窗口结束');
  assert.equal(home.primary.time,'2026-11-13 16:00');
  assert.equal(home.primary.validUntil,'2026-11-13T08:00:00.000Z');
  const oneMinuteLater=homeResetStatus(d,'2026-11-11T12:01:00.000Z').primary;
- assert.equal(oneMinuteLater.hero.metric,'1天19小时59分钟');
+ assert.equal(oneMinuteLater.hero.metric,'1天19小时59分钟0秒');
  assert.equal(oneMinuteLater.revision,home.primary.revision);
  assert.equal(home.primary.sourceUrl,url);
  assert.equal(home.untyped,null);
@@ -161,7 +161,7 @@ test('核验原文中的发卡暗示进入首页主卡，窗口关闭后冷加�
  const end='2026-11-13T08:00:00.000Z';
  const lastMoment=homeResetStatus(d,'2026-11-13T07:59:59.999Z').primary;
  assert.equal(lastMoment.state,'estimated');
- assert.equal(lastMoment.hero.metric,'1秒');
+ assert.equal(lastMoment.hero.metric,'0小时0分钟1秒');
 
  const delivered=previousCardCompletion('2026-11-12T17:00:00.000Z','new-banked');
  const afterDelivery=facts(older,quota,delivered);
@@ -172,11 +172,11 @@ test('核验原文中的发卡暗示进入首页主卡，窗口关闭后冷加�
  assert.equal(switched.kind,'banked_reset');
  assert.match(switched.hero.badge,/已发放/);
  assert.equal(switched.hero.title,'距离上次发卡');
- assert.equal(switched.hero.metric,'20分钟');
+ assert.equal(switched.hero.metric,'0小时20分钟0秒');
  assert.equal(switched.publicationId,delivered.id);
  assert.notEqual(switched.revision,home.primary.revision);
  const past=homeResetStatus(d,end).cards.find(card=>card.kind==='banked_reset');
- assert.equal(past?.state,'overdue');assert.equal(past?.hero.metric,'0秒');assert.equal(past?.hero.label,'推测窗口已过');
+ assert.equal(past?.state,'overdue');assert.equal(past?.hero.metric,'0小时0分钟0秒');assert.equal(past?.hero.label,'推测窗口已过');
  assert.equal(projectReferenceSignal(signal,[{...source,lastSuccessAt:end,referenceSnapshotAt:end}],end)?.hint?.expiresAt,end);
  const limit='2026-11-14T08:00:00.000Z',closed=homeResetStatus(d,limit).cards.find(card=>card.kind==='banked_reset');
  assert.equal(closed?.state,'completed');assert.equal(closed?.roundNotice?.label,'本轮发卡预测已结束');
@@ -255,7 +255,7 @@ test('不等第三方标注：已核验的父帖给短回复提供类别，回�
  assert.equal(main.state,'estimated');
  assert.equal(main.parentSourceUrl,parent.url);
  assert.equal(main.hero.title,'周四可能发放');
- assert.equal(main.hero.metric,'1天12小时0分钟');
+ assert.equal(main.hero.metric,'1天12小时0分钟0秒');
  assert.equal(announced.event.actions[0].stage,'promised');
  announced.event.actions[0].expectedAt='2026-11-12T23:00:00.000Z';
  d.forecasts.outlook=publicResetOutlook(d);

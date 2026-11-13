@@ -148,6 +148,6 @@ test('预告海报圈内标签保留安全宽度，单位随数字显示，预�
     const svg=currentStatusPosterSvg(value,now,snapshot.round,style);assert.match(svg,/>13:00<\/text>/);assert.ok(svg.includes(snapshot.value));assert.equal(snapshot.unit,'');
     const layout=nativePoster.createStatusPosterLayout(mini,measure,style);
     assert.ok(layout.commands.some((c:any)=>c.value==='13:00'||c.value==='13:00 · 北京时间'));
-    if(style==='precision'){const label=layout.commands.find((c:any)=>c.value===mini.label);assert.ok(measure(label.value,label.size)<=390.01);const duration=layout.commands.find((c:any)=>c.value===mini.value);assert.ok(measure(duration.value,duration.size)<=730.01);}
+    if(style==='precision'){const label=layout.commands.find((c:any)=>c.value===mini.label);assert.ok(measure(label.value,label.size)<=390.01);const duration=layout.commands.find((c:any)=>c.value===mini.clockParts.filter((p:any)=>['小时','分钟','秒'].includes(p.unit)).map((p:any)=>p.value).join(' : '));assert.ok(measure(duration.value,duration.size)<=730.01);}
   }
 });

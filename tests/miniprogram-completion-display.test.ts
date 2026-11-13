@@ -30,7 +30,7 @@ function nativeHome(data:PublicData) {
   return module.exports;
  }
  load(resolve(root,'miniprogram/pages/home/index.js'));
- const page={...definition,data:structuredClone(definition.data),setData(patch:object){for(const [key,value] of Object.entries(patch)){const path=key.split('.');let target:any=this.data;for(const part of path.slice(0,-1)){target[part]??={};target=target[part];}target[path.at(-1)!]=value;}}};
+ const page={...definition,data:structuredClone(definition.data),setData(patch:object){for(const [key,value] of Object.entries(patch)){const path=key.replace(/\[(\d+)\]/g,'.$1').split('.');let target:any=this.data;for(const part of path.slice(0,-1)){target[part]??={};target=target[part];}target[path.at(-1)!]=value;}}};
  page.onLoad({});page.onShow();
  return {page,timers,navigations,advance(ms:number){advance+=ms;[...timers.values()].forEach(fn=>fn());},refresh(){listener(state());}};
 }
@@ -117,12 +117,12 @@ test('首页紧凑完成记录使用北京时间，跨年保留年份且不冒�
  assert.equal(h.page.data.completions[0].title,'公告称已重置用量');h.page.onUnload();
 });
 
-test('最近消息不为秒数跨原生桥发更新，分钟变化只传主卡与相对时长',()=>{
+test('主卡按秒原位更新，最近消息只在分钟改变时更新相对时长',()=>{
  const h=nativeHome(fixture([publication('reset','automatic_reset','2026-10-13T05:45:00Z')]));
  const changes:Record<string,unknown>[]=[],original=h.page.setData.bind(h.page),before=h.page.data.completions;
  h.page.setData=(patch:Record<string,unknown>)=>{changes.push(patch);original(patch);};
- h.advance(1000);assert.equal(changes.length,0);assert.equal(h.page.data.lastReset.relativeTime,'距今 2小时15分钟');
- h.advance(59000);assert.equal(changes.length,1);assert.deepEqual(Object.keys(changes[0]),['resetCards','primaryCard','lastReset.relativeTime']);assert.equal(h.page.data.resetCards[0].metric,'2小时16分钟');
+ h.advance(1000);assert.equal(changes.length,1);assert.ok(!Object.keys(changes[0]).includes('lastReset.relativeTime'));assert.equal(h.page.data.lastReset.relativeTime,'距今 2小时15分钟');
+ h.advance(59000);assert.equal(changes.length,2);assert.ok(Object.keys(changes[1]).includes('lastReset.relativeTime'));assert.ok(!Object.keys(changes[1]).some(k=>['resetCards','primaryCard','completions'].includes(k)));assert.equal(h.page.data.resetCards[0].metric,'2小时16分钟0秒');
  assert.equal(h.page.data.completions,before);assert.equal(h.page.data.lastReset.relativeTime,'距今 2小时16分钟');h.page.onUnload();
 });
 
@@ -143,7 +143,7 @@ test('原生首页切换类型同时切换最近消息和链接，返回与刷�
  assert.equal(h.page.data.selectedResetKind,'banked_reset');assert.equal(h.page.data.lastReset.relativeTime,'距今 35分钟');
  h.page.openLastReset();assert.equal(h.navigations.at(-1),'/pages/detail/index?publicationId=card');
  const changes:Record<string,unknown>[]=[],original=h.page.setData.bind(h.page);h.page.setData=(patch:Record<string,unknown>)=>{changes.push(patch);original(patch);};
- h.advance(1000);assert.equal(h.page.data.lastReset.relativeTime,'距今 35分钟');assert.equal(changes.length,0);
+ h.advance(1000);assert.equal(h.page.data.lastReset.relativeTime,'距今 35分钟');assert.equal(changes.length,1);assert.ok(!Object.keys(changes[0]).includes('lastReset.relativeTime'));
  h.page.onHide();h.advance(60000);h.page.onShow();
  assert.equal(h.page.data.selectedResetKind,'banked_reset');assert.equal(h.page.data.lastReset.relativeTime,'距今 36分钟');
  h.refresh();assert.equal(h.page.data.lastReset.publicationId,'card');assert.equal(h.page.data.lastReset.relativeTime,'距今 36分钟');

@@ -85,7 +85,7 @@ test('真实周四发卡原帖回放，晚到观测更新首页、转发与两�
  assert.equal(first.hero.title,'周四可能发放');
  assert.equal(first.expectedAt,'2026-11-13T08:00:00.000Z');
  assert.equal(Date.parse(first.expectedAt)-Date.parse(AT),44*HOUR);
- assert.equal(first.hero.metric,'1天20小时0分钟');
+ assert.equal(first.hero.metric,'1天20小时0分钟0秒');
  assert.equal(statusPosterInput(before,'banked_reset').shareTitle,first.shareTitle);
  const during=data(before.forecasts!.referenceSignals!,'2026-11-12T22:30:00.000Z',publicObservation,evidence);
  assert.equal(homeResetStatus(during).primary.state,'estimated');
@@ -143,7 +143,7 @@ test('无时间从第一条有效原帖算48小时，转述、重试与过期后
  const older=earlierCompletion(shifted(ORIGIN,-20));
  const view=data(signals,at,older);
  assert.equal(homeResetStatus(view).primary.metricLabel,'距离观察窗口结束');
- assert.equal(homeResetStatus(view).primary.hero.metric,'1天18小时0分钟');
+ assert.equal(homeResetStatus(view).primary.hero.metric,'1天18小时0分钟0秒');
  const reloaded=data(referencePublicSignals([lateRepeat,copy,repeat,first],sources,shifted(ORIGIN,50)),shifted(ORIGIN,50),older);
  const boundary=cardAt(view,'banked_reset',end);
  assert.equal(boundary.state,'completed');

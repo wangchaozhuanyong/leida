@@ -39,7 +39,7 @@ function nativeHome(data=fixture()) {
     return module.exports;
   }
   load(resolve(root,'miniprogram/pages/home/index.js'));
-  const page={...definition,data:structuredClone(definition.data),setData(patch:Record<string,unknown>){for(const [key,value] of Object.entries(patch)){const parts=key.split('.');let target=this.data;for(const part of parts.slice(0,-1))target=target[part];target[parts.at(-1)!]=value;}}};
+  const page={...definition,data:structuredClone(definition.data),setData(patch:Record<string,unknown>){for(const [key,value] of Object.entries(patch)){const parts=key.replace(/\[(\d+)\]/g,'.$1').split('.');let target=this.data;for(const part of parts.slice(0,-1))target=target[part];target[parts.at(-1)!]=value;}}};
   page.onLoad({});page.onShow();
   return {page,navigations,toasts,timers};
 }
@@ -51,7 +51,7 @@ test('可信观测使首页进入已重置并从来源时间计时，主按钮�
     const card=h.page.data.resetCards.find((item:{kind:string})=>item.kind==='automatic_reset');
     assert.equal(card.state,'observed');assert.equal(card.completedDisplay,true);assert.equal(card.title,'额度已重置');
     assert.equal(card.publicationId,'observed-reset');assert.equal(card.timeAt,observedAt);assert.equal(card.clockText,'01:40');
-    assert.equal(card.metric,'1小时53分钟');assert.equal(card.hero.title,'距离上次重置（观测）');assert.equal(card.dialStatus,'依据第三方观测');
+    assert.equal(card.metric,'1小时53分钟0秒');assert.equal(card.hero.title,'距离上次重置（观测）');assert.equal(card.dialStatus,'依据第三方观测');
     assert.equal(card.expectedElapsed,'');assert.equal(card.observationPublicationId,'');
     assert.doesNotMatch(card.description+card.footer,/等待.*声明|待核实|官方确认/);
     h.page.openStatusEvidence(tap());assert.equal(h.navigations[0].url,'/pages/detail/index?publicationId=observed-reset');
@@ -149,9 +149,9 @@ test('提前观测无需等预告到点，满24小时仍保留经过时长与真
   const h=nativeHome(data);
   try{
     assert.equal(h.page.data.resetCards[0].completedDisplay,true);
-    const card=h.page.resetCardsPatch(data,'2026-10-25T19:33:00.000Z').resetCards[0];
-    assert.equal(card.completedDisplay,true);assert.equal(card.state,'observed');assert.equal(card.clockAt,observedAt);assert.equal(card.hero.title,'距离上次重置（观测）');assert.equal(card.metric,'2天1小时53分钟');assert.equal(card.clockParts.length,3);
-    assert.equal(card.clockParts[0].unit,'天');assert.equal(card.clockParts[0].value,'02');
+    h.page.setData(h.page.resetCardsPatch(data,'2026-10-25T19:33:00.000Z'));const card=h.page.data.resetCards[0];
+    assert.equal(card.completedDisplay,true);assert.equal(card.state,'observed');assert.equal(card.clockAt,observedAt);assert.equal(card.hero.title,'距离上次重置（观测）');assert.equal(card.metric,'2天1小时53分钟0秒');assert.equal(card.clockParts.length,4);
+    assert.equal(card.clockParts[0].unit,'天');assert.equal(card.clockParts[0].value,'2');
   }finally{h.page.onUnload();}
 });
 

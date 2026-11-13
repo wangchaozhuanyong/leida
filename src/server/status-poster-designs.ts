@@ -7,6 +7,7 @@ interface DesignedPoster {
   style: StatusPosterStyle; name: string; title: string; interval: string;
   statementAt: string; generatedAt: string; nextNote: string; nextIsForecast: boolean;
   sourceLabel: string; brand: string; shareUrl?: string; code?: StatusPosterCode; intervalLabel?: string; statementLabel?:string; intervalUnit?:string;
+  clockParts?: {unit:string;value:string}[];
 }
 const backgrounds = new Map<StatusPosterStyle, string>();
 const escape = (value: string) => value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!));
@@ -48,9 +49,15 @@ export function designedStatusPoster(input: DesignedPoster): string {
   const nextLines = wrap(next.replace(' · 北京时间', ''), dark ? 11 : 10.5);
   const nextSize = nextLines.length > 2 ? 30 : 38;
   const qualifier = '公开信息仅供参考，具体额度以账户为准';
-  const interval = dark
+  const calendar = input.clockParts?.filter(part=>['年','个月','天'].includes(part.unit)).map(part=>Number(part.value)+part.unit).join(' ') || '';
+  const clockTime = input.clockParts?.filter(part=>['小时','分钟','秒'].includes(part.unit)).map(part=>part.value).join(' : ') || '';
+  const clock = input.clockParts?.some(part=>part.unit==='秒')
+    ? (calendar?text(calendar,dark?540:64,dark?820:1055,fit(calendar,48,dark?510:455),ink,500,dark?'middle':'start'):'')
+      + text(clockTime,dark?540:64,dark?970:1180,fit(clockTime,dark?98:80,dark?510:455),dark?'url(#elapsed-gold)':'#b72f28',700,dark?'middle':'start')
+      + text('小时 : 分钟 : 秒',dark?540:64,dark?1040:1250,32,muted,400,dark?'middle':'start') : '';
+  const interval = clock || (dark
     ? elapsed ? text(elapsed[1], 540, 948, fit(elapsed[1], 286, 520), 'url(#elapsed-gold)', 700, 'middle', 'font-family="Georgia,Times New Roman,serif"') + text(elapsed[2], 540, 1070, 43, ink, 400, 'middle') : text(input.interval, 540, 920, fit(input.interval,100,510), 'url(#elapsed-gold)', 700, 'middle')
-    : elapsed ? text(elapsed[1], 380, 1320, fit(elapsed[1], 460, 316), '#b72f28', 700, 'end', 'font-family="Georgia,Times New Roman,serif"') + text(elapsed[2], 505, 1310, elapsed[2].length > 1 ? 58 : 89, ink, 700, 'end') : text(input.interval, 64, 1190, fit(input.interval,138,455), '#b72f28', 700);
+    : elapsed ? text(elapsed[1], 380, 1320, fit(elapsed[1], 460, 316), '#b72f28', 700, 'end', 'font-family="Georgia,Times New Roman,serif"') + text(elapsed[2], 505, 1310, elapsed[2].length > 1 ? 58 : 89, ink, 700, 'end') : text(input.interval, 64, 1190, fit(input.interval,138,455), '#b72f28', 700));
   const content = dark ? `
     ${mark(64, 72)}${text(input.name, 183, 118, fit(input.name, 44, 510))}
     ${line(710, 111, 766, 111)}${text('Codex 用量动态', 1016, 121, 33, ink, 400, 'end')}

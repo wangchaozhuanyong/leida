@@ -21,7 +21,7 @@ function statusPosterInput(data,kind){
   const nextNote=[closure,card.oldTime&&card.oldTime+' · 北京时间',scheduleNote||hero.description,
     card.declarationTime&&'完成声明：'+card.declarationTime+' · 北京时间'].filter(Boolean).join('\n');
   return {name:data.site.name||'模钥重置雷达',kind:card.kind,round:card.revision,followingFocus:!kind,publicationId,codePublicationId:shareable?publicationId:'',sharePath:card.sharePath,shareTitle:card.shareTitle,generatedAt:data.serverTime,
-    title:hero.title||card.title,label:hero.label,value:hero.metric||hero.title,unit:'',date:date.date,time:date.time+(card.timeQualifier?' '+card.timeQualifier:''),generated:generated.date+' '+generated.time,
+    title:hero.title||card.title,label:hero.label,value:hero.metric||hero.title,clockParts:hero.parts,unit:'',date:date.date,time:date.time+(card.timeQualifier?' '+card.timeQualifier:''),generated:generated.date+' '+generated.time,
     statementAt:card.timeAt,statementLabel:hero.timeLabel||'公开状态',nextNote,
     sourceLabel,validUntil:card.validUntil||''};
 }

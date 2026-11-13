@@ -24,10 +24,19 @@ function createStatusPosterLayout(input,measure,theme='precision',includeCode=fa
   const nextLines=[];let row='';for(const c of input.nextNote.replace(' · 北京时间','')){if(c==='\n'){if(row)nextLines.push(row);row='';continue;}if(measure(row+c,38,500)>(dark?425:415)){nextLines.push(row);row='';}row+=c;}if(row)nextLines.push(row);
   if(nextLines.length>3){nextLines.length=3;nextLines[2]=nextLines[2].slice(0,-1)+'…';}
   const nextSize=nextLines.length>2?30:38;
+  const hasClock=input.clockParts?.some(part=>part.unit==='秒');
+  const clock=()=>{
+    const calendar=input.clockParts.filter(part=>['年','个月','天'].includes(part.unit)).map(part=>Number(part.value)+part.unit).join(' ');
+    const time=input.clockParts.filter(part=>['小时','分钟','秒'].includes(part.unit)).map(part=>part.value).join(' : ');
+    if(calendar)text(calendar,dark?540:64,dark?820:1055,48,ink,500,dark?'center':'left',dark?510:455);
+    text(time,dark?540:64,dark?970:1180,dark?98:80,dark?'gold':'#b72f28',700,dark?'center':'left',dark?510:455);
+    text('小时 : 分钟 : 秒',dark?540:64,dark?1040:1250,32,muted,400,dark?'center':'left');
+  };
   if(dark){
     brand(64,72);text(input.name,183,118,44,ink,400,'left',510);line(710,111,766,111);text('Codex 用量动态',1016,121,33,ink,400,'right');
     text(input.title,540,311,111,ink,700,'center',948);text(input.label,540,683,38,ink,400,'center',390);
-    if(/^\d+$/.test(input.value)){text(input.value,540,948,286,'gold',700,'center',520);text(input.unit,540,1070,43,ink,400,'center');}
+    if(hasClock)clock();
+    else if(/^\d+$/.test(input.value)){text(input.value,540,948,286,'gold',700,'center',520);text(input.unit,540,1070,43,ink,400,'center');}
     else{text(input.value,540,920,100,'gold',700,'center',510);if(input.unit)text(input.unit,540,1050,42,ink,400,'center');}
     text(input.statementLabel||'公告时间',72,1355,30,muted);text(input.date,72,1410,48,ink,600,'left',445);text(input.time?`${input.time} · 北京时间`:'时间待公开确认',72,1465,30,muted);
     line(543,1330,543,1500);nextLines.forEach((s,i)=>text(s,590,1375+i*42,nextSize,ink,500,'left',425));
@@ -36,7 +45,8 @@ function createStatusPosterLayout(input,measure,theme='precision',includeCode=fa
     brand(57,105);text(input.name,186,181,61,ink,700,'left',includeCode?490:815);text('Codex 用量动态',64,260,43);line(64,320,includeCode?692:1015,320);text('公开信息整理 · 用量动态记录',64,371,28,muted);
     const completed=input.title.startsWith('公告称');text(completed?'公告称':'公开状态',64,578,146,ink,700);text(input.title.replace(/^公告称/,''),64,769,157,ink,700,'left',948);
     line(64,831,1016,831);text(input.label,64,916,48,ink,600);
-    if(/^\d+$/.test(input.value)){text(input.value,380,1320,460,'#b72f28',700,'right',316);text(input.unit,505,1310,input.unit.length>1?58:89,ink,700,'right');}
+    if(hasClock)clock();
+    else if(/^\d+$/.test(input.value)){text(input.value,380,1320,460,'#b72f28',700,'right',316);text(input.unit,505,1310,input.unit.length>1?58:89,ink,700,'right');}
     else{text(input.value,64,1190,input.value.includes(':')?130:110,'#b72f28',700,'left',455);if(input.unit)text(input.unit,64,1285,35);}
     line(563,886,563,1349);text(input.statementLabel||'公告时间',600,923,35);text(input.date,600,1000,62,ink,600,'left',416);text(input.time||'待公开确认',600,1076,73,ink,600,'left',416);if(input.time)text('北京时间',600,1126,32,muted);
     line(600,1170,1016,1170);nextLines.forEach((s,i)=>text(s,600,1234+i*47,nextSize,ink,600,'left',416));
