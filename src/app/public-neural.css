@@ -804,8 +804,9 @@ html:has(.public-surface) body { background: #f8f9f7; color: #182933; }
   to { transform: translateX(5px) translateY(3px); opacity: .82; }
 }
 /* Keep the heading and every time column on the same horizontal center. */
-.radar-readout { position: relative; display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 300px; min-width: 0; text-align: center; }
-.radar-caption { width: 100%; text-align: center; color: var(--ink); font-size: 20px; font-weight: 600; line-height: 1.6; overflow-wrap: anywhere; }
+.radar-readout { position: relative; display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 300px; min-width: 0; margin: 0 auto; text-align: center; }
+.radar-caption { display: flex; justify-content: center; width: 100%; text-align: center; color: var(--ink); font-size: 20px; font-weight: 600; line-height: 1.6; overflow-wrap: anywhere; }
+.radar-caption-text { display: block; max-width: 100%; text-align: center; }
 .radar-duration { width: 100%; min-width: 0; margin: 22px auto 0; font-variant-numeric: tabular-nums lining-nums; }
 /* Reserve the date row even below one day, so crossing midnight cannot move the clock. */
 .radar-calendar { display: flex; justify-content: center; align-items: baseline; flex-wrap: wrap; min-height: 2em; font-size: 16px; gap: 6px 12px; margin-bottom: 14px; line-height: 1.3; }
@@ -814,7 +815,8 @@ html:has(.public-surface) body { background: #f8f9f7; color: #182933; }
 .radar-calendar-unit { color: #60716c; font-size: 12px; }
 .radar-time { display: flex; align-items: flex-start; justify-content: center; width: 100%; gap: 3px; }
 .radar-time-part { display: flex; flex-direction: column; align-items: center; flex: 1 1 0; min-width: 0; text-align: center; }
-.radar-digits { display: block; width: 100%; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; font-size: 50px; font-weight: 400; line-height: 1.1; letter-spacing: -1px; white-space: nowrap; }
+.radar-digits { display: flex; justify-content: center; width: 100%; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; font-size: 50px; font-weight: 400; line-height: 1.1; letter-spacing: 0; white-space: nowrap; }
+.radar-digit { display: block; flex: 0 0 .6em; width: .6em; text-align: center; }
 .radar-unit { display: block; margin-top: 8px; color: #60716c; font-size: 12px; font-weight: 400; letter-spacing: .08em; line-height: 1.6; }
 .radar-colon { display: block; flex: 0 0 8px; color: #91a5a4; font-size: 28px; font-weight: 300; line-height: 1.9; text-align: center; }
 .radar-time-part.seconds .radar-digits { color: #627d83; }
